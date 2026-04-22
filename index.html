@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWM - Tactical Command Interface (Benchmark)</title>
+
+    <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
+    
+    <script src="https://unpkg.com/topojson-client@3"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stats.js@0.17.0/build/stats.min.js"></script>
+
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: 'Inter', 'Segoe UI', sans-serif; }
+        #map-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        .ui-panel { position: absolute; z-index: 15; background: rgba(10, 15, 25, 0.85); padding: 15px; border-radius: 8px; backdrop-filter: blur(10px); border: 1px solid rgba(59, 130, 246, 0.3); color: white; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .layer-controls { top: 20px; left: 20px; width: 260px; }
+        #sensor-panel { bottom: 30px; right: 30px; min-width: 320px; border-left: 4px solid #3b82f6; }
+        
+        #benchmark-panel { top: 20px; right: 20px; width: 220px; border-top: 4px solid #10b981; text-align: center; }
+        
+        h3 { margin: 0 0 10px 0; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #3b82f6; }
+        #benchmark-panel h3 { color: #10b981; }
+        
+        label { display: flex; align-items: center; gap: 10px; color: #94a3b8; font-size: 12px; cursor: pointer; margin-bottom: 6px; padding: 6px; border-radius: 4px; }
+        label:hover { background: rgba(59, 130, 246, 0.1); color: white; }
+        .sensor-row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 2px; }
+        .sensor-val { font-weight: bold; color: #fde047; font-family: 'monospace'; }
+        
+        .ui-layer-bottom { position: absolute; z-index: 10; bottom: 40px; left: 40px; display: flex; gap: 12px; }
+        button.toggle-btn { padding: 12px 20px; font-size: 11px; font-weight: 800; cursor: pointer; background: #1e293b; color: white; border: 1px solid #334155; border-radius: 4px; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; }
+        button.toggle-btn:hover { border-color: #3b82f6; background: #0f172a; }
+        button.toggle-btn.active { background: #065f46; border-color: #10b981; }
+
+        #stats-wrapper {
+            position: relative;
+            width: 120px; 
+            height: 72px; 
+            margin: 0 auto 15px auto;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #stats-wrapper > div {
+            transform: scale(1.5);
+            transform-origin: center center;
+        }
+
+        .spawn-input-container {
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; margin-bottom: 6px;
+            font-size: 12px; font-weight: bold; color: #e2e8f0;
+        }
+        .spawn-input-container input, .spawn-input-container select {
+            width: 100px; background: #1e293b; color: #10b981; font-weight: bold;
+            border: 1px solid #3b82f6; border-radius: 4px; padding: 4px; text-align: center;
+        }
+
+        /* Testo che mostra quante truppe stiamo davvero renderizzando */
+        #render-count { color: #fde047; font-weight: bold; font-family: monospace; display: block; margin-bottom: 8px;}
+    </style>
+</head>
+
+<body>
+    <div id="map-container"></div>
+
+    <div id="layer-controls" class="ui-panel layer-controls">
+        <h3>Visual Engine Selection</h3>
+        <label><input type="radio" name="basemap" value="esri-sat" checked> 🛰️ ESRI Satellite</label>
+        <label><input type="radio" name="basemap" value="maptiler-hybrid"> 🌍 MapTiler Hybrid</label>
+        <label><input type="radio" name="basemap" value="carto-light"> 🛡️ Carto Stealth (White)</label>
+        
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 12px 0;">
+        <h3>Tactical Overlays</h3>
+        <button id="btn-contours" class="toggle-btn" style="width:100%; margin-bottom: 6px;" onclick="toggleLayer('contours')">Elevation Lines</button>
+        <button id="btn-bathymetry" class="toggle-btn" style="width:100%;" onclick="toggleLayer('bathymetry-layer')">Bathymetry</button>
+    </div>
+
+    <div id="benchmark-panel" class="ui-panel">
+        <h3>📊 3D Engine Benchmark</h3>
+        
+        <div id="stats-wrapper"></div>
+        <span id="render-count">Visibili: 0 / 0</span>
+
+        <div class="spawn-input-container">
+            <span>Quantità:</span>
+            <input type="number" id="spawn-count" value="5000" min="1" max="100000">
+        </div>
+
+        <div class="spawn-input-container">
+            <span>Dominio:</span>
+            <select id="spawn-domain">
+                <option value="land">Terra</option>
+                <option value="sea">Mare</option>
+                <option value="air">Aria</option>
+            </select>
+        </div>
+
+        <div class="spawn-input-container" style="margin-bottom: 12px;">
+            <span>Modello:</span>
+            <select id="spawn-model">
+                </select>
+        </div>
+
+        <button id="btn-spawn" class="toggle-btn" style="width:100%; margin-bottom: 8px; background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #10b981;">
+            + Spawn Units
+        </button>
+        <button id="btn-clear" class="toggle-btn" style="width:100%; background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #ef4444;">
+            🗑️ Clear Units
+        </button>
+    </div>
+
+    <div id="sensor-panel" class="ui-panel">
+        <h3>Intelligence Feed</h3>
+        <div class="sensor-row"><span>COORDS:</span> <span id="out-coords" class="sensor-val">--</span></div>
+        <div class="sensor-row"><span>ALTITUDE:</span> <span id="out-alt" class="sensor-val">--</span> M</div>
+        <div class="sensor-row"><span>SURFACE:</span> <span id="out-type" class="sensor-val">--</span></div>
+        <div class="sensor-row"><span>RES (COM):</span> <span id="out-res-com" class="sensor-val" style="color: #a3e635;">--</span></div>
+        <div class="sensor-row"><span>RES (RARE):</span> <span id="out-res-rare" class="sensor-val" style="color: #c084fc;">--</span></div>
+    </div>
+
+    <div class="ui-layer-bottom">
+        <button id="toggle-btn" class="toggle-btn" style="background: #2563eb; border: none; width: 160px;">Switch to 3D Globe</button>
+    </div>
+
+    <script>
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = 'relative';
+        document.getElementById('stats-wrapper').appendChild(stats.dom);
+
+        const modelDB = {
+            land: [
+                { label: 'APC', path: 'land_troops/apc.glb' },
+                { label: 'Artiglieria Semovente', path: 'land_troops/artiglieria_semovente.glb' },
+                { label: 'ICBM', path: 'land_troops/icbm.glb' },
+                { label: 'LMV', path: 'land_troops/lmv.glb' },
+                { label: 'Missile Balistico 1', path: 'land_troops/missile_balis.glb' },
+                { label: 'Missile Balistico 2', path: 'land_troops/missile_balistico.glb' },
+                { label: 'Missile da Crociera', path: 'land_troops/missile_crociera.glb' },
+                { label: 'SAM (Contraerea)', path: 'land_troops/SAM.glb' },
+                { label: 'Soldato', path: 'land_troops/soldier.glb' },
+                { label: 'Carro Armato', path: 'land_troops/tank.glb' }
+            ],
+            sea: [
+                { label: 'Cacciatorpediniere', path: 'sea_troops/cacciatorpediniere.glb' },
+                { label: 'Corvetta', path: 'sea_troops/corvetta.glb' },
+                { label: 'Fregata', path: 'sea_troops/fregata.glb' },
+                { label: 'Nave Cargo', path: 'sea_troops/nave_cargo.glb' },
+                { label: 'Portaerei', path: 'sea_troops/porta_aerei.glb' },
+                { label: 'Sottomarino', path: 'sea_troops/sottomarino.glb' }
+            ],
+            air: [
+                { label: 'Aereo Cargo', path: 'air_troops/aereo_cargo.glb' },
+                { label: 'Bombardiere Stealth', path: 'air_troops/bombardiere_stealth.glb' },
+                { label: 'Bombardiere', path: 'air_troops/bombardiere.glb' },
+                { label: 'Caccia', path: 'air_troops/caccia.glb' },
+                { label: 'Drone', path: 'air_troops/drone.glb' },
+                { label: 'Elicottero', path: 'air_troops/elicottero.glb' }
+            ]
+        };
+
+        const domainSelect = document.getElementById('spawn-domain');
+        const modelSelect = document.getElementById('spawn-model');
+
+        function updateModelSelect() {
+            const domain = domainSelect.value;
+            modelSelect.innerHTML = '';
+            modelDB[domain].forEach(model => {
+                const opt = document.createElement('option');
+                opt.value = model.path;
+                opt.innerText = model.label;
+                modelSelect.appendChild(opt);
+            });
+        }
+
+        domainSelect.addEventListener('change', updateModelSelect);
+        updateModelSelect(); 
+
+        const MAPTILER_KEY = 'PGAzmQH2OduY9E8gSi6n';
+        const sensorSocket = io('http://localhost:3000', {
+            auth: {
+                token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZF91c2VyIjoxLCJpYXQiOjE3NzY4ODg3MzcsImV4cCI6MTgwODQyNDczN30.R6fcvXXeDA_sOrZ1pMWmz3acNfnxcwvfn0yu24bGl0E"
+            }
+        });
+
+        let isGlobe = false;
+        let hoveredState = { id: null, source: null };
+        let gameRules = null;
+
+        async function loadGameRules() {
+            try {
+                const response = await fetch('game_rules.cdb');
+                if (!response.ok) throw new Error("File non trovato");
+                gameRules = await response.json();
+            } catch (err) {
+                console.error("Errore nel caricamento di game_rules.cdb:", err);
+            }
+        }
+        loadGameRules();
+
+        const map = new maplibregl.Map({
+            container: 'map-container',
+            style: {
+                version: 8,
+                sources: {
+                    'esri-tiles': { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256 },
+                    'maptiler-tiles': { type: 'raster', tiles: [`https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`], tileSize: 256 },
+                    'carto-light-tiles': { type: 'raster', tiles: ['https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'], tileSize: 256 }
+                },
+                layers: [
+                    { id: 'esri-sat', type: 'raster', source: 'esri-tiles', layout: { visibility: 'visible' } },
+                    { id: 'maptiler-hybrid', type: 'raster', source: 'maptiler-tiles', layout: { visibility: 'none' } },
+                    { id: 'carto-light', type: 'raster', source: 'carto-light-tiles', layout: { visibility: 'none' } }
+                ]
+            },
+            center: [12.5, 41.9], zoom: 3.5, minZoom: 1.5, renderWorldCopies: true, projection: { type: 'mercator' }
+        });
+
+        map.on('load', () => {
+            map.addSource('terrain-source', { type: 'raster-dem', url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${MAPTILER_KEY}`, tileSize: 256 });
+            map.setTerrain({ source: 'terrain-source', exaggeration: 1.2 });
+            map.addSource('contours', { type: 'vector', url: `https://api.maptiler.com/tiles/contours-v2/tiles.json?key=${MAPTILER_KEY}` });
+
+            map.addLayer({
+                'id': 'contour-lines', 'type': 'line', 'source': 'contours', 'source-layer': 'contour', 'minzoom': 6, 
+                'layout': { 'visibility': 'none' },
+                'paint': { 'line-color': '#f59e0b', 'line-width': ['case', ['==', ['get', 'nth_line'], 5], 1.5, 0.5], 'line-opacity': 0.8 }
+            });
+
+            map.addLayer({
+                'id': 'contour-labels', 'type': 'symbol', 'source': 'contours', 'source-layer': 'contour', 'minzoom': 6,
+                'layout': { 'visibility': 'none', 'symbol-placement': 'line', 'text-field': ['concat', ['get', 'ele'], ' m'], 'text-size': 10 },
+                'paint': { 'text-color': '#fde047', 'text-halo-color': '#000', 'text-halo-width': 1.5 }
+            });
+
+            loadTopoJsonLayer('assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3.5);
+            loadTopoJsonLayer('assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
+
+            const customInstancedLayer = {
+                id: '10k-models-layer',
+                type: 'custom',
+                renderingMode: '3d',
+                instancedMeshes: [],
+                knownTroops: [], // ARRAY DELLA MEMORIA: Salva la logica, non la grafica!
+                isSpawning: false,
+
+                onAdd: function (map, gl) {
+                    this.map = map;
+                    this.camera = new THREE.Camera();
+                    this.scene = new THREE.Scene();
+
+                    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); 
+                    this.scene.add(ambientLight);
+                    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+                    directionalLight.position.set(0, 150, 100).normalize();
+                    this.scene.add(directionalLight);
+
+                    this.renderer = new THREE.WebGLRenderer({
+                        canvas: map.getCanvas(),
+                        context: gl,
+                        antialias: true
+                    });
+                    this.renderer.autoClear = false;
+
+                    window.benchmark3DLayer = this;
+
+                    // Ascolta i movimenti della mappa per aggiornare il Viewport Culling
+                    this.boundUpdateVisibility = this.updateVisibility.bind(this);
+                    this.map.on('move', this.boundUpdateVisibility);
+                },
+
+                // FUNZIONE MAGICA DI CULLING: Passa alla GPU solo le truppe nel rettangolo dello schermo
+                updateVisibility: function() {
+                    if (this.instancedMeshes.length === 0 || this.knownTroops.length === 0) return;
+
+                    const bounds = this.map.getBounds();
+                    let visibleCount = 0;
+                    const dummy = new THREE.Object3D();
+
+                    // Scansioniamo l'array logico
+                    for (let i = 0; i < this.knownTroops.length; i++) {
+                        const t = this.knownTroops[i];
+                        
+                        // È dentro i confini dello schermo attuale?
+                        if (bounds.contains(new maplibregl.LngLat(t.lng, t.lat))) {
+                            // Se sì, calcoliamo la sua matrice e la diamo alla GPU
+                            dummy.position.set(t.mX, t.mY, t.mZ);
+                            dummy.rotation.set(0, 0, t.rotZ); 
+                            dummy.scale.set(t.scale, -t.scale, t.scale);
+                            dummy.updateMatrix();
+                            
+                            this.instancedMeshes.forEach(iMesh => {
+                                iMesh.setMatrixAt(visibleCount, dummy.matrix);
+                            });
+                            visibleCount++;
+                        }
+                    }
+
+                    // Diciamo a ThreeJS di disegnare SOLO i primi "visibleCount" elementi dell'InstancedMesh!
+                    this.instancedMeshes.forEach(iMesh => {
+                        iMesh.count = visibleCount;
+                        iMesh.instanceMatrix.needsUpdate = true;
+                    });
+
+                    // Aggiorniamo l'interfaccia utente
+                    document.getElementById('render-count').innerText = `Visibili: ${visibleCount} / ${this.knownTroops.length}`;
+                },
+                
+                spawnInstances: function() {
+                    if (this.instancedMeshes.length > 0 || this.isSpawning) return;
+                    this.isSpawning = true;
+                    
+                    const inputVal = document.getElementById('spawn-count').value;
+                    const instanceCount = parseInt(inputVal, 10) || 5000;
+                    const domain = document.getElementById('spawn-domain').value;
+                    const modelPath = document.getElementById('spawn-model').value; 
+                    
+                    console.log(`[THREE.js] Inizio caricamento modello. Unità: ${instanceCount} | File: ${modelPath}`);
+
+                    const loader = new THREE.GLTFLoader();
+                    loader.load(
+                        `assets/3Dmodels/${modelPath}`, 
+                        (gltf) => {
+                            const bakedMeshes = [];
+                            const globalBox = new THREE.Box3(); 
+
+                            gltf.scene.rotation.x = Math.PI / 2;
+                            gltf.scene.updateMatrixWorld(true);
+
+                            gltf.scene.traverse((child) => {
+                                if (child.isMesh) {
+                                    child.material.side = THREE.DoubleSide;
+                                    const geom = child.geometry.clone();
+                                    geom.applyMatrix4(child.matrixWorld); 
+                                    geom.computeBoundingBox();
+                                    if(geom.boundingBox && !geom.boundingBox.isEmpty()) {
+                                        globalBox.union(geom.boundingBox);
+                                        bakedMeshes.push({ geom: geom, material: child.material });
+                                    }
+                                }
+                            });
+
+                            if (bakedMeshes.length === 0 || globalBox.isEmpty()) {
+                                console.error("[THREE.js] Errore: Nessuna geometria valida trovata nel file!");
+                                this.isSpawning = false;
+                                return;
+                            }
+
+                            const center = globalBox.getCenter(new THREE.Vector3());
+                            const maxDim = Math.max(globalBox.max.x - globalBox.min.x, globalBox.max.y - globalBox.min.y, globalBox.max.z - globalBox.min.z) || 1;
+                            const invMaxDim = 1 / maxDim; 
+                            
+                            const normalizeMatrix = new THREE.Matrix4()
+                                .makeScale(invMaxDim, invMaxDim, invMaxDim)
+                                .multiply(new THREE.Matrix4().makeTranslation(-center.x, -center.y, -globalBox.min.z));
+
+                            bakedMeshes.forEach(mesh => {
+                                mesh.geom.applyMatrix4(normalizeMatrix);
+                                const iMesh = new THREE.InstancedMesh(mesh.geom, mesh.material, instanceCount);
+                                iMesh.frustumCulled = false;
+                                this.instancedMeshes.push(iMesh);
+                                this.scene.add(iMesh);
+                            });
+
+                            if (this.instancedMeshes.length > 0) {
+                                const grandezzaInMetri = 15000; 
+                                this.knownTroops = []; // Resettiamo la memoria logica
+
+                                let spawnedCount = 0;
+                                let attempts = 0;
+                                const maxAttempts = instanceCount * 10; 
+
+                                while (spawnedCount < instanceCount && attempts < maxAttempts) {
+                                    attempts++;
+                                    
+                                    const lng = (Math.random() * 360) - 180;
+                                    const lat = (Math.random() * 140) - 70; 
+                                    
+                                    const rawElevation = this.map.queryTerrainElevation([lng, lat]) || 0;
+                                    let finalElevation = rawElevation;
+                                    
+                                    if (domain === 'land') {
+                                        if (rawElevation < 0) continue; // Permettiamo quota 0.0 (se il terreno non è ancora caricato)
+                                    } 
+                                    else if (domain === 'sea') {
+                                        if (rawElevation > 0) continue; 
+                                        finalElevation = 0; 
+                                    } 
+                                    else if (domain === 'air') {
+                                        finalElevation = Math.max(0, rawElevation) + 100000; 
+                                    }
+
+                                    // Calcoliamo i dati mercator per l'uso immediato futuro
+                                    const mercator = maplibregl.MercatorCoordinate.fromLngLat([lng, lat], finalElevation);
+                                    const scale = mercator.meterInMercatorCoordinateUnits() * grandezzaInMetri;
+
+                                    // Inseriamo nell'array logico invece di passarlo subito alla GPU!
+                                    this.knownTroops.push({
+                                        lng: lng, lat: lat, alt: finalElevation,
+                                        mX: mercator.x, mY: mercator.y, mZ: mercator.z,
+                                        scale: scale,
+                                        rotZ: Math.random() * Math.PI * 2
+                                    });
+                                    
+                                    spawnedCount++;
+                                }
+
+                                this.isSpawning = false;
+                                console.log(`[THREE.js] Generati ${spawnedCount} elementi in memoria logica. Attivazione Culling...`);
+                                
+                                // INVIA LE TRUPPE A REDIS (Collegamento abilitato!)
+                                const redisTruppe = this.knownTroops.map((t, idx) => ({
+                                    id_truppa: `test_${Date.now()}_${idx}`,
+                                    x: t.lng,
+                                    y: t.lat,
+                                    alt: Math.round(t.alt)
+                                }));
+                                sensorSocket.emit('crea_truppe_batch', { partitaId: 'partita_test', truppe: redisTruppe });
+
+                                // Avvia il culling iniziale per popolare la vista
+                                this.updateVisibility(); 
+                            }
+                        },
+                        undefined,
+                        (error) => {
+                            console.error("[THREE.js] Errore nel caricamento del modello! Verifica che il file esista:", error);
+                            this.isSpawning = false;
+                        }
+                    );
+                },
+
+                clearInstances: function() {
+                    if (this.instancedMeshes.length > 0) {
+                        this.instancedMeshes.forEach(iMesh => {
+                            this.scene.remove(iMesh);
+                            iMesh.geometry.dispose();
+                            if(Array.isArray(iMesh.material)) {
+                                iMesh.material.forEach(m => m.dispose());
+                            } else {
+                                iMesh.material.dispose();
+                            }
+                        });
+                        this.instancedMeshes = [];
+                        this.knownTroops = [];
+                        console.log("[THREE.js] Istanze rimosse e memoria liberata.");
+                        document.getElementById('render-count').innerText = `Visibili: 0 / 0`;
+                        this.map.triggerRepaint(); 
+                    }
+                },
+
+                render: function (gl, args) { 
+                    stats.begin();
+
+                    if (this.instancedMeshes.length > 0) {
+                        const matrixArray = args.defaultProjectionData ? args.defaultProjectionData.mainMatrix : args;
+                        const m = new THREE.Matrix4().fromArray(matrixArray);
+                        
+                        this.camera.projectionMatrix = m;
+                        this.renderer.resetState();
+                        this.renderer.render(this.scene, this.camera);
+                        
+                        this.map.triggerRepaint();
+                    }
+
+                    gl.useProgram(null);
+                    stats.end();
+                }
+            };
+            
+            map.addLayer(customInstancedLayer);
+        });
+
+        document.getElementById('btn-spawn').addEventListener('click', () => {
+            if(window.benchmark3DLayer) window.benchmark3DLayer.spawnInstances();
+        });
+
+        document.getElementById('btn-clear').addEventListener('click', () => {
+            if(window.benchmark3DLayer) window.benchmark3DLayer.clearInstances();
+        });
+
+        map.on('mousemove', (e) => {
+            sensorSocket.emit('query_point', { lng: e.lngLat.lng, lat: e.lngLat.lat });
+            
+            let wrappedLng = e.lngLat.lng;
+            while (wrappedLng > 180) wrappedLng -= 360;
+            while (wrappedLng < -180) wrappedLng += 360;
+            document.getElementById('out-coords').innerText = `${wrappedLng.toFixed(3)}, ${e.lngLat.lat.toFixed(3)}`;
+
+            if (map.getZoom() > 6) {
+                if (hoveredState.id !== null) {
+                    map.setFeatureState({ source: hoveredState.source, id: hoveredState.id }, { hover: false });
+                    hoveredState = { id: null, source: null };
+                }
+                map.getCanvas().style.cursor = '';
+                return;
+            }
+
+            const features = map.queryRenderedFeatures(e.point, { layers: ['nazioni-layer', 'regioni-layer'] });
+            
+            if (features.length > 0 && features[0].id !== undefined && features[0].id !== null) {
+                const featureId = features[0].id;
+                const featureSource = features[0].source;
+
+                if (hoveredState.id !== null && hoveredState.id !== featureId) {
+                    map.setFeatureState({ source: hoveredState.source, id: hoveredState.id }, { hover: false });
+                }
+                
+                hoveredState = { id: featureId, source: featureSource };
+                map.setFeatureState({ source: hoveredState.source, id: hoveredState.id }, { hover: true });
+                map.getCanvas().style.cursor = 'pointer';
+            } else {
+                if (hoveredState.id !== null) {
+                    map.setFeatureState({ source: hoveredState.source, id: hoveredState.id }, { hover: false });
+                    hoveredState = { id: null, source: null };
+                }
+                map.getCanvas().style.cursor = '';
+            }
+        });
+
+        sensorSocket.on('point_data', (data) => {
+            if (!gameRules || !gameRules.sheets) return;
+
+            const alt = Math.floor(data.altitude);
+            document.getElementById('out-alt').innerText = alt;
+
+            const terreniSheet = gameRules.sheets.find(s => s.name === "Terreni")?.lines;
+            if (!terreniSheet) return;
+
+            let terrainInfo = null;
+
+            if ((data.biomeId === 17 || data.biomeId === 0 || data.biomeId === 255) && alt < 0) {
+                terrainInfo = terreniSheet.find(t => t.id_terreno === 'ocean_deep');
+            } else if (data.biomeId >= 1 && data.biomeId <= 17) {
+                terrainInfo = terreniSheet[data.biomeId - 1];
+            }
+
+            const outType = document.getElementById('out-type');
+            const outResCom = document.getElementById('out-res-com');
+            const outResRare = document.getElementById('out-res-rare');
+            
+            if (terrainInfo) {
+                outType.innerText = terrainInfo.nome.toUpperCase();
+                const tid = terrainInfo.id_terreno;
+                if (tid === 'urban') outType.style.color = "#f87171";
+                else if (tid.includes('forest')) outType.style.color = "#34d399";
+                else if (tid === 'ocean_deep') outType.style.color = "#60a5fa";
+                else if (tid === 'snow_ice') outType.style.color = "#ffffff";
+                else outType.style.color = "#fde047";
+
+                outResCom.innerText = terrainInfo.risorsa_comune ? terrainInfo.risorsa_comune.replace('_', ' ').toUpperCase() : "NESSUNA";
+                outResRare.innerText = terrainInfo.risorsa_rara ? terrainInfo.risorsa_rara.replace('_', ' ').toUpperCase() : "NESSUNA";
+            } else {
+                outType.innerText = "TERRITORIO SCONOSCIUTO";
+                outType.style.color = "#94a3b8";
+                outResCom.innerText = "--";
+                outResRare.innerText = "--";
+            }
+        });
+
+        function loadTopoJsonLayer(url, sourceId, layerId, minZ, maxZ) {
+            fetch(url).then(res => res.json()).then(topology => {
+                const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
+                map.addSource(sourceId, { type: 'geojson', data: geoData, promoteId: 'ne_id', generateId: true });
+                map.addLayer({
+                    id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+                    paint: {
+                        'fill-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#fde047', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
+                        'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.7, 0.2]
+                    }
+                });
+                map.addLayer({
+                    id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+                    paint: { 'line-color': '#ffffff', 'line-width': 0.8, 'line-opacity': 0.6 }
+                });
+            });
+        }
+
+        document.querySelectorAll('input[name="basemap"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const selected = e.target.value;
+                ['esri-sat', 'maptiler-hybrid', 'carto-light'].forEach(id => {
+                    map.setLayoutProperty(id, 'visibility', id === selected ? 'visible' : 'none');
+                });
+                const isWhite = (selected === 'carto-light');
+                ['nazioni-layer-borders', 'regioni-layer-borders'].forEach(lId => { 
+                    if (map.getLayer(lId)) map.setPaintProperty(lId, 'line-color', isWhite ? '#444444' : '#ffffff'); 
+                });
+                if (map.getLayer('contour-lines')) map.setPaintProperty('contour-lines', 'line-color', isWhite ? '#4f46e5' : '#f59e0b');
+            });
+        });
+
+        function toggleLayer(type) {
+            if (type === 'contours') {
+                const ids = ['contour-lines', 'contour-labels'];
+                const vis = map.getLayoutProperty(ids[0], 'visibility');
+                const nextVis = (vis === 'visible' ? 'none' : 'visible');
+                ids.forEach(id => map.setLayoutProperty(id, 'visibility', nextVis));
+                document.getElementById('btn-contours').classList.toggle('active', nextVis === 'visible');
+            }
+        }
+
+        document.getElementById('toggle-btn').addEventListener('click', function() {
+            isGlobe = !isGlobe;
+            map.setProjection({ type: isGlobe ? 'globe' : 'mercator' });
+            this.innerText = isGlobe ? "Switch to 2D" : "Switch to 3D Globe";
+            
+            // Forza un aggiornamento della vista dopo la transizione a Globo
+            setTimeout(() => {
+                if(window.benchmark3DLayer) window.benchmark3DLayer.updateVisibility();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
