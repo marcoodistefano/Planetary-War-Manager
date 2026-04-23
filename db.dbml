@@ -1,0 +1,191 @@
+// 1. Utenti
+Table utenti {
+  id_user integer [primary key, note: 'codice hash o chiave auto incrementale 32bit']
+
+  username varchar [note: '32 char']
+  email varchar [note: '32 char']
+  password_hash varchar [note: 'hash a 64/128/256 byte']
+  reg varchar [note: 'Regione di appartenenza, indica la macro area di connessione. NB: un giocatore che ha come regione Giappone può comunque giocare con un giocatore che ha come regione Italia']
+  elo_rating integer [note: 'Per la leaderboard globale -> valore modificato per ogni partita svolta e conclusa']
+  avatar_id integer [note: 'ID dell avatar scelto, da 1 a 20']
+  last_username_change timestamp [note: 'Data dell\'ultimo cambio username, opzionale']
+  created_at timestamp
+  recupera_passwd varchar [note: 'Token per recupero password, opzionale. Il token è generato dinamicamente al recupero passwd e viene inserito in questo campo per 10 minuti (a seconda del TTL)']
+  2FA_enabled boolean [note: 'Abilita autenticazione a due fattori. Indica che l account è stato verificato con 2FA (che sia OTP o codice di verifica su authenticator o altri) [si dovrebbe inserire, a questo punto, un token che identifica il dispositivo, o comunque, per esempio, il numero di cellulare o altro…]']
+  IS_banned boolean [note: 'Evitiamo di fare richieste all altra tabella: lì vi sono SOLO i motivi ed eventuali altre info. se l utente prova ad accedere, basta visualizzare questo campo, senza eseguire alcun JOIN con la tabella ban']
+  IS_perma_banned boolean
+}
+
+// 2. Accessi
+Table accessi {
+  id_access integer [primary key]
+
+  user_id integer
+  ip_address varchar [note: 'metodo per identificare eventuali account duplicati, non implementato inizialmente']
+  login_time timestamp
+  cookie_token varchar [note: 'cookie di sessione, comprende varie info. (occorre una tabella cookie?????? -> vedere come gestire!). in caso si gestisce, inizialmente, come un banale oggetto che ha ID e TTL, senza ulteriori info.']
+}
+
+// 3. Partite
+Table partite {
+  id_partita integer [primary key, note: 'codice identificativo univoco per la partita (32 bit?)']
+
+  nome_partita varchar
+  id_host integer [note: 'ID dello utente che ha creato la partita']
+  duration_max integer [note: 'Durata massima in minuti. Default 7 giorni, MAX -da definire- se si facesse in giorni e non in minuti (quindi come tempo_ora + X giorni)?']
+  num_player_max integer [note: 'Numero massimo di giocatori']
+  tipo_partita varchar [note: '1v1, 2v2, Free-for-All. campo a bit: 4 bit (penso bastino) indicano le diverse modalità.Modalità giocabili: 1v1, 2v2, NvN, tutti contro tutti, conquista il mondo fisso (alleanze fisse, stabilite dal gioco, non si può uscire o venire espulsi), conquista il mondo dinamico...']
+  modalita varchar [note: 'Distruzione, Conquista, Tempo']
+  moltiplicatore varchar [note: '1x, 2x, 3x per risorse e tempo']
+  regioni_giocabili varchar [note: 'Lista di regioni disponibili per la partita, 16 bit (0,1)']
+  stato varchar [note: 'In attesa, In corso, Terminata. anche “eliminata”, 2 bit']
+  created_at timestamp
+  nome_json varchar [note: 'Nome del file JSON con la mappa e configurazione partita. è generato come HASH di tutte le info della partita']
+}
+
+// NB PARTITE: il server può gestire i campi da duration_max a stato, in un’unica stringa, compressa e gestita sui bit e memorizzata in B64. 
+// per esempio, se la stringa dovesse memorizzare in questo ordine(tra parentesi i bit occupati):
+// stato_partita [2], N_player_max[9 bit -> 512 player], duration_max[5 bit -> 32 giorni (se memorizzato in giorni)], moltiplicatore[4 bit->sono massimo 16 combinazioni, 0000 è default (1x), poi 2x, 3x, 5x, 10x, 20x, 30x, 40x…], tipo_partita [4], modalità [4 bit? 16 modalità…oppure 5?], regioni_giocabili [16 bit]
+// 
+// ->Stato partita {00->in attesa; 01->in corso; 10->terminata; 11->eliminata (si intende che si eliminano le mosse e il documento (si fa dopo X giorni dalla fine della partita))
+// ->N_player_max -> conteggio classico… 10, 20, 30, 50, 100, 250, 500 -> si potrebbero usare, allora, solo 3 bit… {000 001 010 011 100 101 110 111} dove il valore 111 è assunto SOLO per modalità 1v1 e 2v2 (NvN < 10 giocatori totali)
+// ->duration_max -> default è 7, quindi 0111, max è 1111 che indica 32 giorni; 0000 è controllo, NON UTILIZZATO
+// ->moltiplicatore -> {1x 0000; 2x 0001; 3x 0010; 4x 0011; 5x 0100; 10x 0101; 20x 0110; 30x 0111; 40x 1000; 50x 1001; 60x 1010; 100x 1011; 200x 1100; 500x 1101; 1000x 1110; [ILLIMITATA (produzione istantanea di tutto eccetto che delle risorse) oppure 5000x 1111}
+// -> tipo partita -> {1v1 0000; 2v2 0001; 3v3 0010; 5v5 0011; tutti_contro_tutti 0100…altro da definire}
+// -> modalità ->SI CAMBIA SOLO UN BIT! {tempo 0000 (def.); distruzione 0001; conquista 0010; altro}
+// -> regioni giocabili -> SI CAMBIA SOLO UN BIT! {0000000000000000} [DA MSB A LSB}
+// MSB (bit 1^): tutto il mondobit 2: europabit 3: Asiabit 4: africa
+// bit 5: oceaniabit 6: america NORDbit 7: america SUD
+// DAL BIT 8 FINO AL 16 SONO ALTRE MODALITA’, ALCUNI ESEMPI:
+// bit 8: vecchio mondo (europa-medio oriente-nord africa)
+// bit 9: medio orientebit 10: italia…
+// Definito questo, procedo con un esempio: giocatore X ha appena creato una partita con le seguenti caratteristiche: 1v1, 7giorni, moltiplicatore x30, modalità conquista, solo italia. 
+// il server avrà, allora, la seguente stringa di bit:
+// 00|111|0111|0111|0000|0010|0000000001000000
+
+// 4. Utenti-Partite (Stato in gioco e Risorse)
+Table partecipanti_partite {
+  user_id integer
+  partita_id integer
+
+  punteggio integer
+  territori_conquistati integer [note: 'numero']
+  territori_persi integer [note: 'numero']
+  capitali_distrutte integer [note: 'numero']
+  time_death timestamp [note: 'momento in cui il player è stato sconfitto -> nessun territorio']
+  rank integer [note: 'posizione in classifica, definita dai territori, capitali, time death…']
+  strutture_lvl_max integer [note: 'numero di strutture costruite fino a livello max']
+  truppe_eliminate integer [note: 'nemici']
+  truppe_perse integer [note: 'proprie']
+  perc_distruzione float [note: 'rispetto ai territori conquistati']
+  id_alleanza integer [note: 'ID dell alleanza a cui appartiene il giocatore, se presente']
+
+  stato_struttura varchar [note: 'Nessuna, Porto, Fortezza, Cittadella. b64 del tipo e del livello delle strutture per ogni territorio posseduto']
+  stato_risorse varchar [note: 'Risorse attuali del giocatore, aggiornate ad ogni ciclo di generazione risorse (se le risorse venissero generate in maniera continue, avremmo millemila richieste al db)']
+  stato_territori varchar [note: 'Lista di territori posseduti, b64 o vettore di bit dove l ID identifica il territorio, se posto a 1, allora è posseduto.']
+  stato_truppe varchar [note: 'Lista di truppe attive, 16 bit (0,1) -> ?????? da capire visto il movimento libero (forse)']
+
+  indexes {
+    (user_id, partita_id) [pk] // Chiave primaria composta
+  }
+}
+
+// 5. Mosse (Coda eventi asincrona e stato mappa)
+Table mosse {
+  user_id integer
+  partita_id integer
+
+  type_action varchar [note: 'es. costruisci_porto, sposta_truppa, attacco']
+  queue_order integer [note: 'Ordine di esecuzione nella coda asincrona']
+  TTL integer [note: 'Time To Live in secondi per l esecuzione della mossa, 0 se da eseguire immediatamente']
+  priorita varchar [note: 'priorità mossa, 2 bit. in cancellazione vengono eliminate tutte le mosse che NON hanno in questo campo i bit posti a 11']
+  created_at timestamp
+
+  indexes {
+    (user_id, partita_id) [pk] // Chiave primaria composta
+  }
+}
+
+// 6. Alleanze
+Table alleanze {
+  id_alleanza integer [primary key]
+
+  nome_alleanza varchar
+  created_at timestamp
+  path_logo varchar [note: 'Percorso del logo dell alleanza, opzionale -> SOLO PREDEFINITI!']
+  id_leader integer [note: 'ID dell utente che è il leader dell alleanza -> il leader può espellere altri componenti']
+  id_partita integer [note: 'ID della partita a cui l alleanza appartiene']
+
+}
+
+// 7. BAN (log dei ban degli utenti -> un utente può subire dei ban temporanei o permanenti)
+Table ban {
+  id_ban integer [primary key]
+
+  id_user integer
+  Time_stamp timestamp [note: 'Entrata in vigore del ban']
+  Time_until timestamp [note: 'Fine del ban; è impostato ad una data "alta" se il ban è permanente']
+  motivo varchar [note: 'da 1 a 20 caratteri']
+}
+
+// 8. MEX (messaggi scritti dagli utenti dentro una partita)
+Table messaggi {
+  id_mex integer [primary key, unique, note: 'numero random a 64 bit']
+  Time_stamp timestamp 
+  content varchar [note: 'da 1 a 200 caratteri']
+}
+
+// 9. CHAT (messaggio-utente)
+Table chat {
+  id_user_send integer
+  id_partita integer
+  id_mex integer 
+
+  id_user_reciver integer
+  tipo_chat bit [note: '2 bit-> unicast, multicast, broadcast; oppure stringa estesa']
+
+  indexes {
+    (id_user_send, id_partita, id_mex) [pk]
+  }
+}
+
+// 10. Truppe (Ottimizzata)
+Table truppe {
+  id_istanza_truppa varchar [primary key, note: 'UUID univoco per l istanza della truppa nella partita']
+  partita_id integer
+  user_id integer
+  id_truppa varchar [note: 'Riferimento al modello della truppa in game_rules.cdb (es. fante, sam_mobile, ecc.). Tutte le statistiche fisse (costo, danno, range) lette da Redis/game_rules.']
+  x float [note: 'Longitudine attuale o Target']
+  y float [note: 'Latitudine attuale o Target']
+  alt float [note: 'L altitudine dell entità. Questo è particolarmente utile per le truppe aeree per differenziare spazialmente.']
+  rot float [note: 'La rotazione dell entità (es. in gradi o radianti). Serve al client per sapere in che direzione "guarda" graficamente l unità.']
+  hp integer [note: 'HP attuali, il max dipenderà dal modello su game_rules.cdb']
+  stato integer [note: '1: Idle, 2: In movimento, 3: In combattimento -> numero intero base che definisce cosa sta facendo attualmente la truppa.']
+  last_update timestamp [note: 'Si aggiorna automaticamente ad ogni minima modifica. Essenziale nei giochi multiplayer state-based.']
+
+  indexes {
+    (partita_id, user_id)
+  }
+}
+
+// --- Relazioni (Foreign Keys) ---
+
+Ref: utenti.id_user < accessi.user_id
+Ref: utenti.id_user < partecipanti_partite.user_id
+Ref: utenti.id_user < mosse.user_id
+Ref: utenti.id_user < partite.id_host
+Ref: utenti.id_user < alleanze.id_leader
+Ref: utenti.id_user < truppe.user_id
+
+Ref: partite.id_partita < partecipanti_partite.partita_id
+Ref: partite.id_partita < mosse.partita_id
+Ref: partite.id_partita < alleanze.id_partita
+Ref: partite.id_partita < truppe.partita_id
+
+Ref: partecipanti_partite.id_alleanza < alleanze.id_alleanza
+
+Ref: ban.id_user < utenti.id_user
+Ref: chat.id_mex < messaggi.id_mex
+Ref: chat.id_partita < partecipanti_partite.partita_id
+Ref: chat.id_user_send < partecipanti_partite.user_id
+Ref: chat.id_user_reciver < partecipanti_partite.user_id

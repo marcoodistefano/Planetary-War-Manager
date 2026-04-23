@@ -126,18 +126,20 @@ CREATE TABLE chat (
 
 -- 10. Tabella Truppe Ottimizzata (Sostituisce il campo TEXT in partecipanti_partite)
 CREATE TABLE IF NOT EXISTS truppe (
-    id_truppa VARCHAR(36) PRIMARY KEY,
+    id_istanza_truppa VARCHAR(36) PRIMARY KEY COMMENT 'UUID univoco per listanza della truppa nella partita',
     partita_id INT NOT NULL,
     user_id INT NOT NULL,
-    tipo VARCHAR(32) NOT NULL,
+    id_truppa VARCHAR(64) NOT NULL COMMENT 'Riferimento al modello della truppa in game_rules.cdb (es. fanteria_t1)',
     x DOUBLE NOT NULL, -- Longitudine attuale o Target
     y DOUBLE NOT NULL, -- Latitudine attuale o Target
     alt FLOAT DEFAULT 0,
     rot FLOAT DEFAULT 0,
-    hp INT NOT NULL,
-    stato TINYINT DEFAULT 1 COMMENT '1: Idle, 2: In movimento',
+    hp INT NOT NULL COMMENT 'HP attuali, il max dipendera dal modello su game_rules.cdb',
+    stato TINYINT DEFAULT 1 COMMENT '1: Idle, 2: In movimento, 3: In combattimento',
     last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_partita_user (partita_id, user_id)
+    INDEX idx_partita_user (partita_id, user_id),
+    FOREIGN KEY (partita_id) REFERENCES partite(id_partita) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES utenti(id_user) ON DELETE CASCADE
 );
 
 -- ==========================================
