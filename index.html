@@ -189,7 +189,7 @@
         updateModelSelect(); 
 
         const MAPTILER_KEY = 'PGAzmQH2OduY9E8gSi6n';
-        const sensorSocket = io('http://localhost:3000', {
+        const sensorSocket = io('http://localhost:3030', {
             auth: {
                 token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZF91c2VyIjoxLCJpYXQiOjE3NzY4ODg3MzcsImV4cCI6MTgwODQyNDczN30.R6fcvXXeDA_sOrZ1pMWmz3acNfnxcwvfn0yu24bGl0E"
             }
@@ -506,6 +506,9 @@
                 map.getCanvas().style.cursor = '';
                 return;
             }
+            
+            // Wait for asynchronous TopoJSON layers to load before querying them
+            if (!map.getLayer('nazioni-layer') || !map.getLayer('regioni-layer')) return;
 
             const features = map.queryRenderedFeatures(e.point, { layers: ['nazioni-layer', 'regioni-layer'] });
             
@@ -572,7 +575,7 @@
         function loadTopoJsonLayer(url, sourceId, layerId, minZ, maxZ) {
             fetch(url).then(res => res.json()).then(topology => {
                 const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
-                map.addSource(sourceId, { type: 'geojson', data: geoData, promoteId: 'ne_id', generateId: true });
+                map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
                 map.addLayer({
                     id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
                     paint: {

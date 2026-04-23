@@ -79,4 +79,4 @@ io.on('connection', (socket) => {
     });
 });
 
-initTiffs().then(() => server.listen(3000, () => console.log("🟢 Server Pronto")));
+initTiffs().then(() => server.listen(3030, () => console.log("🟢 Server Pronto sulla porta 3030")));
