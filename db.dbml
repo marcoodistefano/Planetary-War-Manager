@@ -81,7 +81,7 @@ Table partecipanti_partite {
   id_alleanza integer [note: 'ID dell alleanza a cui appartiene il giocatore, se presente']
 
   stato_struttura varchar [note: 'Nessuna, Porto, Fortezza, Cittadella. b64 del tipo e del livello delle strutture per ogni territorio posseduto']
-  stato_risorse varchar [note: 'Risorse attuali del giocatore, aggiornate ad ogni ciclo di generazione risorse (se le risorse venissero generate in maniera continue, avremmo millemila richieste al db)']
+  stato_risorse varchar [note: 'Snapshot asincrono. Sincronizzato da Redis a MySQL esclusivamente alla disconnessione dell’utente o tramite backup programmato (Heartbeat Save) ogni 15-30 minuti per ottimizzazione carichi IO.']
   stato_territori varchar [note: 'Lista di territori posseduti, b64 o vettore di bit dove l ID identifica il territorio, se posto a 1, allora è posseduto.']
   stato_truppe varchar [note: 'Lista di truppe attive, 16 bit (0,1) -> ?????? da capire visto il movimento libero (forse)']
 
@@ -92,6 +92,7 @@ Table partecipanti_partite {
 
 // 5. Mosse (Coda eventi asincrona e stato mappa)
 Table mosse {
+  id_mossa integer [primary key, note: 'codice identificativo univoco per la mossa)']
   user_id integer
   partita_id integer
 
@@ -100,10 +101,6 @@ Table mosse {
   TTL integer [note: 'Time To Live in secondi per l esecuzione della mossa, 0 se da eseguire immediatamente']
   priorita varchar [note: 'priorità mossa, 2 bit. in cancellazione vengono eliminate tutte le mosse che NON hanno in questo campo i bit posti a 11']
   created_at timestamp
-
-  indexes {
-    (user_id, partita_id) [pk] // Chiave primaria composta
-  }
 }
 
 // 6. Alleanze
@@ -149,25 +146,32 @@ Table chat {
   }
 }
 
-// 10. Truppe (Ottimizzata)
+// 10. Truppe (Versione Definitiva Ottimizzata)
 Table truppe {
-  id_istanza_truppa varchar [primary key, note: 'UUID univoco per l istanza della truppa nella partita']
-  partita_id integer
-  user_id integer
-  id_truppa varchar [note: 'Riferimento al modello della truppa in game_rules.cdb (es. fante, sam_mobile, ecc.). Tutte le statistiche fisse (costo, danno, range) lette da Redis/game_rules.']
-  x float [note: 'Longitudine attuale o Target']
-  y float [note: 'Latitudine attuale o Target']
-  alt float [note: 'L altitudine dell entità. Questo è particolarmente utile per le truppe aeree per differenziare spazialmente.']
-  rot float [note: 'La rotazione dell entità (es. in gradi o radianti). Serve al client per sapere in che direzione "guarda" graficamente l unità.']
-  hp integer [note: 'HP attuali, il max dipenderà dal modello su game_rules.cdb']
-  stato integer [note: '1: Idle, 2: In movimento, 3: In combattimento -> numero intero base che definisce cosa sta facendo attualmente la truppa.']
-  last_update timestamp [note: 'Si aggiorna automaticamente ad ogni minima modifica. Essenziale nei giochi multiplayer state-based.']
+  id_istanza_truppa varchar [primary key, note: 'UUID univoco generato dal server (es. unit_1714123)']
+  partita_id integer [ note: 'Collegamento alla partita attiva']
+  user_id integer [note: 'Proprietario della truppa']
+  id_modello varchar [note: 'Riferimento al modello in game_rules.cdb (es. tank, soldier, predator_drone)']
+  
+  // Posizionamento e Movimento
+  x float [note: 'Longitudine (Lng) - Sincronizzata da Redis']
+  y float [note: 'Latitudine (Lat) - Sincronizzata da Redis']
+  alt float [default: 0, note: 'Altitudine. Fondamentale per unità aeree o sottomarini (-20m)']
+  rot float [default: 0, note: 'Rotazione in radianti per il rendering 3D']
+  
+  // Stato Vitale e Logico
+  hp integer [note: 'Punti Vita attuali']
+  stato integer [default: 1, note: '1: Idle, 2: In Movimento, 3: In Combattimento, 4: Ritirata']
+  attitudine integer [default: 1, note: 'Comportamento AI: 1: Aggressiva, 2: Difensiva, 3: Evasiva']
+  
+  // Meta-dati
+  last_update timestamp [default: `now()`, note: 'Ultimo salvataggio da Redis a MySQL']
 
   indexes {
-    (partita_id, user_id)
+    (partita_id, user_id) [name: 'idx_player_units']
+    (x, y) [name: 'idx_geo_static'] // Utile per query spaziali su DB se Redis è spento
   }
 }
-
 // --- Relazioni (Foreign Keys) ---
 
 Ref: utenti.id_user < accessi.user_id

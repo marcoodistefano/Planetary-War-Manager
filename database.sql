@@ -93,6 +93,7 @@ CREATE TABLE partecipanti_partite (
 
 -- 7. MOSSE
 CREATE TABLE mosse (
+    id_mossa INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     partita_id INT NOT NULL,
     queue_order INT NOT NULL COMMENT 'Ordine di esecuzione nella coda',
@@ -100,7 +101,6 @@ CREATE TABLE mosse (
     TTL INT DEFAULT 0 COMMENT '0 se immediata',
     priorita VARCHAR(2) DEFAULT '00' COMMENT 'Bit di priorità',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, partita_id, queue_order),
     FOREIGN KEY (user_id, partita_id) REFERENCES partecipanti_partite(user_id, partita_id) ON DELETE CASCADE
 );
 
@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS truppe (
     hp INT NOT NULL COMMENT 'HP attuali, il max dipendera dal modello su game_rules.cdb',
     stato TINYINT DEFAULT 1 COMMENT '1: Idle, 2: In movimento, 3: In combattimento',
     last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    attitudine TINYINT DEFAULT 1 COMMENT '1: Aggressiva, 2: Difensiva, 3: Evasiva';
     INDEX idx_partita_user (partita_id, user_id),
     FOREIGN KEY (partita_id) REFERENCES partite(id_partita) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES utenti(id_user) ON DELETE CASCADE

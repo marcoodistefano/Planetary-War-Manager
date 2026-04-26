@@ -65,7 +65,7 @@ io.on('connection', (socket) => {
         truppe.forEach(t => {
             // Validazione coordinate per Redis (Max +/- 85 lat)
             const lat = Math.max(-85, Math.min(85, t.y));
-            pipeline.hset(`truppa:${t.id_truppa}`, { user_id: socket.userId, x: t.x, y: lat, alt: t.alt, tipo: 'tank', hp: 100, stato: 1, speed: 1.5 });
+            pipeline.hset(`truppa:${t.id_truppa}`, { user_id: socket.userId, x: t.x, y: lat, alt: t.alt, tipo: 'tank', hp: 100, stato: 1, speed: 1.5 , att: t.attitudine || 1});
             pipeline.geoadd(`mappa:${partitaId}`, t.x, lat, t.id_truppa);
             pipeline.sadd(`modificati:${partitaId}`, t.id_truppa);
         });
