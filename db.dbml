@@ -82,16 +82,38 @@ Table partecipanti_partite {
   truppe_perse integer [note: 'proprie']
   perc_distruzione float [note: 'rispetto ai territori conquistati']
   id_alleanza integer [note: 'ID dell alleanza a cui appartiene il giocatore, se presente']
-  
-  stato_struttura varchar [note: 'Nessuna, Porto, Fortezza, Cittadella. b64 del tipo e del livello delle strutture per ogni territorio posseduto']
+
+  utenti_alleati varchar [note: 'B64 val. matrice triang. sup gestita in 0/1, 0 non in alleanza, 1 in guerra. la matrice è speculare!]
+  utenti_in_guerra varchar [note: 'B64 val. matrice triang. sup gestita in 0/1, 0 non in guerra, 1 in guerra. la matrice è speculare!]
   stato_risorse varchar [note: 'Snapshot asincrono. Sincronizzato da Redis a PostgreSQL esclusivamente alla disconnessione dell’utente o tramite backup programmato (Heartbeat Save) ogni 15-30 minuti per ottimizzazione carichi IO.']
   stato_territori varchar [note: 'Lista di territori posseduti, b64 o vettore di bit dove l ID identifica il territorio, se posto a 1, allora è posseduto.']
-  stato_truppe varchar [note: 'Lista di truppe attive, 16 bit (0,1) -> ?????? da capire visto il movimento libero (forse)']
 
   indexes {
     (user_id, partita_id) [pk] // Chiave primaria composta
   }
 }
+
+//4.1 Strutture_Partecipanti_partite{
+  id_riga integer [primary key, note: 'codice identificativo univoco per la struttura)']
+  id_struttura integer [note: 'definisce la struttura rispetto alle regole definite']
+  HP integer 
+  id_utente 
+  id_partita
+  pos_x
+  pos_y
+}
+//4.2 Coda_spostamenti
+Spostamenti{
+  id_spostamento integer [primary key, note: 'codice identificativo univoco per lo spostamento)']
+  id_mossa
+
+  numero [note: 'Identifica il numero nella coda (che mossa deve essere eseguita prima?)']
+  x_dest
+  y_dest
+  Time_to_arrive [note: 'tempo di arrivo al punto successivo -si invoca automaticamente il DBMS che, allo scadere provvede ad eliminare la tupla etc-']
+}
+
+//4.3 NEXT COMING COMMANDER!
 
 // 5. Mosse (Coda eventi asincrona e stato mappa)
 Table mosse {
@@ -184,8 +206,8 @@ Table Armata{
   id_modello varchar [note: 'Riferimento al modello in game_rules.cdb (viene caricato solo questo modello) si prenda in considerazione il modello della truppa che può attaccare, vale a dire il modello della truppa che ha range d\'attacco massimo e molteplicità maggiore. in caso di conflitto, si considera il tier più alto, altrimenti si considera la truppa con più potenza di fuoco']
   
   // Posizionamento e Movimento
-  x float [ note: 'Longitudine (Lng) - Sincronizzata da Redis']
-  y float [ note: 'Latitudine (Lat) - Sincronizzata da Redis']
+  x float [ note: 'Longitudine attuale (Lng) - Sincronizzata da Redis - Per campo are_they_in_the_same_position=false questa posizione indica la coordinata di congiunzione']
+  y float [ note: 'Latitudine attuale (Lat) - Sincronizzata da Redis - Per campo are_they_in_the_same_position=false questa posizione indica la coordinata di congiunzione']
   alt float [default: 0, note: 'Altitudine. Fondamentale per unità aeree o sottomarini (-20m)']
   rot float [default: 0, note: 'Rotazione in radianti per il rendering 3D']
   
@@ -197,8 +219,9 @@ Table Armata{
   dmg_tot integer [note: 'attacco totale delle truppe con range d\'azione massimo']
   speed integer [note: 'velocità della truppa più lenta dell\'armata. sarà preso in considerazione questo dato per il movimento']
   tipo_armata integer [note: 'indica il tipo di armata e ciò che essa può fare. per esempio, un\'armata che disponde di 100 fanti e 1 carro armato sarà di tipo carro armato e non potrà proseguire su percorsi montuosi; un\'armata che dispone di 100 fanti e 1 nave, sarà di tipo nave e i fanti non potranno attaccare. da definire criteri e metodi di attacco ed ingaggio.']
+  are_they_in_the_same_position [note: 'indica che tutte le truppe sono nella stessa posizione (sono raggruppate) e quindi il backend, per la gestione del danno e il resto, può basarsi su questi criteri']
   
-  // Meta-dati
+// Meta-dati
   last_update timestamp [default: `now()`, note: 'Ultimo salvataggio da Redis a PostgreSQL']
 
   indexes {
@@ -214,16 +237,16 @@ Ref: utenti.id_user < partecipanti_partite.user_id
 Ref: utenti.id_user < mosse.user_id
 Ref: utenti.id_user < partite.id_host
 Ref: utenti.id_user < alleanze.id_leader
+Ref: utenti.id_user < truppe.user_id
 
 Ref: partite.id_partita < partecipanti_partite.partita_id
 Ref: partite.id_partita < mosse.partita_id
 Ref: partite.id_partita < alleanze.id_partita
-
-Ref: partecipanti_partite.user_id < truppe.user_id
-Ref: partecipanti_partite.partita_id < truppe.partita_id
-Ref: partecipanti_partite.id_alleanza < alleanze.id_alleanza
+Ref: partite.id_partita < truppe.partita_id
 
 Ref: truppe.id_armata < Armata.id_istanza_armata
+
+Ref: partecipanti_partite.id_alleanza < alleanze.id_alleanza
 
 Ref: ban.id_user < utenti.id_user
 
