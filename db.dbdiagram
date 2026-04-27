@@ -164,21 +164,6 @@
     },
     {
       "firstFieldNames": [
-        "id_user"
-      ],
-      "firstTableName": "utenti",
-      "firstSchemaName": "public",
-      "firstRelation": "1",
-      "secondFieldNames": [
-        "user_id"
-      ],
-      "secondTableName": "truppe",
-      "secondSchemaName": "public",
-      "secondRelation": "*",
-      "checkPoints": []
-    },
-    {
-      "firstFieldNames": [
         "id_partita"
       ],
       "firstTableName": "partite",
@@ -242,9 +227,33 @@
     },
     {
       "firstFieldNames": [
-        "id_partita"
+        "user_id"
       ],
-      "firstTableName": "partite",
+      "firstTableName": "partecipanti_partite",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "truppe",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": [
+        {
+          "x": 1485.4356903850025,
+          "y": -423.71905138324655
+        },
+        {
+          "x": 1485.4356903850025,
+          "y": -1001.4116420060782
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "partita_id"
+      ],
+      "firstTableName": "partecipanti_partite",
       "firstSchemaName": "public",
       "firstRelation": "1",
       "secondFieldNames": [
@@ -255,29 +264,14 @@
       "secondRelation": "*",
       "checkPoints": [
         {
-          "x": 2092.826018215474,
-          "y": -1238.1216040167146
+          "x": 1475.4356903850025,
+          "y": -391.71905138324655
         },
         {
-          "x": 2092.826018215474,
+          "x": 1475.4356903850025,
           "y": -1033.4116420060782
         }
       ]
-    },
-    {
-      "firstFieldNames": [
-        "id_armata"
-      ],
-      "firstTableName": "truppe",
-      "firstSchemaName": "public",
-      "firstRelation": "1",
-      "secondFieldNames": [
-        "id_istanza_armata"
-      ],
-      "secondTableName": "Armata",
-      "secondSchemaName": "public",
-      "secondRelation": "*",
-      "checkPoints": []
     },
     {
       "firstFieldNames": [
@@ -290,6 +284,21 @@
         "id_alleanza"
       ],
       "secondTableName": "alleanze",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_armata"
+      ],
+      "firstTableName": "truppe",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id_istanza_armata"
+      ],
+      "secondTableName": "Armata",
       "secondSchemaName": "public",
       "secondRelation": "*",
       "checkPoints": []

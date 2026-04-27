@@ -214,16 +214,16 @@ Ref: utenti.id_user < partecipanti_partite.user_id
 Ref: utenti.id_user < mosse.user_id
 Ref: utenti.id_user < partite.id_host
 Ref: utenti.id_user < alleanze.id_leader
-Ref: utenti.id_user < truppe.user_id
 
 Ref: partite.id_partita < partecipanti_partite.partita_id
 Ref: partite.id_partita < mosse.partita_id
 Ref: partite.id_partita < alleanze.id_partita
-Ref: partite.id_partita < truppe.partita_id
+
+Ref: partecipanti_partite.user_id < truppe.user_id
+Ref: partecipanti_partite.partita_id < truppe.partita_id
+Ref: partecipanti_partite.id_alleanza < alleanze.id_alleanza
 
 Ref: truppe.id_armata < Armata.id_istanza_armata
-
-Ref: partecipanti_partite.id_alleanza < alleanze.id_alleanza
 
 Ref: ban.id_user < utenti.id_user
 
