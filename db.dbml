@@ -84,7 +84,7 @@ Table partecipanti_partite {
   id_alleanza integer [note: 'ID dell alleanza a cui appartiene il giocatore, se presente']
   
   stato_struttura varchar [note: 'Nessuna, Porto, Fortezza, Cittadella. b64 del tipo e del livello delle strutture per ogni territorio posseduto']
-  stato_risorse varchar [note: 'Snapshot asincrono. Sincronizzato da Redis a MySQL esclusivamente alla disconnessione dell’utente o tramite backup programmato (Heartbeat Save) ogni 15-30 minuti per ottimizzazione carichi IO.']
+  stato_risorse varchar [note: 'Snapshot asincrono. Sincronizzato da Redis a PostgreSQL esclusivamente alla disconnessione dell’utente o tramite backup programmato (Heartbeat Save) ogni 15-30 minuti per ottimizzazione carichi IO.']
   stato_territori varchar [note: 'Lista di territori posseduti, b64 o vettore di bit dove l ID identifica il territorio, se posto a 1, allora è posseduto.']
   stato_truppe varchar [note: 'Lista di truppe attive, 16 bit (0,1) -> ?????? da capire visto il movimento libero (forse)']
 
@@ -168,7 +168,8 @@ Table truppe {
   attitudine integer [default: 1, note: 'Comportamento AI: 1: Aggressiva, 2: Difensiva, 3: Evasiva']
   
   // Meta-dati
-  last_update timestamp [default: `now()`, note: 'Ultimo salvataggio da Redis a MySQL']
+  last_update timestamp [default: `now()`, note: 'Ultimo salvataggio da Redis a PostgreSQL, utile per il backup e la sincronizzazione']
+  id_armata integer [note: 'Riferimento all armata di appartenenza, se presente (es. fanteria, corazzata, aerea) -> da definire se necessario per il gioco e per ottimizzare le query sulle truppe (es. per visualizzare solo le truppe aeree, si potrebbe filtrare su questo campo invece che sul modello)']
 
   indexes {
     (partita_id, user_id) [name: 'idx_player_units']
@@ -180,25 +181,25 @@ Table Armata{
   id_istanza_armata varchar [primary key, note: 'UUID univoco generato dal server (es. armata_1714123)']
   partita_id integer [ note: 'Collegamento alla partita attiva']
   user_id integer [note: 'Proprietario della truppa']
-  id_modello varchar [note: 'Riferimento al modello in game_rules.cdb (viene caricato solo questo modello) si prenda in considerazione il modello della truppa che può attaccare, vale a dire il modello della truppa che ha range d'attacco massimo e molteplicità maggiore. in caso di conflitto, si considera il tier più alto, altrimenti si considera la truppa con più potenza di fuoco']
+  id_modello varchar [note: 'Riferimento al modello in game_rules.cdb (viene caricato solo questo modello) si prenda in considerazione il modello della truppa che può attaccare, vale a dire il modello della truppa che ha range d\'attacco massimo e molteplicità maggiore. in caso di conflitto, si considera il tier più alto, altrimenti si considera la truppa con più potenza di fuoco']
   
   // Posizionamento e Movimento
-  x float [note: 'Longitudine (Lng) - Sincronizzata da Redis']
-  y float [note: 'Latitudine (Lat) - Sincronizzata da Redis']
+  x float [ note: 'Longitudine (Lng) - Sincronizzata da Redis']
+  y float [ note: 'Latitudine (Lat) - Sincronizzata da Redis']
   alt float [default: 0, note: 'Altitudine. Fondamentale per unità aeree o sottomarini (-20m)']
   rot float [default: 0, note: 'Rotazione in radianti per il rendering 3D']
   
   // Stato Vitale e Logico
-  hp integer [note: 'Punti Vita attuali dell'armata']
+  hp integer [note: 'Punti Vita attuali dell\'armata']
   stato integer [default: 1, note: '1: Idle, 2: In Movimento, 3: In Combattimento, 4: Ritirata']
   attitudine integer [default: 1, note: 'Comportamento AI: 1: Aggressiva, 2: Difensiva, 3: Evasiva']
-  max_range_atck [note: range di azione della/e truppa/e con maggior range d'azione]
-  dmg_tot [note: attacco totale delle truppe con range d'azione massimo]
-  speed [note: velocità della truppa più lenta dell'armata. sarà preso in considerazione questo dato per il movimento]
-  tipo_armata [note: indica il tipo di armata e ciò che essa può fare. per esempio, un'armata che disponde di 100 fanti e 1 carro armato sarà di tipo carro armato e non potrà proseguire su percorsi montuosi; un'armata che dispone di 100 fanti e 1 nave, sarà di tipo nave e i fanti non potranno attaccare. da definire criteri e metodi di attacco ed ingaggio.]
+  max_range_atck integer [note: 'range di azione della/e truppa/e con maggior range d\'azione']
+  dmg_tot integer [note: 'attacco totale delle truppe con range d\'azione massimo']
+  speed integer [note: 'velocità della truppa più lenta dell\'armata. sarà preso in considerazione questo dato per il movimento']
+  tipo_armata integer [note: 'indica il tipo di armata e ciò che essa può fare. per esempio, un\'armata che disponde di 100 fanti e 1 carro armato sarà di tipo carro armato e non potrà proseguire su percorsi montuosi; un\'armata che dispone di 100 fanti e 1 nave, sarà di tipo nave e i fanti non potranno attaccare. da definire criteri e metodi di attacco ed ingaggio.']
   
   // Meta-dati
-  last_update timestamp [default: `now()`, note: 'Ultimo salvataggio da Redis a MySQL']
+  last_update timestamp [default: `now()`, note: 'Ultimo salvataggio da Redis a PostgreSQL']
 
   indexes {
     (partita_id, user_id) [name: 'idx_player_units']
@@ -220,9 +221,12 @@ Ref: partite.id_partita < mosse.partita_id
 Ref: partite.id_partita < alleanze.id_partita
 Ref: partite.id_partita < truppe.partita_id
 
+Ref: truppe.id_armata < Armata.id_istanza_armata
+
 Ref: partecipanti_partite.id_alleanza < alleanze.id_alleanza
 
 Ref: ban.id_user < utenti.id_user
+
 Ref: chat.id_mex < messaggi.id_mex
 Ref: chat.id_partita < partecipanti_partite.partita_id
 Ref: chat.id_user_send < partecipanti_partite.user_id

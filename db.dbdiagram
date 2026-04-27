@@ -3,8 +3,389 @@
   "darkMode": true,
   "gridEnabling": false,
   "detailLevel": "All",
-  "tablePositions": [],
+  "tablePositions": [
+    {
+      "name": "utenti",
+      "schemaName": "public",
+      "x": 1038.3083409494825,
+      "y": -1042.597154914395
+    },
+    {
+      "name": "accessi",
+      "schemaName": "public",
+      "x": 576.1914532460186,
+      "y": -820.3506473887917
+    },
+    {
+      "name": "partite",
+      "schemaName": "public",
+      "x": 2202.770417663094,
+      "y": -1278.1216040167146
+    },
+    {
+      "name": "partecipanti_partite",
+      "schemaName": "public",
+      "x": 1103.1289919128658,
+      "y": -479.7190513832465
+    },
+    {
+      "name": "mosse",
+      "schemaName": "public",
+      "x": 1448.4410239342985,
+      "y": -1478.0697749360033
+    },
+    {
+      "name": "alleanze",
+      "schemaName": "public",
+      "x": 1557.8018596656882,
+      "y": -95.60802537015451
+    },
+    {
+      "name": "ban",
+      "schemaName": "public",
+      "x": 573.4810040272686,
+      "y": -1082.8692510544429
+    },
+    {
+      "name": "messaggi",
+      "schemaName": "public",
+      "x": 22.809174493398388,
+      "y": -115.43677507665026
+    },
+    {
+      "name": "chat",
+      "schemaName": "public",
+      "x": 382.99362727542064,
+      "y": -179.43677507665026
+    },
+    {
+      "name": "truppe",
+      "schemaName": "public",
+      "x": 1540.4411890803538,
+      "y": -1113.4116420060782
+    },
+    {
+      "name": "Armata",
+      "schemaName": "public",
+      "x": 2197.664216491219,
+      "y": -728.2516332892147
+    }
+  ],
   "tableGroupCollapseStates": [],
   "stickyNoteLayouts": [],
-  "referencePaths": []
+  "referencePaths": [
+    {
+      "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "utenti",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "accessi",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "utenti",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "partecipanti_partite",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "utenti",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "mosse",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "utenti",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id_host"
+      ],
+      "secondTableName": "partite",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": [
+        {
+          "x": 1387.8574726851393,
+          "y": -1002.5971549143951
+        },
+        {
+          "x": 1387.8574726851393,
+          "y": -1136.0240799777903
+        },
+        {
+          "x": 2192.770417663094,
+          "y": -1136.0240799777903
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "utenti",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id_leader"
+      ],
+      "secondTableName": "alleanze",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "utenti",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "truppe",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_partita"
+      ],
+      "firstTableName": "partite",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "partita_id"
+      ],
+      "secondTableName": "partecipanti_partite",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": [
+        {
+          "x": 1936.032624551549,
+          "y": -1222.1216040167146
+        },
+        {
+          "x": 1936.032624551549,
+          "y": -399.71905138324655
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "id_partita"
+      ],
+      "firstTableName": "partite",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "partita_id"
+      ],
+      "secondTableName": "mosse",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_partita"
+      ],
+      "firstTableName": "partite",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id_partita"
+      ],
+      "secondTableName": "alleanze",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": [
+        {
+          "x": 2093.5387759004348,
+          "y": -1238.1216040167146
+        },
+        {
+          "x": 2093.5387759004348,
+          "y": 112.39197462984544
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "id_partita"
+      ],
+      "firstTableName": "partite",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "partita_id"
+      ],
+      "secondTableName": "truppe",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": [
+        {
+          "x": 2092.826018215474,
+          "y": -1238.1216040167146
+        },
+        {
+          "x": 2092.826018215474,
+          "y": -1033.4116420060782
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "id_armata"
+      ],
+      "firstTableName": "truppe",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id_istanza_armata"
+      ],
+      "secondTableName": "Armata",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_alleanza"
+      ],
+      "firstTableName": "partecipanti_partite",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id_alleanza"
+      ],
+      "secondTableName": "alleanze",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "ban",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id_user"
+      ],
+      "secondTableName": "utenti",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_mex"
+      ],
+      "firstTableName": "chat",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id_mex"
+      ],
+      "secondTableName": "messaggi",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_partita"
+      ],
+      "firstTableName": "chat",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "partita_id"
+      ],
+      "secondTableName": "partecipanti_partite",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": [
+        {
+          "x": 963.5937185325602,
+          "y": -99.43677507665024
+        },
+        {
+          "x": 963.5937185325602,
+          "y": -399.7190513832465
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "id_user_send"
+      ],
+      "firstTableName": "chat",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "partecipanti_partite",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": [
+        {
+          "x": 716.8615584343647,
+          "y": -131.43677507665024
+        },
+        {
+          "x": 716.8615584343647,
+          "y": -431.7190513832465
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "id_user_reciver"
+      ],
+      "firstTableName": "chat",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "partecipanti_partite",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    }
+  ]
 }
