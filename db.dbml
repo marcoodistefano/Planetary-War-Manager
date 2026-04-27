@@ -175,7 +175,36 @@ Table truppe {
     (x, y) [name: 'idx_geo_static'] // Utile per query spaziali su DB se Redis è spento
   }
 }
-//tabella ARMATE!!!!
+//11. armata
+Table Armata{
+  id_istanza_armata varchar [primary key, note: 'UUID univoco generato dal server (es. armata_1714123)']
+  partita_id integer [ note: 'Collegamento alla partita attiva']
+  user_id integer [note: 'Proprietario della truppa']
+  id_modello varchar [note: 'Riferimento al modello in game_rules.cdb (viene caricato solo questo modello) si prenda in considerazione il modello della truppa che può attaccare, vale a dire il modello della truppa che ha range d'attacco massimo e molteplicità maggiore. in caso di conflitto, si considera il tier più alto, altrimenti si considera la truppa con più potenza di fuoco']
+  
+  // Posizionamento e Movimento
+  x float [note: 'Longitudine (Lng) - Sincronizzata da Redis']
+  y float [note: 'Latitudine (Lat) - Sincronizzata da Redis']
+  alt float [default: 0, note: 'Altitudine. Fondamentale per unità aeree o sottomarini (-20m)']
+  rot float [default: 0, note: 'Rotazione in radianti per il rendering 3D']
+  
+  // Stato Vitale e Logico
+  hp integer [note: 'Punti Vita attuali dell'armata']
+  stato integer [default: 1, note: '1: Idle, 2: In Movimento, 3: In Combattimento, 4: Ritirata']
+  attitudine integer [default: 1, note: 'Comportamento AI: 1: Aggressiva, 2: Difensiva, 3: Evasiva']
+  max_range_atck [note: range di azione della/e truppa/e con maggior range d'azione]
+  dmg_tot [note: attacco totale delle truppe con range d'azione massimo]
+  speed [note: velocità della truppa più lenta dell'armata. sarà preso in considerazione questo dato per il movimento]
+  tipo_armata [note: indica il tipo di armata e ciò che essa può fare. per esempio, un'armata che disponde di 100 fanti e 1 carro armato sarà di tipo carro armato e non potrà proseguire su percorsi montuosi; un'armata che dispone di 100 fanti e 1 nave, sarà di tipo nave e i fanti non potranno attaccare. da definire criteri e metodi di attacco ed ingaggio.]
+  
+  // Meta-dati
+  last_update timestamp [default: `now()`, note: 'Ultimo salvataggio da Redis a MySQL']
+
+  indexes {
+    (partita_id, user_id) [name: 'idx_player_units']
+    (x, y) [name: 'idx_geo_static'] // Utile per query spaziali su DB se Redis è spento
+  }
+}
 
 // --- Relazioni (Foreign Keys) ---
 
