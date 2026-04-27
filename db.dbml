@@ -11,6 +11,8 @@ Table utenti {
   last_username_change timestamp [note: 'Data dell\'ultimo cambio username, opzionale']
   created_at timestamp
   recupera_passwd varchar [note: 'Token per recupero password, opzionale. Il token è generato dinamicamente al recupero passwd e viene inserito in questo campo per 10 minuti (a seconda del TTL)']
+  2FA_method varchar [note: 'Metodo di autenticazione a due fattori scelto dall utente, se presente (OTP, Authenticator, SMS, ecc.)']
+  2FA_secret varchar [note: 'Segreto per la generazione dei codici 2FA, se applicabile. Deve essere memorizzato in modo sicuro e crittografato.']
   2FA_enabled boolean [note: 'Abilita autenticazione a due fattori. Indica che l account è stato verificato con 2FA (che sia OTP o codice di verifica su authenticator o altri) [si dovrebbe inserire, a questo punto, un token che identifica il dispositivo, o comunque, per esempio, il numero di cellulare o altro…]']
   IS_banned boolean [note: 'Evitiamo di fare richieste all altra tabella: lì vi sono SOLO i motivi ed eventuali altre info. se l utente prova ad accedere, basta visualizzare questo campo, senza eseguire alcun JOIN con la tabella ban']
   IS_perma_banned boolean
@@ -24,13 +26,14 @@ Table accessi {
   ip_address varchar [note: 'metodo per identificare eventuali account duplicati, non implementato inizialmente']
   login_time timestamp
   cookie_token varchar [note: 'cookie di sessione, comprende varie info. (occorre una tabella cookie?????? -> vedere come gestire!). in caso si gestisce, inizialmente, come un banale oggetto che ha ID e TTL, senza ulteriori info.']
-}
+}//da capire come usare i cookie
 
 // 3. Partite
 Table partite {
   id_partita integer [primary key, note: 'codice identificativo univoco per la partita (32 bit?)']
 
   nome_partita varchar
+  hasELO boolean [note: 'Indica se la partita è classificata (con ELO) o amichevole']
   id_host integer [note: 'ID dello utente che ha creato la partita']
   duration_max integer [note: 'Durata massima in minuti. Default 7 giorni, MAX -da definire- se si facesse in giorni e non in minuti (quindi come tempo_ora + X giorni)?']
   num_player_max integer [note: 'Numero massimo di giocatori']
@@ -79,7 +82,7 @@ Table partecipanti_partite {
   truppe_perse integer [note: 'proprie']
   perc_distruzione float [note: 'rispetto ai territori conquistati']
   id_alleanza integer [note: 'ID dell alleanza a cui appartiene il giocatore, se presente']
-
+  
   stato_struttura varchar [note: 'Nessuna, Porto, Fortezza, Cittadella. b64 del tipo e del livello delle strutture per ogni territorio posseduto']
   stato_risorse varchar [note: 'Snapshot asincrono. Sincronizzato da Redis a MySQL esclusivamente alla disconnessione dell’utente o tramite backup programmato (Heartbeat Save) ogni 15-30 minuti per ottimizzazione carichi IO.']
   stato_territori varchar [note: 'Lista di territori posseduti, b64 o vettore di bit dove l ID identifica il territorio, se posto a 1, allora è posseduto.']
@@ -146,7 +149,7 @@ Table chat {
   }
 }
 
-// 10. Truppe (Versione Definitiva Ottimizzata)
+// 10. Truppe
 Table truppe {
   id_istanza_truppa varchar [primary key, note: 'UUID univoco generato dal server (es. unit_1714123)']
   partita_id integer [ note: 'Collegamento alla partita attiva']
@@ -172,6 +175,8 @@ Table truppe {
     (x, y) [name: 'idx_geo_static'] // Utile per query spaziali su DB se Redis è spento
   }
 }
+//tabella ARMATE!!!!
+
 // --- Relazioni (Foreign Keys) ---
 
 Ref: utenti.id_user < accessi.user_id
