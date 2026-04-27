@@ -19,7 +19,7 @@
     {
       "name": "partite",
       "schemaName": "public",
-      "x": 2202.770417663094,
+      "x": 2219.876618834969,
       "y": -1278.1216040167146
     },
     {
@@ -27,6 +27,18 @@
       "schemaName": "public",
       "x": 1103.1289919128658,
       "y": -479.7190513832465
+    },
+    {
+      "name": "strutture_Partecipanti_partite",
+      "schemaName": "public",
+      "x": 22.809174493398388,
+      "y": 452.3919746298455
+    },
+    {
+      "name": "spostamenti",
+      "schemaName": "public",
+      "x": 22.809174493398388,
+      "y": 758.3919746298454
     },
     {
       "name": "mosse",
@@ -164,6 +176,21 @@
     },
     {
       "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "utenti",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "truppe",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
         "id_partita"
       ],
       "firstTableName": "partite",
@@ -227,33 +254,9 @@
     },
     {
       "firstFieldNames": [
-        "user_id"
+        "id_partita"
       ],
-      "firstTableName": "partecipanti_partite",
-      "firstSchemaName": "public",
-      "firstRelation": "1",
-      "secondFieldNames": [
-        "user_id"
-      ],
-      "secondTableName": "truppe",
-      "secondSchemaName": "public",
-      "secondRelation": "*",
-      "checkPoints": [
-        {
-          "x": 1485.4356903850025,
-          "y": -423.71905138324655
-        },
-        {
-          "x": 1485.4356903850025,
-          "y": -1001.4116420060782
-        }
-      ]
-    },
-    {
-      "firstFieldNames": [
-        "partita_id"
-      ],
-      "firstTableName": "partecipanti_partite",
+      "firstTableName": "partite",
       "firstSchemaName": "public",
       "firstRelation": "1",
       "secondFieldNames": [
@@ -262,28 +265,49 @@
       "secondTableName": "truppe",
       "secondSchemaName": "public",
       "secondRelation": "*",
-      "checkPoints": [
-        {
-          "x": 1475.4356903850025,
-          "y": -391.71905138324655
-        },
-        {
-          "x": 1475.4356903850025,
-          "y": -1033.4116420060782
-        }
-      ]
+      "checkPoints": []
     },
     {
       "firstFieldNames": [
-        "id_alleanza"
+        "id_partita"
       ],
-      "firstTableName": "partecipanti_partite",
+      "firstTableName": "strutture_Partecipanti_partite",
       "firstSchemaName": "public",
       "firstRelation": "1",
       "secondFieldNames": [
-        "id_alleanza"
+        "partita_id"
       ],
-      "secondTableName": "alleanze",
+      "secondTableName": "partecipanti_partite",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_utente"
+      ],
+      "firstTableName": "strutture_Partecipanti_partite",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "partecipanti_partite",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_mossa"
+      ],
+      "firstTableName": "spostamenti",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id_mossa"
+      ],
+      "secondTableName": "mosse",
       "secondSchemaName": "public",
       "secondRelation": "*",
       "checkPoints": []
@@ -299,6 +323,21 @@
         "id_istanza_armata"
       ],
       "secondTableName": "Armata",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_alleanza"
+      ],
+      "firstTableName": "partecipanti_partite",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id_alleanza"
+      ],
+      "secondTableName": "alleanze",
       "secondSchemaName": "public",
       "secondRelation": "*",
       "checkPoints": []
