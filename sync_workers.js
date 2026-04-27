@@ -1,8 +1,9 @@
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
+const format = require('pg-format');
 const Redis = require('ioredis');
 const redis = new Redis();
 
-const db = mysql.createPool({ host: 'localhost', user: 'root', database: 'pwm_tactical' });
+const db = new Pool({ host: 'localhost', user: 'postgres', database: 'planetary_war_manager_database', port: 5432 });
 
 async function performDump() {
     const partiteAttive = await redis.keys('modificati:*');
@@ -28,11 +29,16 @@ async function performDump() {
             rows.push([id, partitaId, data.user_id, data.tipo, currentX, currentY, data.alt || 0, data.rot || 0, data.hp || 100, data.stato || 1]);
         }
 
-        const sql = `INSERT INTO truppe (id_truppa, partita_id, user_id, tipo, x, y, alt, rot, hp, stato) 
-                     VALUES ? ON DUPLICATE KEY UPDATE x=VALUES(x), y=VALUES(y), stato=VALUES(stato)`;
+        const sql = format(
+            `INSERT INTO truppe (id_istanza_truppa, partita_id, user_id, id_modello, x, y, alt, rot, hp, stato) 
+             VALUES %L 
+             ON CONFLICT (id_istanza_truppa) 
+             DO UPDATE SET x=EXCLUDED.x, y=EXCLUDED.y, stato=EXCLUDED.stato`,
+            rows
+        );
         
         try {
-            await db.query(sql, [rows]);
+            await db.query(sql);
             // Elimina la chiave SOLO se il DB ha confermato il salvataggio
             await redis.del(processingKey); 
             console.log(`Sincronizzate ${ids.length} truppe per partita ${partitaId}`);

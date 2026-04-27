@@ -2,10 +2,37 @@
 
 echo "🚀 Avvio dei servizi PWM Tactical Command..."
 
+echo "🗄️ Configurazione Database PostgreSQL..."
+DB_NAME="planetary_war_manager_database"
+
+# Controllo se PostgreSQL è in esecuzione
+if ! systemctl is-active --quiet postgresql; then
+    echo "Servizio PostgreSQL non attivo. Tento l'avvio..."
+    sudo systemctl start postgresql
+    sleep 2
+fi
+
+# Controllo se il database esiste, se no lo creo
+if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
+    echo "Creazione del database $DB_NAME..."
+    sudo -u postgres createdb "$DB_NAME"
+else
+    echo "✅ Database $DB_NAME già esistente."
+fi
+
+# Applica sempre lo schema (le tabelle non verranno duplicate grazie agli IF NOT EXISTS)
+if [ -f "database.sql" ]; then
+    echo "Sincronizzazione delle tabelle da database.sql..."
+    sudo -u postgres psql -d "$DB_NAME" -f database.sql > /dev/null
+    echo "✅ Tabelle sincronizzate con successo!"
+else
+    echo "⚠️ File database.sql non trovato. Tabelle non create."
+fi
+
 if [ ! -d "node_modules" ]; then
     echo "📦 Dipendenze non trovate. Installazione in corso..."
     npm init -y > /dev/null
-    npm install express socket.io ioredis jsonwebtoken geotiff cors mysql2
+    npm install express socket.io ioredis jsonwebtoken geotiff cors pg pg-format
     echo "✅ Installazione completata!"
 fi
 

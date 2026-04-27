@@ -7,7 +7,7 @@
 -- CREATE SCHEMA public;
 
 -- 1. UTENTI
-CREATE TABLE utenti (
+CREATE TABLE IF NOT EXISTS utenti (
     id_user SERIAL PRIMARY KEY,
     username VARCHAR(32) NOT NULL UNIQUE,
     email VARCHAR(64) NOT NULL UNIQUE,
@@ -18,7 +18,7 @@ CREATE TABLE utenti (
     last_username_change TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     recupera_passwd VARCHAR(255) NULL,
-    two_fa_method VARCHAR(50), -- Rinominato da 2FA_method (Postgres preferisce non iniziare con numeri)
+    two_fa_method VARCHAR(50), 
     two_fa_secret VARCHAR(255),
     two_fa_enabled BOOLEAN DEFAULT FALSE,
     is_banned BOOLEAN DEFAULT FALSE,
@@ -31,7 +31,7 @@ COMMENT ON COLUMN utenti.avatar_id IS 'ID dell''avatar scelto, da 1 a 20';
 COMMENT ON COLUMN utenti.recupera_passwd IS 'Token generato dinamicamente al recupero passwd, valido 10 min';
 
 -- 2. ACCESSI
-CREATE TABLE accessi (
+CREATE TABLE IF NOT EXISTS accessi (
     id_access SERIAL PRIMARY KEY,
     user_id INT NOT NULL,
     ip_address VARCHAR(45),
@@ -41,7 +41,7 @@ CREATE TABLE accessi (
 );
 
 -- 3. PARTITE
-CREATE TABLE partite (
+CREATE TABLE IF NOT EXISTS partite (
     id_partita SERIAL PRIMARY KEY,
     nome_partita VARCHAR(100) NOT NULL,
     has_elo BOOLEAN DEFAULT TRUE,
@@ -62,7 +62,7 @@ CREATE TABLE partite (
 COMMENT ON COLUMN partite.configurazione_compressa IS 'Stato[2]|MaxPly[3]|Durata[4]|Molt[4]|Tipo[4]|Mod[4]|Regioni[16]';
 
 -- 4. BAN
-CREATE TABLE ban (
+CREATE TABLE IF NOT EXISTS ban (
     id_ban SERIAL PRIMARY KEY,
     id_user INT NOT NULL,
     time_stamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -72,7 +72,7 @@ CREATE TABLE ban (
 );
 
 -- 5. ALLEANZE
-CREATE TABLE alleanze (
+CREATE TABLE IF NOT EXISTS alleanze (
     id_alleanza SERIAL PRIMARY KEY,
     nome_alleanza VARCHAR(50) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -84,7 +84,7 @@ CREATE TABLE alleanze (
 );
 
 -- 6. PARTECIPANTI_PARTITE
-CREATE TABLE partecipanti_partite (
+CREATE TABLE IF NOT EXISTS partecipanti_partite (
     user_id INT NOT NULL,
     partita_id INT NOT NULL,
     punteggio INT DEFAULT 0,
@@ -111,7 +111,7 @@ CREATE TABLE partecipanti_partite (
 COMMENT ON COLUMN partecipanti_partite.stato_risorse IS 'Snapshot asincrono sincronizzato da Redis a DB ogni 15-30 min';
 
 -- 7. MOSSE
-CREATE TABLE mosse (
+CREATE TABLE IF NOT EXISTS mosse (
     id_mossa SERIAL PRIMARY KEY,
     user_id INT NOT NULL,
     partita_id INT NOT NULL,
@@ -124,14 +124,14 @@ CREATE TABLE mosse (
 );
 
 -- 8. MESSAGGI
-CREATE TABLE messaggi (
-    id_mex BIGINT PRIMARY KEY, -- Rimosso SERIAL per gestire il numero random a 64 bit come richiesto
+CREATE TABLE IF NOT EXISTS messaggi (
+    id_mex BIGINT PRIMARY KEY, 
     time_stamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     content VARCHAR(200) NOT NULL
 );
 
 -- 9. CHAT
-CREATE TABLE chat (
+CREATE TABLE IF NOT EXISTS chat (
     id_user_send INT NOT NULL,
     id_partita INT NOT NULL,
     id_mex BIGINT NOT NULL,
@@ -144,7 +144,7 @@ CREATE TABLE chat (
 );
 
 -- 10. TRUPPE
-CREATE TABLE truppe (
+CREATE TABLE IF NOT EXISTS truppe (
     id_istanza_truppa VARCHAR(36) PRIMARY KEY,
     partita_id INT NOT NULL,
     user_id INT NOT NULL,
@@ -161,11 +161,11 @@ CREATE TABLE truppe (
     CONSTRAINT fk_user_truppa FOREIGN KEY (user_id) REFERENCES utenti(id_user) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_player_units_truppe ON truppe(partita_id, user_id);
-CREATE INDEX idx_geo_static_truppe ON truppe(x, y);
+CREATE INDEX IF NOT EXISTS idx_player_units_truppe ON truppe(partita_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_geo_static_truppe ON truppe(x, y);
 
 -- 11. ARMATA
-CREATE TABLE armata (
+CREATE TABLE IF NOT EXISTS armata (
     id_istanza_armata VARCHAR(36) PRIMARY KEY,
     partita_id INT NOT NULL,
     user_id INT NOT NULL,
@@ -186,8 +186,8 @@ CREATE TABLE armata (
     CONSTRAINT fk_user_armata FOREIGN KEY (user_id) REFERENCES utenti(id_user) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_player_units_armata ON armata(partita_id, user_id);
-CREATE INDEX idx_geo_static_armata ON armata(x, y);
+CREATE INDEX IF NOT EXISTS idx_player_units_armata ON armata(partita_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_geo_static_armata ON armata(x, y);
 
 -- ==========================================
 -- DATI DI TEST (DML)
@@ -197,7 +197,14 @@ INSERT INTO utenti (username, email, password_hash, reg, elo_rating, two_fa_enab
 ('Generale_Inverno', 'gen@mail.com', 'hash_sha256_dummy_1', 'Europa', 1450, TRUE),
 ('DesertFox', 'fox@mail.com', 'hash_sha256_dummy_2', 'Africa', 1320, FALSE),
 ('PacificFleet', 'pac@mail.com', 'hash_sha256_dummy_3', 'Asia', 1580, TRUE),
-('NoobMaster', 'noob@mail.com', 'hash_sha256_dummy_4', 'Nord America', 900, FALSE);
+('NoobMaster', 'noob@mail.com', 'hash_sha256_dummy_4', 'Nord America', 900, FALSE)
+ON CONFLICT (username) DO NOTHING;
+
+-- ==========================================
+-- PERMESSI (Ambiente di Sviluppo)
+-- ==========================================
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO PUBLIC;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO PUBLIC;;
 
 UPDATE utenti SET is_banned = TRUE WHERE username = 'NoobMaster';
 
