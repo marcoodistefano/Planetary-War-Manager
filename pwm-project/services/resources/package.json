@@ -1,0 +1,14 @@
+{
+  "name": "pwm-resources",
+  "version": "1.0.0",
+  "main": "sync_workers.js",
+  "scripts": {
+    "start": "node sync_workers.js",
+    "sync": "node sync_workers.js"
+  },
+  "dependencies": {
+    "ioredis": "^5.4.1",
+    "pg": "^8.11.3",
+    "pg-format": "^1.0.4"
+  }
+}

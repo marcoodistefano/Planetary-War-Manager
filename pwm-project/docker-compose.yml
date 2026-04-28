@@ -1,0 +1,114 @@
+services:
+  # IL CUORE DATI
+  redis:
+    image: redis:7-alpine
+    networks:
+      - pwm-net
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=pwm_tactical_database
+      - POSTGRES_PASSWORD=secret
+    volumes:
+      - ./db-init:/docker-entrypoint-initdb.d
+    networks:
+      - pwm-net
+
+  # AUTH & ELO
+  auth-service:
+    build: ./services/auth-elo
+    depends_on:
+      - db
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DB_URL=postgres://postgres:secret@db:5432/postgres
+    networks:
+      - pwm-net
+
+  # ENGINE SPOSTAMENTI
+  engine-move:
+    build: ./services/movement
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=MIA_CHIAVE_SEGRETA_2026
+    volumes:
+      - ./shared/assets:/app/assets:ro
+    networks:
+      - pwm-net
+
+  # ENGINE COMBATTIMENTI
+  engine-combat:
+    build: ./services/combat
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - pwm-net
+
+  # ENGINE RISORSE
+  engine-res:
+    build: ./services/resources
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - pwm-net
+
+  # CHAT
+  chat:
+    build: ./services/chat
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - pwm-net
+
+  # GATEWAY DI INGRESSO
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend:/usr/share/nginx/html
+      - ./shared/assets:/usr/share/nginx/html/assets:ro 
+    depends_on:
+      - auth-service
+      - engine-move
+      - engine-combat
+      - engine-res
+      - chat
+    networks:
+      - pwm-net
+
+  # --- STRUMENTI DI VISUALIZZAZIONE DATABASE ---
+  pgadminer:
+    image: adminer
+    ports:
+      - "8085:8080" # Porta non canonica esterna per visualizzare Postgres
+    depends_on:
+      - db
+    networks:
+      - pwm-net
+      
+  redis-ui:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8086:8081" # Porta non canonica esterna per visualizzare Redis
+    depends_on:
+      - redis
+    networks:
+      - pwm-net
+
+networks:
+  pwm-net:
+    driver: bridge
