@@ -5,3 +5,22 @@ shared/assets/*.TIF
 
 assets/*.tif
 node_modules/
+# --- ASSET PESANTI ---
+# Ignora i GeoTIFF ovunque si trovino (nella root o nelle sottocartelle)
+**/*.tif
+**/*.TIF
+
+# --- DIPENDENZE ---
+# IMPORTANTE: Il doppio asterisco serve per ignorare i node_modules 
+# dentro ogni microservizio (chat, movement, auth, ecc.)
+**/node_modules/
+node_modules/
+
+# --- SICUREZZA & LOG ---
+# Anche se sei in sviluppo, mettilo ora così non rischi di caricarlo per sbaglio
+# .env
+npm-debug.log*
+
+# --- SPAZZATURA DI SISTEMA ---
+.DS_Store
+Thumbs.db
