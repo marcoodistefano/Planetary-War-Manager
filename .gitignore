@@ -1,2 +1,7 @@
+# Ignora i file GeoTIFF pesanti
+shared/assets/*.tif
+shared/assets/*.TIF
+**/*.tif
+
 assets/*.tif
 node_modules/
