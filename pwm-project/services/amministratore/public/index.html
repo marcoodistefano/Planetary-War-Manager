@@ -35,6 +35,16 @@
         <button class="btn" style="background:#555; float:right;" onclick="logout()">🚪 Disconnetti</button>
     </div>
 
+    <div class="card" style="margin-bottom: 20px;">
+        <h2>Traffico di Rete e Topologia (Weave Scope)</h2>
+        <div style="width: 100%; height: 500px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden;">
+            <iframe src="http://localhost:4040" style="width: 100%; height: 100%; border: none;" title="Weave Scope Preview"></iframe>
+        </div>
+        <p style="text-align: right; margin-top: 10px; font-size: 0.9em;">
+            <a href="http://localhost:4040" target="_blank" style="color: #007bff; text-decoration: none;">Apri Weave Scope a tutto schermo ↗</a>
+        </p>
+    </div>
+
     <h2>Stato Containers</h2>
     <div id="containers" class="dashboard">
         <!-- Containers verranno inseriti qui dallo script -->
