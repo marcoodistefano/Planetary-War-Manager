@@ -88,6 +88,28 @@ services:
     networks:
       - pwm-net
 
+  # --- RIPRISTINA ASSETS ---
+  ripristina:
+    build:
+      context: .
+      dockerfile: ./services/ripristina/Dockerfile
+    volumes:
+      - ./shared/assets:/app/assets
+    networks:
+      - pwm-net
+
+  # --- AMMINISTRATORE ---
+  amministratore:
+    build: ./services/amministratore
+    ports:
+      - "8080:8080" # Pannello admin (es. http://localhost:8080)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Necessario per controllare gli altri container
+    depends_on:
+      - ripristina
+    networks:
+      - pwm-net
+
   # --- STRUMENTI DI VISUALIZZAZIONE DATABASE ---
   pgadminer:
     image: adminer
