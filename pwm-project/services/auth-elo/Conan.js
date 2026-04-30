@@ -68,17 +68,22 @@ function URL_detective(input) {
 }
 
 function B64_detective(input) {
-  if (input.length % 4 !== 0 || input.length === 0) return false;
-  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(input)) return false;
+  const cleanInput = input.replace(/\s+/g, ""); // FONDAMENTALE: togliere gli spazi prima del calcolo
+
+  if (cleanInput.length % 4 !== 0 || cleanInput.length === 0) return false;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(cleanInput)) return false;
 
   try {
-    const decoded = Buffer.from(input, "base64").toString("utf8");
-    // HEURISTIC CHECK: Il Base64 produce spesso "spazzatura" se decodifichi una stringa casuale.
-    // Accettiamo il risultato solo se è composto per lo più da caratteri di testo validi.
-    if (
-      /^[\x20-\x7E\u00A0-\uFFFF\n\r\t]*$/.test(decoded) &&
-      decoded.trim() !== ""
-    ) {
+    const decoded = Buffer.from(cleanInput, "base64").toString("utf8");
+    
+    // EURISTICA ROUND-TRIP: La prova matematica che impedisce di convertire nomi utente (es. "User")
+    const reencoded = Buffer.from(decoded, "utf8").toString("base64");
+    if (reencoded !== cleanInput) {
+      return false; // Era testo normale!
+    }
+    
+    // EURISTICA: Il risultato decodificato deve essere testo valido stampabile
+    if (/^[\x20-\x7E\u00A0-\uFFFF\n\r\t]*$/.test(decoded) && decoded.trim() !== "") {
       return "B64";
     }
   } catch (e) {

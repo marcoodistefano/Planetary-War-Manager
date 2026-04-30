@@ -17,7 +17,7 @@
 <body>
 
 <form id="authForm">
-    <h3>PWM Auth Test</h3>
+    <h3>PWM Auth Test - Registrazione</h3>
     <div>
         <label>Username</label>
         <input type="text" id="username" placeholder="Es: Comandante<script>" required>
@@ -38,16 +38,30 @@
             <option value="Asia">Asia</option>
         </select>
     </div>
-    <button type="submit">Invia al Server</button>
+    <button type="submit">Registrati</button>
     <div id="response"></div>
 </form>
 
+<form id="loginForm">
+    <h3>PWM Auth Test - Login</h3>
+    <div>
+        <label>Username</label>
+        <input type="text" id="login-username" placeholder="Es: Comandante" required>
+    </div>
+    <div>
+        <label>Password (min 12 char)</label>
+        <input type="password" id="login-password" required>
+    </div>
+    <button type="submit">Accedi</button>
+    <div id="login-response"></div>
+</form>
+
 <script>
+    // REGISTRAZIONE
     document.getElementById('authForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const responseDiv = document.getElementById('response');
         
-        // Raccolta dati conforme al modulo standard PWM
         const data = {
             username: document.getElementById('username').value,
             email: document.getElementById('email').value,
@@ -57,6 +71,32 @@
 
         try {
             const response = await fetch('http://localhost:3001/auth/test-auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+            responseDiv.style.color = response.ok ? "#28a745" : "#dc3545";
+            responseDiv.textContent = JSON.stringify(result, null, 2);
+        } catch (err) {
+            responseDiv.style.color = "#dc3545";
+            responseDiv.textContent = "Errore: Assicurati che il server Node.js sia attivo!";
+        }
+    });
+
+    // LOGIN
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const responseDiv = document.getElementById('login-response');
+        
+        const data = {
+            username: document.getElementById('login-username').value,
+            password: document.getElementById('login-password').value
+        };
+
+        try {
+            const response = await fetch('http://localhost:3001/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
