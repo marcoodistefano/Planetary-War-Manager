@@ -20,6 +20,10 @@ const routes: Routes = [
     loadComponent: () => import('./auth/register/register.page').then( m => m.RegisterPage)
   },
   {
+    path: 'auth/recover-password',
+    loadComponent: () => import('./auth/recover-password/recover-password.page').then( m => m.RecoverPasswordPage)
+  },
+  {
     path: 'game/match/:id', // Ricorda l'ID dinamico per la partita
     loadComponent: () => import('./game/match/match.page').then( m => m.MatchPage)
   },
@@ -30,7 +34,7 @@ const routes: Routes = [
   {
     path: 'history',
     loadComponent: () => import('./history/history.page').then( m => m.HistoryPage)
-  }
+  },
 ];
 
 @NgModule({

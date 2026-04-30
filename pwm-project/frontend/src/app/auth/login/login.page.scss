@@ -1,0 +1,131 @@
+/* ==========================================================================
+   1. SETTAGGI GLOBALI E LAYOUT
+   ========================================================================== */
+
+ion-content {
+  --background: #0D1117;
+}
+
+ion-toolbar {
+  --background: #161B22;
+  --color: #C9D1D9;
+  border-bottom: 1px solid #30363D;
+}
+
+.login-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100%; /* Importante per il click del footer */
+  padding: 24px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.logo-space {
+  text-align: center;
+  margin-bottom: 30px;
+
+  h1 {
+    color: #58A6FF;
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+}
+
+/* ==========================================================================
+   2. STRUTTURA DEL FORM E CONTENITORI (UNIFORMI AL REGISTER)
+   ========================================================================== */
+
+form {
+  background: #161B22;
+  padding: 30px 20px;
+  border-radius: 12px;
+  border: 1px solid #30363D;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+/* Il contenitore universale che sostituisce ion-item */
+.field-container {
+  background: #010409;
+  border: 1px solid #30363D;
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  transition: border-color 0.2s ease-in-out;
+
+  /* Illumina il bordo al click */
+  &:focus-within {
+    border-color: #58A6FF;
+  }
+}
+
+/* ==========================================================================
+   3. TIPOGRAFIA E ETICHETTE
+   ========================================================================== */
+
+.custom-label {
+  display: block;
+  color: #58A6FF !important;
+  font-size: 0.70rem !important;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 4px !important;
+}
+
+/* ==========================================================================
+   4. COMPONENTI DI INPUT
+   ========================================================================== */
+
+ion-input {
+  --color: #C9D1D9;
+  --placeholder-color: #484F58;
+  --padding-start: 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1rem;
+}
+
+/* ==========================================================================
+   5. AZIONI E FOOTER (FIX PER IL CLICK)
+   ========================================================================== */
+
+ion-button {
+  margin-top: 10px;
+  height: 48px;
+  font-weight: bold;
+  --background: #1D4ED8;
+  --background-activated: #1e40af;
+  --border-radius: 6px;
+  --color: white;
+}
+
+.form-footer {
+  text-align: center;
+  margin-top: 25px;
+  position: relative; /* Garantisce la cliccabilità */
+  z-index: 10;
+
+  p {
+    color: #8B949E;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+  }
+}
+
+.secondary-link {
+  display: inline-block; /* Espande l'area di click */
+  color: #58A6FF;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: bold;
+  padding: 5px; 
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+    color: #79c0ff;
+  }
+}

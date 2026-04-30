@@ -1,0 +1,188 @@
+/* ==========================================================================
+   1. SETTAGGI GLOBALI E LAYOUT
+   ========================================================================== */
+
+ion-content {
+  --background: #0D1117;
+}
+
+ion-toolbar {
+  --background: #161B22;
+  --color: #C9D1D9;
+  border-bottom: 1px solid #30363D;
+}
+
+.register-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100%;
+  padding: 24px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.logo-space {
+  text-align: center;
+  margin-bottom: 30px;
+
+  h1 {
+    color: #58A6FF;
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+}
+
+/* ==========================================================================
+   2. STRUTTURA DEL FORM E CONTENITORI
+   ========================================================================== */
+
+form {
+  background: #161B22;
+  padding: 30px 20px;
+  border-radius: 12px;
+  border: 1px solid #30363D;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+/* Il contenitore universale per tutti i campi (Input e Selectable) */
+.field-container {
+  background: #010409;
+  border: 1px solid #30363D;
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  transition: border-color 0.2s ease-in-out;
+
+  &:focus-within {
+    border-color: #58A6FF;
+  }
+}
+
+/* ==========================================================================
+   3. TIPOGRAFIA E ETICHETTE
+   ========================================================================== */
+
+/* Etichetta blu tattica in alto */
+.custom-label {
+  display: block;
+  color: #58A6FF !important;
+  font-size: 0.70rem !important;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 4px !important;
+}
+
+/* Label generica (fallback) */
+ion-label {
+  color: #58A6FF !important;
+  font-size: 0.75rem !important;
+  font-weight: bold;
+  letter-spacing: 1px;
+  margin-bottom: 8px !important;
+}
+
+/* ==========================================================================
+   4. COMPONENTI DI INPUT
+   ========================================================================== */
+
+/* Stile comune per font militare */
+ion-input, 
+ionic-selectable {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Input di testo standard */
+ion-input {
+  --color: #C9D1D9;
+  --placeholder-color: #484F58;
+  --padding-start: 0;
+  font-size: 1rem;
+}
+
+/* Selettore avanzato (Nazioni) */
+ionic-selectable {
+  width: 100%;
+  height: 50px;
+  margin-top: 2px;
+  --color: #C9D1D9;
+  --placeholder-color: #484F58;
+
+  /* Forza il contenitore interno a occupare tutto lo spazio */
+  &::part(container) {
+    width: 100%;
+    display: flex;
+    justify-content: space-between; /* Spinge il testo a sinistra e l'icona a destra */
+    align-items: center;
+  }
+
+  /* Gestisce lo spazio del testo/placeholder */
+  &::part(value), 
+  &::part(placeholder) {
+    padding: 0;
+    flex-grow: 1; /* Permette al testo di prendersi lo spazio necessario */
+    text-align: left;
+  }
+
+  /* Posiziona l'icona a destra */
+  &::part(icon) {
+    color: #484F58;
+    margin-left: 10px; /* Distanza minima dal testo */
+  }
+}
+
+/* Select standard (Legacy) */
+ion-select {
+  width: 100%;
+  font-size: 1.1rem;
+  --placeholder-color: #999;
+  --placeholder-opacity: 1;
+  padding-top: 10px;
+
+  &::part(icon) {
+    color: #764ba2;
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   5. AZIONI E FOOTER
+   ========================================================================== */
+
+/* Bottone Primario (Blu Tattico) */
+ion-button {
+  margin-top: 10px;
+  height: 48px;
+  font-weight: bold;
+  --background: #1D4ED8;
+  --background-activated: #1e40af;
+  --border-radius: 6px;
+  --color: white;
+}
+
+.form-footer {
+  text-align: center;
+  margin-top: 20px;
+
+  p {
+    color: #8B949E;
+    font-size: 0.85rem;
+  }
+
+  position: relative; /* Aggiungi questo */
+  z-index: 10;        /* Assicura che sia sopra tutto */
+}
+
+.secondary-link {
+  color: #58A6FF;
+  text-decoration: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

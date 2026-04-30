@@ -1,13 +1,60 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
-    <ion-title>register</ion-title>
+    <!-- <ion-title>PWM - SECURE REGISTER</ion-title> -->
   </ion-toolbar>
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">register</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <div class="register-container">
+    <div class="logo-space">
+      <!-- Qui potresti mettere il banner identificativo citato nel CDD -->
+      <h1>PLANETARY WAR MANAGER</h1>
+    </div>
+
+    <form [formGroup]="RegisterForm" (ngSubmit)="onSubmit()">
+  
+      <!-- USERNAME -->
+      <div class="field-container">
+        <ion-label class="custom-label">USERNAME</ion-label>
+        <ion-input type="text" formControlName="username" placeholder="nome utente"></ion-input>
+      </div>
+
+      <!-- REGIONE UTENTE -->
+      <div class="field-container">
+        <ion-label class="custom-label">REGIONE UTENTE</ion-label>
+        <ionic-selectable
+          formControlName="region"
+          [items]="countries"
+          itemValueField="code"
+          itemTextField="name"
+          [canSearch]="true"
+          placeholder="Seleziona Regione"
+          searchPlaceholder="Cerca...">
+          <ng-template ionicSelectableItemTemplate let-country="item">
+            {{ country.flag }} {{ country.name }}
+          </ng-template>
+        </ionic-selectable>
+      </div>
+
+      <!-- EMAIL -->
+      <div class="field-container">
+        <ion-label class="custom-label">EMAIL COMANDANTE</ion-label>
+        <ion-input type="email" formControlName="email" placeholder="nome@esempio.it"></ion-input>
+      </div>
+
+      <!-- PASSWORD -->
+      <div class="field-container">
+        <ion-label class="custom-label">PASSWORD</ion-label>
+        <ion-input type="password" formControlName="password" placeholder="••••••••"></ion-input>
+      </div>
+
+      <ion-button expand="block" type="submit" [disabled]="!RegisterForm.valid">
+        REGISTRAZIONE
+      </ion-button>
+
+      <div class="form-footer">
+        <p>Hai giá un account? <a class="secondary-link" routerLink="/auth/login">Accedi ora</a></p>
+      </div>
+    </form>
+  </div>
 </ion-content>
