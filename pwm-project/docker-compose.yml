@@ -1,3 +1,4 @@
+version: '3.8'
 services:
   scope:
     image: weaveworks/scope:latest
@@ -10,8 +11,6 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:rw"
     command:
       - "--probe.docker=true"
-    ports:
-      - "4040:4040"
 
   # IL CUORE DATI
   redis:
@@ -29,6 +28,18 @@ services:
     networks:
       - pwm-net
 
+  frontend-dev:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - pwm-net
+
   # AUTH & ELO
   auth-service:
     build: ./services/auth-elo
@@ -37,7 +48,7 @@ services:
       - redis
     environment:
       - REDIS_URL=redis://redis:6379
-      - DB_URL=postgres://postgres:secret@db:5432/postgres
+      - DB_URL=postgres://postgres:secret@db:5432/pwm_tactical_database
     networks:
       - pwm-net
 
@@ -91,7 +102,7 @@ services:
       - "80:80"
     volumes:
       - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./frontend:/usr/share/nginx/html
+      - ../frontend/www:/usr/share/nginx/html
       - ./shared/assets:/usr/share/nginx/html/assets:ro 
     depends_on:
       - auth-service
