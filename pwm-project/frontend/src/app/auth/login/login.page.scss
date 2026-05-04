@@ -3,7 +3,7 @@
    ========================================================================== */
 
 ion-content {
-  --background: #0D1117;
+  --background: linear-gradient(rgba(13, 17, 23, 0.3), rgba(13, 17, 23, 0.4)), url('/assets/background/background1.png') center center / cover no-repeat fixed;
 }
 
 ion-toolbar {
@@ -16,22 +16,33 @@ ion-toolbar {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 100%; /* Importante per il click del footer */
-  padding: 24px;
+  align-items: center;
+  min-height: 100%;
+  padding: 20px 24px;
   max-width: 400px;
   margin: 0 auto;
+  position: relative;
 }
 
 .logo-space {
   text-align: center;
-  margin-bottom: 30px;
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 0;
+  width: 100%;
 
   h1 {
     color: #58A6FF;
-    font-size: 1.4rem;
+    font-size: 2rem;
     letter-spacing: 2px;
     font-weight: 800;
     text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(88, 166, 255, 0.6);
+
+    @media (max-width: 768px) {
+      font-size: 1.8rem;
+    }
   }
 }
 
@@ -40,25 +51,29 @@ ion-toolbar {
    ========================================================================== */
 
 form {
-  background: #161B22;
+  background: rgba(22, 27, 34, 0.5);
   padding: 30px 20px;
   border-radius: 12px;
-  border: 1px solid #30363D;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(48, 54, 61, 0.6);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+  width: 100%;
 }
 
 /* Il contenitore universale che sostituisce ion-item */
 .field-container {
-  background: #010409;
-  border: 1px solid #30363D;
+  background: rgba(1, 4, 9, 0.4);
+  border: 1px solid rgba(88, 166, 255, 0.3);
   border-radius: 12px;
   padding: 10px 16px;
   margin-bottom: 20px;
-  transition: border-color 0.2s ease-in-out;
+  transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+  backdrop-filter: blur(3px);
 
   /* Illumina il bordo al click */
   &:focus-within {
     border-color: #58A6FF;
+    background: rgba(1, 4, 9, 0.6);
   }
 }
 
@@ -68,12 +83,13 @@ form {
 
 .custom-label {
   display: block;
-  color: #58A6FF !important;
+  color: #79c0ff !important;
   font-size: 0.70rem !important;
   font-weight: 800;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   margin-bottom: 4px !important;
+  text-shadow: 0 0 5px rgba(121, 192, 255, 0.4);
 }
 
 /* ==========================================================================

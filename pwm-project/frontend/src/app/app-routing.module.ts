@@ -4,43 +4,65 @@ import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
 const routes: Routes = [
   {
     path: '',
-    redirectTo: 'auth/login', // Pagina iniziale di default
+    redirectTo: 'login',
     pathMatch: 'full'
   },
   {
     path: 'home',
-    loadComponent: () => import('./home/home.page').then( m => m.HomePage)
+    loadComponent: () => import('./home/home.page').then(m => m.HomePage)
+  },
+  {
+    path: 'login',
+    loadComponent: () => import('./auth/login/login.page').then(m => m.LoginPage)
+  },
+  {
+    path: 'register',
+    loadComponent: () => import('./auth/register/register.page').then(m => m.RegisterPage)
+  },
+  {
+    path: 'login/recovery/username',
+    loadComponent: () => import('./auth/recover-password/recover-password.page').then(m => m.RecoverPasswordPage)
+  },
+  {
+    path: 'login/recovery/password',
+    loadComponent: () => import('./auth/recover-password/recover-password.page').then(m => m.RecoverPasswordPage)
   },
   {
     path: 'auth/login',
-    loadComponent: () => import('./auth/login/login.page').then( m => m.LoginPage)
+    redirectTo: 'login',
+    pathMatch: 'full'
   },
   {
     path: 'auth/register',
-    loadComponent: () => import('./auth/register/register.page').then( m => m.RegisterPage)
+    redirectTo: 'register',
+    pathMatch: 'full'
   },
   {
-    path: 'auth/recover-password',
-    loadComponent: () => import('./auth/recover-password/recover-password.page').then( m => m.RecoverPasswordPage)
+    path: 'auth/login/recovery/username',
+    redirectTo: 'login/recovery/username',
+    pathMatch: 'full'
   },
   {
-    path: 'game/match/:id', // Ricorda l'ID dinamico per la partita
-    loadComponent: () => import('./game/match/match.page').then( m => m.MatchPage)
+    path: 'auth/login/recovery/password',
+    redirectTo: 'login/recovery/password',
+    pathMatch: 'full'
+  },
+  {
+    path: 'game/match/:id',
+    loadComponent: () => import('./game/match/match.page').then(m => m.MatchPage)
   },
   {
     path: 'profile',
-    loadComponent: () => import('./profile/profile.page').then( m => m.ProfilePage)
+    loadComponent: () => import('./profile/profile.page').then(m => m.ProfilePage)
   },
   {
     path: 'history',
-    loadComponent: () => import('./history/history.page').then( m => m.HistoryPage)
+    loadComponent: () => import('./history/history.page').then(m => m.HistoryPage)
   },
 ];
 
 @NgModule({
-  imports: [
-    RouterModule.forRoot(routes, { preloadingStrategy: PreloadAllModules })
-  ],
+  imports: [RouterModule.forRoot(routes, { preloadingStrategy: PreloadAllModules })],
   exports: [RouterModule]
 })
 export class AppRoutingModule { }
