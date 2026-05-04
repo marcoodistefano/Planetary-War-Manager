@@ -3,6 +3,7 @@ const cors = require("cors");
 const app = express();
 const { json } = require("body-parser");
 const PWMSecurity = require("./Manager.js");
+const path = require('path');
 
 app.use(cors());
 app.use(express.json());
@@ -61,6 +62,16 @@ app.post("/login", async (req, res) => {
       error: "Errore interno del server",
       details: error.message 
     });
+  }
+});
+
+// Serve una semplice pagina di test per il login via GET
+app.get('/login', (req, res) => {
+  try {
+    // prova a servire auth.html presente nella stessa cartella
+    res.sendFile(path.join(__dirname, 'auth.html'));
+  } catch (err) {
+    res.status(500).send('Errore nel servire la pagina di login');
   }
 });
 

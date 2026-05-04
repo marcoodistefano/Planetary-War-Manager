@@ -1,20 +1,121 @@
-<ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>
-      Blank
-    </ion-title>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">Blank</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <audio autoplay loop src="assets/audio/background_sound.mpeg" style="display: none;"></audio>
+  <div class="home-page">
+    <div class="overlay"></div>
 
-  <div id="container">
-    <strong>Ready to create an app?</strong>
-    <p>Start with Ionic <a target="_blank" rel="noopener noreferrer" href="https://ionicframework.com/docs/components">UI Components</a></p>
+    <section class="top-row">
+      <aside class="panel leaderboard-panel">
+        <div class="panel-heading">
+          <span>Leaderboard</span>
+          <small>Classifiche rapide</small>
+        </div>
+
+        <div class="leaderboard-toggle">
+          <button type="button" [class.active]="leaderboardView === 'global'" (click)="leaderboardView = 'global'">Globale</button>
+          <button type="button" [class.active]="leaderboardView === 'regional'" (click)="leaderboardView = 'regional'">Regionale</button>
+          <button type="button" class="view-full" aria-label="Vedi classifica completa" (click)="viewFullLeaderboard()">Vedi classifica completa</button>
+        </div>
+
+        <div class="leaderboard-group">
+          <h2 *ngIf="leaderboardView === 'global'">Globale</h2>
+          <h2 *ngIf="leaderboardView === 'regional'">Regionale - {{ currentPlayer.region }}</h2>
+
+          <ng-container *ngIf="leaderboardView === 'global'">
+            <div class="leaderboard-entry" *ngFor="let player of getQuickLeaderboard()">
+              <span class="rank">#{{ player.rank }}</span>
+              <span class="flag" *ngIf="player.region">{{ flagEmoji(player.region) }}</span>
+              <span class="name">{{ player.player }}</span>
+              <span class="score">{{ player.score | number }}</span>
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="leaderboardView === 'regional'">
+            <div class="leaderboard-entry secondary" *ngFor="let player of getRegionalQuick()">
+              <span class="rank">#{{ player.rank }}</span>
+              <span class="flag" *ngIf="player.region">{{ flagEmoji(player.region) }}</span>
+              <span class="name">{{ player.player }}</span>
+              <span class="score">{{ player.score | number }}</span>
+            </div>
+          </ng-container>
+        </div>
+      </aside>
+
+      <div class="title-block">
+        <p class="eyebrow">Strategia, alleanze, conquista</p>
+        <h1>Planetary War Manager</h1>
+      </div>
+
+      <aside class="panel profile-panel">
+        <div class="profile-card">
+          <p class="profile-label">Profilo</p>
+          <div class="avatar">MR</div>
+          <h2 class="profile-name">Marco Rossi</h2>
+          <small class="profile-level">Livello 24</small>
+        </div>
+
+        <div class="quick-actions">
+          <button type="button" *ngFor="let action of quickActions">
+            {{ action }}
+          </button>
+        </div>
+      </aside>
+    </section>
+
+    <div class="games-container">
+      <div class="games-actions">
+        <button type="button" class="primary-button">Crea nuova partita</button>
+        <button type="button" class="ghost-button">Vedi tutte le partite attive</button>
+        <button type="button" class="ghost-button">Partite terminate ({{ finishedGames }})</button>
+      </div>
+    </div>
+
+    <div class="bottom-grid">
+      <section class="bottom-section panel">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Partite attive</p>
+            <h2>Ultime 5 partite attive</h2>
+          </div>
+        </div>
+
+        <div class="games-list">
+          <article class="game-card" *ngFor="let game of activeGames">
+            <div class="game-info">
+              <div>
+                <h3>{{ game.name }}</h3>
+                <div class="meta">{{ game.players }} giocatori · {{ activeGameTimeText(game) }}</div>
+              </div>
+            </div>
+
+            <span class="status-badge">{{ game.status }}</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="bottom-section panel">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">In attesa</p>
+            <h2>Ultime partite create</h2>
+          </div>
+        </div>
+
+        <div class="search-bar-container">
+          <ion-searchbar class="glass-searchbar" placeholder="Cerca tra le partite" (ionInput)="filterNewGames($event)"></ion-searchbar>
+        </div>
+
+        <div class="games-list">
+          <article class="game-card" *ngFor="let game of filteredNewGames">
+            <div class="game-info">
+              <div>
+                <h3>{{ game.name }}</h3>
+                <div class="meta">{{ game.players }} giocatori · Creata da {{ game.creator }} · {{ game.timeCreated }}</div>
+              </div>
+            </div>
+            <button type="button" class="join-button">Partecipa</button>
+          </article>
+        </div>
+      </section>
+    </div>
   </div>
 </ion-content>
