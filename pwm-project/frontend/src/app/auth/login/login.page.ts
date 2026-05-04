@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common'; 
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';   
 import { IonicModule } from '@ionic/angular';   
@@ -11,10 +11,11 @@ import { Router, RouterLink } from '@angular/router'; // Aggiungi RouterLink
   standalone: true,
   imports: [IonicModule, CommonModule, FormsModule, ReactiveFormsModule, RouterLink]
 })
-export class LoginPage implements OnInit {
+export class LoginPage implements OnInit, AfterViewInit {
 
   // 1. Dichiara la variabile loginForm
   loginForm!: FormGroup;
+  @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
 
   // 2. Inietta il FormBuilder e il Router nel costruttore
   constructor(private formBuilder: FormBuilder, private router: Router) { }
@@ -25,6 +26,26 @@ export class LoginPage implements OnInit {
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]]
     });
+  }
+
+  ngAfterViewInit() {
+    this.playBackgroundVideo();
+  }
+
+  ionViewDidEnter() {
+    this.playBackgroundVideo();
+  }
+
+  private playBackgroundVideo() {
+    const video = this.backgroundVideo?.nativeElement;
+    if (!video) {
+      return;
+    }
+
+    video.muted = true;
+    video.playsInline = true;
+    video.load();
+    video.play().catch(() => undefined);
   }
 
   // 4. Aggiungi il metodo onSubmit richiamato dall'HTML

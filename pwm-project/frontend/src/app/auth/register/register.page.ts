@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common'; 
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';   
 import { IonicModule } from '@ionic/angular';   
@@ -25,11 +25,12 @@ import {
     IonicSelectableItemTemplateDirective
   ]
 })
-export class RegisterPage implements OnInit {
+export class RegisterPage implements OnInit, AfterViewInit {
 
   // Usiamo '!' per dire a TS che il form verrà inizializzato nel constructor
   RegisterForm!: FormGroup;
   countries: any[] = [];
+  @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
 
   constructor(private formBuilder: FormBuilder, private router: Router) {
     // Inizializziamo subito il form per evitare errori di "undefined" nel template
@@ -39,6 +40,26 @@ export class RegisterPage implements OnInit {
   async ngOnInit() {
     // Carichiamo le nazioni in background
     await this.loadCountries();
+  }
+
+  ngAfterViewInit() {
+    this.playBackgroundVideo();
+  }
+
+  ionViewDidEnter() {
+    this.playBackgroundVideo();
+  }
+
+  private playBackgroundVideo() {
+    const video = this.backgroundVideo?.nativeElement;
+    if (!video) {
+      return;
+    }
+
+    video.muted = true;
+    video.playsInline = true;
+    video.load();
+    video.play().catch(() => undefined);
   }
 
   initForm() {
