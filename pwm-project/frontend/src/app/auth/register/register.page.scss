@@ -227,3 +227,18 @@ ion-button {
     text-decoration: underline;
   }
 }
+.panel, ion-card { 
+}
+ion-item, ion-input, ion-button { 
+}
+
+.panel, ion-card, form, .field-container { 
+  background: rgba(9, 16, 30, 0.15) !important; 
+  backdrop-filter: blur(15px) saturate(140%) !important; 
+  border: 1px solid rgba(255, 255, 255, 0.05) !important; 
+}
+ion-item, ion-input, ion-button { 
+  --background: rgba(255, 255, 255, 0.02) !important; 
+  background: rgba(255, 255, 255, 0.02) !important;
+  backdrop-filter: blur(8px) !important; 
+}

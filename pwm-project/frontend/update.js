@@ -1,4 +1,5 @@
-<ion-content>
+const fs = require('fs');
+fs.writeFileSync('src/app/home/home.page.html', `<ion-content [fullscreen]="true">
   <audio autoplay loop src="assets/audio/background_sound.mpeg" style="display: none;"></audio>
   <div class="home-page">
     <div class="overlay"></div>
@@ -127,21 +128,19 @@
       </div>
 
     </section>
-
-    <!-- FOOTER SCI-FI A FONDO PAGINA -->
-    <div class="hud-footer transparent-element" style="margin: 40px auto 0; border: 1px solid rgba(88, 166, 255, 0.4); border-radius: 16px; background: rgba(5, 10, 20, 0.6); backdrop-filter: blur(12px); z-index: 1000; position: relative; max-width: 1200px; width: 100%; box-sizing: border-box;">
-      <div class="hud-footer-content">
-        <div class="footer-left">
-          <span class="status-dot"></span> COMM-LINK: <span class="status-text" style="color: #3fb950; font-weight: bold;">ONLINE</span>
-        </div>
-        <div class="footer-center">
-          &copy; 2026 PLANETARY WAR MANAGER <span class="divider" style="color: rgba(255,255,255,0.3); margin: 0 12px;">///</span> STRATEGIC COMMAND
-        </div>
-        <div class="footer-right">
-          SYS.VER 1.0.4
-        </div>
-      </div>
-    </div>
-
   </div>
+<div class="hud-footer transparent-element">
+  <div class="hud-footer-content">
+    <div class="footer-left">
+      <span class="status-dot"></span> COMM-LINK: <span class="status-text">ONLINE</span>
+    </div>
+    <div class="footer-center">
+      &copy; 2026 PLANETARY WAR MANAGER <span class="divider">///</span> STRATEGIC COMMAND
+    </div>
+    <div class="footer-right">
+      SYS.VER 1.0.4
+    </div>
+  </div>
+</div>
 </ion-content>
+`);

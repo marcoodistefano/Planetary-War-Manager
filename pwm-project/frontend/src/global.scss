@@ -35,3 +35,74 @@
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 @import "@ionic/angular/css/palettes/dark.system.css";
+
+/* ==========================================================================
+   FOOTER GLOBALE (SCIFI / HUD STYLE)
+   ========================================================================== */
+.hud-footer {
+  border-top: 1px solid rgba(95, 208, 255, 0.22);
+  background: rgba(9, 16, 30, 0.45);
+  backdrop-filter: blur(12px);
+  color: rgba(150, 230, 255, 0.9);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.70rem;
+  padding: 10px 16px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  z-index: 100; position: relative; /* fixed */
+}
+
+.hud-footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1200px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background-color: #3fb950;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #3fb950;
+  margin-right: 8px;
+  animation: pulse 2s infinite;
+}
+
+.status-text {
+  color: #3fb950;
+  font-weight: bold;
+}
+
+.divider {
+  color: rgba(255, 255, 255, 0.15);
+  margin: 0 12px;
+  letter-spacing: 2px;
+}
+
+.footer-center {
+  text-align: center;
+  flex: 1;
+}
+
+.footer-left, .footer-right {
+  flex: 0 0 auto;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(63, 185, 80, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0); }
+}
+
+@media (max-width: 768px) {
+  .hud-footer-content {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

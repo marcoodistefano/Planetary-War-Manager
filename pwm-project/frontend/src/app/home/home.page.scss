@@ -11,6 +11,7 @@ ion-content {
   min-height: 100%;
   padding: 24px;
   color: #f4f7fb;
+  font-family: 'Courier New', Courier, monospace;
   background:
     linear-gradient(180deg, rgba(3, 8, 18, 0.45) 0%, rgba(3, 8, 18, 0.82) 100%),
     url('/assets/background/background.png') center/cover no-repeat;
@@ -33,18 +34,73 @@ ion-content {
 }
 
 .top-row {
+  perspective: 1200px;
   display: grid;
   grid-template-columns: minmax(260px, 340px) minmax(240px, 1fr) minmax(260px, 340px);
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
+  min-height: calc(100vh - 48px);
+  padding: 0 5vw; /* Push them inwards to the center */
 }
 
+.left-column,
+.right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.center-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 60px;
+}
+
+.games-container.buttons-bottom {
+  margin-top: 0;
+  margin-bottom: 24px;
+}
+
+
 .panel {
-  background: rgba(9, 16, 30, 0.24);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(22px) saturate(140%);
+  /* Match login glass effect with celeste highlights */
+  background: rgba(9, 16, 30, 0.15);
+  border: 1px solid rgba(95, 208, 255, 0.06);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.32), 0 0 18px rgba(95, 208, 255, 0.04) inset;
+  backdrop-filter: blur(15px) saturate(140%);
+  -webkit-backdrop-filter: blur(15px) saturate(140%);
   border-radius: 24px;
+}
+
+.inner-panel {
+  /* Use the same glass container feel as login fields with celeste tint */
+  background: rgba(1, 36, 46, 0.101) !important;
+  border: 1px solid rgba(95, 208, 255, 0.28) !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.114) !important;
+  backdrop-filter: blur(15px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(15px) saturate(140%) !important;
+  padding: 18px;
+  border-radius: 16px;
+}
+
+.panel-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin: 0 18px;
+}
+
+.left-column.panel,
+.right-column.panel {
+  padding: 0; 
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.transparent-element {
+  background: rgba(255, 255, 255, 0.02) !important;
+  backdrop-filter: blur(8px);
 }
 
 .leaderboard-panel,
@@ -119,7 +175,7 @@ ion-content {
 }
 
 .leaderboard-toggle button.active {
-  background: linear-gradient(135deg, rgba(103, 184, 255, 0.18), rgba(45, 114, 210, 0.24));
+  background: linear-gradient(135deg, rgba(120, 205, 255, 0.20), rgba(30, 120, 160, 0.16));
 }
 
 .leaderboard-toggle .view-full {
@@ -206,7 +262,7 @@ ion-content {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #67b8ff, #1d3f7d);
+  background: linear-gradient(135deg, #67e0ff, #12394b);
   color: #ffffff;
   font-size: 1.2rem;
   font-weight: 800;
@@ -437,4 +493,38 @@ ion-content {
   font-weight: 700;
   cursor: pointer;
   backdrop-filter: blur(10px);
+}
+
+/* ==========================================================================
+   3D SCI-FI LAYOUT
+   ========================================================================== */
+.left-column.panel {
+  transform: rotateY(15deg) scale(0.85) translateX(3vw);
+  transform-origin: right center;
+  transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
+  box-shadow: 20px 10px 30px rgba(0, 0, 0, 0.2) !important;
+}
+.left-column.panel:hover {
+  transform: rotateY(13deg) scale(0.85) translateX(3vw);
+  box-shadow: 10px 10px 30px rgba(0, 0, 0, 0.25) !important;
+}
+
+.right-column.panel {
+  transform: rotateY(-15deg) scale(0.85) translateX(-3vw);
+  transform-origin: left center;
+  transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
+  box-shadow: -20px 10px 30px rgba(0, 0, 0, 0.2) !important;
+}
+.right-column.panel:hover {
+  transform: rotateY(-13deg) scale(0.85) translateX(-3vw);
+  box-shadow: -10px 10px 30px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Ensure center buttons are completely centered */
+.center-column {
+  justify-content: center !important;
+}
+.games-container.buttons-bottom {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
