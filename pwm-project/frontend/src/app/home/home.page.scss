@@ -22,8 +22,6 @@ ion-content {
   inset: 0;
   background:
     radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%),
-    linear-gradient(180deg, rgba(4, 10, 22, 0.25), rgba(4, 10, 22, 0.7));
-  pointer-events: none;
 }
 
 .top-row,
@@ -269,6 +267,13 @@ ion-content {
   font-weight: 800;
   letter-spacing: 0.05em;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1); // Effetto zoom al passaggio del mouse
+    box-shadow: 0 0 15px rgba(103, 224, 255, 0.5);
+  }
 }
 
 .profile-label {

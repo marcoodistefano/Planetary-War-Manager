@@ -1,0 +1,262 @@
+/* ==========================================================================
+   1. BACKGROUND E OVERLAY BASE
+   ========================================================================== */
+ion-content {
+  --background: #08111f;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.home-page {
+  position: relative;
+  min-height: 100%;
+  padding: 14px;
+  background: linear-gradient(180deg, rgba(3, 8, 18, 0.45) 0%, rgba(3, 8, 18, 0.82) 100%),
+              url('/assets/background/background.png') center/cover no-repeat;
+}
+
+.overlay {
+  position: absolute; 
+  inset: 0;
+  background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%);
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   2. LAYOUT CENTRATO (Visuale 3D Inclinata a 15 Gradi)
+   ========================================================================== */
+.top-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 30px; 
+  min-height: calc(100vh - 80px);
+  max-width: 950px; 
+  margin: 0 auto;
+  perspective: 1200px;
+}
+
+/* Stile base condiviso */
+.left-column, .right-column {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  transition: transform 0.4s ease-out;
+}
+
+/* Colonna Sinistra */
+.left-column { 
+  flex: 0 0 280px; 
+  transform: rotateY(15deg) translateZ(0) scale(0.999); 
+  transform-origin: right center; 
+}
+.left-column:hover {
+  transform: rotateY(10deg) translateZ(0) scale(0.999);
+}
+
+/* Colonna Centrale */
+.center-column { 
+  flex: 0 0 300px; 
+  margin-top: -100px; 
+} 
+
+/* Colonna Destra */
+.right-column { 
+  flex: 0 0 280px; 
+  transform: rotateY(-15deg) translateZ(0) scale(0.999); 
+  transform-origin: left center; 
+}
+.right-column:hover {
+  transform: rotateY(-10deg) translateZ(0) scale(0.999);
+}
+
+/* ==========================================================================
+   3. STILE VETRO E CONTENITORI PANNELLI
+   ========================================================================== */
+.panel {
+  background: rgba(9, 16, 30, 0.15);
+  border: 1px solid rgba(95, 208, 255, 0.06);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.32), 0 0 18px rgba(95, 208, 255, 0.04) inset;
+  backdrop-filter: blur(15px) saturate(140%);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.inner-panel {
+  background: rgba(1, 36, 46, 0.101) !important;
+  border: 1px solid rgba(95, 208, 255, 0.28) !important;
+  padding: 14px;
+  border-radius: 9px;
+  margin: 10px;
+}
+
+.transparent-element {
+  background: rgba(255, 255, 255, 0.02) !important;
+  backdrop-filter: blur(8px);
+}
+
+.panel-divider { 
+  border: none; 
+  border-top: 1px solid rgba(255, 255, 255, 0.05); 
+  margin: 0 14px; 
+}
+
+/* ==========================================================================
+   4. TIPOGRAFIA UNIFORME E OFFUSCAMENTO
+   ========================================================================== */
+.panel-heading {
+  margin-bottom: 12px;
+  span { display: block; font-size: 0.85rem; font-weight: 700; color: #fff; }
+  small { display: block; font-size: 0.6rem; color: #86d7ff; text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; }
+}
+
+.title-block {
+  text-align: center; margin-bottom: 20px;
+  .eyebrow { margin: 0 0 10px; color: #b6cee9; font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; }
+  h1 { font-size: clamp(1.6rem, 3vw, 2.4rem); line-height: 0.95; letter-spacing: 0.04em; text-transform: uppercase; text-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); margin: 0; color: #fff; }
+}
+
+/* Wrapper dei campi crittografati */
+.field-container {
+  padding: 10px; margin-bottom: 8px; border-radius: 6px;
+  
+  .custom-label { 
+    font-size: 0.6rem; 
+    color: #79c0ff; 
+    margin: 0 0 4px 0; 
+    font-weight: bold; 
+    letter-spacing: 1px; 
+  }
+}
+
+.data-value-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.data-value { 
+  font-size: 0.85rem; 
+  color: #fff; 
+  transition: filter 0.3s ease, opacity 0.3s ease; 
+}
+
+/* Effetto di sfocatura tipo vetro smerigliato */
+.obfuscated-text {
+  filter: blur(5px); 
+  opacity: 0.5; 
+  user-select: none; 
+  pointer-events: none;
+}
+
+/* Icone Toggle Occhio */
+.toggle-eye-btn {
+  --color: rgba(201, 209, 217, 0.6);
+  --padding-start: 0;
+  --padding-end: 0;
+  margin: 0;
+  height: 24px;
+  
+  &:hover { --color: #fff; }
+}
+
+.highlight-eye {
+  --color: rgba(88, 166, 255, 0.7);
+  &:hover { --color: #58a6ff; }
+}
+
+/* ==========================================================================
+   5. GRAFICI E STATISTICHE HUD
+   ========================================================================== */
+.chart-container {
+  height: 90px; padding: 10px; margin-top: 10px; border-radius: 8px;
+  .bars { display: flex; align-items: flex-end; justify-content: space-around; height: 100%; border-bottom: 1px solid rgba(88, 166, 255, 0.2); padding-bottom: 5px; }
+  .bar-unit { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; width: 25px; }
+  .bar-fill { width: 100%; background: linear-gradient(0deg, #1d4ed8, #58a6ff); border-radius: 3px 3px 0 0; }
+  .bar-label { font-size: 0.55rem; color: #c9d1d9; margin-top: 4px; }
+}
+
+.radial-container {
+  display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; margin-top: 10px; border-radius: 8px;
+  .chart-wrap { position: relative; width: 55px; height: 55px; }
+  .circular-chart { width: 100%; height: 100%; }
+  .circle { fill: none; stroke: #58a6ff; stroke-width: 2.8; stroke-linecap: round; }
+  .circle-bg { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 2.8; }
+  .percentage { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; font-weight: bold; color: #fff; }
+  .text-wrap { text-align: right; h3 { margin: 0; font-size: 1.1rem; color: #58a6ff; } p { margin: 0; font-size: 0.55rem; color: #86d7ff; text-transform: uppercase; } }
+}
+
+.kd-container {
+  padding: 10px; margin-top: 10px; border-radius: 8px;
+  .kd-labels { display: flex; justify-content: space-between; font-size: 0.65rem; font-weight: bold; margin-bottom: 6px; .kill-text { color: #58a6ff; } .death-text { color: #ff7b72; } }
+  .progress-bar-dual { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.1); .fill-kill { background: #58a6ff; box-shadow: 0 0 8px #58a6ff; } .fill-death { background: #ff7b72; box-shadow: 0 0 8px #ff7b72; } }
+}
+
+.stats-linear {
+  margin-top: 15px;
+  .stat-row { margin-bottom: 8px; &:last-child { margin-bottom: 0; } }
+  .stat-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: #c9d1d9; margin-bottom: 4px; font-weight: bold; }
+  .progress-bar-single { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; .fill { height: 100%; background: #58a6ff; box-shadow: 0 0 8px #58a6ff; } &.danger .fill { background: #ff7b72; box-shadow: 0 0 8px #ff7b72; } }
+}
+
+/* ==========================================================================
+   6. AVATAR CORE E BOTTONI
+   ========================================================================== */
+.avatar-core {
+  text-align: center;
+  .avatar-frame { width: 110px; height: 110px; border-radius: 50%; border: 1px solid #58a6ff; margin: 0 auto; padding: 8px; box-shadow: 0 0 20px rgba(88, 166, 255, 0.2); }
+  .avatar-main { width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle, #1d4ed8, #050a14); display: grid; place-items: center; font-size: 2.2rem; font-weight: bold; color: #fff; }
+  .elo-badge { margin-top: 12px; h2 { color: #58a6ff; font-size: 1.6rem; margin: 0; text-shadow: 0 0 10px rgba(88, 166, 255, 0.4); } p { font-size: 0.65rem; color: #b6cee9; letter-spacing: 1px; margin-top: 4px; } }
+}
+
+.action-dock {
+  margin-top: 25px;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.quick-actions {
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.action-btn {
+  width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #c9d1d9; border-radius: 6px; font-size: 0.75rem; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;
+  cursor: pointer; transition: 0.2s; backdrop-filter: blur(8px);
+  &:hover { background: rgba(88, 166, 255, 0.1); border-color: #58a6ff; color: #fff; }
+}
+
+.primary-glow {
+  display: flex; justify-content: center; align-items: center;
+  background: rgba(29, 78, 216, 0.2) !important; border: 1px solid #58a6ff !important;
+  color: #fff !important; box-shadow: 0 0 15px rgba(88, 166, 255, 0.2);
+  font-size: 0.8rem !important; padding: 12px 20px !important; cursor: pointer;
+  &:hover { background: rgba(29, 78, 216, 0.4) !important; box-shadow: 0 0 20px rgba(88, 166, 255, 0.5); }
+}
+
+.logout-button {
+  width: 100%; padding: 12px; background: rgba(255, 123, 114, 0.1); border: 1px solid #ff7b72;
+  color: #ff7b72; border-radius: 6px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+  cursor: pointer; transition: 0.2s;
+  &:hover { background: rgba(255, 123, 114, 0.2); box-shadow: 0 0 15px rgba(255, 123, 114, 0.3); color: #fff; }
+}
+
+/* ==========================================================================
+   7. FOOTER HUD
+   ========================================================================== */
+.hud-footer-content { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+}
+
+.status-dot { 
+  width: 6px; 
+  height: 6px; 
+  background: #3fb950; 
+  border-radius: 50%; 
+  display: inline-block; 
+  margin-right: 4px; 
+}

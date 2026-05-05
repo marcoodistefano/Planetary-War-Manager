@@ -2,6 +2,9 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
+import { Router, RouterModule } from '@angular/router';
+import { Title } from '@angular/platform-browser';
+
 
 @Component({
   selector: 'app-home',
@@ -9,7 +12,7 @@ import { IonicModule } from '@ionic/angular';
   styleUrls: ['home.page.scss'],
   standalone: true,
   // Aggiungi esattamente questa riga qui sotto:
-  imports: [IonicModule, CommonModule, FormsModule]
+  imports: [IonicModule, CommonModule, FormsModule, RouterModule]
 })
 export class HomePage {
   // Simulated data: include region/nation for flag display
@@ -80,7 +83,14 @@ filterNewGames(event: any) {
   // UI state
   leaderboardView: 'global' | 'regional' = 'global';
 
-  constructor() {}
+  constructor(
+    private router: Router, 
+    private titleService: Title
+  ) { }
+
+  ngOnInit() {
+    this.titleService.setTitle('PWM | Homepage');
+  }
 
   viewFullLeaderboard() {
     // TODO: navigate to full leaderboard page when available.

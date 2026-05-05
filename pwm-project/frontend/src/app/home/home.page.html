@@ -87,8 +87,8 @@
         <aside class="profile-panel inner-panel">
           <div class="profile-card">
             <p class="profile-label">Profilo</p>
-            <div class="avatar transparent-element">MR</div>
-            <h2 class="profile-name">Marco Rossi</h2>
+            <div class="avatar transparent-element" routerLink="/profile">{{ currentPlayer.name.substring(0, 2).toUpperCase() }}</div>
+            <h2 class="profile-name">{{ currentPlayer.name }}</h2>
             <small class="profile-level">Livello 24</small>
           </div>
 

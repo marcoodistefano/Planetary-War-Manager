@@ -1,13 +1,188 @@
-<ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>profile</ion-title>
-  </ion-toolbar>
-</ion-header>
+<ion-content>
+  <audio autoplay loop src="assets/audio/background_sound.mpeg" style="display: none;"></audio>
+  
+  <div class="home-page">
+    <div class="overlay"></div>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">profile</ion-title>
-    </ion-toolbar>
-  </ion-header>
+    <section class="top-row">
+
+      <!-- COLONNA SINISTRA: STATISTICHE E GRAFICI -->
+      <div class="panel left-column">
+        <!-- Grafico 1: ELO History -->
+        <div class="inner-panel">
+          <div class="panel-heading">
+            <span>Andamento ELO</span>
+            <small>Ultime 5 operazioni</small>
+          </div>
+          <div class="chart-container transparent-element">
+            <div class="bars">
+              <div class="bar-unit" *ngFor="let point of user.elo_history">
+                <div class="bar-fill" [style.height.%]="(point / 2000) * 100"></div>
+                <span class="bar-label">{{ point }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr class="panel-divider" />
+        
+        <!-- Grafico 2: Win Rate -->
+        <div class="inner-panel">
+          <div class="panel-heading">
+            <span>Efficienza Bellica</span>
+            <small>Percentuale di successo</small>
+          </div>
+          <div class="radial-container transparent-element">
+            <div class="chart-wrap">
+              <svg viewBox="0 0 36 36" class="circular-chart">
+                <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path class="circle" [attr.stroke-dasharray]="user.win_rate + ', 100'" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              </svg>
+              <div class="percentage">{{ user.win_rate }}%</div>
+            </div>
+            <div class="text-wrap">
+              <h3>WIN RATE</h3>
+              <p>Globale</p>
+            </div>
+          </div>
+        </div>
+
+        <hr class="panel-divider" />
+
+        <!-- Grafico 3: K/D Ratio e Territori -->
+        <div class="inner-panel">
+          <div class="panel-heading">
+            <span>Rapporto Operativo</span>
+            <small>Truppe e conquiste</small>
+          </div>
+          <div class="kd-container transparent-element">
+            <div class="kd-labels">
+              <span class="kill-text">Kills: {{ user.truppe_eliminate }}</span>
+              <span class="death-text">Perse: {{ user.truppe_perse }}</span>
+            </div>
+            <div class="progress-bar-dual">
+              <div class="fill-kill" [style.width.%]="(user.truppe_eliminate / (user.truppe_eliminate + user.truppe_perse)) * 100"></div>
+              <div class="fill-death" [style.width.%]="(user.truppe_perse / (user.truppe_eliminate + user.truppe_perse)) * 100"></div>
+            </div>
+
+            <div class="stats-linear">
+              <div class="stat-row">
+                <div class="stat-labels"><span>Territori</span><span>{{ user.territori_conquistati }}</span></div>
+                <div class="progress-bar-single"><div class="fill" style="width: 75%;"></div></div>
+              </div>
+              <div class="stat-row">
+                <div class="stat-labels"><span>Capitali</span><span>{{ user.capitali_distrutte }}</span></div>
+                <div class="progress-bar-single danger"><div class="fill" style="width: 40%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COLONNA CENTRALE: NUCLEO IDENTITÀ E MAIN ACTIONS -->
+      <div class="center-column">
+        <div class="title-block">
+          <p class="eyebrow">Strategic Command Profile</p>
+          <h1>{{ user.username }}</h1>
+        </div>
+
+        <div class="avatar-core">
+          <div class="avatar-frame transparent-element">
+            <div class="avatar-main">{{ user.username.substring(0, 2).toUpperCase() }}</div>
+          </div>
+          <div class="elo-badge">
+            <h2>{{ user.elo_rating }} ELO</h2>
+            <p>RANK: COMANDANTE DI BRIGATA</p>
+          </div>
+        </div>
+
+        <div class="action-dock">
+          <button class="action-btn primary-glow" (click)="openMatchHistory()">
+            <ion-icon name="film-outline" style="margin-right: 8px;"></ion-icon>
+            ARCHIVIO E REPLAY
+          </button>
+        </div>
+      </div>
+
+      <!-- COLONNA DESTRA: PROTOCOLLI, SOCIAL E IMPOSTAZIONI -->
+      <div class="panel right-column">
+        
+        <!-- DATI CRITTOGRAFATI E CODICE AMICO -->
+        <div class="inner-panel">
+          <div class="panel-heading">
+            <span>Dati Crittografati</span>
+            <small>Identificativi di rete</small>
+          </div>
+
+          <div class="field-container transparent-element">
+            <p class="custom-label">EMAIL COMM-LINK</p>
+            <div class="data-value-wrapper">
+              <!-- Aggiunta classe condizionale per la sfocatura -->
+              <div class="data-value" [class.obfuscated-text]="!showEmail">
+                {{ user.email }}
+              </div>
+              <ion-button fill="clear" size="small" (click)="toggleEmailVisibility()" class="toggle-eye-btn">
+                <ion-icon slot="icon-only" [name]="showEmail ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+              </ion-button>
+            </div>
+          </div>
+
+          <div class="field-container transparent-element">
+            <p class="custom-label">REGIONE OPERATIVA</p>
+            <div class="data-value">{{ user.reg }}</div>
+          </div>
+
+          <div class="field-container transparent-element">
+            <p class="custom-label">CODICE AMICO</p>
+            <div class="data-value-wrapper">
+              <!-- Aggiunta classe condizionale per la sfocatura -->
+              <div class="data-value" style="color: #58a6ff; font-weight: bold; letter-spacing: 1px;" [class.obfuscated-text]="!showFriendCode">
+                {{ user.codice_amico }}
+              </div>
+              <ion-button fill="clear" size="small" (click)="toggleFriendCodeVisibility()" class="toggle-eye-btn highlight-eye">
+                <ion-icon slot="icon-only" [name]="showFriendCode ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+              </ion-button>
+            </div>
+          </div>
+        </div>
+
+        <hr class="panel-divider" />
+
+        <!-- GESTIONE SISTEMA E PROTOCOLLI -->
+        <div class="inner-panel">
+          <div class="panel-heading">
+            <span>Comando & Controllo</span>
+            <small>Sistema e Sicurezza</small>
+          </div>
+          <div class="quick-actions">
+            <button class="action-btn" (click)="manageFriends()">Rete Diplomatica (Amici)</button>
+            <button class="action-btn" (click)="openSettings()">Preferenze Sistema</button>
+            <button class="action-btn" (click)="changeUsername()">Cambia Username</button>
+            <button class="action-btn" (click)="changePassword()">Cambia Password</button>
+            <button class="action-btn" (click)="changeAvatar()">Cambia Avatar</button>
+          </div>
+        </div>
+
+        <hr class="panel-divider" />
+
+        <div class="inner-panel">
+          <button class="logout-button" (click)="logout()">Disconnessione</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- FOOTER HUD -->
+    <div class="hud-footer transparent-element" style="margin: -10px auto 0; border: 1px solid rgba(88, 166, 255, 0.4); border-radius: 12px; background: rgba(5, 10, 20, 0.6); backdrop-filter: blur(12px); z-index: 1000; position: relative; max-width: 900px; width: 100%; box-sizing: border-box; font-size: 0.55rem; padding: 8px 12px;">
+      <div class="hud-footer-content">
+        <div class="footer-left">
+          <span class="status-dot" style="width: 6px; height: 6px;"></span> COMM-LINK: <span class="status-text" style="color: #3fb950; font-weight: bold;">ONLINE</span>
+        </div>
+        <div class="footer-center">
+          &copy; 2026 PLANETARY WAR MANAGER <span class="divider" style="color: rgba(255,255,255,0.3); margin: 0 8px;">///</span> STRATEGIC COMMAND
+        </div>
+        <div class="footer-right">SYS.VER 1.0.4</div>
+      </div>
+    </div>
+  </div>
 </ion-content>
