@@ -1,11 +1,11 @@
 {
-  "name": "pwm-auth-service",
+  "name": "pwm-app-route",
   "version": "1.0.0",
   "private": true,
-  "main": "server.js",
+  "main": "app-route.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js"
+    "start": "node app-route.js"
   },
   "dependencies": {
     "argon2": "^0.41.1",

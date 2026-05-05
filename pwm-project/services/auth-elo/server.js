@@ -1,11 +1,16 @@
-const express = require('express');
+const express = require("express");
+const cors = require("cors");
+const authRoutes = require("./auth.routes.js");
+
 const app = express();
-const port = 3000;
 
-app.get('/', (req, res) => {
-  res.send(`Service is running`);
-});
+app.use(cors());
+app.use(express.json());
 
-app.listen(port, () => {
-  console.log(`Service listening on port ${port}`);
-});
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+app.use(authRoutes);
+
+app.listen(3000, () =>
+  console.log("Auth service attivo su http://localhost:3000"),
+);

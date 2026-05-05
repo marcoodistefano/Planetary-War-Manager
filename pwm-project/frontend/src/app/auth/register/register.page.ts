@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';   
 import { IonicModule } from '@ionic/angular';   
 import { Router, RouterLink } from '@angular/router';
+import { AuthApiService } from '../auth-api.service';
+import { finalize } from 'rxjs/operators';
 
 // Importazione dei componenti necessari per il selettore nazioni
 import { 
@@ -29,10 +31,16 @@ export class RegisterPage implements OnInit, AfterViewInit {
 
   // Usiamo '!' per dire a TS che il form verrà inizializzato nel constructor
   RegisterForm!: FormGroup;
+  errorMessage = '';
+  isSubmitting = false;
   countries: any[] = [];
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
 
-  constructor(private formBuilder: FormBuilder, private router: Router) {
+  constructor(
+    private formBuilder: FormBuilder,
+    private router: Router,
+    private authApi: AuthApiService,
+  ) {
     // Inizializziamo subito il form per evitare errori di "undefined" nel template
     this.initForm();
   }
@@ -66,7 +74,7 @@ export class RegisterPage implements OnInit, AfterViewInit {
     this.RegisterForm = this.formBuilder.group({
       username: ['', [Validators.required, Validators.minLength(3)]],
       email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, Validators.minLength(6)]],
+      password: ['', [Validators.required, Validators.minLength(12)]],
       region: [null, [Validators.required]]
     });
   }
@@ -91,12 +99,34 @@ export class RegisterPage implements OnInit, AfterViewInit {
   }
 
   onSubmit() {
-    if (this.RegisterForm.valid) {
-      console.log('Accesso al sistema PWM autorizzato. Dati inviati:', this.RegisterForm.value);
-      // Qui andrà la logica del servizio di autenticazione
-      this.router.navigate(['/login']);
-    } else {
+    if (!this.RegisterForm.valid) {
       console.log('Protocollo di registrazione fallito: dati non validi.');
+      return;
     }
+
+    const { username, email, password } = this.RegisterForm.value;
+    this.errorMessage = '';
+    this.isSubmitting = true;
+    this.authApi
+      .register({ username, email, password })
+      .pipe(finalize(() => {
+        this.isSubmitting = false;
+      }))
+      .subscribe({
+        next: () => {
+          this.router.navigate(['/login']);
+        },
+        error: (error) => {
+          const apiErrors = error?.error?.errors;
+          if (Array.isArray(apiErrors) && apiErrors.length > 0) {
+            this.errorMessage = apiErrors.join(' | ');
+          } else if (error?.error?.error) {
+            this.errorMessage = error.error.error;
+          } else {
+            this.errorMessage = 'Registrazione fallita. Verifica i dati e riprova.';
+          }
+          console.error('Registrazione fallita:', error);
+        },
+      });
   }
 }

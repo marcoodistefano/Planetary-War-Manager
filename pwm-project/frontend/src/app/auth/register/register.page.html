@@ -51,9 +51,13 @@
         <ion-input type="password" formControlName="password" placeholder="••••••••"></ion-input>
       </div>
 
-      <ion-button expand="block" type="submit" [disabled]="!RegisterForm.valid">
+      <ion-button expand="block" type="submit" [disabled]="!RegisterForm.valid || isSubmitting">
         REGISTRAZIONE
       </ion-button>
+
+      <ion-text class="form-error" color="danger" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </ion-text>
 
       <div class="form-footer">
         <p>Hai giá un account? <a class="secondary-link" routerLink="/login">Accedi ora</a></p>

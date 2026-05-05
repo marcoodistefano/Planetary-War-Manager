@@ -17,8 +17,8 @@
 
     <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
       <div class="field-container">
-        <ion-label class="custom-label">EMAIL COMANDANTE</ion-label>
-        <ion-input type="email" formControlName="email" placeholder="nome@esempio.it"></ion-input>
+        <ion-label class="custom-label">USERNAME</ion-label>
+        <ion-input type="text" formControlName="username" placeholder="nome utente"></ion-input>
       </div>
 
       <div class="field-container">
@@ -26,9 +26,13 @@
         <ion-input type="password" formControlName="password" placeholder="••••••••"></ion-input>
       </div>
 
-      <ion-button expand="block" type="submit" [disabled]="!loginForm.valid">
+      <ion-button expand="block" type="submit" [disabled]="!loginForm.valid || isSubmitting">
         AUTENTICAZIONE
       </ion-button>
+
+      <ion-text class="form-error" color="danger" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </ion-text>
 
       <div class="form-footer">
         <a class="secondary-link" routerLink="/login/recovery/password">Hai dimenticato la password?</a>
