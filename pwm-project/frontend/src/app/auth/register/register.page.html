@@ -2,7 +2,6 @@
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <audio autoplay loop src="assets/audio/background_sound.mpeg" style="display: none;"></audio>
   <div class="auth-background" aria-hidden="true">
     <video #backgroundVideo class="auth-background__video" autoplay muted loop playsinline preload="metadata" src="assets/background_gif/background_gif.mp4"></video>
     <div class="auth-background__overlay"></div>
@@ -25,18 +24,11 @@
       <!-- REGIONE UTENTE -->
       <div class="field-container">
         <ion-label class="custom-label">REGIONE UTENTE</ion-label>
-        <ionic-selectable
-          formControlName="region"
-          [items]="countries"
-          itemValueField="code"
-          itemTextField="name"
-          [canSearch]="true"
-          placeholder="Seleziona Regione"
-          searchPlaceholder="Cerca...">
-          <ng-template ionicSelectableItemTemplate let-country="item">
+        <ion-select formControlName="region" interface="popover" placeholder="Seleziona Regione">
+          <ion-select-option *ngFor="let country of countries" [value]="country.code">
             {{ country.flag }} {{ country.name }}
-          </ng-template>
-        </ionic-selectable>
+          </ion-select-option>
+        </ion-select>
       </div>
 
       <!-- EMAIL -->

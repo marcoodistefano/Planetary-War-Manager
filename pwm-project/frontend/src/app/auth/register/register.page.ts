@@ -7,10 +7,6 @@ import { AuthApiService } from '../auth-api.service';
 import { finalize } from 'rxjs/operators';
 
 // Importazione dei componenti necessari per il selettore nazioni
-import { 
-  IonicSelectableComponent, 
-  IonicSelectableItemTemplateDirective 
-} from 'ionic-selectable';
 
 @Component({
   selector: 'app-register',
@@ -22,9 +18,7 @@ import {
     CommonModule, 
     FormsModule, 
     ReactiveFormsModule, 
-    RouterLink,
-    IonicSelectableComponent,
-    IonicSelectableItemTemplateDirective
+    RouterLink
   ]
 })
 export class RegisterPage implements OnInit, AfterViewInit {

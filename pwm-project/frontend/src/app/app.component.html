@@ -1,3 +1,6 @@
 <ion-app>
+  @if (!isGameRoute) {
+    <audio #bgAudio loop playsinline preload="auto" src="assets/audio/background_sound.mpeg" style="display: none;"></audio>
+  }
   <ion-router-outlet></ion-router-outlet>
 </ion-app>

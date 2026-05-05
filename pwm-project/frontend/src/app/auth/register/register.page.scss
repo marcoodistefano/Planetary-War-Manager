@@ -131,8 +131,8 @@ ion-label {
    ========================================================================== */
 
 /* Stile comune per font militare */
-ion-input, 
-ionic-selectable {
+ion-input,
+ion-select {
   font-family: 'Courier New', Courier, monospace;
 }
 
@@ -144,38 +144,7 @@ ion-input {
   font-size: 1rem;
 }
 
-/* Selettore avanzato (Nazioni) */
-ionic-selectable {
-  width: 100%;
-  height: 50px;
-  margin-top: 2px;
-  --color: #C9D1D9;
-  --placeholder-color: #484F58;
-
-  /* Forza il contenitore interno a occupare tutto lo spazio */
-  &::part(container) {
-    width: 100%;
-    display: flex;
-    justify-content: space-between; /* Spinge il testo a sinistra e l'icona a destra */
-    align-items: center;
-  }
-
-  /* Gestisce lo spazio del testo/placeholder */
-  &::part(value), 
-  &::part(placeholder) {
-    padding: 0;
-    flex-grow: 1; /* Permette al testo di prendersi lo spazio necessario */
-    text-align: left;
-  }
-
-  /* Posiziona l'icona a destra */
-  &::part(icon) {
-    color: #484F58;
-    margin-left: 10px; /* Distanza minima dal testo */
-  }
-}
-
-/* Select standard (Legacy) */
+/* Select standard */
 ion-select {
   width: 100%;
   font-size: 1.1rem;

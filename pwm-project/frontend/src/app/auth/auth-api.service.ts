@@ -14,6 +14,12 @@ export interface RegisterPayload {
   password: string;
 }
 
+export interface RecoveryPasswordPayload {
+  username: string;
+  email: string;
+  newPassword: string;
+}
+
 export interface AuthResponse {
   message: string;
   dato_x_sicuro?: Record<string, unknown>;
@@ -37,5 +43,9 @@ export class AuthApiService {
 
   register(payload: RegisterPayload): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.baseUrl}/auth/register`, payload);
+  }
+
+  recoveryPassword(payload: RecoveryPasswordPayload): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.baseUrl}/auth/login/recovery/password`, payload);
   }
 }
