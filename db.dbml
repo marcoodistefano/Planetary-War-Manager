@@ -1,6 +1,6 @@
 // 1. Utenti
 Table utenti {
-  id_user integer [primary key, note: 'codice hash o chiave auto incrementale 32bit']
+  id_user UUID [primary key, note: 'codice hash o chiave auto incrementale 32bit']
 
   username varchar [note: '32 char']
   email varchar [note: '32 char']
@@ -16,25 +16,42 @@ Table utenti {
   2FA_enabled boolean [note: 'Abilita autenticazione a due fattori. Indica che l account è stato verificato con 2FA (che sia OTP o codice di verifica su authenticator o altri) [si dovrebbe inserire, a questo punto, un token che identifica il dispositivo, o comunque, per esempio, il numero di cellulare o altro…]']
   IS_banned boolean [note: 'Evitiamo di fare richieste all altra tabella: lì vi sono SOLO i motivi ed eventuali altre info. se l utente prova ad accedere, basta visualizzare questo campo, senza eseguire alcun JOIN con la tabella ban']
   IS_perma_banned boolean
+  codice_amico varchar [note: 'Codice univoco generato dal server (es. AMICO-1234) che l\'utente può condividere per farsi aggiungere alla lista degli amici. Il codice è alfanumerico di 10 caratteri che include lettere e numeri, per rendere più difficile l\'indovinare i codici degli amici e migliorare la sicurezza. Si basa sull\'id utente']
+}
+
+//1.1 Amici
+Table amici {
+  id_user UUID
+  id_amico UUID
+  created_at timestamp [note: 'data in cui è stata inviata la richiesta di amicizia']
+  accepted_at timestamp [note: 'data in cui la richiesta di amicizia è stata accettata, null se ancora in pending']
+  status varchar [note: 'pending, accepted, rejected, blocked']
+  link varchar [note: 'link univoco generato dal server (es. LINK-1234) usato per accettare o rifiutare la richiesta di amicizia, è alfanumerico di 10 caratteri che include lettere e numeri, per rendere più difficile l\'indovinare i link e migliorare la sicurezza.']
+  link_duration integer [note: 'Durata in giorni da quando è stato inviato il request di amicizia, utile per disabilitare il link dopo un certo periodo di tempo se non accettato o rifiutato.']
+
+  indexes {
+    (id_user, id_amico) [pk] // Chiave primaria composta
+  }
 }
 
 // 2. Accessi
 Table accessi {
   id_access integer [primary key]
-
-  user_id integer
+  user_id UUID
   ip_address varchar [note: 'metodo per identificare eventuali account duplicati, non implementato inizialmente']
-  login_time timestamp
+  login_time timestamp [note: 'data e ora del login, utile per monitorare l\'attività degli utenti e per eventuali analisi di sicurezza.']
   cookie_token varchar [note: 'cookie di sessione, comprende varie info. (occorre una tabella cookie?????? -> vedere come gestire!). in caso si gestisce, inizialmente, come un banale oggetto che ha ID e TTL, senza ulteriori info.']
+  expire_time timestamp [note: 'data di scadenza del cookie, utile per invalidare sessioni inattive o per implementare il logout automatico dopo un certo periodo di tempo.']
 }//da capire come usare i cookie
 
 // 3. Partite
 Table partite {
-  id_partita integer [primary key, note: 'codice identificativo univoco per la partita (32 bit?)']
-
+  id_partita UUID [primary key, note: 'codice identificativo univoco per la partita (32 bit?)']
+  id_partita_visualizzato varchar [note: 'codice identificativo univoco per la partita, da visualizzare agli utenti (es. PARTITA-1234) -> è generato dinamicamente dal server al momento della creazione della partita, è un codice alfanumerico di 10 caratteri che include lettere e numeri, per rendere più difficile l\'indovinare le partite attive e migliorare la sicurezza.']
+  id_partita_hash varchar [note: 'hash univoco generato dal server (es. HASH-1234) usato nell\'URL.']
   nome_partita varchar
   hasELO boolean [note: 'Indica se la partita è classificata (con ELO) o amichevole']
-  id_host integer [note: 'ID dello utente che ha creato la partita']
+  id_host UUID [note: 'ID dello utente che ha creato la partita']
   duration_max integer [note: 'Durata massima in minuti. Default 7 giorni, MAX -da definire- se si facesse in giorni e non in minuti (quindi come tempo_ora + X giorni)?']
   num_player_max integer [note: 'Numero massimo di giocatori']
   tipo_partita varchar [note: '1v1, 2v2, Free-for-All. campo a bit: 4 bit (penso bastino) indicano le diverse modalità.Modalità giocabili: 1v1, 2v2, NvN, tutti contro tutti, conquista il mondo fisso (alleanze fisse, stabilite dal gioco, non si può uscire o venire espulsi), conquista il mondo dinamico...']
@@ -68,8 +85,8 @@ Table partite {
 
 // 4. Utenti-Partite (Stato in gioco e Risorse)
 Table partecipanti_partite {
-  user_id integer
-  partita_id integer
+  user_id UUID
+  partita_id UUID
 
   punteggio integer
   territori_conquistati integer [note: 'numero']
@@ -97,8 +114,8 @@ Table strutture_Partecipanti_partite {
   id_riga integer [primary key, note: 'codice identificativo univoco per la struttura)']
   id_struttura integer [note: 'definisce la struttura rispetto alle regole definite']
   hp integer [note: 'Punti vita attuali della struttura']
-  id_utente integer [note: 'proprietario della struttura']
-  id_partita integer [note: 'partita a cui la struttura appartiene']
+  id_utente UUID [note: 'proprietario della struttura']
+  id_partita UUID [note: 'partita a cui la struttura appartiene']
   pos_x float [note: 'Longitudine (Lng) - Sincronizzata da Redis']
   pos_y float [note: 'Latitudine (Lat) - Sincronizzata da Redis']
 }
@@ -118,8 +135,8 @@ Table spostamenti{
 // 5. Mosse (Coda eventi asincrona e stato mappa)
 Table mosse {
   id_mossa integer [primary key, note: 'codice identificativo univoco per la mossa)']
-  user_id integer
-  partita_id integer
+  user_id UUID
+  partita_id UUID
 
   type_action varchar [note: 'es. costruisci_porto, sposta_truppa, attacco']
   queue_order integer [note: 'Ordine di esecuzione nella coda asincrona']
@@ -135,8 +152,8 @@ Table alleanze {
   nome_alleanza varchar
   created_at timestamp
   path_logo varchar [note: 'Percorso del logo dell alleanza, opzionale -> SOLO PREDEFINITI!']
-  id_leader integer [note: 'ID dell utente che è il leader dell alleanza -> il leader può espellere altri componenti']
-  id_partita integer [note: 'ID della partita a cui l alleanza appartiene']
+  id_leader UUID [note: 'ID dell utente che è il leader dell alleanza -> il leader può espellere altri componenti']
+  id_partita UUID [note: 'ID della partita a cui l alleanza appartiene']
 
 }
 
@@ -144,7 +161,7 @@ Table alleanze {
 Table ban {
   id_ban integer [primary key]
 
-  id_user integer
+  id_user UUID
   Time_stamp timestamp [note: 'Entrata in vigore del ban']
   Time_until timestamp [note: 'Fine del ban; è impostato ad una data "alta" se il ban è permanente']
   motivo varchar [note: 'da 1 a 20 caratteri']
@@ -159,11 +176,11 @@ Table messaggi {
 
 // 9. CHAT (messaggio-utente)
 Table chat {
-  id_user_send integer
-  id_partita integer
+  id_user_send UUID
+  id_partita UUID
   id_mex integer 
 
-  id_user_reciver integer
+  id_user_reciver UUID
   tipo_chat bit [note: '2 bit-> unicast, multicast, broadcast; oppure stringa estesa']
 
   indexes {
@@ -174,8 +191,8 @@ Table chat {
 // 10. Truppe
 Table truppe {
   id_istanza_truppa varchar [primary key, note: 'UUID univoco generato dal server (es. unit_1714123)']
-  partita_id integer [ note: 'Collegamento alla partita attiva']
-  user_id integer [note: 'Proprietario della truppa']
+  partita_id UUID [ note: 'Collegamento alla partita attiva']
+  user_id UUID [note: 'Proprietario della truppa']
   id_modello varchar [note: 'Riferimento al modello in game_rules.cdb (es. tank, soldier, predator_drone)']
   
   // Posizionamento e Movimento
@@ -201,8 +218,8 @@ Table truppe {
 //11. armata
 Table Armata{
   id_istanza_armata varchar [primary key, note: 'UUID univoco generato dal server (es. armata_1714123)']
-  partita_id integer [ note: 'Collegamento alla partita attiva']
-  user_id integer [note: 'Proprietario della truppa']
+  partita_id UUID [ note: 'Collegamento alla partita attiva']
+  user_id UUID [note: 'Proprietario della truppa']
   id_modello varchar [note: 'Riferimento al modello in game_rules.cdb (viene caricato solo questo modello) si prenda in considerazione il modello della truppa che può attaccare, vale a dire il modello della truppa che ha range d\'attacco massimo e molteplicità maggiore. in caso di conflitto, si considera il tier più alto, altrimenti si considera la truppa con più potenza di fuoco']
   
   // Posizionamento e Movimento
