@@ -1,13 +1,11 @@
 import { AfterViewInit, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common'; 
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';   
-import { IonicModule } from '@ionic/angular';   
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';     
 import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../auth-api.service';
+import { IonicModule, IonSearchbar } from '@ionic/angular';
 import { finalize } from 'rxjs/operators';
 import { Title } from '@angular/platform-browser';
-
-// Importazione dei componenti necessari per il selettore nazioni
 
 @Component({
   selector: 'app-register',
@@ -24,12 +22,19 @@ import { Title } from '@angular/platform-browser';
 })
 export class RegisterPage implements OnInit, AfterViewInit {
 
-  // Usiamo '!' per dire a TS che il form verrà inizializzato nel constructor
+  // Variabili del Form
   RegisterForm!: FormGroup;
   errorMessage = '';
   isSubmitting = false;
+  
+  // Variabili per il Modale delle Nazioni
   countries: any[] = [];
+  filteredCountries: any[] = [];
+  selectedCountry: any = null;
+  isCountryModalOpen = false;
+
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
+  @ViewChild('countrySearchbar') searchbar?: IonSearchbar;
 
   constructor(
     private formBuilder: FormBuilder,
@@ -37,13 +42,11 @@ export class RegisterPage implements OnInit, AfterViewInit {
     private authApi: AuthApiService,
     private titleService: Title
   ) {
-    // Inizializziamo subito il form per evitare errori di "undefined" nel template
     this.initForm();
   }
 
   async ngOnInit() {
     this.titleService.setTitle('PWM | Registrazione');
-    // Carichiamo le nazioni in background
     await this.loadCountries();
   }
 
@@ -88,12 +91,52 @@ export class RegisterPage implements OnInit, AfterViewInit {
         code: c.cca2
       })).sort((a: any, b: any) => a.name.localeCompare(b.name));
 
+      // Inizializza la lista filtrata per il modale
+      this.filteredCountries = [...this.countries];
+
     } catch (error) {
       console.error('Errore nel caricamento delle nazioni dall\'API:', error);
       // Fallback in caso di problemi di rete
       this.countries = [{ name: 'Italia', code: 'IT', flag: '🇮🇹' }];
+      this.filteredCountries = [...this.countries];
     }
   }
+
+  // === METODI PER LA GESTIONE DEL MODALE NAZIONI ===
+
+ openCountryModal() {
+    this.filteredCountries = [...this.countries]; 
+    this.isCountryModalOpen = true;
+  }
+
+  // NUOVO METODO: Forza il focus sulla barra di ricerca
+  focusSearchbar() {
+    // Un microscopico delay assicura che il rendering del DOM sia terminato
+    setTimeout(() => {
+      this.searchbar?.setFocus();
+    }, 150);
+  }
+
+  closeCountryModal() {
+    this.isCountryModalOpen = false;
+  }
+
+  filterCountries(event: any) {
+    const query = event.target.value?.toLowerCase() || '';
+    if (!query) {
+      this.filteredCountries = [...this.countries];
+    } else {
+      this.filteredCountries = this.countries.filter(c => c.name.toLowerCase().includes(query));
+    }
+  }
+
+  selectCountry(country: any) {
+    this.selectedCountry = country; 
+    this.RegisterForm.patchValue({ region: country.code }); 
+    this.closeCountryModal(); 
+  }
+
+  // === INVIO DATI ===
 
   onSubmit() {
     if (!this.RegisterForm.valid) {
