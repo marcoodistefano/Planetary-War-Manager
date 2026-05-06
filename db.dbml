@@ -1,278 +1,172 @@
-// 1. Utenti
-Table utenti {
-  id_user UUID [primary key, note: 'codice hash o chiave auto incrementale 32bit']
+// ==========================================
+// PWM TACTICAL - DBML SCHEMA (DEFINITIVO CON NOTE)
+// ==========================================
 
-  username varchar [note: '32 char']
-  email varchar [note: '32 char']
-  password_hash varchar [note: 'hash a 64/128/256 byte']
-  reg varchar [note: 'Regione di appartenenza, indica la macro area di connessione. NB: un giocatore che ha come regione Giappone può comunque giocare con un giocatore che ha come regione Italia']
-  elo_rating integer [note: 'Per la leaderboard globale -> valore modificato per ogni partita svolta e conclusa']
-  avatar_id integer [note: 'ID dell avatar scelto, da 1 a 20']
-  last_username_change timestamp [note: 'Data dell\'ultimo cambio username, opzionale']
-  created_at timestamp
-  recupera_passwd varchar [note: 'Token per recupero password, opzionale. Il token è generato dinamicamente al recupero passwd e viene inserito in questo campo per 10 minuti (a seconda del TTL)']
-  2FA_method varchar [note: 'Metodo di autenticazione a due fattori scelto dall utente, se presente (OTP, Authenticator, SMS, ecc.)']
-  2FA_secret varchar [note: 'Segreto per la generazione dei codici 2FA, se applicabile. Deve essere memorizzato in modo sicuro e crittografato.']
-  2FA_enabled boolean [note: 'Abilita autenticazione a due fattori. Indica che l account è stato verificato con 2FA (che sia OTP o codice di verifica su authenticator o altri) [si dovrebbe inserire, a questo punto, un token che identifica il dispositivo, o comunque, per esempio, il numero di cellulare o altro…]']
-  IS_banned boolean [note: 'Evitiamo di fare richieste all altra tabella: lì vi sono SOLO i motivi ed eventuali altre info. se l utente prova ad accedere, basta visualizzare questo campo, senza eseguire alcun JOIN con la tabella ban']
-  IS_perma_banned boolean
-  codice_amico varchar [note: 'Codice univoco generato dal server (es. AMICO-1234) che l\'utente può condividere per farsi aggiungere alla lista degli amici. Il codice è alfanumerico di 10 caratteri che include lettere e numeri, per rendere più difficile l\'indovinare i codici degli amici e migliorare la sicurezza. Si basa sull\'id utente']
+// --- TIPI PERSONALIZZATI ---
+
+Enum status_amico {
+  pending [note: 'Richiesta inviata']
+  accepted [note: 'Richiesta accettata']
+  rejected [note: 'Richiesta rifiutata']
+  blocked [note: 'Utente bloccato']
 }
 
-//1.1 Amici
+// --- TABELLE ---
+
+// 1. Utenti
+Table utenti {
+  id_user UUID [primary key, default: `uuid_generate_v4()`, note: 'Codice hash o chiave auto incrementale 32bit']
+  username varchar(32) [unique, not null, note: '32 char']
+  email varchar(64) [unique, not null, note: '32 char']
+  password_hash text [not null, note: 'Hash generato con Argon2id (Modulo Aslan)']
+  reg varchar(32) [note: 'Regione di appartenenza macro area. Un giocatore JP può giocare con uno IT']
+  elo_rating integer [default: 1000, note: 'Leaderboard globale: modificato per ogni partita conclusa']
+  avatar_id smallint [default: 1, note: 'ID dell avatar scelto, da 1 a 20']
+  last_username_change timestamp [note: 'Data dell ultimo cambio username, opzionale']
+  created_at timestamp [default: `now()`]
+  recupera_passwd varchar(255) [note: 'Token dinamico per recupero password (TTL 10 min)']
+  two_fa_method varchar(50) [note: 'Metodo scelto: OTP, Authenticator, SMS']
+  two_fa_secret varchar(255) [note: 'Segreto crittografato per generazione codici 2FA']
+  two_fa_enabled boolean [default: false, note: 'Indica se l account è verificato con 2FA']
+  is_banned boolean [default: false, note: 'Evita JOIN con tabella ban in fase di login']
+  is_perma_banned boolean
+  codice_amico varchar(10) [unique, note: 'Codice univoco AMICO-1234 generato dal server basato su ID']
+}
+
+// 1.1 Amici
 Table amici {
   id_user UUID
   id_amico UUID
-  created_at timestamp [note: 'data in cui è stata inviata la richiesta di amicizia']
-  accepted_at timestamp [note: 'data in cui la richiesta di amicizia è stata accettata, null se ancora in pending']
-  status varchar [note: 'pending, accepted, rejected, blocked']
-  link varchar [note: 'link univoco generato dal server (es. LINK-1234) usato per accettare o rifiutare la richiesta di amicizia, è alfanumerico di 10 caratteri che include lettere e numeri, per rendere più difficile l\'indovinare i link e migliorare la sicurezza.']
-  link_duration integer [note: 'Durata in giorni da quando è stato inviato il request di amicizia, utile per disabilitare il link dopo un certo periodo di tempo se non accettato o rifiutato.']
+  created_at timestamp [default: `now()`, note: 'Data invio richiesta']
+  accepted_at timestamp [note: 'Data accettazione, null se pending']
+  status status_amico [default: 'pending']
+  link varchar(10) [note: 'Link alfanumerico univoco per accettare/rifiutare']
+  link_duration integer [note: 'Durata in giorni per disabilitare il link']
 
   indexes {
-    (id_user, id_amico) [pk] // Chiave primaria composta
+    (id_user, id_amico) [pk]
   }
 }
 
 // 2. Accessi
 Table accessi {
-  id_access integer [primary key]
-  user_id UUID
-  ip_address varchar [note: 'metodo per identificare eventuali account duplicati, non implementato inizialmente']
-  login_time timestamp [note: 'data e ora del login, utile per monitorare l\'attività degli utenti e per eventuali analisi di sicurezza.']
-  cookie_token varchar [note: 'cookie di sessione, comprende varie info. (occorre una tabella cookie?????? -> vedere come gestire!). in caso si gestisce, inizialmente, come un banale oggetto che ha ID e TTL, senza ulteriori info.']
-  expire_time timestamp [note: 'data di scadenza del cookie, utile per invalidare sessioni inattive o per implementare il logout automatico dopo un certo periodo di tempo.']
-}//da capire come usare i cookie
+  id_access UUID [primary key, default: `uuid_generate_v4()`]
+  user_id UUID [not null]
+  ip_address varchar(45) [note: 'Identificazione account duplicati']
+  login_time timestamp [default: `now()`, note: 'Monitoraggio attività e analisi sicurezza']
+  cookie_token varchar(255) [note: 'ID sessione e TTL inizialmente gestiti come oggetto']
+  expire_time timestamp [note: 'Scadenza per invalidazione sessioni inattive']
+}
 
 // 3. Partite
 Table partite {
-  id_partita UUID [primary key, note: 'codice identificativo univoco per la partita (32 bit?)']
-  id_partita_visualizzato varchar [note: 'codice identificativo univoco per la partita, da visualizzare agli utenti (es. PARTITA-1234) -> è generato dinamicamente dal server al momento della creazione della partita, è un codice alfanumerico di 10 caratteri che include lettere e numeri, per rendere più difficile l\'indovinare le partite attive e migliorare la sicurezza.']
-  id_partita_hash varchar [note: 'hash univoco generato dal server (es. HASH-1234) usato nell\'URL.']
-  nome_partita varchar
-  hasELO boolean [note: 'Indica se la partita è classificata (con ELO) o amichevole']
-  id_host UUID [note: 'ID dello utente che ha creato la partita']
-  duration_max integer [note: 'Durata massima in minuti. Default 7 giorni, MAX -da definire- se si facesse in giorni e non in minuti (quindi come tempo_ora + X giorni)?']
-  num_player_max integer [note: 'Numero massimo di giocatori']
-  tipo_partita varchar [note: '1v1, 2v2, Free-for-All. campo a bit: 4 bit (penso bastino) indicano le diverse modalità.Modalità giocabili: 1v1, 2v2, NvN, tutti contro tutti, conquista il mondo fisso (alleanze fisse, stabilite dal gioco, non si può uscire o venire espulsi), conquista il mondo dinamico...']
-  modalita varchar [note: 'Distruzione, Conquista, Tempo']
-  moltiplicatore varchar [note: '1x, 2x, 3x per risorse e tempo']
-  regioni_giocabili varchar [note: 'Lista di regioni disponibili per la partita, 16 bit (0,1)']
-  stato varchar [note: 'In attesa, In corso, Terminata. anche “eliminata”, 2 bit']
-  created_at timestamp
-  nome_json varchar [note: 'Nome del file JSON con la mappa e configurazione partita. è generato come HASH di tutte le info della partita']
+  id_partita UUID [primary key, default: `uuid_generate_v4()`]
+  id_partita_visualizzato varchar(10) [unique, note: 'Codice alfanumerico (es. PARTITA-1234) per gli utenti']
+  id_partita_hash varchar(255) [note: 'Hash univoco usato nell URL']
+  nome_partita varchar(100) [not null]
+  has_elo boolean [default: true, note: 'Indica se la partita è classificata o amichevole']
+  id_host UUID [not null, note: 'ID utente creatore']
+  duration_max integer [default: 10080, note: 'Default 7 giorni (in minuti)']
+  num_player_max integer [note: 'Max 512 player']
+  tipo_partita varchar(50) [note: '1v1, 2v2, FFA, Conquista Mondo (Fissa/Dinamica)']
+  modalita varchar(50) [note: 'Distruzione, Conquista, Tempo']
+  moltiplicatore varchar(10) [note: '1x fino a 1000x per risorse e tempo']
+  regioni_giocabili varchar(16) [note: 'Vettore 16 bit (es. Bit 2: Europa, Bit 10: Italia)']
+  stato varchar(20) [note: 'In attesa (00), In corso (01), Terminata (10), Eliminata (11)']
+  created_at timestamp [default: `now()`]
+  nome_json varchar(255) [note: 'Hash di configurazione mappa e regole']
+  
+  note: 'Il server può gestire i campi da duration_max a stato in una stringa compressa B64 (es: 00|111|0111|0111|0000|0010|0000000001000000)'
 }
 
-// NB PARTITE: il server può gestire i campi da duration_max a stato, in un’unica stringa, compressa e gestita sui bit e memorizzata in B64. 
-// per esempio, se la stringa dovesse memorizzare in questo ordine(tra parentesi i bit occupati):
-// stato_partita [2], N_player_max[9 bit -> 512 player], duration_max[5 bit -> 32 giorni (se memorizzato in giorni)], moltiplicatore[4 bit->sono massimo 16 combinazioni, 0000 è default (1x), poi 2x, 3x, 5x, 10x, 20x, 30x, 40x…], tipo_partita [4], modalità [4 bit? 16 modalità…oppure 5?], regioni_giocabili [16 bit]
-// 
-// ->Stato partita {00->in attesa; 01->in corso; 10->terminata; 11->eliminata (si intende che si eliminano le mosse e il documento (si fa dopo X giorni dalla fine della partita))
-// ->N_player_max -> conteggio classico… 10, 20, 30, 50, 100, 250, 500 -> si potrebbero usare, allora, solo 3 bit… {000 001 010 011 100 101 110 111} dove il valore 111 è assunto SOLO per modalità 1v1 e 2v2 (NvN < 10 giocatori totali)
-// ->duration_max -> default è 7, quindi 0111, max è 1111 che indica 32 giorni; 0000 è controllo, NON UTILIZZATO
-// ->moltiplicatore -> {1x 0000; 2x 0001; 3x 0010; 4x 0011; 5x 0100; 10x 0101; 20x 0110; 30x 0111; 40x 1000; 50x 1001; 60x 1010; 100x 1011; 200x 1100; 500x 1101; 1000x 1110; [ILLIMITATA (produzione istantanea di tutto eccetto che delle risorse) oppure 5000x 1111}
-// -> tipo partita -> {1v1 0000; 2v2 0001; 3v3 0010; 5v5 0011; tutti_contro_tutti 0100…altro da definire}
-// -> modalità ->SI CAMBIA SOLO UN BIT! {tempo 0000 (def.); distruzione 0001; conquista 0010; altro}
-// -> regioni giocabili -> SI CAMBIA SOLO UN BIT! {0000000000000000} [DA MSB A LSB}
-// MSB (bit 1^): tutto il mondobit 2: europabit 3: Asiabit 4: africa
-// bit 5: oceaniabit 6: america NORDbit 7: america SUD
-// DAL BIT 8 FINO AL 16 SONO ALTRE MODALITA’, ALCUNI ESEMPI:
-// bit 8: vecchio mondo (europa-medio oriente-nord africa)
-// bit 9: medio orientebit 10: italia…
-// Definito questo, procedo con un esempio: giocatore X ha appena creato una partita con le seguenti caratteristiche: 1v1, 7giorni, moltiplicatore x30, modalità conquista, solo italia. 
-// il server avrà, allora, la seguente stringa di bit:
-// 00|111|0111|0111|0000|0010|0000000001000000
-
-// 4. Utenti-Partite (Stato in gioco e Risorse)
+// 4. Partecipanti Partite
 Table partecipanti_partite {
-  user_id UUID
-  partita_id UUID
-
-  punteggio integer
-  territori_conquistati integer [note: 'numero']
-  territori_persi integer [note: 'numero']
-  capitali_distrutte integer [note: 'numero']
-  time_death timestamp [note: 'momento in cui il player è stato sconfitto -> nessun territorio']
-  rank integer [note: 'posizione in classifica, definita dai territori, capitali, time death…']
-  strutture_lvl_max integer [note: 'numero di strutture costruite fino a livello max']
-  truppe_eliminate integer [note: 'nemici']
-  truppe_perse integer [note: 'proprie']
-  perc_distruzione float [note: 'rispetto ai territori conquistati']
-  id_alleanza integer [note: 'ID dell alleanza a cui appartiene il giocatore, se presente']
-
-  utenti_alleati varchar [note: 'B64 val. matrice triang. sup gestita in 0/1, 0 non in alleanza, 1 in guerra. la matrice è speculare!']
-  utenti_in_guerra varchar [note: 'B64 val. matrice triang. sup gestita in 0/1, 0 non in guerra, 1 in guerra. la matrice è speculare!']
-  stato_risorse varchar [note: 'Snapshot asincrono. Sincronizzato da Redis a PostgreSQL esclusivamente alla disconnessione dell\'utente o tramite backup programmato (Heartbeat Save) ogni 15-30 minuti per ottimizzazione carichi IO.']
-  stato_territori varchar [note: 'Lista di territori posseduti, b64 o vettore di bit dove l ID identifica il territorio, se posto a 1, allora è posseduto.']
+  user_id UUID [not null]
+  partita_id UUID [not null]
+  punteggio integer [default: 0]
+  territori_conquistati integer [default: 0]
+  territori_persi integer [default: 0]
+  capitali_distrutte integer [default: 0]
+  time_death timestamp [note: 'Sconfitto (zero territori)']
+  rank integer [note: 'Posizione definita da territori e capitali']
+  strutture_lvl_max integer [default: 0]
+  truppe_eliminate integer [note: 'Kill count nemici']
+  truppe_perse integer [note: 'Perdite proprie']
+  perc_distruzione real [default: 0.0]
+  id_alleanza UUID
+  utenti_alleati text [note: 'Matrice triangolare B64 (0: No, 1: Alleanza)']
+  utenti_in_guerra text [note: 'Matrice triangolare B64 (0: No, 1: Guerra)']
+  stato_risorse jsonb [default: '{}', note: 'Sincronizzato da Redis ogni 15-30m (Heartbeat) o disconnessione']
+  stato_territori jsonb [note: 'Lista territori (Vettore di bit)']
+  stato_ricerche jsonb [default: '{}', note: 'Tech Tree del partecipante']
 
   indexes {
-    (user_id, partita_id) [pk] // Chiave primaria composta
+    (user_id, partita_id) [pk]
   }
 }
 
-Table strutture_Partecipanti_partite {
-  id_riga integer [primary key, note: 'codice identificativo univoco per la struttura)']
-  id_struttura integer [note: 'definisce la struttura rispetto alle regole definite']
-  hp integer [note: 'Punti vita attuali della struttura']
-  id_utente UUID [note: 'proprietario della struttura']
-  id_partita UUID [note: 'partita a cui la struttura appartiene']
-  pos_x float [note: 'Longitudine (Lng) - Sincronizzata da Redis']
-  pos_y float [note: 'Latitudine (Lat) - Sincronizzata da Redis']
-}
-
-//4.2 Coda_spostamenti
-Table spostamenti{
-  id_spostamento integer [primary key, note: 'codice identificativo univoco per lo spostamento)']
-  id_mossa integer [note: 'collegamento alla mossa che ha generato lo spostamento, se presente']
-  numero integer [note: 'Identifica il numero nella coda (che mossa deve essere eseguita prima?)']
-  x_dest float [note: 'Longitudine (Lng) di destinazione - Sincronizzata da Redis']
-  y_dest float [note: 'Latitudine (Lat) di destinazione - Sincronizzata da Redis']
-  time_to_arrive timestamp [note: 'tempo di arrivo al punto successivo -si invoca automaticamen e il DBMS che, allo scadere provvede ad eliminare la tupla etc-']
-}
-
-//4.3 NEXT COMING COMMANDER!
-
-// 5. Mosse (Coda eventi asincrona e stato mappa)
-Table mosse {
-  id_mossa integer [primary key, note: 'codice identificativo univoco per la mossa)']
-  user_id UUID
-  partita_id UUID
-
-  type_action varchar [note: 'es. costruisci_porto, sposta_truppa, attacco']
-  queue_order integer [note: 'Ordine di esecuzione nella coda asincrona']
-  TTL integer [note: 'Time To Live in secondi per l esecuzione della mossa, 0 se da eseguire immediatamente']
-  priorita varchar [note: 'priorità mossa, 2 bit. in cancellazione vengono eliminate tutte le mosse che NON hanno in questo campo i bit posti a 11']
-  created_at timestamp
-}
-
-// 6. Alleanze
-Table alleanze {
-  id_alleanza integer [primary key]
-
-  nome_alleanza varchar
-  created_at timestamp
-  path_logo varchar [note: 'Percorso del logo dell alleanza, opzionale -> SOLO PREDEFINITI!']
-  id_leader UUID [note: 'ID dell utente che è il leader dell alleanza -> il leader può espellere altri componenti']
-  id_partita UUID [note: 'ID della partita a cui l alleanza appartiene']
-
-}
-
-// 7. BAN (log dei ban degli utenti -> un utente può subire dei ban temporanei o permanenti)
-Table ban {
-  id_ban integer [primary key]
-
-  id_user UUID
-  Time_stamp timestamp [note: 'Entrata in vigore del ban']
-  Time_until timestamp [note: 'Fine del ban; è impostato ad una data "alta" se il ban è permanente']
-  motivo varchar [note: 'da 1 a 20 caratteri']
-}
-
-// 8. MEX (messaggi scritti dagli utenti dentro una partita)
+// 8. Messaggi
 Table messaggi {
-  id_mex integer [primary key, unique, note: 'numero random a 64 bit']
-  Time_stamp timestamp 
-  content varchar [note: 'da 1 a 200 caratteri']
+  id_mex UUID [primary key, default: `uuid_generate_v4()`, note: 'Ancoraggio autore/partita per evitare messaggi fantasma']
+  id_user_send UUID [not null]
+  id_partita UUID [not null]
+  content text [not null, note: 'Testo da 1 a 200 caratteri']
+  time_stamp timestamp [default: `now()`]
 }
 
-// 9. CHAT (messaggio-utente)
+// 9. Chat
 Table chat {
-  id_user_send UUID
-  id_partita UUID
-  id_mex integer 
-
-  id_user_reciver UUID
-  tipo_chat bit [note: '2 bit-> unicast, multicast, broadcast; oppure stringa estesa']
-
-  indexes {
-    (id_user_send, id_partita, id_mex) [pk]
-  }
+  id_chat_entry bigint [primary key, increment]
+  id_mex UUID [unique, not null]
+  id_user_receiver UUID [note: 'Null per broadcast/alleanza']
+  tipo_chat varchar(20) [note: '2 bit: unicast, multicast, broadcast o stringa estesa']
 }
 
-// 10. Truppe
+// 10. Armata
+Table armata {
+  id_istanza_armata UUID [primary key, default: `uuid_generate_v4()`, note: 'UUID es. armata_1714123']
+  partita_id UUID [not null]
+  user_id UUID [not null]
+  id_modello varchar(64) [note: 'Modello truppa con range d attacco massimo e tier più alto']
+  x double_precision [note: 'Sincronizzata da Redis']
+  y double_precision [note: 'Sincronizzata da Redis']
+  alt real [default: 0, note: 'Altitudine (Aereo/Sottomarino -20m)']
+  rot real [default: 0, note: 'Rotazione radianti per rendering 3D']
+  hp integer [note: 'Punti Vita totali armata']
+  stato integer [default: 1, note: '1:Idle, 2:Movimento, 3:Combattimento, 4:Ritirata']
+  attitudine integer [default: 1, note: 'AI: 1:Aggressiva, 2:Difensiva, 3:Evasiva']
+  max_range_atck integer [note: 'Range della truppa con gittata massima']
+  dmg_tot integer [note: 'Attacco totale truppe a range massimo']
+  speed integer [note: 'Velocità della truppa più lenta nell armata']
+  tipo_armata integer [note: 'Definisce limitazioni movimento (es. Nave non attacca fanti)']
+  are_they_in_the_same_position boolean [note: 'Indica se il gruppo è raggruppato per gestione danno']
+  last_update timestamp [default: `now()`]
+}
+
+// 11. Truppe
 Table truppe {
-  id_istanza_truppa varchar [primary key, note: 'UUID univoco generato dal server (es. unit_1714123)']
-  partita_id UUID [ note: 'Collegamento alla partita attiva']
-  user_id UUID [note: 'Proprietario della truppa']
-  id_modello varchar [note: 'Riferimento al modello in game_rules.cdb (es. tank, soldier, predator_drone)']
-  
-  // Posizionamento e Movimento
-  x float [note: 'Longitudine (Lng) - Sincronizzata da Redis']
-  y float [note: 'Latitudine (Lat) - Sincronizzata da Redis']
-  alt float [default: 0, note: 'Altitudine. Fondamentale per unità aeree o sottomarini (-20m)']
-  rot float [default: 0, note: 'Rotazione in radianti per il rendering 3D']
-  
-  // Stato Vitale e Logico
-  hp integer [note: 'Punti Vita attuali']
-  stato integer [default: 1, note: '1: Idle, 2: In Movimento, 3: In Combattimento, 4: Ritirata']
-  attitudine integer [default: 1, note: 'Comportamento AI: 1: Aggressiva, 2: Difensiva, 3: Evasiva']
-  
-  // Meta-dati
-  last_update timestamp [default: `now()`, note: 'Ultimo salvataggio da Redis a PostgreSQL, utile per il backup e la sincronizzazione']
-  id_armata integer [note: 'Riferimento all armata di appartenenza, se presente (es. fanteria, corazzata, aerea) -> da definire se necessario per il gioco e per ottimizzare le query sulle truppe (es. per visualizzare solo le truppe aeree, si potrebbe filtrare su questo campo invece che sul modello)']
-
-  indexes {
-    (partita_id, user_id) [name: 'idx_player_units']
-    (x, y) [name: 'idx_geo_static'] // Utile per query spaziali su DB se Redis è spento
-  }
-}
-//11. armata
-Table Armata{
-  id_istanza_armata varchar [primary key, note: 'UUID univoco generato dal server (es. armata_1714123)']
-  partita_id UUID [ note: 'Collegamento alla partita attiva']
-  user_id UUID [note: 'Proprietario della truppa']
-  id_modello varchar [note: 'Riferimento al modello in game_rules.cdb (viene caricato solo questo modello) si prenda in considerazione il modello della truppa che può attaccare, vale a dire il modello della truppa che ha range d\'attacco massimo e molteplicità maggiore. in caso di conflitto, si considera il tier più alto, altrimenti si considera la truppa con più potenza di fuoco']
-  
-  // Posizionamento e Movimento
-  x float [ note: 'Longitudine attuale (Lng) - Sincronizzata da Redis - Per campo are_they_in_the_same_position=false questa posizione indica la coordinata di congiunzione']
-  y float [ note: 'Latitudine attuale (Lat) - Sincronizzata da Redis - Per campo are_they_in_the_same_position=false questa posizione indica la coordinata di congiunzione']
-  alt float [default: 0, note: 'Altitudine. Fondamentale per unità aeree o sottomarini (-20m)']
-  rot float [default: 0, note: 'Rotazione in radianti per il rendering 3D']
-  
-  // Stato Vitale e Logico
-  hp integer [note: 'Punti Vita attuali dell\'armata']
-  stato integer [default: 1, note: '1: Idle, 2: In Movimento, 3: In Combattimento, 4: Ritirata']
-  attitudine integer [default: 1, note: 'Comportamento AI: 1: Aggressiva, 2: Difensiva, 3: Evasiva']
-  max_range_atck integer [note: 'range di azione della/e truppa/e con maggior range d\'azione']
-  dmg_tot integer [note: 'attacco totale delle truppe con range d\'azione massimo']
-  speed integer [note: 'velocità della truppa più lenta dell\'armata. sarà preso in considerazione questo dato per il movimento']
-  tipo_armata integer [note: 'indica il tipo di armata e ciò che essa può fare. per esempio, un\'armata che disponde di 100 fanti e 1 carro armato sarà di tipo carro armato e non potrà proseguire su percorsi montuosi; un\'armata che dispone di 100 fanti e 1 nave, sarà di tipo nave e i fanti non potranno attaccare. da definire criteri e metodi di attacco ed ingaggio.']
-  are_they_in_the_same_position boolean [note: 'indica che tutte le truppe sono nella stessa posizione (sono raggruppate) e quindi il backend, per la gestione del danno e il resto, può basarsi su questi criteri']
-  
-// Meta-dati
-  last_update timestamp [default: `now()`, note: 'Ultimo salvataggio da Redis a PostgreSQL']
-
-  indexes {
-    (partita_id, user_id) [name: 'idx_player_units']
-    (x, y) [name: 'idx_geo_static'] // Utile per query spaziali su DB se Redis è spento
-  }
+  id_istanza_truppa UUID [primary key, default: `uuid_generate_v4()`, note: 'UUID es. unit_1714123']
+  partita_id UUID [not null]
+  user_id UUID [not null]
+  id_armata UUID [note: 'Riferimento all armata per ottimizzazione query filtri']
+  hp integer
+  metadata jsonb [note: 'Intelligence e parametri spionaggio']
 }
 
-// --- Relazioni (Foreign Keys) ---
+// --- RELAZIONI ---
 
-Ref: utenti.id_user < accessi.user_id
-Ref: utenti.id_user < partecipanti_partite.user_id
-Ref: utenti.id_user < mosse.user_id
+Ref: utenti.id_user < accessi.user_id [delete: cascade]
+Ref: utenti.id_user < partecipanti_partite.user_id [delete: cascade]
 Ref: utenti.id_user < partite.id_host
-Ref: utenti.id_user < alleanze.id_leader
-Ref: utenti.id_user < truppe.user_id
+Ref: utenti.id_user < chat.id_user_receiver
 
-Ref: partite.id_partita < partecipanti_partite.partita_id
-Ref: partite.id_partita < mosse.partita_id
-Ref: partite.id_partita < alleanze.id_partita
-Ref: partite.id_partita < truppe.partita_id
+Ref: partite.id_partita < partecipanti_partite.partita_id [delete: cascade]
 
-Ref: strutture_Partecipanti_partite.id_partita < partecipanti_partite.partita_id
-Ref: strutture_Partecipanti_partite.id_utente < partecipanti_partite.user_id
+Ref: partecipanti_partite.(user_id, partita_id) < messaggi.(id_user_send, id_partita) [delete: cascade]
+Ref: partecipanti_partite.(user_id, partita_id) < armata.(user_id, partita_id) [delete: cascade]
+Ref: partecipanti_partite.(user_id, partita_id) < truppe.(user_id, partita_id) [delete: cascade]
 
-Ref: spostamenti.id_mossa < mosse.id_mossa
-
-Ref: truppe.id_armata < Armata.id_istanza_armata
-
-Ref: partecipanti_partite.id_alleanza < alleanze.id_alleanza
-
-Ref: ban.id_user < utenti.id_user
-
-Ref: chat.id_mex < messaggi.id_mex
-Ref: chat.id_partita < partecipanti_partite.partita_id
-Ref: chat.id_user_send < partecipanti_partite.user_id
-Ref: chat.id_user_reciver < partecipanti_partite.user_id
+Ref: messaggi.id_mex - chat.id_mex [delete: cascade]
+Ref: armata.id_istanza_armata < truppe.id_armata [delete: set null]
+Ref: utenti.id_user < amici.id_user
+Ref: utenti.id_user < amici.id_amico

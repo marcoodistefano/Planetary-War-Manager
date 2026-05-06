@@ -11,6 +11,12 @@
       "y": -1042.597154914395
     },
     {
+      "name": "amici",
+      "schemaName": "public",
+      "x": 551.0764746190182,
+      "y": 227.1801420981846
+    },
+    {
       "name": "accessi",
       "schemaName": "public",
       "x": 576.1914532460186,
@@ -29,36 +35,6 @@
       "y": -479.7190513832465
     },
     {
-      "name": "strutture_Partecipanti_partite",
-      "schemaName": "public",
-      "x": 248.49370440752364,
-      "y": -574.9779003523669
-    },
-    {
-      "name": "spostamenti",
-      "schemaName": "public",
-      "x": 1011.442152550052,
-      "y": -1510.2428148800561
-    },
-    {
-      "name": "mosse",
-      "schemaName": "public",
-      "x": 1448.4410239342985,
-      "y": -1478.0697749360033
-    },
-    {
-      "name": "alleanze",
-      "schemaName": "public",
-      "x": 1557.8018596656882,
-      "y": -95.60802537015451
-    },
-    {
-      "name": "ban",
-      "schemaName": "public",
-      "x": 573.4810040272686,
-      "y": -1082.8692510544429
-    },
-    {
       "name": "messaggi",
       "schemaName": "public",
       "x": 22.809174493398388,
@@ -71,16 +47,16 @@
       "y": -179.43677507665026
     },
     {
+      "name": "armata",
+      "schemaName": "public",
+      "x": 1601.63330078125,
+      "y": 324
+    },
+    {
       "name": "truppe",
       "schemaName": "public",
       "x": 1540.4411890803538,
       "y": -1113.4116420060782
-    },
-    {
-      "name": "Armata",
-      "schemaName": "public",
-      "x": 2197.664216491219,
-      "y": -728.2516332892147
     }
   ],
   "tableGroupCollapseStates": [],

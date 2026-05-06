@@ -11,22 +11,28 @@ services:
     command:
       - "--probe.docker=true"
 
-  # IL CUORE DATI
+  # REDIS PER IL COMM-LINK (MESSAGGI IN TEMPO REALE, PUB/SUB, CACHE RISORSE, SESSIONI, ETC.)
   redis:
     image: redis:7-alpine
     networks:
       - pwm-net
-
+# IL DATABASE POSTGRESQL
   db:
     image: postgres:15-alpine
+    container_name: pwm-postgres
+    restart: always  # Forza il riavvio se il database crasha
     environment:
+      - POSTGRES_USER=commander_admin        # È meglio definire un utente specifico
       - POSTGRES_DB=pwm_tactical_database
       - POSTGRES_PASSWORD=secret
     volumes:
-      - ./db-init:/docker-entrypoint-initdb.d
+      - ./db-init:/docker-entrypoint-initdb.d  # Per gli script SQL iniziali
+      - postgres_data:/var/lib/postgresql/data # <--- FONDAMENTALE per non perdere i dati
+    ports:
+      - "5432:5432" # Ti permette di collegarti con programmi esterni dal tuo PC
     networks:
       - pwm-net
-
+  # FRONTEND IN DEV MODE (CON HOT-RELOAD)
   frontend-dev:
     build: 
       context: ./frontend
@@ -165,6 +171,7 @@ services:
   # --- STRUMENTI DI VISUALIZZAZIONE DATABASE ---
   pgadminer:
     image: adminer
+    container_name: pwm-adminer
     ports:
       - "8085:8080" # Porta non canonica esterna per visualizzare Postgres
     depends_on:
@@ -182,6 +189,9 @@ services:
       - redis
     networks:
       - pwm-net
+
+volumes:
+  postgres_data:
 
 networks:
   pwm-net:
