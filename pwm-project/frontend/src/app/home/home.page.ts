@@ -1,20 +1,22 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 
-
 @Component({
   selector: 'app-home',
   templateUrl: 'home.page.html',
   styleUrls: ['home.page.scss'],
   standalone: true,
-  // Aggiungi esattamente questa riga qui sotto:
   imports: [IonicModule, CommonModule, FormsModule, RouterModule]
 })
-export class HomePage {
+export class HomePage implements OnInit, AfterViewInit {
+  
+  // === VARIABILI PER SFONDO VIDEO ===
+  @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
+
   // Simulated data: include region/nation for flag display
   leaderboardGlobal = [
     { rank: 1, player: 'Aurelio', score: 12840, region: 'IT' },
@@ -90,6 +92,26 @@ filterNewGames(event: any) {
 
   ngOnInit() {
     this.titleService.setTitle('PWM | Homepage');
+  }
+
+  // === METODI PER IL PLAYBACK DEL VIDEO ===
+  ngAfterViewInit() {
+    this.playBackgroundVideo();
+  }
+
+  ionViewDidEnter() {
+    this.playBackgroundVideo();
+  }
+
+  private playBackgroundVideo() {
+    const video = this.backgroundVideo?.nativeElement;
+    if (!video) {
+      return;
+    }
+    video.muted = true;
+    video.playsInline = true;
+    video.load();
+    video.play().catch(() => undefined);
   }
 
   viewFullLeaderboard() {

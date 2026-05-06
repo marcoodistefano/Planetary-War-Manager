@@ -1,11 +1,16 @@
-<ion-content>
+<ion-content [fullscreen]="true">
+  <!-- SFONDO ANIMATO TATTICO -->
+  <div class="auth-background" aria-hidden="true">
+    <video #backgroundVideo class="auth-background__video" autoplay muted loop playsinline preload="metadata" src="assets/background_gif/background_gif.mp4"></video>
+    <div class="auth-background__overlay"></div>
+  </div>
+
   <div class="home-page">
-    <div class="overlay"></div>
-
+    
     <section class="top-row">
-
       <!-- COLONNA SINISTRA -->
       <div class="panel left-column">
+      <!-- ... TUTTO IL RESTO DELLA PAGINA RIMANE INVARIATO ... -->
         <aside class="leaderboard-panel inner-panel">
           <div class="panel-heading">
             <span>Leaderboard</span>

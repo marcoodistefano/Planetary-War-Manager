@@ -22,6 +22,11 @@ ion-content {
   object-fit: cover;
   object-position: center;
   filter: brightness(0.72) saturate(1.05) contrast(1.05);
+
+  /* FIX HARDWARE: Forza il rendering nativo GPU per evitare sfocature del video */
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .auth-background__overlay {
@@ -87,6 +92,9 @@ ion-toolbar {
   margin: 0 auto;
   position: relative;
   z-index: 1;
+
+  /* FIX LAYER: Separa il contesto 3D per impedire conflitti con il video sottostante */
+  transform-style: preserve-3d;
 }
 
 form {
@@ -99,6 +107,12 @@ form {
   padding: 40px 24px;
   width: 100%;
   margin-top: 60px;
+
+  /* FIX ANTI-BLUR: Forza il livello rendering separato */
+  transform: translateZ(0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  backface-visibility: hidden;
 }
 
 .field-container {
