@@ -5,6 +5,7 @@ import { IonicModule } from '@ionic/angular';
 import { Router, RouterLink } from '@angular/router'; // Aggiungi RouterLink
 import { AuthApiService } from '../auth-api.service';
 import { finalize } from 'rxjs/operators';
+import { Title } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-login',
@@ -26,9 +27,11 @@ export class LoginPage implements OnInit, AfterViewInit {
     private formBuilder: FormBuilder,
     private router: Router,
     private authApi: AuthApiService,
+    private titleService: Title
   ) {}
 
   ngOnInit() {
+    this.titleService.setTitle('PWM | Login');
     // 3. Inizializza il form e i suoi controlli (es. email e password)
     this.loginForm = this.formBuilder.group({
       username: ['', [Validators.required, Validators.minLength(3)]],

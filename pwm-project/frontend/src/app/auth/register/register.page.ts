@@ -5,6 +5,7 @@ import { IonicModule } from '@ionic/angular';
 import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../auth-api.service';
 import { finalize } from 'rxjs/operators';
+import { Title } from '@angular/platform-browser';
 
 // Importazione dei componenti necessari per il selettore nazioni
 
@@ -34,12 +35,14 @@ export class RegisterPage implements OnInit, AfterViewInit {
     private formBuilder: FormBuilder,
     private router: Router,
     private authApi: AuthApiService,
+    private titleService: Title
   ) {
     // Inizializziamo subito il form per evitare errori di "undefined" nel template
     this.initForm();
   }
 
   async ngOnInit() {
+    this.titleService.setTitle('PWM | Registrazione');
     // Carichiamo le nazioni in background
     await this.loadCountries();
   }

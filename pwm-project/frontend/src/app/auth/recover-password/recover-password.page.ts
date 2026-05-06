@@ -5,6 +5,7 @@ import { IonicModule } from '@ionic/angular';
 import { Router, RouterLink } from '@angular/router'; // Aggiungi RouterLink
 import { AuthApiService } from '../auth-api.service';
 import { finalize } from 'rxjs/operators';
+import { Title } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-recover-password',
@@ -27,9 +28,11 @@ export class RecoverPasswordPage implements OnInit, AfterViewInit {
     private formBuilder: FormBuilder,
     private router: Router,
     private authApi: AuthApiService,
+    private titleService: Title
   ) { }
 
   ngOnInit() {
+    this.titleService.setTitle('PWM | Recupero Password');
     // 3. Inizializza il form e i suoi controlli (es. email e password)
     this.recoverForm = this.formBuilder.group({
       username: ['', [Validators.required, Validators.minLength(3)]],
