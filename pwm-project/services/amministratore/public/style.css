@@ -1,0 +1,210 @@
+/* ==========================================
+   PWM TACTICAL - DASHBOARD STYLE CONFIG
+   ========================================== */
+
+:root {
+    --bg: #05070a;
+    --card-bg: rgba(13, 17, 23, 0.85);
+    --neon-blue: #00f2ff;
+    --neon-red: #ff2e63;
+    --neon-green: #08ffc8;
+    --text: #e6edf3;
+    --border: rgba(0, 242, 255, 0.15);
+    --font-main: 'JetBrains Mono', monospace;
+    --font-header: 'Orbitron', sans-serif;
+}
+
+/* 1. LAYOUT GENERALE */
+body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-main);
+    margin: 0;
+    padding: 20px;
+    overflow-x: hidden;
+}
+
+.glow-bg {
+    position: fixed;
+    top: -50%; left: -50%; width: 200%; height: 200%;
+    background: radial-gradient(circle, rgba(0,242,255,0.03) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+.container { 
+    max-width: 1400px; 
+    margin: auto; 
+}
+
+/* 2. HEADER E SEZIONI */
+header {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 20px; 
+    margin-bottom: 30px;
+}
+
+h1 { 
+    font-family: var(--font-header); 
+    font-size: 2rem; 
+    margin: 0; 
+}
+
+h1 span { 
+    color: var(--neon-blue); 
+    text-shadow: 0 0 10px var(--neon-blue); 
+}
+
+.section-title {
+    font-family: var(--font-header);
+    text-align: center;
+    margin-top: 40px;
+}
+
+/* 3. LEGENDA CENTRALE */
+.dashboard-legend {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-bottom: 30px;
+    font-family: var(--font-header);
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.cpu-dot { background-color: var(--neon-blue); box-shadow: 0 0 8px var(--neon-blue); }
+.ram-dot { background-color: var(--neon-red); box-shadow: 0 0 8px var(--neon-red); }
+
+/* 4. GRID E CARD */
+.dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); 
+    gap: 30px;
+}
+
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 15px; /* Bordi smussati */
+    padding: 25px;       /* Distanzia i contenuti dai bordi */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    backdrop-filter: blur(8px);
+    transition: all 0.4s ease;
+}
+
+.card h3 {
+    border-left: 3px solid var(--neon-blue);
+    padding-left: 15px;
+    margin-top: 0;
+    color: var(--neon-blue);
+    font-family: var(--font-header);
+}
+
+/* Effetto 'Pulse' per container attivi */
+.card:has(.status-running) {
+    box-shadow: inset 0 0 20px rgba(0, 242, 255, 0.05), 0 0 15px rgba(0, 242, 255, 0.1);
+    border-color: rgba(0, 242, 255, 0.4);
+}
+
+/* 5. STATISTICHE E GRAFICI */
+.stats-text {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    line-height: 1.8;
+    font-size: 0.95rem;
+}
+
+.chart-container {
+    width: 95%;           /* Aumentato per occupare quasi tutta la larghezza della card */
+    max-width: 500px;     /* Alzato il tetto massimo di crescita */
+    margin: 20px auto 0 auto; /* Aumentato leggermente lo stacco superiore */
+    aspect-ratio: 1.4;    /* Portato da 1.8 a 1.4 per renderlo più alto e leggibile */
+    position: relative;
+    filter: drop-shadow(0 0 8px rgba(0, 242, 255, 0.1));
+}
+.usage-critical {
+    color: var(--neon-red);
+    font-weight: bold;
+    text-shadow: 0 0 5px var(--neon-red);
+}
+
+/* 6. PULSANTI E AZIONI */
+.actions {
+    margin-top: 25px;
+    display: flex;
+    gap: 15px;
+    /* Impedisce ai pulsanti di toccare il bordo inferiore grazie al padding della card */
+}
+
+.btn {
+    padding: 12px 24px; 
+    border: none; 
+    border-radius: 8px; /* Arrotondati per coerenza */
+    font-family: var(--font-header); 
+    font-weight: bold;
+    font-size: 0.75rem;
+    cursor: pointer; 
+    transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+}
+
+.btn-yellow { background: #f9d423; color: #000; }
+.btn-red { background: var(--neon-red); color: #fff; }
+.btn-blue { background: #007bff; color: #fff; }
+.btn-outline { 
+    background: transparent; 
+    border: 1px solid var(--neon-blue); 
+    color: var(--neon-blue); 
+}
+
+.btn:hover:not(:disabled) { 
+    transform: translateY(-3px); 
+    box-shadow: 0 5px 15px rgba(0, 242, 255, 0.2); 
+}
+
+.btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* 7. ELEMENTI EXTRA (WEAVE SCOPE / BADGES) */
+.iframe-wrapper {
+    height: 500px; 
+    border-radius: 12px; 
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border: 1px solid var(--border);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+    background: #000;
+}
+
+iframe { width: 100%; height: 100%; border: none; filter: invert(92%) hue-rotate(180deg) brightness(1.1) contrast(0.9);}
+
+.status-badge {
+    background: rgba(0, 242, 255, 0.1);
+    color: var(--neon-blue);
+    padding: 8px 18px; 
+    border-radius: 20px;
+    border: 1px solid var(--neon-blue);
+    font-family: var(--font-header);
+    font-size: 0.8rem;
+}

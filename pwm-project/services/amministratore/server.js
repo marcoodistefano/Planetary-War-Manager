@@ -173,42 +173,41 @@ app.post('/api/restore', async (req, res) => {
 // Endpoint per riavviare tutti i container
 app.post('/api/restart-all', async (req, res) => {
     try {
-        const containers = await docker.listContainers();
+        // Recuperiamo tutti i container
+        const allContainers = await docker.listContainers();
         
-        // Rispondiamo al client prima di iniziare la sequenza di riavvio, 
-        // specialmente per non lasciare la richiesta appesa quando questo container si riavvierà.
-        res.json({ success: true, message: 'Riavvio globale in corso...' });
+        // Filtriamo solo quelli che appartengono al progetto
+        const projectContainers = allContainers.filter(c => 
+            c.Names[0].replace('/', '').startsWith('pwm-')
+        );
 
-        // Asincrono: riavviamo prima gli altri container, infine se stesso
+        res.json({ success: true, message: `Riavvio di ${projectContainers.length} unità PWM in corso...` });
+
         setTimeout(async () => {
             let adminContainerId = null;
             
-            for (const c of containers) {
+            for (const c of projectContainers) {
                 if (c.Names[0].includes('amministratore')) {
                     adminContainerId = c.Id;
-                    continue; // Rimandiamo alla fine
+                    continue; 
                 }
                 try {
                     const container = docker.getContainer(c.Id);
                     await container.restart();
                 } catch (e) { 
-                    console.error(`Errore rinvio container ${c.Names[0]}:`, e.message); 
+                    console.error(`Errore riavvio ${c.Names[0]}:`, e.message); 
                 }
             }
 
-            // Riavvia l'amministratore come ultimo container
             if (adminContainerId) {
                 try {
-                    const adminContainer = docker.getContainer(adminContainerId);
-                    await adminContainer.restart();
+                    const admin = docker.getContainer(adminContainerId);
+                    await admin.restart();
                 } catch (e) {}
             }
         }, 500);
-
     } catch (error) {
-        if (!res.headersSent) {
-            res.status(500).json({ error: error.message });
-        }
+        res.status(500).json({ error: error.message });
     }
 });
 
