@@ -1,6 +1,8 @@
 const aslan = require("./middleware/Aslan.js");
+const crypto = require("crypto");
 
 let AUTH_STORE = {
+  uuid: null,
   username: null,
   email: null,
   passwordHash: null,
@@ -8,12 +10,16 @@ let AUTH_STORE = {
 
 const registerUser = async ({ username, email, password }) => {
   const passwordHash = await aslan.hash_password(password);
+  // Simula la generazione di un UUID da parte del DBMS
+  const userUuid = crypto.randomUUID(); 
+  
   AUTH_STORE = {
+    uuid: userUuid,
     username,
     email,
     passwordHash,
   };
-  return { passwordHash };
+  return { passwordHash, uuid: userUuid };
 };
 
 const verifyLogin = async ({ username, password }) => {
@@ -30,19 +36,19 @@ const verifyLogin = async ({ username, password }) => {
     return { ok: false, error: "Credenziali non valide" };
   }
 
-  return { ok: true };
+  // Restituiamo l'UUID per usarlo in Redis
+  return { ok: true, uuid: AUTH_STORE.uuid };
 };
 
+// recoverUsername rimane invariato...
 const recoverUsername = async ({ email, password }) => {
   if (!AUTH_STORE.email || AUTH_STORE.email !== email) {
     return { ok: false, error: "Email non valida" };
   }
-
   const isMatch = await aslan.verify_password(password, AUTH_STORE.passwordHash);
   if (!isMatch) {
     return { ok: false, error: "Credenziali non valide" };
   }
-
   return { ok: true, username: AUTH_STORE.username };
 };
 
@@ -56,13 +62,10 @@ const resetPassword = async ({ username, email, newPassword }) => {
   }
 
   const passwordHash = await aslan.hash_password(newPassword);
-  AUTH_STORE = {
-    username: AUTH_STORE.username,
-    email: AUTH_STORE.email,
-    passwordHash,
-  };
+  AUTH_STORE.passwordHash = passwordHash;
 
-  return { ok: true, passwordHash };
+  // Restituiamo l'UUID per revocare le sessioni
+  return { ok: true, passwordHash, uuid: AUTH_STORE.uuid };
 };
 
 module.exports = {

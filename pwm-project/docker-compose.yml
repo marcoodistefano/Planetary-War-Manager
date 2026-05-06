@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   scope:
     image: weaveworks/scope:latest
@@ -43,6 +42,12 @@ services:
   # AUTH & ELO
   auth-service:
     build: ./services/auth-elo
+    working_dir: /app/services/auth-elo
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./services/auth-elo:/app/services/auth-elo
+      - ./services/shared:/app/services/shared
     depends_on:
       - db
       - redis
@@ -57,8 +62,19 @@ services:
     build:
       context: .
       dockerfile: ./gateway/Dockerfile.app-route
+    # Impostiamo la directory di lavoro alla radice per far coincidere i percorsi require
+    working_dir: /app
+    volumes:
+      - ./gateway:/app 
+      - ./services/auth-elo:/app/services/auth-elo
+      - ./services/shared:/app/services/shared
+    ports:
+      - "4000:4000" # <--- Fondamentale per ricevere ordini dal Frontend (Angular)
     depends_on:
       - auth-service
+    environment:
+      - REDIS_URL=redis://redis:6379 # <--- FONDAMENTALE per il Comm-Link
+      - JWT_SECRET=CHIAVE_SEGRETA_TEMPORANEA_SUPER_SICURA
     networks:
       - pwm-net
 
