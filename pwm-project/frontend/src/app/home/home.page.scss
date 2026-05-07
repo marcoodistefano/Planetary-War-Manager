@@ -56,13 +56,17 @@ ion-content {
 
 .top-row {
   perspective: 1200px;
-  transform-style: preserve-3d; /* Isolamento del layer 3D per non corrompere il video */
+  transform-style: preserve-3d;
   display: grid;
-  grid-template-columns: minmax(260px, 360px) minmax(180px, 1fr) minmax(260px, 360px);
-  gap: 20px;
+  /* Riduciamo lo spazio centrale (da 1fr a un valore fisso o più piccolo) */
+  grid-template-columns: 320px 400px 320px; 
+  gap: 10px; /* Riduciamo il gap tra le colonne */
+  justify-content: center; /* Centra l'intera griglia nella pagina */
   align-items: center;
   min-height: calc(100vh - 48px);
-  padding: 0 5vw; 
+  padding: 0; /* Rimuoviamo il padding laterale eccessivo */
+  margin: 0 auto;
+  max-width: 1200px; /* Limita l'espansione su monitor molto grandi */
 }
 
 /* ==========================================================================
@@ -173,13 +177,18 @@ ion-content {
   backdrop-filter: none;
 
   .games-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    margin-bottom: 9px;
-    flex-wrap: wrap;
-    width: 100%;
+  display: flex;
+  flex-direction: row;      /* Forza l'allineamento parallelo */
+  flex-wrap: nowrap;        /* Impedisce che vadano a capo se lo spazio è poco */
+  justify-content: center;
+  gap: 15px;
+  width: 100%;
+
+  button {
+    width: auto;            /* Impedisce ai bottoni di prendersi tutto lo spazio */
+    min-width: 140px;
   }
+}
 }
 
 /* ==========================================================================
@@ -194,7 +203,7 @@ ion-content {
 
 .left-column.panel {
   /* Aggiunto translateZ(0) per accelerazione GPU */
-  transform: rotateY(15deg) scale(0.85) translateX(3vw) translateZ(0);
+  transform: rotateY(15deg) scale(0.85) translateX(-10vw) translateZ(0);
   transform-origin: right center;
   transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
   box-shadow: 20px 10px 30px rgba(0, 0, 0, 0.2) !important;
@@ -205,14 +214,14 @@ ion-content {
   backface-visibility: hidden;
   
   &:hover {
-    transform: rotateY(13deg) scale(0.85) translateX(3vw) translateZ(0);
+    transform: rotateY(13deg) scale(0.85) translateX(-10vw) translateZ(0);
     box-shadow: 10px 10px 30px rgba(0, 0, 0, 0.25) !important;
   }
 }
 
 .right-column.panel {
   /* Aggiunto translateZ(0) per accelerazione GPU */
-  transform: rotateY(-15deg) scale(0.85) translateX(-3vw) translateZ(0);
+  transform: rotateY(-15deg) scale(0.85) translateX(10vw) translateZ(0);
   transform-origin: left center;
   transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
   box-shadow: -20px 10px 30px rgba(0, 0, 0, 0.2) !important;
@@ -223,7 +232,7 @@ ion-content {
   backface-visibility: hidden;
 
   &:hover {
-    transform: rotateY(-13deg) scale(0.85) translateX(-3vw) translateZ(0);
+    transform: rotateY(-13deg) scale(0.85) translateX(10vw) translateZ(0);
     box-shadow: -10px 10px 30px rgba(0, 0, 0, 0.25) !important;
   }
 }
@@ -310,16 +319,31 @@ ion-content {
   flex-direction: column; text-align: center; gap: 6px; margin-bottom: 9px; justify-content: center;
 }
 
+/* Nel file home.page.scss, trova la classe .avatar e aggiornala così: */
+
 .avatar {
-  display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%;
-  background: linear-gradient(135deg, #67e0ff, #12394b); color: #ffffff; font-size: 0.7rem; font-weight: 800;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25); cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;
-  &:hover { transform: scale(1.1); box-shadow: 0 0 15px rgba(103, 224, 255, 0.5); }
+  display: grid; 
+  place-items: center; 
+  width: 80px;             /* Aumentato da 48px */
+  height: 80px;            /* Aumentato da 48px */
+  border-radius: 50%;
+  background: linear-gradient(135deg, #67e0ff, #12394b); 
+  color: #ffffff; 
+  font-size: 1.5rem;       /* Aumentato da 0.7rem per le iniziali */
+  font-weight: 800;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25); 
+  cursor: pointer; 
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover { 
+    transform: scale(1.1); 
+    box-shadow: 0 0 15px rgba(103, 224, 255, 0.5); 
+  }
 }
 
-.profile-label { margin: 0 0 1px; color: rgba(244, 247, 251, 0.65); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.12em; }
-.profile-name { font-size: 0.85rem; }
-.profile-level { font-size: 0.65rem; color: rgba(244, 247, 251, 0.7); }
+.profile-label { margin: 0 0 1px; color: rgba(244, 247, 251, 0.65); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em; }
+.profile-name { font-size: 1rem; }
+.profile-level { font-size: 0.75rem; color: rgba(244, 247, 251, 0.7); }
 
 .quick-actions {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
