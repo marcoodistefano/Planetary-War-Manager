@@ -4,6 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
+import { ModalController } from '@ionic/angular';
+import { SettingsComponent } from '../profile/components/settings/settings.component';
+import { NotificationsComponent } from './components/notifications/notifications.component';
+import { ObjectivesComponent } from './components/objectives/objectives.component';
+import { FriendsComponent } from './components/friends/friends.component';
 
 @Component({
   selector: 'app-home',
@@ -87,7 +92,8 @@ filterNewGames(event: any) {
 
   constructor(
     private router: Router, 
-    private titleService: Title
+    private titleService: Title,
+    private modalCtrl: ModalController
   ) { }
 
   ngOnInit() {
@@ -168,6 +174,33 @@ filterNewGames(event: any) {
       return `sono passate ${hours} ore dall'inizio della partita`;
     }
     return '';
+  }
+
+  // Funzione universale per gestire i pulsanti HUD
+  async handleQuickAction(action: string) {
+    switch (action) {
+      case 'Notifiche':
+        await this.openModal(NotificationsComponent);
+        break;
+      case 'Impostazioni':
+        await this.openModal(SettingsComponent);
+        break;
+      case 'Obiettivi':
+        await this.openModal(ObjectivesComponent);
+        break;
+      case 'Amici':
+        await this.openModal(FriendsComponent);
+        break;
+    }
+  }
+
+  // Metodo helper per aprire i modali con lo stile tactical
+  private async openModal(component: any) {
+    const modal = await this.modalCtrl.create({
+      component: component,
+      cssClass: 'tactical-modal' // Usa la classe globale che abbiamo creato
+    });
+    return await modal.present();
   }
 }
 

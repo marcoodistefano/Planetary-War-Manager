@@ -1,0 +1,28 @@
+<ion-content [scrollY]="false" class="transparent-bg">
+  <div class="modal-wrapper">
+    <div class="panel">
+      
+      <div class="title-block">
+        <p class="eyebrow">Log Operativo Sistema</p>
+        <h2>NOTIFICHE HUD</h2>
+      </div>
+
+      <div class="log-scroll-container">
+        <div class="log-entry" *ngFor="let n of notifications" [class]="'log-' + n.type">
+          <div class="log-header">
+            <span class="timestamp">[{{ n.time }}]</span>
+            <span class="status-label">{{ n.type.toUpperCase() }}</span>
+          </div>
+          <div class="log-body">{{ n.msg }}</div>
+        </div>
+      </div>
+
+      <div class="action-dock">
+        <button class="logout-button" (click)="close()">
+          [ CHIUDI COMUNICAZIONI ]
+        </button>
+      </div>
+
+    </div>
+  </div>
+</ion-content>

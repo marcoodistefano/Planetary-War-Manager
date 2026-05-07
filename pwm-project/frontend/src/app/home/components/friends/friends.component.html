@@ -1,0 +1,75 @@
+<ion-content [scrollY]="false" class="transparent-bg">
+  <div class="modal-wrapper">
+    <div class="panel">
+      
+      <div class="title-block">
+        <p class="eyebrow">Canale Comunicazioni Protette</p>
+        <h2>RETE DIPLOMATICA</h2>
+      </div>
+
+      <div class="fixed-controls">
+        <div class="tabs-container">
+          <button [class.active]="currentTab === 'online'" (click)="currentTab = 'online'">ONLINE</button>
+          <button [class.active]="currentTab === 'all'" (click)="currentTab = 'all'">TUTTI</button>
+          <button [class.active]="currentTab === 'requests'" (click)="currentTab = 'requests'">
+            RICHIESTE <span class="req-badge" *ngIf="requests.length > 0">{{requests.length}}</span>
+          </button>
+        </div>
+
+        <div class="search-box" *ngIf="currentTab !== 'requests'">
+          <ion-icon name="search-outline"></ion-icon>
+          <input type="text" [(ngModel)]="searchQuery" placeholder="Cerca identificativo..." />
+        </div>
+      </div>
+
+      <div class="friends-scroll-area">
+        <ng-container *ngIf="currentTab !== 'requests'">
+          <div class="friend-item" *ngFor="let friend of filteredFriends">
+            <div class="friend-avatar">
+              <img [src]="friend.avatar" />
+              <div class="status-dot" [class.online]="friend.status === 'online'"></div>
+            </div>
+            <div class="friend-info">
+              <span class="f-name">{{ friend.name }}</span>
+              <span class="f-rank">{{ friend.rank }}</span>
+            </div>
+            <button class="comm-btn"><ion-icon name="chatbubble-ellipses-outline"></ion-icon></button>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="currentTab === 'requests'">
+          <div class="friend-item" *ngFor="let req of requests">
+            <div class="friend-avatar"><img [src]="req.avatar" /></div>
+            <div class="friend-info">
+              <span class="f-name">{{ req.name }}</span>
+              <span class="f-rank">In attesa di approvazione</span>
+            </div>
+            <div class="req-actions">
+              <button class="accept"><ion-icon name="checkmark-outline"></ion-icon></button>
+              <button class="reject"><ion-icon name="close-outline"></ion-icon></button>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+
+      <div class="action-dock">
+        <button class="primary-glow" (click)="showAddFriendPopup = true">
+          AGGIUNGI TRAMITE CODICE
+        </button>
+        <button class="logout-button" (click)="close()">[ CHIUDI COMM-LINK ]</button>
+      </div>
+
+      <div class="overlay-popup" *ngIf="showAddFriendPopup" (click)="showAddFriendPopup = false">
+        <div class="popup-content" (click)="$event.stopPropagation()">
+          <h3>INVIA CHIAVE AMICIZIA</h3>
+          <input type="text" [(ngModel)]="friendCodeInput" placeholder="AMICO-XXXX" class="code-input" />
+          <div class="popup-btns">
+            <button class="confirm" (click)="sendRequest()">INVIA</button>
+            <button class="cancel" (click)="showAddFriendPopup = false">ANNULLA</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</ion-content>

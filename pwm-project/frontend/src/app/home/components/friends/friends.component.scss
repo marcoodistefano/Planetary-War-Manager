@@ -1,0 +1,102 @@
+:host {
+  --danger-color: #ff7b72;
+  --primary-blue: #58a6ff;
+  --success-green: #3fb950;
+  --glass-bg: rgba(5, 10, 20, 0.95);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.transparent-bg { --background: transparent !important; }
+
+/* 1. Il Wrapper deve occupare tutto lo schermo e centrare il pannello */
+.modal-wrapper {
+  padding: 40px 20px;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box; /* Fondamentale */
+}
+
+/* 2. Il Pannello non deve MAI superare l'altezza del wrapper */
+.panel {
+  width: 100%;
+  max-width: 450px;
+  max-height: 100%; /* Si ferma al bordo del padding del wrapper */
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg);
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  border-radius: 24px;
+  padding: 30px;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 3. Blocchiamo gli elementi che non devono schiacciarsi */
+.title-block, .fixed-controls, .action-dock {
+  flex-shrink: 0; 
+}
+
+.title-block {
+  text-align: center;
+  margin-bottom: 20px;
+  .eyebrow { color: var(--danger-color); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 2px; }
+  h2 { font-size: 1.3rem; color: #fff; margin: 5px 0 0; text-shadow: 0 0 10px var(--primary-blue); }
+}
+
+/* 4. Area Scorrimento: Prende tutto lo spazio che resta e attiva lo scroll */
+.friends-scroll-area {
+  flex: 1; 
+  min-height: 0; /* TRUCCO CSS: Permette al flex-child di restringersi */
+  overflow-y: auto;
+  padding-right: 8px;
+  margin: 15px 0;
+  
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: var(--primary-blue); border-radius: 10px; }
+}
+
+/* --- STILI ELEMENTI INTERNI --- */
+.tabs-container {
+  display: flex; gap: 5px; margin-bottom: 15px;
+  button {
+    flex: 1; padding: 10px 5px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
+    color: #8892b0; font-size: 0.65rem; font-weight: bold; cursor: pointer; border-radius: 8px;
+    &.active { background: rgba(88, 166, 255, 0.1); border-color: var(--primary-blue); color: #fff; }
+  }
+}
+
+.search-box {
+  display: flex; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid rgba(88,166,255,0.2);
+  border-radius: 10px; padding: 8px 12px;
+  input { background: transparent; border: none; color: #fff; flex: 1; outline: none; font-family: inherit; font-size: 0.8rem; }
+  ion-icon { color: var(--primary-blue); margin-right: 10px; }
+}
+
+.friend-item {
+  display: flex; align-items: center; background: rgba(255,255,255,0.03); 
+  border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 10px; margin-bottom: 10px;
+  .friend-avatar {
+    position: relative; width: 45px; height: 45px; border-radius: 10px; border: 1px solid rgba(88,166,255,0.3);
+    img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+    .status-dot { position: absolute; bottom: -2px; right: -2px; width: 10px; height: 10px; background: #555; border: 2px solid #000; border-radius: 50%; }
+    .status-dot.online { background: var(--success-green); box-shadow: 0 0 8px var(--success-green); }
+  }
+  .friend-info { flex: 1; margin-left: 12px; .f-name { color: #fff; font-weight: bold; font-size: 0.85rem; display: block; } .f-rank { color: #8892b0; font-size: 0.6rem; text-transform: uppercase; } }
+  .comm-btn { background: transparent; border: 1px solid rgba(88,166,255,0.2); color: var(--primary-blue); border-radius: 8px; padding: 8px; cursor: pointer; }
+}
+
+.req-actions { display: flex; gap: 8px; button { border: none; border-radius: 6px; padding: 6px 10px; color: #fff; cursor: pointer; &.accept { background: var(--success-green); } &.reject { background: var(--danger-color); } } }
+
+.action-dock { display: flex; flex-direction: column; gap: 10px; }
+.primary-glow { width: 100%; background: rgba(88, 166, 255, 0.15); border: 1px solid var(--primary-blue); color: #fff; padding: 15px; border-radius: 12px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-family: inherit; &:hover { background: var(--primary-blue); box-shadow: 0 0 20px var(--primary-blue); } }
+.logout-button { background: transparent; border: none; color: rgba(255,255,255,0.4); font-size: 0.7rem; text-transform: uppercase; cursor: pointer; &:hover { color: var(--danger-color); } }
+
+/* POPUP INTERNO */
+.overlay-popup { position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; border-radius: 24px; display: flex; justify-content: center; align-items: center; padding: 20px; }
+.popup-content { background: #0d1117; border: 1px solid var(--primary-blue); border-radius: 18px; padding: 25px; width: 100%; text-align: center; h3 { color: var(--primary-blue); margin-bottom: 15px; font-size: 0.9rem; } }
+.code-input { width: 100%; background: #000; border: 1px solid rgba(88,166,255,0.5); padding: 12px; border-radius: 8px; color: #fff; text-align: center; font-family: inherit; margin-bottom: 20px; }
+.popup-btns { display: flex; gap: 10px; button { flex: 1; padding: 12px; border-radius: 8px; cursor: pointer; font-family: inherit; &.confirm { background: var(--primary-blue); border: none; color: #fff; } &.cancel { background: transparent; border: 1px solid #444; color: #8892b0; } } }

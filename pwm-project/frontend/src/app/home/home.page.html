@@ -104,8 +104,10 @@
           </div>
 
           <div class="quick-actions">
-            <button type="button" class="transparent-element" *ngFor="let action of quickActions">
-              {{ action }}
+            <button type="button" 
+                    class="transparent-element" 
+                    *ngFor="let action of quickActions"
+                    (click)="handleQuickAction(action)"> {{ action }}
             </button>
           </div>
         </aside>
