@@ -240,3 +240,29 @@ ion-button {
   background: rgba(255, 255, 255, 0.02) !important;
   backdrop-filter: blur(8px);
 }
+
+.password-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Stile dell'icona ereditato dal design del profilo */
+.toggle-eye-btn {
+  --color: rgba(201, 209, 217, 0.6);
+  --padding-start: 0;
+  --padding-end: 0;
+  margin: 0;
+  height: 24px;
+  transition: --color 0.2s ease;
+  
+  &:hover { 
+    --color: #58a6ff; /* Colore neon quando si passa sopra */
+  }
+}
+
+/* Assicuriamoci che l'input occupi lo spazio necessario */
+ion-input {
+  flex: 1;
+  --padding-end: 8px;
+}

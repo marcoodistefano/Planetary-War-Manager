@@ -15,9 +15,9 @@ export interface RegisterPayload {
 }
 
 export interface RecoveryPasswordPayload {
-  username: string;
   email: string;
-  newPassword: string;
+  username?: string;
+  newPassword?: string;
 }
 
 export interface AuthResponse {

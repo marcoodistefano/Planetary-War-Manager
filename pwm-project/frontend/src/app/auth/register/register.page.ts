@@ -26,6 +26,7 @@ export class RegisterPage implements OnInit, AfterViewInit {
   RegisterForm!: FormGroup;
   errorMessage = '';
   isSubmitting = false;
+  showPassword = false;
   
   // Variabili per il Modale delle Nazioni
   countries: any[] = [];
@@ -48,6 +49,10 @@ export class RegisterPage implements OnInit, AfterViewInit {
   async ngOnInit() {
     this.titleService.setTitle('PWM | Registrazione');
     await this.loadCountries();
+  }
+
+  togglePasswordVisibility() {
+    this.showPassword = !this.showPassword;
   }
 
   ngAfterViewInit() {

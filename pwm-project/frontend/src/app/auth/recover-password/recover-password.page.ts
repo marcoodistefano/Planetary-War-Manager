@@ -2,7 +2,7 @@ import { AfterViewInit, Component, ElementRef, OnInit, ViewChild } from '@angula
 import { CommonModule } from '@angular/common'; 
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';   
 import { IonicModule } from '@ionic/angular';   
-import { Router, RouterLink } from '@angular/router'; // Aggiungi RouterLink
+import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../auth-api.service';
 import { finalize } from 'rxjs/operators';
 import { Title } from '@angular/platform-browser';
@@ -14,16 +14,15 @@ import { Title } from '@angular/platform-browser';
   standalone: true,
   imports: [IonicModule, CommonModule, FormsModule, ReactiveFormsModule, RouterLink]
 })
+// Assicurati che la classe sia scritta ESATTAMENTE così
 export class RecoverPasswordPage implements OnInit, AfterViewInit {
 
-  // 1. Dichiara la variabile loginForm
   recoverForm!: FormGroup;
   errorMessage = '';
   successMessage = '';
   isSubmitting = false;
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
 
-  // 2. Inietta il FormBuilder e il Router nel costruttore
   constructor(
     private formBuilder: FormBuilder,
     private router: Router,
@@ -33,14 +32,12 @@ export class RecoverPasswordPage implements OnInit, AfterViewInit {
 
   ngOnInit() {
     this.titleService.setTitle('PWM | Recupero Password');
-    // 3. Inizializza il form e i suoi controlli (es. email e password)
     this.recoverForm = this.formBuilder.group({
-      username: ['', [Validators.required, Validators.minLength(3)]],
       email: ['', [Validators.required, Validators.email]],
-      newPassword: ['', [Validators.required, Validators.minLength(12)]],
     });
   }
 
+  // QUESTO È IL METODO CHE IL COMPILATORE NON TROVA:
   ngAfterViewInit() {
     this.playBackgroundVideo();
   }
@@ -51,49 +48,36 @@ export class RecoverPasswordPage implements OnInit, AfterViewInit {
 
   private playBackgroundVideo() {
     const video = this.backgroundVideo?.nativeElement;
-    if (!video) {
-      return;
+    if (video) {
+      video.muted = true;
+      video.playsInline = true;
+      video.load();
+      video.play().catch(() => undefined);
     }
-
-    video.muted = true;
-    video.playsInline = true;
-    video.load();
-    video.play().catch(() => undefined);
   }
 
-  // 4. Aggiungi il metodo onSubmit richiamato dall'HTML
   onSubmit() {
-    if (!this.recoverForm.valid) {
-      console.log('Il form contiene errori e non è valido.');
-      return;
-    }
+    if (!this.recoverForm.valid) return;
 
-    const { username, email, newPassword } = this.recoverForm.value;
+    const { email } = this.recoverForm.value;
     this.errorMessage = '';
     this.successMessage = '';
     this.isSubmitting = true;
+
+    // Chiamata API aggiornata per inviare solo l'email
     this.authApi
-      .recoveryPassword({ username, email, newPassword })
-      .pipe(finalize(() => {
-        this.isSubmitting = false;
-      }))
+      .recoveryPassword({ email }) 
+      .pipe(finalize(() => this.isSubmitting = false))
       .subscribe({
         next: () => {
-          this.successMessage = 'Password aggiornata con successo. Puoi accedere.';
-          this.router.navigate(['/login']);
+          this.successMessage = 'Protocollo avviato. Controlla la tua email per il link di ripristino.';
+          // Opzionale: reindirizzamento dopo qualche secondo
+          setTimeout(() => this.router.navigate(['/login']), 5000);
         },
         error: (error) => {
-          const apiErrors = error?.error?.errors;
-          if (Array.isArray(apiErrors) && apiErrors.length > 0) {
-            this.errorMessage = apiErrors.join(' | ');
-          } else if (error?.error?.error) {
-            this.errorMessage = error.error.error;
-          } else {
-            this.errorMessage = 'Recupero password fallito. Verifica i dati e riprova.';
-          }
-          console.error('Recupero password fallito:', error);
+          this.errorMessage = error?.error?.error || 'Impossibile inviare il link. Verifica l\'indirizzo e riprova.';
+          console.error('Errore recupero:', error);
         },
       });
   }
-
 }

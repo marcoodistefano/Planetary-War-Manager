@@ -19,8 +19,16 @@
       </div>
 
       <div class="field-container">
-        <ion-label class="custom-label">PASSWORD</ion-label>
-        <ion-input type="password" formControlName="password" placeholder="••••••••"></ion-input>
+      <ion-label class="custom-label">PASSWORD</ion-label>
+      <div class="password-wrapper">
+        <ion-input [type]="showPassword ? 'text' : 'password'" 
+                  formControlName="password" 
+                  placeholder="••••••••"></ion-input>
+        
+        <ion-button fill="clear" size="small" (click)="togglePasswordVisibility()" class="toggle-eye-btn">
+          <ion-icon slot="icon-only" [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+        </ion-button>
+      </div>
       </div>
 
       <ion-button expand="block" type="submit" [disabled]="!loginForm.valid || isSubmitting">

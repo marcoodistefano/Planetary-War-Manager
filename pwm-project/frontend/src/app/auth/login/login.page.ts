@@ -20,6 +20,7 @@ export class LoginPage implements OnInit, AfterViewInit {
   loginForm!: FormGroup;
   errorMessage = '';
   isSubmitting = false;
+  showPassword = false;
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
 
   // 2. Inietta il FormBuilder e il Router nel costruttore
@@ -57,6 +58,10 @@ export class LoginPage implements OnInit, AfterViewInit {
     video.playsInline = true;
     video.load();
     video.play().catch(() => undefined);
+  }
+
+  togglePasswordVisibility() {
+    this.showPassword = !this.showPassword;
   }
 
   // 4. Aggiungi il metodo onSubmit richiamato dall'HTML
