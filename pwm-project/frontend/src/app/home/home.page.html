@@ -85,9 +85,9 @@
 
         <div class="games-container buttons-bottom">
           <div class="games-actions">
-            <button type="button" class="primary-button">Crea nuova partita</button>
-            <button type="button" class="ghost-button">Vedi tutte le partite attive</button>
-            <button type="button" class="ghost-button">Partite terminate ({{ finishedGames }})</button>
+            <button type="button" class="primary-button" (click)="openCreateMatch()">Crea nuova partita</button>
+            <button type="button" class="ghost-button" (click)="viewActiveGames()">Vedi tutte le partite attive</button>
+            <button type="button" class="ghost-button" (click)="viewFinishedGames()">Partite terminate ({{ finishedGames }})</button>
           </div>
         </div>
 

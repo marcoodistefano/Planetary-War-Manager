@@ -1,0 +1,152 @@
+:host {
+  --primary-blue: #58a6ff;
+  --danger-color: #ff7b72;
+  --glass-bg: rgba(5, 10, 20, 0.95);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.transparent-bg { --background: transparent !important; }
+
+.modal-wrapper {
+  padding: 20px; // Ridotto il padding esterno per dare più respiro al modale
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+/* PANNELLO ULTRA-WIDE E BASSO */
+.panel.extra-wide-panel {
+  width: 100%;
+  max-width: 1300px;  // Aumentato da 1100px per renderlo più largo
+  height: auto;
+  max-height: 80vh;   // Ridotto da 92vh per renderlo più stretto in altezza
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg);
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(88, 166, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border-radius: 20px;
+  padding: 20px 30px; // Padding interno più compatto
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.title-block {
+  text-align: center;
+  margin-bottom: 15px; // Ridotto margine
+  flex-shrink: 0;
+  .eyebrow { color: var(--danger-color); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 2px; }
+  h2 { font-size: 1.3rem; color: #fff; margin: 2px 0 0; text-shadow: 0 0 10px var(--primary-blue); }
+}
+
+/* Griglia a 3 colonne ottimizzata */
+.sections-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px; // Gap ridotto
+  width: 100%;
+  
+  .inner-panel {
+    background: rgba(1, 36, 46, 0.2);
+    border: 1px solid rgba(88, 166, 255, 0.2);
+    padding: 12px 15px; // Padding interno dei settori ridotto
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px; // Spazio tra gli item ridotto
+  }
+}
+
+.settings-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 10px;
+  margin-bottom: 15px;
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: var(--primary-blue); border-radius: 10px; }
+}
+
+.custom-label { 
+  color: var(--primary-blue); 
+  font-size: 0.65rem; 
+  font-weight: bold; 
+  margin: 0 0 5px 0; 
+  letter-spacing: 1px; 
+}
+
+.setting-item {
+  margin-bottom: 5px; // Margine tra i campi ridotto
+  label { font-size: 0.6rem; color: #8892b0; display: block; margin-bottom: 4px; }
+  
+  &.toggle-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    label { margin-bottom: 0; }
+  }
+}
+
+.tactical-input, .tactical-select {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  color: #fff;
+  padding: 8px 12px; // Input più sottili
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  outline: none;
+  &:focus { border-color: var(--primary-blue); }
+}
+
+.action-dock {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.primary-glow {
+  width: 100%;
+  max-width: 350px;
+  background: rgba(88, 166, 255, 0.1);
+  border: 1px solid var(--primary-blue);
+  color: #fff;
+  padding: 12px; // Bottone più basso
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  transition: 0.3s;
+  &:hover { background: var(--primary-blue); box-shadow: 0 0 20px var(--primary-blue); color: #000; }
+}
+
+.logout-button {
+  background: transparent; border: none; color: rgba(255, 255, 255, 0.4); 
+  font-size: 0.65rem; text-transform: uppercase; cursor: pointer;
+  &:hover { color: var(--danger-color); }
+}
+
+/* RESPONSIVENESS */
+@media (max-width: 1200px) {
+  .panel.extra-wide-panel { max-width: 950px; }
+}
+
+@media (max-width: 1024px) {
+  .sections-grid { grid-template-columns: repeat(2, 1fr); }
+  .panel.extra-wide-panel { max-height: 85vh; }
+}
+
+@media (max-width: 600px) {
+  .sections-grid { grid-template-columns: 1fr; }
+  .panel.extra-wide-panel { padding: 15px; max-height: 90vh; }
+}

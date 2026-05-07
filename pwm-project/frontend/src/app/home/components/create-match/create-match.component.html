@@ -1,0 +1,102 @@
+<ion-content [scrollY]="false" class="transparent-bg">
+  <div class="modal-wrapper">
+    <div class="panel extra-wide-panel">
+      
+      <div class="title-block">
+        <p class="eyebrow">Protocollo di Configurazione Operativa</p>
+        <h2>CREA NUOVA PARTITA</h2>
+      </div>
+
+      <div class="settings-scroll-container">
+        <div class="sections-grid">
+          
+          <div class="inner-panel">
+            <p class="custom-label">SETTORE 01: LOGISTICA</p>
+            <div class="setting-item">
+              <label>IDENTIFICATIVO MISSIONE</label>
+              <input type="text" class="tactical-input" placeholder="Operazione...">
+            </div>
+            <div class="setting-item">
+              <label>REGIONE OPERATIVA</label>
+              <select class="tactical-select">
+                <option>Mondo</option>
+                <option>Italia</option>
+                <option>Cina</option>
+              </select>
+            </div>
+            <div class="setting-item">
+              <label>CAPACITÀ COMANDANTI (MAX: 12)</label>
+              <ion-range min="2" max="12" step="1" snaps="true" class="tactical-range"></ion-range>
+            </div>
+            <div class="setting-item">
+              <label>QUORUM MINIMO AVVIO</label>
+              <input type="number" class="tactical-input" placeholder="Giocatori richiesti">
+            </div>
+            <div class="setting-item toggle-group">
+              <label>LATE-JOIN (DROP-IN)</label>
+              <ion-toggle class="tactical-toggle"></ion-toggle>
+            </div>
+          </div>
+
+          <div class="inner-panel">
+            <p class="custom-label">SETTORE 02: REGOLE D'INGAGGIO</p>
+            <div class="setting-item">
+              <label>MODALITÀ DI VITTORIA</label>
+              <select class="tactical-select">
+                <option>Distruzione Globale</option>
+                <option>Conquista Territoriale</option>
+                <option>Partita a Tempo</option>
+              </select>
+            </div>
+            <div class="setting-item">
+              <label>SOGLIA VITTORIA (%)</label>
+              <ion-range min="20" max="100" step="5" pin="true" class="tactical-range"></ion-range>
+            </div>
+            <div class="setting-item">
+              <label>MEMBRI MAX ALLEANZA</label>
+              <input type="number" class="tactical-input" value="3">
+            </div>
+            <div class="setting-item toggle-group">
+              <label>PARTITA CLASSIFICATA (ELO)</label>
+              <ion-toggle class="tactical-toggle" color="primary"></ion-toggle>
+            </div>
+            <div class="setting-item toggle-group">
+              <label>VITTORIA DI COALIZIONE</label>
+              <ion-toggle class="tactical-toggle"></ion-toggle>
+            </div>
+          </div>
+
+          <div class="inner-panel">
+            <p class="custom-label">SETTORE 03: MODULI TATTICI</p>
+            <div class="setting-item">
+              <label>MOLTIPLICATORE TEMPORALE</label>
+              <select class="tactical-select">
+                <option>x30 (Standard)</option>
+                <option>x60 (Blitz)</option>
+              </select>
+            </div>
+            <div class="setting-item">
+              <label>TIER TECNOLOGICO INIZIALE</label>
+              <ion-range min="1" max="3" step="1" snaps="true" class="tactical-range"></ion-range>
+            </div>
+            <div class="setting-item toggle-group">
+              <label>MODULO INTELLIGENCE</label>
+              <ion-toggle class="tactical-toggle"></ion-toggle>
+            </div>
+            <div class="setting-item toggle-group">
+              <label>SUPERARMI (END-GAME)</label>
+              <ion-toggle class="tactical-toggle"></ion-toggle>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="action-dock">
+        <button class="primary-glow" (click)="confirmCreation()">TRASMETTI ORDINI DI BATTAGLIA</button>
+        <button class="logout-button" (click)="close()">[ ANNULLA PROTOCOLLO ]</button>
+      </div>
+
+    </div>
+  </div>
+</ion-content>

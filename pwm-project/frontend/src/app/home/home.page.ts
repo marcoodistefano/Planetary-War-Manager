@@ -9,6 +9,7 @@ import { SettingsComponent } from '../profile/components/settings/settings.compo
 import { NotificationsComponent } from './components/notifications/notifications.component';
 import { ObjectivesComponent } from './components/objectives/objectives.component';
 import { FriendsComponent } from './components/friends/friends.component';
+import { CreateMatchComponent } from './components/create-match/create-match.component';
 
 @Component({
   selector: 'app-home',
@@ -201,6 +202,22 @@ filterNewGames(event: any) {
       cssClass: 'tactical-modal' // Usa la classe globale che abbiamo creato
     });
     return await modal.present();
+  }
+
+  async openCreateMatch() {
+  const modal = await this.modalCtrl.create({
+    component: CreateMatchComponent,
+    cssClass: 'tactical-modal'
+  });
+  return await modal.present();
+  }
+
+  viewActiveGames() {
+    this.router.navigate(['/game-browser'], { queryParams: { tab: 'active' } });
+  }
+
+  viewFinishedGames() {
+    this.router.navigate(['/game-browser'], { queryParams: { tab: 'finished' } });
   }
 }
 

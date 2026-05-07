@@ -59,6 +59,10 @@ const routes: Routes = [
     path: 'history',
     loadComponent: () => import('./history/history.page').then(m => m.HistoryPage)
   },
+  {
+    path: 'game-browser',
+    loadComponent: () => import('./game-browser/game-browser.page').then(m => m.GameBrowserPage)
+  },
 ];
 
 @NgModule({
