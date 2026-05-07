@@ -55,6 +55,28 @@ CREATE TABLE IF NOT EXISTS ban (
     motivo VARCHAR(20) NOT NULL,
     CONSTRAINT fk_user_ban FOREIGN KEY (id_user) REFERENCES utenti(id_user) ON DELETE CASCADE
 );
+
+--1.3 OBBIETTIVI
+CREATE TABLE IF NOT EXISTS obbiettivi (
+    id_obbiettivo UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nome_obbiettivo VARCHAR(32) NOT NULL,
+    descrizione TEXT,
+    requisito TEXT, --es. {"conquista": 10, "distruzione": 5}
+    ricompensa TEXT, --es. {"ferro": 100, "petrolio": 50, "oro": 10}
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+--1.4 OBBIETTIVI_UTENTE
+CREATE TABLE IF NOT EXISTS obbiettivi_utente (
+    id_obbiettivo_utente UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id_user UUID NOT NULL,
+    id_obbiettivo UUID NOT NULL,
+    stato VARCHAR(20) DEFAULT 'incompleto', -- 'incompleto', 'completo', 'ricompensa_riscattata'
+    progress REAL DEFAULT 0.00, --es. {"conquista": 3, "distruzione": 1}
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_user_obbiettivo FOREIGN KEY (id_user) REFERENCES utenti(id_user) ON DELETE CASCADE,
+    CONSTRAINT fk_obbiettivo FOREIGN KEY (id_obbiettivo) REFERENCES obbiettivi(id_obbiettivo) ON DELETE CASCADE
+);
 -- 2. ACCESSI
 CREATE TABLE IF NOT EXISTS accessi (
     id_access UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -130,6 +152,7 @@ CREATE TABLE IF NOT EXISTS partecipanti_partite (
     stato_risorse JSONB DEFAULT '{}'::jsonb,
     stato_territori JSONB DEFAULT '{}'::jsonb,
     stato_ricerche JSONB DEFAULT '{}'::jsonb,
+    stato_strutture JSONB DEFAULT '{}'::jsonb,
     PRIMARY KEY (user_id, partita_id),
     CONSTRAINT fk_user_partecipante FOREIGN KEY (user_id) REFERENCES utenti(id_user) ON DELETE CASCADE,
     CONSTRAINT fk_partita_partecipante FOREIGN KEY (partita_id) REFERENCES partite(id_partita) ON DELETE CASCADE
