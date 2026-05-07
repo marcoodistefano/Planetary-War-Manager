@@ -5,7 +5,7 @@
 -- Pulizia dello schema (Opzionale)
 -- DROP SCHEMA public CASCADE;
 -- CREATE SCHEMA public;
-
+---------SBAGLIATO!!!!!!!!!
 -- 1. UTENTI
 CREATE TABLE IF NOT EXISTS utenti (
     id_user SERIAL PRIMARY KEY,
