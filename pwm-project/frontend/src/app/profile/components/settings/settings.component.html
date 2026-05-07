@@ -1,0 +1,74 @@
+<ion-content class="transparent-bg">
+  <div class="modal-wrapper">
+    <div class="panel">
+      
+      <div class="title-block">
+        <p class="eyebrow">Strategic System Config</p>
+        <h2>PREFERENZE SISTEMA</h2>
+      </div>
+
+      <div class="settings-scroll-container">
+        
+        <div class="inner-panel">
+          <p class="custom-label">COMUNICAZIONI AUDIO</p>
+          
+          <div class="setting-item">
+            <label>VOLUME MASTER</label>
+            <ion-range min="0" max="100" [(ngModel)]="settings.masterVol" class="tactical-range"></ion-range>
+          </div>
+
+          <div class="setting-item toggle-group">
+            <label>SINTESI VOCALE AI</label>
+            <ion-toggle [(ngModel)]="settings.voiceAssist" class="tactical-toggle"></ion-toggle>
+          </div>
+        </div>
+
+        <div class="inner-panel">
+          <p class="custom-label">VISUALIZZAZIONE OLOGRAFICA</p>
+          
+          <div class="setting-item toggle-group">
+            <label>EFFETTO SCANLINES</label>
+            <ion-toggle [(ngModel)]="settings.scanlines" class="tactical-toggle"></ion-toggle>
+          </div>
+
+          <div class="setting-item toggle-group">
+            <label>ANIMAZIONI BELLICHE</label>
+            <ion-toggle [(ngModel)]="settings.animations" class="tactical-toggle"></ion-toggle>
+          </div>
+        </div>
+
+        <div class="inner-panel">
+          <p class="custom-label">PROTOCOLLI DI SISTEMA</p>
+          
+          <div class="setting-item custom-dropdown-container">
+            <label>LINGUA TERMINALE</label>
+            
+            <div class="tactical-select-trigger" (click)="isLangMenuOpen = !isLangMenuOpen">
+              <span>{{ settings.language === 'it' ? 'ITALIANO' : 'ENGLISH' }}</span>
+              <ion-icon [name]="isLangMenuOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+            </div>
+
+            <div class="tactical-dropdown-menu" *ngIf="isLangMenuOpen">
+              <div class="dropdown-option" (click)="selectLang('it')" [class.active]="settings.language === 'it'">
+                ITALIANO
+              </div>
+              <div class="dropdown-option" (click)="selectLang('en')" [class.active]="settings.language === 'en'">
+                ENGLISH
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div> <div class="action-dock">
+        <button class="primary-glow" (click)="save()">
+          SALVA CONFIGURAZIONE
+        </button>
+        <button class="logout-button" (click)="close()">
+          [ CHIUDI TERMINALE ]
+        </button>
+      </div>
+
+    </div>
+  </div>
+</ion-content>

@@ -1,0 +1,143 @@
+:host {
+  --danger-color: #ff7b72;
+  --primary-blue: #58a6ff;
+  --glass-bg: rgba(5, 10, 20, 0.95);
+  
+  background: transparent !important;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.transparent-bg {
+  --background: transparent !important;
+}
+
+.modal-wrapper {
+  padding: 40px 20px; /* Aumentato il padding per non far toccare i bordi */
+  height: 100%;
+  box-sizing: border-box; /* Fondamentale per i calcoli di altezza */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.panel {
+  width: 100%;
+  max-width: 420px; 
+  max-height: 100%; /* Si adatta al wrapper senza sbordare */
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg);
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 
+              inset 0 0 15px rgba(88, 166, 255, 0.08);
+  backdrop-filter: blur(8px) saturate(120%);
+  border-radius: 24px;
+  padding: 30px 20px;
+  box-sizing: border-box;
+  text-align: center;
+  outline: none;
+  animation: modalSlideIn 0.4s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.title-block {
+  margin-bottom: 20px;
+  flex-shrink: 0; /* Impedisce al titolo di schiacciarsi */
+  .eyebrow { 
+    margin: 0 0 5px; color: var(--danger-color); font-size: 0.65rem; 
+    letter-spacing: 0.16em; text-transform: uppercase; 
+  }
+  h2 { 
+    font-size: 1.3rem; margin: 0; color: #fff; 
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.2); 
+  }
+}
+
+/* Contenitore con scroll INVISIBILE */
+.grid-scroll-container {
+  flex: 1; /* Prende tutto lo spazio rimanente */
+  overflow-y: auto;
+  overflow-x: hidden; /* Blocca scorrimenti laterali indesiderati */
+  margin-bottom: 20px;
+  padding: 15px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  border: 1px solid rgba(88, 166, 255, 0.1);
+
+  /* Nasconde la scrollbar su Chrome, Safari e Opera */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  /* Nasconde la scrollbar su IE, Edge e Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 15px;
+  justify-items: center;
+}
+
+.icon-item {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.2s ease;
+
+  &:hover { transform: scale(1.08); }
+  &:hover .avatar-frame {
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 15px rgba(88, 166, 255, 0.4);
+  }
+  &:hover .avatar-label { color: var(--primary-blue); }
+}
+
+.avatar-frame {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  background: #050a14;
+  transition: all 0.3s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  img { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+  }
+}
+
+.avatar-label {
+  font-size: 0.6rem;
+  color: #8892b0;
+  transition: color 0.3s;
+  font-weight: bold;
+}
+
+.action-dock { 
+  flex-shrink: 0; /* Impedisce ai bottoni di schiacciarsi */
+  display: flex; 
+  justify-content: center;
+}
+
+.logout-button {
+  background: transparent; border: none; 
+  color: rgba(255, 255, 255, 0.4); 
+  font-size: 0.7rem; text-transform: uppercase;
+  cursor: pointer; transition: 0.3s; font-family: inherit;
+  
+  &:hover { color: var(--danger-color); }
+}

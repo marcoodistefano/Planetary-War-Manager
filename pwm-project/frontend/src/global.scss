@@ -106,3 +106,67 @@
     gap: 8px;
   }
 }
+
+
+/* ==========================================================================
+   STILI GLOBALI MODALI CYBER / TACTICAL
+   Da inserire in global.scss
+   ========================================================================== */
+ion-modal.tactical-modal {
+  --background: transparent;
+  --box-shadow: none;
+  --border-radius: 0;
+  
+  /* Agiamo direttamente sulla Shadow DOM del modale */
+  &::part(content) {
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    // Rimuove eventuali outline o bordi nativi
+    outline: none; 
+  }
+}
+
+.tactical-modal {
+  // Rimuove lo sfondo predefinito del contenitore Ionic
+  --background: transparent;
+  
+  // Rimuove l'ombra e i bordi del contenitore nativo
+  ::part(content) {
+    border-radius: 24px; // Allinea al raggio del tuo glass-panel
+    box-shadow: none;    // Elimina l'ombra esterna automatica
+    background: transparent;
+  }
+}
+
+/* ==========================================================================
+   MENU A TENDINA TATTICI (POPOVER)
+   ========================================================================== */
+.tactical-popover-menu {
+  --background: rgba(5, 10, 20, 0.95);
+  --color: #fff;
+  --max-width: 300px;
+  border: 1px solid #58a6ff;
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(88, 166, 255, 0.2);
+  backdrop-filter: blur(10px);
+
+  /* Stile delle singole opzioni */
+  ion-item {
+    --background: transparent;
+    --color: #fff;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.85rem;
+    font-weight: bold;
+    
+    &:hover {
+      --background: rgba(88, 166, 255, 0.15);
+    }
+  }
+
+  /* Colore della spunta o del radio button */
+  ion-radio {
+    --color: #58a6ff;
+    --color-checked: #58a6ff;
+  }
+}

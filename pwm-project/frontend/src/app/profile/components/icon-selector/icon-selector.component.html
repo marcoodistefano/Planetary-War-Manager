@@ -1,0 +1,31 @@
+<ion-content class="transparent-bg">
+  <div class="modal-wrapper">
+    <div class="panel icon-panel">
+      
+      <div class="title-block">
+        <p class="eyebrow">Database Personale</p>
+        <h2>SELEZIONA AVATAR</h2>
+      </div>
+
+      <div class="inner-panel grid-scroll-container">
+        <div class="avatar-grid">
+          
+          <div class="icon-item" *ngFor="let icon of icons" (click)="select(icon.path)">
+            <div class="avatar-frame">
+              <img [src]="icon.path" alt="avatar" />
+            </div>
+            <div class="avatar-label">ID_{{ icon.id }}</div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="action-dock">
+        <button class="logout-button" (click)="close()">
+          [ ANNULLA OPERAZIONE ]
+        </button>
+      </div>
+
+    </div>
+  </div>
+</ion-content>

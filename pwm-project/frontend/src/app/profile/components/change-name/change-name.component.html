@@ -1,0 +1,27 @@
+<ion-content class="transparent-bg">
+  <div class="modal-wrapper">
+    <div class="panel">
+      
+      <div class="title-block">
+        <p class="eyebrow">Protocollo di Rete</p>
+        <h2>MODIFICA USERNAME</h2>
+      </div>
+
+      <div class="inner-panel">
+        <p class="custom-label">NUOVO IDENTIFICATIVO TERMINALE</p>
+        <input type="text" [(ngModel)]="newName" placeholder="Inserisci nome..." class="tactical-input" />
+      </div>
+
+      <div class="action-dock">
+        <button class="primary-glow" (click)="confirm()" [disabled]="newName.length < 3">
+          AGGIORNA USERNAME
+        </button>
+        
+        <button class="logout-button" (click)="close()">
+          [ ANNULLA OPERAZIONE ]
+        </button>
+      </div>
+
+    </div>
+  </div>
+</ion-content>

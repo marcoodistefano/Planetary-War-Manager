@@ -1,9 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule } from '@ionic/angular';
+import { IonicModule, ModalController } from '@ionic/angular';
 import { Title } from '@angular/platform-browser';
 import { Router, RouterModule } from '@angular/router';
+import { IconSelectorComponent } from './components/icon-selector/icon-selector.component';
+import { ChangeNameComponent } from './components/change-name/change-name.component';
+import { ChangePasswordComponent } from './components/change-password/change-password.component';
+import { SettingsComponent } from './components/settings/settings.component';
 
 @Component({
   selector: 'app-profile',
@@ -20,6 +24,7 @@ export class ProfilePage implements OnInit {
 
   user: any = {
     username: '',
+    avatar: 'assets/icons/icon-1.png', // Default avatar
     email: '',
     reg: '',
     elo_rating: 0,
@@ -33,7 +38,8 @@ export class ProfilePage implements OnInit {
 
   constructor(
     private router: Router, 
-    private titleService: Title
+    private titleService: Title,
+    private modalCtrl: ModalController
   ) { }
 
   ngOnInit() {
@@ -45,6 +51,7 @@ export class ProfilePage implements OnInit {
     this.user = {
       id_user: '550e8400-e29b-41d4-a716-446655440000',
       username: 'Generale_Inverno',
+      avatar: 'assets/icons/icon-1.png',
       email: 'gen@mail.com',
       reg: 'Europa',
       elo_rating: 1450,
@@ -58,6 +65,37 @@ export class ProfilePage implements OnInit {
     };
   }
 
+  async changeAvatar() {
+  const modal = await this.modalCtrl.create({
+    component: IconSelectorComponent,
+    cssClass: 'tactical-modal' // <--- DEVE ESSERE tactical-modal!
+  });
+  await modal.present();
+
+  const { data } = await modal.onDidDismiss();
+  if (data) {
+    console.log("Nuovo Avatar selezionato:", data);
+    this.user.avatar = data; 
+  }
+}
+
+  // Assicurati che sia così per TUTTI E TRE
+async changeUsername() {
+  const modal = await this.modalCtrl.create({
+    component: ChangeNameComponent,
+    cssClass: 'tactical-modal' // <--- DEVE ESSERE QUI
+  });
+  return await modal.present();
+}
+
+async changePassword() {
+  const modal = await this.modalCtrl.create({
+    component: ChangePasswordComponent,
+    cssClass: 'tactical-modal' // <--- E ANCHE QUI
+  });
+  return await modal.present();
+}
+
   toggleEmailVisibility() {
     this.showEmail = !this.showEmail;
   }
@@ -66,12 +104,28 @@ export class ProfilePage implements OnInit {
     this.showFriendCode = !this.showFriendCode;
   }
 
-  changeUsername() { console.log("Controllo cooldown 6 mesi per cambio username..."); }
-  changePassword() { console.log("Generazione token alfanumerico temporaneo per reset..."); }
-  changeAvatar() { console.log("Accesso alla collezione di 20 avatar tattici..."); }
   editProfile() { console.log('Accesso al pannello configurazione protocolli...'); }
   logout() { this.router.navigate(['/login']); }
   openMatchHistory() { console.log("Apertura Archivio: Recupero snapshot PostgreSQL per il Timelapse..."); }
   manageFriends() { console.log("Accesso alla Rete Diplomatica: Caricamento lista amici pending/accepted..."); }
-  openSettings() { console.log("Inizializzazione Preferenze di Sistema: Lettura file .JSON locale..."); }
+  
+  
+  async openSettings() {
+  const modal = await this.modalCtrl.create({
+    component: SettingsComponent,
+    cssClass: 'tactical-modal'
+  });
+  await modal.present();
+
+  const { data } = await modal.onDidDismiss();
+  if (data) {
+    console.log("Applicazione nuove impostazioni...", data);
+    
+    // QUI DIREMO AL SERVIZIO DI CAMBIARE LINGUA:
+    // this.translate.use(data.language);
+    
+    // E lo salveremo nel browser per ricordarlo al prossimo accesso:
+    // localStorage.setItem('sys_lang', data.language);
+  }
+}
 }
