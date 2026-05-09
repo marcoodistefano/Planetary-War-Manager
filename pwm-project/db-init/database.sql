@@ -109,27 +109,16 @@ CREATE TABLE IF NOT EXISTS partite (
     CONSTRAINT fk_host FOREIGN KEY (id_host) REFERENCES utenti(id_user)
 );
 
-'''
-//SERVONO REALMENTE SOLO 40 BIT 
-//NB PARTITE: il server può gestire i campi da duration_max a stato, in un’unica stringa, compressa e gestita sui bit e memorizzata in B64. 
-// per esempio, se la stringa dovesse memorizzare in questo ordine(tra parentesi i bit occupati):
-// stato_partita [2], N_player_max[9 bit -> 512 player], duration_max[5 bit -> 32 giorni (se memorizzato in giorni)], moltiplicatore[4 bit->sono massimo 16 combinazioni, 0000 è default (1x), poi 2x, 3x, 5x, 10x, 20x, 30x, 40x…], tipo_partita [4], modalità [4 bit? 16 modalità…oppure 5?], regioni_giocabili [16 bit]
-// 
-// ->Stato partita {00->in attesa; 01->in corso; 10->terminata; 11->eliminata (si intende che si eliminano le mosse e il documento (si fa dopo X giorni dalla fine della partita))
-// ->N_player_max -> conteggio classico… 10, 20, 30, 50, 100, 250, 500 -> si potrebbero usare, allora, solo 3 bit… {000 001 010 011 100 101 110 111} dove il valore 111 è assunto SOLO per modalità 1v1 e 2v2 (NvN < 10 giocatori totali)
-// ->duration_max -> default è 7, quindi 0111, max è 1111 che indica 32 giorni; 0000 è controllo, NON UTILIZZATO
-// ->moltiplicatore -> {1x 0000; 2x 0001; 3x 0010; 4x 0011; 5x 0100; 10x 0101; 20x 0110; 30x 0111; 40x 1000; 50x 1001; 60x 1010; 100x 1011; 200x 1100; 500x 1101; 1000x 1110; [ILLIMITATA (produzione istantanea di tutto eccetto che delle risorse) oppure 5000x 1111}
-// -> tipo partita -> {1v1 0000; 2v2 0001; 3v3 0010; 5v5 0011; tutti_contro_tutti 0100…altro da definire}
-// -> modalità ->SI CAMBIA SOLO UN BIT! {tempo 0000 (def.); distruzione 0001; conquista 0010; altro}
-// -> regioni giocabili -> SI CAMBIA SOLO UN BIT! {0000000000000000} [DA MSB A LSB}
-// MSB (bit 1^): tutto il mondobit 2: europabit 3: Asiabit 4: africa
-// bit 5: oceaniabit 6: america NORDbit 7: america SUD
-// DAL BIT 8 FINO AL 16 SONO ALTRE MODALITA, ALCUNI ESEMPI:
-// bit 8: vecchio mondo (europa-medio oriente-nord africa)
-// bit 9: medio orientebit 10: italia…
-// Definito questo, procedo con un esempio: giocatore X ha appena creato una partita con le seguenti caratteristiche: 1v1, 7giorni, moltiplicatore x30, modalità conquista, solo italia. 
-// il server avrà, allora, la seguente stringa di bit:
-// 00|111|0111|0111|0000|0010|0000000001000000 '''
+/*
+NB PARTITE (documentazione):
+Il server può gestire i campi da duration_max a stato in un'unica stringa di bit
+compressa e memorizzata in B64. Esempio di layout:
+
+stato_partita[2] | N_player_max[9] | duration_max[5] | moltiplicatore[4] |
+tipo_partita[4] | modalita[4..5] | regioni_giocabili[16]
+
+Esempio: 00|111|0111|0111|0000|0010|0000000001000000
+*/
 
 -- 4. PARTECIPANTI_PARTITE
 CREATE TABLE IF NOT EXISTS partecipanti_partite (
@@ -172,8 +161,6 @@ CREATE TABLE IF NOT EXISTS mosse (
     priorita VARCHAR(2) DEFAULT '00', -- Bit 11 per non eliminabili
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_mossa_owner FOREIGN KEY (user_id, partita_id) REFERENCES partecipanti_partite(user_id, partita_id) ON DELETE CASCADE
-    CONSTRAINT fk_spostamento_truppa FOREIGN KEY (id_truppa) REFERENCES truppe(id_istanza_truppa) ON DELETE CASCADE, 
-    CONSTRAINT fk_spostamento_armata FOREIGN KEY (id_armata) REFERENCES armata(id_istanza_armata) ON DELETE CASCADE
 );
 --DA CAPIRE COME GESTIRE LA PERSISTENZA DELLA PRODUZIONE STRUTTURE, RICERCHE E TRUPPE.
 -- DA CAPIRE COME GESTIRE LE MOSSE AUTOMATICHE.
@@ -199,7 +186,7 @@ CREATE TABLE IF NOT EXISTS spostamenti (
     x_dest REAL,
     y_dest REAL,
     time_to_arrive TIMESTAMP,
-    CONSTRAINT fk_spostamento_mossa FOREIGN KEY (id_mossa) REFERENCES mosse(id_mossa) ON DELETE CASCADE, 
+    CONSTRAINT fk_spostamento_mossa FOREIGN KEY (id_mossa) REFERENCES mosse(id_mossa) ON DELETE CASCADE
 );
 
 --6.1 ATTACCHI
@@ -209,9 +196,7 @@ CREATE TABLE IF NOT EXISTS attacco (
     id_target_truppa UUID default NULL,
     id_target_armata UUID default NULL,
     time_stamp TIMESTAMP default now(),
-    CONSTRAINT fk_attacco_mossa FOREIGN KEY (id_mossa) REFERENCES mosse(id_mossa) ON DELETE CASCADE,
-    CONSTRAINT fk_attacco_truppa FOREIGN KEY (id_target_truppa) REFERENCES truppe(id_istanza_truppa) ON DELETE SET NULL,
-    CONSTRAINT fk_attacco_armata FOREIGN KEY (id_target_armata) REFERENCES armata(id_istanza_armata) ON DELETE SET NULL
+    CONSTRAINT fk_attacco_mossa FOREIGN KEY (id_mossa) REFERENCES mosse(id_mossa) ON DELETE CASCADE
 );
 -- 7. ALLEANZE
 CREATE TABLE IF NOT EXISTS alleanze (
@@ -225,7 +210,7 @@ CREATE TABLE IF NOT EXISTS alleanze (
     CONSTRAINT fk_partita_alleanza FOREIGN KEY (id_partita) REFERENCES partite(id_partita) ON DELETE CASCADE
 );
 -- 8. MESSAGGI
-CREATE TABLE IF NOT EXISTS messaggio (
+CREATE TABLE IF NOT EXISTS messaggi (
     id_mex UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     id_user_send UUID NOT NULL,
     id_partita UUID NOT NULL,
@@ -260,8 +245,7 @@ CREATE TABLE IF NOT EXISTS truppe (
     stato BIT(3) DEFAULT B'000', -- 00: idle, 01: in movimento, 10: in combattimento, 11: morto
     attitudine BIT(3) DEFAULT B'000', -- 000: difensiva, 001: offensiva, 010: esplorativa, 011: evasiva, 100: supporto
     last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_truppa_owner FOREIGN KEY (user_id, partita_id) REFERENCES partecipanti_partite(user_id, partita_id) ON DELETE CASCADE,
-    CONSTRAINT fk_truppa_armata FOREIGN KEY (id_armata) REFERENCES armata(id_istanza_armata) ON DELETE SET NULL
+    CONSTRAINT fk_truppa_owner FOREIGN KEY (user_id, partita_id) REFERENCES partecipanti_partite(user_id, partita_id) ON DELETE CASCADE
 );
 
 -- 11. ARMATA
@@ -287,6 +271,83 @@ CREATE TABLE IF NOT EXISTS armata (
 );
 
 -- ==========================================
+-- FOREIGN KEYS (Deferred - required order)
+-- ==========================================
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_truppa_armata'
+          AND conrelid = 'truppe'::regclass
+    ) THEN
+        ALTER TABLE truppe
+            ADD CONSTRAINT fk_truppa_armata
+            FOREIGN KEY (id_armata)
+            REFERENCES armata(id_istanza_armata)
+            ON DELETE SET NULL;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_spostamento_truppa'
+          AND conrelid = 'mosse'::regclass
+    ) THEN
+        ALTER TABLE mosse
+            ADD CONSTRAINT fk_spostamento_truppa
+            FOREIGN KEY (id_truppa)
+            REFERENCES truppe(id_istanza_truppa)
+            ON DELETE CASCADE;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_spostamento_armata'
+          AND conrelid = 'mosse'::regclass
+    ) THEN
+        ALTER TABLE mosse
+            ADD CONSTRAINT fk_spostamento_armata
+            FOREIGN KEY (id_armata)
+            REFERENCES armata(id_istanza_armata)
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_attacco_truppa'
+          AND conrelid = 'attacco'::regclass
+    ) THEN
+        ALTER TABLE attacco
+            ADD CONSTRAINT fk_attacco_truppa
+            FOREIGN KEY (id_target_truppa)
+            REFERENCES truppe(id_istanza_truppa)
+            ON DELETE SET NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_attacco_armata'
+          AND conrelid = 'attacco'::regclass
+    ) THEN
+        ALTER TABLE attacco
+            ADD CONSTRAINT fk_attacco_armata
+            FOREIGN KEY (id_target_armata)
+            REFERENCES armata(id_istanza_armata)
+            ON DELETE SET NULL;
+    END IF;
+END $$;
+
+-- ==========================================
 -- INDEXES E PERMESSI
 -- ==========================================
 CREATE INDEX IF NOT EXISTS idx_truppe_geo ON truppe(x, y);
@@ -297,80 +358,8 @@ CREATE INDEX IF NOT EXISTS idx_risorse_jsonb ON partecipanti_partite USING GIN (
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO PUBLIC;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO PUBLIC;
 
--- Inserimento Utenti (Password fittizie)
-INSERT INTO utenti (username, email, password_hash, reg, elo_rating, codice_amico) VALUES 
-('ShadowGeneral', 'shadow@pwm.com', 'hash_123', 'EU-WEST', 1250, 'AMICO-0001'),
-('IronFist_99', 'iron@pwm.com', 'hash_456', 'EU-EAST', 1100, 'AMICO-0002'),
-('GhostTactician', 'ghost@pwm.com', 'hash_789', 'NA-NORTH', 950, 'AMICO-0003'),
-('ViperStrike', 'viper@pwm.com', 'hash_000', 'ASIA-SOUTH', 1400, 'AMICO-0004');
-
--- Simulazione Accessi
-INSERT INTO accessi (user_id, ip_address, cookie_token, expire_time)
-SELECT id_user, '192.168.1.' || (rank() OVER (ORDER BY id_user)), 'token_' || username, NOW() + INTERVAL '7 days'
-FROM utenti;
-
--- Creazione di una Partita
-INSERT INTO partite (id_partita_visualizzato, nome_partita, id_host, tipo_partita, modalita, regioni_giocabili, stato)
-VALUES (
-    'GME-77', 
-    'Assalto all Atollo', 
-    (SELECT id_user FROM utenti WHERE username = 'ShadowGeneral'), 
-    'Competitiva', 
-    'Deathmatch', 
-    'Pacific-Ocean', 
-    'in_corso'
-);
-
--- Creazione Alleanza nella partita appena creata
-INSERT INTO alleanze (nome_alleanza, id_leader, id_partita, path_logo)
-VALUES (
-    'Lupi del Deserto', 
-    (SELECT id_user FROM utenti WHERE username = 'ShadowGeneral'), 
-    (SELECT id_partita FROM partite WHERE id_partita_visualizzato = 'GME-77'),
-    '/logos/lupi_01.png'
-);
-
--- Inserimento Partecipanti
-INSERT INTO partecipanti_partite (user_id, partita_id, punteggio, id_alleanza, stato_risorse, stato_territori)
-SELECT 
-    id_user, 
-    (SELECT id_partita FROM partite WHERE id_partita_visualizzato = 'GME-77'),
-    1500,
-    (SELECT id_alleanza FROM alleanze WHERE nome_alleanza = 'Lupi del Deserto'),
-    '{"ferro": 500, "petrolio": 200, "oro": 50}',
-    'sector_A1,sector_A2'
-FROM utenti WHERE username IN ('ShadowGeneral', 'IronFist_99');
-
--- Aggiungiamo un nemico senza alleanza
-INSERT INTO partecipanti_partite (user_id, partita_id, punteggio, stato_risorse)
-VALUES (
-    (SELECT id_user FROM utenti WHERE username = 'ViperStrike'),
-    (SELECT id_partita FROM partite WHERE id_partita_visualizzato = 'GME-77'),
-    2000,
-    '{"ferro": 800, "petrolio": 400, "oro": 150}'
-);
-
--- Creazione di un'Armata per ShadowGeneral
-INSERT INTO armata (partita_id, user_id, id_modello, x, y, hp, dmg_tot, speed, tipo_armata)
-VALUES (
-    (SELECT id_partita FROM partite WHERE id_partita_visualizzato = 'GME-77'),
-    (SELECT id_user FROM utenti WHERE username = 'ShadowGeneral'),
-    'Tank_Tiger_V1',
-    45.552, 12.331, -- Coordinate
-    1000, 150, 5, 1
-);
-
--- Messaggi e Chat
-WITH msg AS (
-    INSERT INTO messaggi (content) 
-    VALUES ('Spostate i tank sul fianco est, Viper sta arrivando!') 
-    RETURNING id_mex
-)
-INSERT INTO chat (id_user_send, id_partita, id_mex, id_user_reciver, tipo_chat)
-VALUES (
-    (SELECT id_user FROM utenti WHERE username = 'ShadowGeneral'),
-    (SELECT id_partita FROM partite WHERE id_partita_visualizzato = 'GME-77'),
-    (SELECT id_mex FROM msg),
-    (SELECT id_user FROM utenti WHERE username = 'IronFist_99'),
-    'alleanza'
-);
+/*
+SEED DATA (disabilitato): il blocco di INSERT sotto era incoerente con lo schema
+(colonne non più presenti / nomi diversi) e bloccava l'import della schema.
+Se serve demo data, meglio creare un file seed separato e allineato allo schema.
+*/

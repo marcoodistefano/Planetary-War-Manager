@@ -4,8 +4,20 @@ const redisClient = require("../shared/redisClient.js");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 
-const JWT_SECRET = process.env.JWT_SECRET || "CHIAVE_SEGRETA_TEMPORANEA_SUPER_SICURA";
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  process.env.SECRET_KEY ||
+  "CHIAVE_SEGRETA_TEMPORANEA_SUPER_SICURA";
 const SESSION_TTL = 86400; // 24 ore in secondi
+
+const getClientIp = (req) => {
+  const forwarded = req.headers["x-forwarded-for"];
+  const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const forwardedIp = String(forwardedValue ?? "")
+    .split(",")[0]
+    .trim();
+  return forwardedIp || req.ip || req.connection?.remoteAddress || null;
+};
 
 const register = async (req, res) => {
   console.log("--- Ricevuto dato grezzo ---");
@@ -31,6 +43,13 @@ const register = async (req, res) => {
       dato_x_sicuro: result.data,
     });
   } catch (error) {
+    if (error && error.code === "USER_EXISTS") {
+      return res.status(409).json({
+        isValid: false,
+        errors: [error.message],
+      });
+    }
+
     console.error("--- Errore durante l'elaborazione ---");
     console.error(error);
     return res.status(500).json({
@@ -60,27 +79,48 @@ const login = async (req, res) => {
     // --- INIZIO PROTOCOLLO DI SESSIONE REDIS & JWT ---
     const sessionId = crypto.randomUUID();
     const userId = authResult.uuid;
+    const ipAddress = getClientIp(req);
+    const expireTime = new Date(Date.now() + SESSION_TTL * 1000);
 
     // 1. Prepara il payload per Redis
     const sessionData = {
       userId: userId,
-      ip: req.ip || req.connection.remoteAddress,
+      ip: ipAddress,
       userAgent: req.headers["user-agent"] || "Unknown",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     // 2. Salva la sessione in Redis con Scadenza (TTL)
-    await redisClient.setEx(`session:${sessionId}`, SESSION_TTL, JSON.stringify(sessionData));
+    await redisClient.setEx(
+      `session:${sessionId}`,
+      SESSION_TTL,
+      JSON.stringify(sessionData),
+    );
     
     // 3. Aggiungi il sessionId al Set dell'utente per tracciamento
     await redisClient.sAdd(`user_sessions:${userId}`, sessionId);
 
     // 4. Genera il JWT
     const token = jwt.sign(
-      { sub: userId, jti: sessionId }, 
-      JWT_SECRET, 
-      { expiresIn: "24h" }
+      { sub: userId, id_user: userId, jti: sessionId },
+      JWT_SECRET,
+      { expiresIn: SESSION_TTL },
     );
+
+    // 5. Persisti la sessione anche su Postgres (tabella accessi)
+    try {
+      await authModel.createAccessSession({
+        userId,
+        ipAddress,
+        cookieToken: sessionId,
+        expireTime,
+      });
+    } catch (dbError) {
+      // Manteniamo consistenza: se non scriviamo sul DB, invalidiamo la sessione Redis
+      await redisClient.del(`session:${sessionId}`);
+      await redisClient.sRem(`user_sessions:${userId}`, sessionId);
+      throw dbError;
+    }
 
     return res.json({
       message: "Login avvenuto con successo",

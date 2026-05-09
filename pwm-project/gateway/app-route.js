@@ -18,6 +18,8 @@ app.use(authRoutes);
 // app.use(gameRoutes);
 // app.use(matchesRoutes);
 
-app.listen(3001, () =>
-  console.log("App-route attivo su http://app-route:3001"),
+const PORT = parseInt(process.env.PORT ?? "", 10) || 3001;
+
+app.listen(PORT, () =>
+  console.log(`App-route attivo su http://app-route:${PORT}`),
 );

@@ -59,7 +59,8 @@ services:
       - redis
     environment:
       - REDIS_URL=redis://redis:6379
-      - DB_URL=postgres://postgres:secret@db:5432/pwm_tactical_database
+      - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
+      - SECRET_KEY=${SECRET_KEY}
     networks:
       - pwm-net
 
@@ -72,15 +73,18 @@ services:
     working_dir: /app
     volumes:
       - ./gateway:/app 
+      - /app/node_modules
       - ./services/auth-elo:/app/services/auth-elo
       - ./services/shared:/app/services/shared
     ports:
-      - "4000:4000" # <--- Fondamentale per ricevere ordini dal Frontend (Angular)
+      - "4000:3001" # <--- Frontend -> app-route (porta interna 3001)
     depends_on:
       - auth-service
     environment:
       - REDIS_URL=redis://redis:6379 # <--- FONDAMENTALE per il Comm-Link
-      - JWT_SECRET=CHIAVE_SEGRETA_TEMPORANEA_SUPER_SICURA
+      - JWT_SECRET=${SECRET_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
     networks:
       - pwm-net
 
@@ -91,7 +95,7 @@ services:
       - redis
     environment:
       - REDIS_URL=redis://redis:6379
-      - SECRET_KEY=MIA_CHIAVE_SEGRETA_2026
+      - SECRET_KEY=${SECRET_KEY}
     volumes:
       - ./shared/assets:/app/assets:ro
     networks:

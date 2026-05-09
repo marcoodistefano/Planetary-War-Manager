@@ -2,7 +2,10 @@ const jwt = require('jsonwebtoken');
 const redisClient = require('../redisClient'); // Importa il client dalla cartella genitore
 
 // Assicurati di usare la stessa variabile d'ambiente usata in authController
-const JWT_SECRET = process.env.JWT_SECRET || "CHIAVE_SEGRETA_TEMPORANEA_SUPER_SICURA";
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  process.env.SECRET_KEY ||
+  "CHIAVE_SEGRETA_TEMPORANEA_SUPER_SICURA";
 
 const checkCommLink = async (req, res, next) => {
   try {
