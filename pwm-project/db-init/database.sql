@@ -110,15 +110,26 @@ CREATE TABLE IF NOT EXISTS partite (
 );
 
 /*
-NB PARTITE (documentazione):
-Il server può gestire i campi da duration_max a stato in un'unica stringa di bit
-compressa e memorizzata in B64. Esempio di layout:
-
-stato_partita[2] | N_player_max[9] | duration_max[5] | moltiplicatore[4] |
-tipo_partita[4] | modalita[4..5] | regioni_giocabili[16]
-
-Esempio: 00|111|0111|0111|0000|0010|0000000001000000
-*/
+//SERVONO REALMENTE SOLO 40 BIT 
+//NB PARTITE: il server può gestire i campi da duration_max a stato, in un’unica stringa, compressa e gestita sui bit e memorizzata in B64. 
+// per esempio, se la stringa dovesse memorizzare in questo ordine(tra parentesi i bit occupati):
+// stato_partita [2], N_player_max[9 bit -> 512 player], duration_max[5 bit -> 32 giorni (se memorizzato in giorni)], moltiplicatore[4 bit->sono massimo 16 combinazioni, 0000 è default (1x), poi 2x, 3x, 5x, 10x, 20x, 30x, 40x…], tipo_partita [4], modalità [4 bit? 16 modalità…oppure 5?], regioni_giocabili [16 bit]
+// 
+// ->Stato partita {00->in attesa; 01->in corso; 10->terminata; 11->eliminata (si intende che si eliminano le mosse e il documento (si fa dopo X giorni dalla fine della partita))
+// ->N_player_max -> conteggio classico… 10, 20, 30, 50, 100, 250, 500 -> si potrebbero usare, allora, solo 3 bit… {000 001 010 011 100 101 110 111} dove il valore 111 è assunto SOLO per modalità 1v1 e 2v2 (NvN < 10 giocatori totali)
+// ->duration_max -> default è 7, quindi 0111, max è 1111 che indica 32 giorni; 0000 è controllo, NON UTILIZZATO
+// ->moltiplicatore -> {1x 0000; 2x 0001; 3x 0010; 4x 0011; 5x 0100; 10x 0101; 20x 0110; 30x 0111; 40x 1000; 50x 1001; 60x 1010; 100x 1011; 200x 1100; 500x 1101; 1000x 1110; [ILLIMITATA (produzione istantanea di tutto eccetto che delle risorse) oppure 5000x 1111}
+// -> tipo partita -> {1v1 0000; 2v2 0001; 3v3 0010; 5v5 0011; tutti_contro_tutti 0100…altro da definire}
+// -> modalità ->SI CAMBIA SOLO UN BIT! {tempo 0000 (def.); distruzione 0001; conquista 0010; altro}
+// -> regioni giocabili -> SI CAMBIA SOLO UN BIT! {0000000000000000} [DA MSB A LSB}
+// MSB (bit 1^): tutto il mondobit 2: europabit 3: Asiabit 4: africa
+// bit 5: oceaniabit 6: america NORDbit 7: america SUD
+// DAL BIT 8 FINO AL 16 SONO ALTRE MODALITA, ALCUNI ESEMPI:
+// bit 8: vecchio mondo (europa-medio oriente-nord africa)
+// bit 9: medio orientebit 10: italia…
+// Definito questo, procedo con un esempio: giocatore X ha appena creato una partita con le seguenti caratteristiche: 1v1, 7giorni, moltiplicatore x30, modalità conquista, solo italia. 
+// il server avrà, allora, la seguente stringa di bit:
+// 00|111|0111|0111|0000|0010|0000000001000000 */
 
 -- 4. PARTECIPANTI_PARTITE
 CREATE TABLE IF NOT EXISTS partecipanti_partite (
