@@ -15,13 +15,21 @@ ion-content {
   padding: 14px;
   color: #f4f7fb;
   font-family: 'Courier New', Courier, monospace;
-  z-index: 1; /* Garantisce che la UI stia sopra il video */
+  z-index: 1; 
+  
+  /* FIX SFOCATURA: Forza il rendering vettoriale dei testi */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* Classi per il video di sfondo animato */
 .auth-background {
-  position: absolute;
-  inset: 0;
+  position: fixed; /* Mantiene lo sfondo incollato allo schermo */
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
@@ -41,14 +49,14 @@ ion-content {
 }
 
 .auth-background__overlay {
-  position: absolute;
+  position: absolute; 
   inset: 0;
   background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%);
   backdrop-filter: blur(2px);
 }
 
 /* ==========================================================================
-   2. LAYOUT GRID PRINCIPALE
+   2. LAYOUT GRID PRINCIPALE (Fluido per tutti i Monitor Desktop)
    ========================================================================== */
 .top-row, .bottom-section {
   position: relative;
@@ -59,15 +67,16 @@ ion-content {
   perspective: 1200px;
   transform-style: preserve-3d;
   display: grid;
-  /* Riduciamo lo spazio centrale (da 1fr a un valore fisso o più piccolo) */
-  grid-template-columns: 320px 400px 320px; 
-  gap: 10px; /* Riduciamo il gap tra le colonne */
-  justify-content: center; /* Centra l'intera griglia nella pagina */
+  /* Griglia fluida: Pannelli laterali min 280px max 350px. Centro prende lo spazio rimanente */
+  grid-template-columns: minmax(280px, 350px) 1fr minmax(280px, 350px); 
+  gap: clamp(15px, 3vw, 40px); /* Spaziatura proporzionale */
+  justify-content: center;
   align-items: center;
   min-height: calc(100vh - 48px);
-  padding: 0; /* Rimuoviamo il padding laterale eccessivo */
+  padding: 0 2vw; 
+  max-width: 1800px; 
   margin: 0 auto;
-  max-width: 1200px; /* Limita l'espansione su monitor molto grandi */
+  width: 100%;
 }
 
 /* ==========================================================================
@@ -78,10 +87,9 @@ ion-content {
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 400px; /* Garanzia di spazio per elementi absolute */
+  min-height: 500px;
 }
 
-/* TITOLO (Ancorato in alto) */
 .title-block {
   position: absolute;
   top: 20px;
@@ -91,9 +99,7 @@ ion-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
   text-align: center;
-  padding: 14px 0;
 
   .eyebrow {
     margin: 0 0 10px;
@@ -104,7 +110,7 @@ ion-content {
   }
 
   h1 {
-    font-size: clamp(1.8rem, 3.75vw, 3.6rem);
+    font-size: clamp(1.8rem, 3vw, 3.6rem); 
     line-height: 0.95;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -113,23 +119,18 @@ ion-content {
   }
 }
 
-/* BOTTONE TONDO OLOGRAFICO (Ancorato al centro) */
 .return-last-match {
   position: absolute;
-  top: 48.5%;
+  top: 50%;
   left: 50%;
-  /* Fix hardware GPU anche qui */
   transform: translate(-50%, -50%) translateZ(0);
   z-index: 2;
   
-  width: 575px;
-  height: 570px;
+  width: clamp(280px, 40vw, 575px);
+  height: clamp(280px, 40vw, 575px);
   border-radius: 50%; 
-  
-  /* Bordo sottile e fantasma, interno totalmente vuoto */
   border: 1px solid rgba(120, 210, 255, 0.15);
   background: transparent !important; 
-  backdrop-filter: none !important;
   box-shadow: none;
   
   color: rgba(244, 247, 251, 0.8);
@@ -152,88 +153,59 @@ ion-content {
     box-shadow: 0 0 25px rgba(88, 166, 255, 0.4), 0 0 50px rgba(88, 166, 255, 0.15);
   }
 
-  &:focus-visible {
-    outline: none;
-    box-shadow: 0 0 20px rgba(88, 166, 255, 0.8);
-  }
-
-  &::before, &::after {
-    display: none !important;
-  }
+  &:focus-visible { outline: none; box-shadow: 0 0 20px rgba(88, 166, 255, 0.8); }
 }
 
-/* CONTENITORE AZIONI (Ancorato in basso, sopra il footer) */
 .games-container {
   position: absolute;
   left: 0;
-  bottom: 60px;
+  bottom: 20px;
   z-index: 10;
   width: 100%;
-  margin: 0;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: transparent;
-  border: 0;
-  backdrop-filter: none;
+  justify-content: center;
 
   .games-actions {
-  display: flex;
-  flex-direction: row;      /* Forza l'allineamento parallelo */
-  flex-wrap: nowrap;        /* Impedisce che vadano a capo se lo spazio è poco */
-  justify-content: center;
-  gap: 15px;
-  width: 100%;
-
-  button {
-    width: auto;            /* Impedisce ai bottoni di prendersi tutto lo spazio */
-    min-width: 140px;
+    display: flex;
+    flex-wrap: wrap; 
+    justify-content: center;
+    gap: 15px;
+    width: 100%;
+    button { min-width: 140px; }
   }
-}
 }
 
 /* ==========================================================================
-   4. PANNELLI LATERALI (Glassmorphism 3D a 15 gradi)
+   4. PANNELLI LATERALI (Glassmorphism 3D per Desktop)
    ========================================================================== */
 .left-column, .right-column {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 0;
+  gap: 15px; 
 }
 
 .left-column.panel {
-  /* Aggiunto translateZ(0) per accelerazione GPU */
-  transform: rotateY(15deg) scale(0.85) translateX(-10vw) translateZ(0);
+  transform: rotateY(12deg) scale(0.98) translateZ(0);
   transform-origin: right center;
   transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
   box-shadow: 20px 10px 30px rgba(0, 0, 0, 0.2) !important;
-  
-  /* FIX ANTI-BLUR */
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased; backface-visibility: hidden;
   
   &:hover {
-    transform: rotateY(13deg) scale(0.85) translateX(-10vw) translateZ(0);
+    transform: rotateY(8deg) scale(0.98) translateZ(0);
     box-shadow: 10px 10px 30px rgba(0, 0, 0, 0.25) !important;
   }
 }
 
 .right-column.panel {
-  /* Aggiunto translateZ(0) per accelerazione GPU */
-  transform: rotateY(-15deg) scale(0.85) translateX(10vw) translateZ(0);
+  transform: rotateY(-12deg) scale(0.98) translateZ(0);
   transform-origin: left center;
   transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
   box-shadow: -20px 10px 30px rgba(0, 0, 0, 0.2) !important;
-
-  /* FIX ANTI-BLUR */
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased; backface-visibility: hidden;
 
   &:hover {
-    transform: rotateY(-13deg) scale(0.85) translateX(10vw) translateZ(0);
+    transform: rotateY(-8deg) scale(0.98) translateZ(0);
     box-shadow: -10px 10px 30px rgba(0, 0, 0, 0.25) !important;
   }
 }
@@ -266,18 +238,10 @@ ion-content {
 }
 
 /* ==========================================================================
-   5. COMPONENTI UI INTERNI (Leaderboard, Card, Bottoni)
+   5. COMPONENTI UI INTERNI (Leaderboard, Card, Bottoni Desktop)
    ========================================================================== */
-.leaderboard-panel, .profile-panel, .bottom-section {
-  padding: 14px;
-}
-
-.panel-heading, .section-header, .profile-card, .game-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
+.leaderboard-panel, .profile-panel, .bottom-section { padding: 14px; }
+.panel-heading, .section-header, .profile-card, .game-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
 .panel-heading {
   margin-bottom: 9px;
@@ -285,14 +249,8 @@ ion-content {
   small { color: rgba(244, 247, 251, 0.68); font-size: 0.65rem; display: block; }
 }
 
-.leaderboard-group h2, .section-header h2, .profile-card h2, .game-card h3 {
-  margin: 0;
-}
-
-.leaderboard-group h2 {
-  margin-bottom: 8px; font-size: 0.7rem; color: rgba(244, 247, 251, 0.78);
-  text-transform: uppercase; letter-spacing: 0.08em;
-}
+.leaderboard-group h2, .section-header h2, .profile-card h2, .game-card h3 { margin: 0; }
+.leaderboard-group h2 { margin-bottom: 8px; font-size: 0.7rem; color: rgba(244, 247, 251, 0.78); text-transform: uppercase; letter-spacing: 0.08em; }
 
 .leaderboard-toggle {
   display: flex; gap: 6px; margin-bottom: 9px;
@@ -316,35 +274,17 @@ ion-content {
 .flag { font-size: 0.85rem; text-align: center; }
 .score { color: #86d7ff; }
 
-.profile-card {
-  flex-direction: column; text-align: center; gap: 6px; margin-bottom: 9px; justify-content: center;
-}
-
-/* Nel file home.page.scss, trova la classe .avatar e aggiornala così: */
-
-.avatar {
-  display: grid; 
-  place-items: center; 
-  width: 100px;             /* Aumentato da 48px */
-  height: 100px;            /* Aumentato da 48px */
-  border-radius: 50%;
-  background: linear-gradient(135deg, #67e0ff, #12394b); 
-  color: #ffffff; 
-  font-size: 1.5rem;       /* Aumentato da 0.7rem per le iniziali */
-  font-weight: 800;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25); 
-  cursor: pointer; 
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-
-  &:hover { 
-    transform: scale(1.1); 
-    box-shadow: 0 0 15px rgba(103, 224, 255, 0.5); 
-  }
-}
-
+.profile-card { flex-direction: column; text-align: center; gap: 6px; margin-bottom: 9px; justify-content: center; }
 .profile-label { margin: 0 0 1px; color: rgba(244, 247, 251, 0.65); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em; }
 .profile-name { font-size: 1rem; }
 .profile-level { font-size: 0.75rem; color: rgba(244, 247, 251, 0.7); }
+
+.avatar {
+  display: grid; place-items: center; width: 100px; height: 100px; border-radius: 50%;
+  background: linear-gradient(135deg, #67e0ff, #12394b); color: #ffffff; font-size: 1.5rem; font-weight: 800;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25); cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;
+  &:hover { transform: scale(1.1); box-shadow: 0 0 15px rgba(103, 224, 255, 0.5); }
+}
 
 .quick-actions {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
@@ -375,47 +315,115 @@ ion-content {
 
 .status-badge { padding: 5px 8px; border-radius: 999px; background: rgba(134, 215, 255, 0.08); border: 1px solid rgba(134, 215, 255, 0.1); color: #86d7ff; white-space: nowrap; }
 
-.search-bar-container { margin-bottom: 9px; }
 .glass-searchbar {
   --background: rgba(255, 255, 255, 0.03); --color: #f4f7fb; --placeholder-color: rgba(244, 247, 251, 0.5); --icon-color: rgba(244, 247, 251, 0.7);
   --clear-button-color: rgba(244, 247, 251, 0.7); --border-radius: 9px; --box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 9px; backdrop-filter: blur(10px); padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 9px; backdrop-filter: blur(10px); padding: 0; margin-bottom: 9px;
 }
 
 /* ==========================================================================
-   6. RESPONSIVE DESIGN
+   6. HEADER E MENU LATERALE (MOBILE DRAWER)
    ========================================================================== */
-@media (max-width: 1100px) {
-  .top-row { grid-template-columns: 1fr; }
-  
-  .center-column {
-    height: auto; 
-    min-height: 250px;
-    padding: 30px 0;
-    gap: 25px;
-    align-items: center;
-  }
+.tactical-drawer {
+  --background: rgba(5, 10, 20, 0.95);
+  --width: 280px;
 
-  /* Reset dei posizionamenti assoluti su schermi piccoli per evitare sovrapposizioni */
-  .title-block, .return-last-match, .games-container {
-    position: relative;
-    top: auto; left: auto; bottom: auto; right: auto;
-    transform: none;
-  }
-  
-  .return-last-match:hover {
-    transform: scale(1.05) translateZ(0); 
-  }
-
-  .left-column.panel, .right-column.panel {
-    transform: none !important;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.32) !important;
+  .drawer-container {
+    padding: 40px 20px;
+    display: flex; flex-direction: column; gap: 30px; height: 100%;
+    backdrop-filter: blur(15px); border-left: 1px solid rgba(88, 166, 255, 0.3);
   }
 }
 
-@media (max-width: 640px) {
-  .home-page { padding: 16px; }
-  .quick-actions { grid-template-columns: 1fr; }
-  .game-card, .section-header, .profile-card { align-items: flex-start; flex-direction: column; }
-  .games-actions { flex-direction: column; button { width: 100%; } }
+.profile-card-mobile {
+  text-align: center;
+  .avatar { 
+    margin: 0 auto 15px; border: 1px solid #58a6ff; 
+    width: 80px; height: 80px; box-shadow: 0 0 15px rgba(88,166,255,0.3);
+  }
+  .profile-name { font-size: 1.2rem; color: #fff; margin: 0; }
+  .profile-level { color: #86d7ff; font-size: 0.7rem; text-transform: uppercase; }
+}
+
+.quick-actions-vertical {
+  .menu-label { color: #58a6ff; font-size: 0.6rem; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px; }
+  .action-item {
+    width: 100%; padding: 15px; margin-bottom: 10px; text-align: left;
+    border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; color: #fff; font-size: 0.8rem; cursor: pointer;
+    background: transparent;
+    &:hover { border-color: #58a6ff; background: rgba(88, 166, 255, 0.1); }
+  }
+}
+
+.mobile-header {
+  display: none; /* Nascosto su Desktop, attivato dalle media queries */
+  justify-content: space-between; align-items: center; padding: 10px 20px;
+  position: sticky; top: 0; z-index: 1001; background: rgba(5, 10, 20, 0.6);
+  backdrop-filter: blur(10px); border-bottom: 1px solid rgba(88, 166, 255, 0.2);
+
+  .logo { font-weight: 900; color: #fff; letter-spacing: 2px; }
+  .menu-trigger { cursor: pointer; }
+  .mini-avatar {
+    width: 35px; height: 35px; border-radius: 50%; border: 1px solid #58a6ff; overflow: hidden;
+    img { width: 100%; height: 100%; object-fit: cover; }
+  }
+}
+
+/* ==========================================================================
+   7. RESPONSIVE LOGIC CONSOLIDATA (Mobile/Tablet < 1100px)
+   ========================================================================== */
+@media (max-width: 1100px) {
+  
+  /* 1. Mostra Header Mobile e nascondi Pannello Profilo Desktop */
+  .mobile-header { display: flex; }
+  
+  .desktop-only .profile-panel, 
+  .desktop-only .panel-divider:first-of-type { 
+    display: none; 
+  }
+
+  /* 2. Riformatta la Griglia Principale in Colonna Flat (No 3D) */
+  .top-row { 
+    display: flex; flex-direction: column; padding: 20px 10px; gap: 25px;
+    perspective: none !important;
+    transform-style: flat !important;
+  }
+  
+  /* 3. Annulla le trasformazioni 3D sui pannelli */
+  .left-column.panel, .right-column.panel {
+    transform: none !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+    width: 100%; max-width: 600px; margin: 0 auto;
+  }
+
+  /* Rimuove sfondi e bordi superflui per la colonna destra che ora contiene solo le partite create */
+  .right-column.panel {
+    background: transparent !important;
+    border: none !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
+  /* 4. Porta la Colonna Centrale in cima allo schermo */
+  .center-column {
+    order: -1; 
+    height: auto; min-height: auto; width: 100%; max-width: 600px;
+    margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 20px; 
+  }
+
+  /* 5. Ripristina i posizionamenti */
+  .title-block, .games-container {
+    position: relative; top: auto; left: auto; bottom: auto; right: auto;
+    transform: none !important; width: 100%;
+  }
+  .title-block { padding: 0; }
+
+  /* 6. Nasconde il bottone circolare enorme */
+  .return-last-match { display: none !important; }
+
+  /* 7. Bottoni Azioni Impilati */
+  .games-container .games-actions {
+    flex-direction: column;
+    button { width: 100%; }
+  }
 }

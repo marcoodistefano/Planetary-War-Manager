@@ -1,5 +1,28 @@
-<ion-content [fullscreen]="true">
-  <!-- SFONDO ANIMATO TATTICO -->
+<ion-menu side="end" contentId="main-content" menuId="profile-menu" class="tactical-drawer">
+  <ion-content class="transparent-bg">
+    <div class="drawer-container">
+      <div class="profile-card-mobile">
+        <div class="avatar transparent-element" routerLink="/profile">
+          <img [src]="'assets/profile_icons/id_1.jpeg'" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+        <h2 class="profile-name">{{ currentPlayer.name }}</h2>
+        <small class="profile-level">Livello 24</small>
+      </div>
+
+      <div class="quick-actions-vertical">
+        <p class="menu-label">Protocolli Rapidi</p>
+        <button type="button" 
+                class="action-item transparent-element" 
+                *ngFor="let action of quickActions"
+                (click)="handleQuickAction(action)"> 
+          {{ action }}
+        </button>
+      </div>
+    </div>
+  </ion-content>
+</ion-menu>
+
+<ion-content [fullscreen]="true" id="main-content">
   <div class="auth-background" aria-hidden="true">
     <video #backgroundVideo class="auth-background__video" autoplay muted loop playsinline preload="metadata" src="assets/background_gif/background_gif.mp4"></video>
     <div class="auth-background__overlay"></div>
@@ -7,10 +30,17 @@
 
   <div class="home-page">
     
+    <header class="mobile-header">
+      <div class="logo">PWM</div>
+      <ion-menu-button menu="profile-menu" class="menu-trigger">
+        <div class="mini-avatar">
+          <img [src]="'assets/profile_icons/id_1.jpeg'">
+        </div>
+      </ion-menu-button>
+    </header>
+    
     <section class="top-row">
-      <!-- COLONNA SINISTRA -->
       <div class="panel left-column">
-      <!-- ... TUTTO IL RESTO DELLA PAGINA RIMANE INVARIATO ... -->
         <aside class="leaderboard-panel inner-panel">
           <div class="panel-heading">
             <span>Leaderboard</span>
@@ -70,7 +100,6 @@
         </section>
       </div>
 
-      <!-- COLONNA CENTRALE -->
       <div class="center-column">
         
         <div class="title-block">
@@ -78,7 +107,6 @@
           <h1>Planetary War Manager</h1>
         </div>
 
-        <!-- NUOVO BOTTONE TONDO TRASPARENTE -->
         <button type="button" class="return-last-match" routerLink="/game/match/last">
           torna all'ultima partita
         </button>
@@ -90,16 +118,14 @@
             <button type="button" class="ghost-button" (click)="viewFinishedGames()">Partite terminate ({{ finishedGames }})</button>
           </div>
         </div>
-
       </div>
 
-      <!-- COLONNA DESTRA -->
-      <div class="panel right-column">
+      <div class="panel right-column desktop-only">
         <aside class="profile-panel inner-panel">
           <div class="profile-card">
             <p class="profile-label">Profilo</p>
             <div class="avatar transparent-element" routerLink="/profile" style="padding: 0; overflow: hidden;">
-            <img [src]="'assets/profile_icons/id_1.jpeg'" style="width: 100%; height: 100%; object-fit: cover;">
+              <img [src]="'assets/profile_icons/id_1.jpeg'" style="width: 100%; height: 100%; object-fit: cover;">
             </div>
             <h2 class="profile-name">{{ currentPlayer.name }}</h2>
             <small class="profile-level">Livello 24</small>
@@ -140,10 +166,8 @@
           </div>
         </section>
       </div>
-
     </section>
 
-    <!-- FOOTER SCI-FI A FONDO PAGINA -->
     <div class="hud-footer transparent-element" style="margin: -10px auto 0; border: 1px solid rgba(88, 166, 255, 0.4); border-radius: 12px; background: rgba(5, 10, 20, 0.6); backdrop-filter: blur(12px); z-index: 1000; position: relative; max-width: 900px; width: 100%; box-sizing: border-box; font-size: 0.55rem; padding: 8px 12px;">
       <div class="hud-footer-content">
         <div class="footer-left">
