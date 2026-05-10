@@ -12,7 +12,7 @@ import { CommonModule } from '@angular/common';
 export class IconSelectorComponent {
   // Aggiornato a 37 icone con estensione .jpeg e prefisso id_
   icons = Array.from({ length: 37 }, (_, i) => ({
-    path: `assets/icons/id_${i + 1}.jpeg`,
+    path: `assets/profile_icons/id_${i + 1}.jpeg`,
     id: i + 1
   }));
 
