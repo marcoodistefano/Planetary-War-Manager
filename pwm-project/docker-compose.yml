@@ -73,8 +73,9 @@ services:
     working_dir: /app
     volumes:
       - ./gateway:/app 
-      - /app/node_modules
+      - app_route_node_modules:/app/node_modules
       - ./services/auth-elo:/app/services/auth-elo
+      - ./services/match:/app/services/match
       - ./services/shared:/app/services/shared
     ports:
       - "4000:3001" # <--- Frontend -> app-route (porta interna 3001)
@@ -87,7 +88,23 @@ services:
       - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
     networks:
       - pwm-net
-
+  match-service:
+    build: ./services/match
+    working_dir: /app/services/match
+    ports:
+      - "3001:3000" # <--- app-route -> match-service (porta interna 3000)
+    volumes:
+      - ./services/match:/app/services/match
+      - ./services/shared:/app/services/shared
+    depends_on:
+      - db
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
+      - SECRET_KEY=${SECRET_KEY}
+    networks:
+      - pwm-net
   # ENGINE SPOSTAMENTI
   engine-move:
     build: ./services/movement
@@ -196,6 +213,7 @@ services:
 
 volumes:
   postgres_data:
+  app_route_node_modules:
 
 networks:
   pwm-net:

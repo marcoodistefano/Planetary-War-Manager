@@ -182,35 +182,60 @@ const recoveryPassword = async (req, res) => {
       return res.status(400).json(result);
     }
 
-    const reset = await authModel.resetPassword({
-      username: result.data.username,
+    const recovery = await authModel.recoveryPassword({
       email: result.data.email,
-      newPassword: result.data.newPassword,
     });
 
-    if (!reset.ok) {
-      return res.status(400).json({ isValid: false, errors: [reset.error] });
+    if (recovery.status !== 200) {
+      return res.status(recovery.status).json({
+        isValid: false,
+        errors: [recovery.message],
+      });
     }
 
-    // --- REVOCA DI TUTTE LE SESSIONI REDIS ---
-    const userId = reset.uuid;
+    return res.json({
+      message: recovery.message,
+    });
+  } catch (error) {
+    console.error("--- Errore durante l'elaborazione ---");
+    console.error(error);
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
+
+const recoveryPasswordToken = async (req, res) => {
+  try {
+    const result = await Sauron.process_recovery_password(req.body);
+    if (!result.isValid) {
+      return res.status(400).json(result);
+    }
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    // Verifica se il token è valido e non è scaduto
+    const tokenData = await redisClient.get(`password_recovery:${token}`);
+    if (!tokenData) {
+      return res.status(400).json({ isValid: false, errors: ["Token non valido o scaduto"] });
+    }
     
-    // 1. Recupera tutte le sessioni attive dell'utente
-    const activeSessions = await redisClient.sMembers(`user_sessions:${userId}`);
-    
-    if (activeSessions.length > 0) {
-      // 2. Formatta le chiavi (es. "session:1234")
-      const sessionKeys = activeSessions.map(id => `session:${id}`);
-      
-      // 3. Elimina fisicamente i payload delle sessioni
-      await redisClient.del(sessionKeys);
-      
-      // 4. Svuota l'elenco delle sessioni dell'utente
-      await redisClient.del(`user_sessions:${userId}`);
-      console.log(`--- Revocate ${activeSessions.length} sessioni per l'utente ${userId} ---`);
+    const { username, email } = JSON.parse(tokenData);
+
+    // Resetta la password
+    const resetResult = await authModel.resetPasswordToken({
+      username,
+      email,
+      newPassword,
+      tokenData,
+    });
+
+    if (!resetResult.ok) {
+      return res.status(400).json({ isValid: false, errors: [resetResult.error] });
     }
 
-    return res.json({ message: "Password aggiornata. Tutte le sessioni precedenti sono state revocate." });
+    // Invalida il token dopo averlo utilizzato
+    await redisClient.del(`password_recovery:${token}`);
+
+    return res.json({ message: "Password reimpostata con successo" });
   } catch (error) {
     console.error("--- Errore durante l'elaborazione ---");
     console.error(error);
@@ -223,4 +248,5 @@ module.exports = {
   login,
   recoveryUsername,
   recoveryPassword,
+  recoveryPasswordToken
 };

@@ -138,12 +138,10 @@ const Sauron = {
     return result;
   },
 
-  // Recupero password (email disabilitata, reset diretto)
+  // Recupero password: richiesta del link di reset via email
   process_recovery_password: async (body) => {
     const schema = {
-      username: { required: true },
       email: { required: true },
-      newPassword: { required: true, minLength: 12 },
     };
     let result = { isValid: true, data: {}, errors: [] };
     result = await Sauron.process(body, schema, result);

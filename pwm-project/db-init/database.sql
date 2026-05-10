@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS utenti (
     last_username_change TIMESTAMP NULL DEFAULT NULL,
     last_password_change TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    recupera_passwd VARCHAR(8) DEFAULT NULL,
+    recupera_passwd_token_link VARCHAR(8) DEFAULT NULL,
     two_fa_method BIT(3) DEFAULT B'000', -- 3 bit per 3 metodi (app, email, sms)
     two_fa_secret VARCHAR(8) DEFAULT NULL,
     two_fa_enabled BOOLEAN DEFAULT FALSE,
@@ -86,6 +86,15 @@ CREATE TABLE IF NOT EXISTS accessi (
     cookie_token VARCHAR(255),
     expire_time TIMESTAMP,
     CONSTRAINT fk_user_accessi FOREIGN KEY (user_id) REFERENCES utenti(id_user) ON DELETE CASCADE
+);
+
+-- 2.1 TOKEN RECUPERO PASSWORD
+CREATE TABLE IF NOT EXISTS password_recovery_tokens (
+    token VARCHAR(64) PRIMARY KEY,
+    id_user UUID NOT NULL,
+    expire_time TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_password_recovery_username FOREIGN KEY (id_user) REFERENCES utenti(id_user) ON DELETE CASCADE
 );
 
 -- 3. PARTITE
