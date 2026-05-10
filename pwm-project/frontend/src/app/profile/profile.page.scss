@@ -205,8 +205,28 @@ ion-content {
    ========================================================================== */
 .avatar-core {
   text-align: center;
-  .avatar-frame { width: 110px; height: 110px; border-radius: 50%; border: 1px solid #58a6ff; margin: 0 auto; padding: 8px; box-shadow: 0 0 20px rgba(88, 166, 255, 0.2); }
-  .avatar-main { width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle, #1d4ed8, #050a14); display: grid; place-items: center; font-size: 2.2rem; font-weight: bold; color: #fff; }
+  .avatar-frame {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  border: 1px solid #58a6ff;
+  margin: 0 auto;
+  padding: 5px; /* Spazio per l'effetto ologramma */
+  box-shadow: 0 0 20px rgba(88, 166, 255, 0.2);
+  overflow: hidden; /* Taglia l'immagine a cerchio */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Mantiene le proporzioni tagliando gli eccessi */
+  border-radius: 50%;
+  filter: brightness(1.1) contrast(1.1); /* Effetto leggermente più vivido per l'HUD */
+}
+ .avatar-main { width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle, #1d4ed8, #050a14); display: grid; place-items: center; font-size: 2.2rem; font-weight: bold; color: #fff; }
   .elo-badge { margin-top: 12px; h2 { color: #58a6ff; font-size: 1.6rem; margin: 0; text-shadow: 0 0 10px rgba(88, 166, 255, 0.4); } p { font-size: 0.65rem; color: #b6cee9; letter-spacing: 1px; margin-top: 4px; } }
 }
 
@@ -260,3 +280,4 @@ ion-content {
   display: inline-block; 
   margin-right: 4px; 
 }
+

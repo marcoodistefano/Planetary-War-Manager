@@ -24,7 +24,7 @@ export class ProfilePage implements OnInit {
 
   user: any = {
     username: '',
-    avatar: 'assets/icons/icon-1.png', // Default avatar
+    avatar: 'assets/icons/id_1.jpeg', // Default avatar
     email: '',
     reg: '',
     elo_rating: 0,
@@ -51,7 +51,7 @@ export class ProfilePage implements OnInit {
     this.user = {
       id_user: '550e8400-e29b-41d4-a716-446655440000',
       username: 'Generale_Inverno',
-      avatar: 'assets/icons/icon-1.png',
+      avatar: 'assets/icons/id_1.jpeg',
       email: 'gen@mail.com',
       reg: 'Europa',
       elo_rating: 1450,

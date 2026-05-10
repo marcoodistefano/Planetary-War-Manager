@@ -98,7 +98,9 @@
         <aside class="profile-panel inner-panel">
           <div class="profile-card">
             <p class="profile-label">Profilo</p>
-            <div class="avatar transparent-element" routerLink="/profile">{{ currentPlayer.name.substring(0, 2).toUpperCase() }}</div>
+            <div class="avatar transparent-element" routerLink="/profile" style="padding: 0; overflow: hidden;">
+            <img [src]="'assets/icons/id_1.jpeg'" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
             <h2 class="profile-name">{{ currentPlayer.name }}</h2>
             <small class="profile-level">Livello 24</small>
           </div>

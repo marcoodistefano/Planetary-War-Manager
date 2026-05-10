@@ -80,28 +80,29 @@
 
       <!-- COLONNA CENTRALE: NUCLEO IDENTITÀ E MAIN ACTIONS -->
       <div class="center-column">
-        <div class="title-block">
-          <p class="eyebrow">Strategic Command Profile</p>
-          <h1>{{ user.username }}</h1>
-        </div>
+      <div class="title-block">
+        <p class="eyebrow">Strategic Command Profile</p>
+        <h1>{{ user.username }}</h1>
+      </div>
 
-        <div class="avatar-core">
-          <div class="avatar-frame transparent-element">
-            <div class="avatar-main">{{ user.username.substring(0, 2).toUpperCase() }}</div>
-          </div>
-          <div class="elo-badge">
-            <h2>{{ user.elo_rating }} ELO</h2>
-            <p>RANK: COMANDANTE DI BRIGATA</p>
-          </div>
+      <div class="avatar-core">
+        <div class="avatar-frame transparent-element" (click)="changeAvatar()">
+          <img [src]="user.avatar" class="avatar-img" alt="Avatar Comandante">
         </div>
-
-        <div class="action-dock">
-          <button class="action-btn primary-glow" (click)="openMatchHistory()">
-            <ion-icon name="film-outline" style="margin-right: 8px;"></ion-icon>
-            ARCHIVIO E REPLAY
-          </button>
+        
+        <div class="elo-badge">
+          <h2>{{ user.elo_rating }} ELO</h2>
+          <p>RANK: COMANDANTE DI BRIGATA</p>
         </div>
       </div>
+
+      <div class="action-dock">
+        <button class="action-btn primary-glow" (click)="openMatchHistory()">
+          <ion-icon name="film-outline" style="margin-right: 8px;"></ion-icon>
+          ARCHIVIO E REPLAY
+        </button>
+      </div>
+    </div>
 
       <!-- COLONNA DESTRA: PROTOCOLLI, SOCIAL E IMPOSTAZIONI -->
       <div class="panel right-column">
