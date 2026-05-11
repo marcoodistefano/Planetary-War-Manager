@@ -4,18 +4,17 @@
 
 ion-content {
   --background: #08111f;
-  --overflow: hidden; /* Blocca definitivamente lo scroll sugli assi */
+  --overflow: hidden; 
   font-family: 'Courier New', Courier, monospace;
 }
 
-/* Allineamento Flex Dinamico e Sicuro */
 ion-content::part(scroll) {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   align-items: center;
-  padding-top: clamp(20px, 8vh, 10vh); /* Partenza allineata al login, ma flessibile */
-  padding-bottom: 80px; /* DISTANZA DI SICUREZZA ASSOLUTA DAL FOOTER */
+  padding-top: clamp(20px, 10vh, 12vh); 
+  padding-bottom: 10px; 
   min-height: 100%;
 }
 
@@ -25,39 +24,34 @@ ion-content::part(scroll) {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-}
 
-.auth-background__video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-  filter: brightness(0.72) saturate(1.05) contrast(1.05);
-  transform: translateZ(0);
-  will-change: transform;
-  backface-visibility: hidden;
-}
+  &__video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    filter: brightness(0.72) saturate(1.05) contrast(1.05);
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
 
-.auth-background__overlay {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%);
-  backdrop-filter: blur(3px);
-}
-
-ion-toolbar {
-  --background: transparent;
-  --border-color: transparent;
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%);
+    backdrop-filter: blur(3px);
+  }
 }
 
 /* ==========================================================================
-   2. TITOLO
+   2. TITOLO E SCRITTA SUPERIORE (EYEBROW)
    ========================================================================== */
 
 .title-block {
   width: 100%;
   text-align: center;
-  margin-bottom: clamp(15px, 3vh, 30px); /* Distanza fluida dal form */
+  margin-bottom: clamp(10px, 3vh, 30px); 
   flex-shrink: 0; 
   z-index: 10;
   
@@ -82,15 +76,15 @@ ion-toolbar {
 }
 
 /* ==========================================================================
-   3. LAYOUT DEL FORM E CONTENITORI 
+   3. LAYOUT DEL FORM
    ========================================================================== */
 
 .register-container {
   width: 100%;
-  max-width: 420px;
+  max-width: 460px; 
   padding: 0 24px; 
   z-index: 10;
-  flex-shrink: 1; /* Permette al modulo di adattarsi se compresso */
+  flex-shrink: 1; 
   transform-style: preserve-3d;
 }
 
@@ -101,23 +95,30 @@ form {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-radius: 18px;
-  padding: clamp(20px, 3.5vh, 30px) 24px; /* Padding interno elastico per fare spazio ai 4 campi */
+  padding: clamp(15px, 3.5vh, 30px) 24px; 
   width: 100%;
   margin: 0; 
   transform: translateZ(0);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   backface-visibility: hidden;
 }
+
+/* ==========================================================================
+   4. CAMPI DI INPUT (STILE E UNIFORMITÀ)
+   ========================================================================== */
 
 .field-container {
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(95, 208, 255, 0.2);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) inset;
   border-radius: 9px;
-  padding: clamp(6px, 1.5vh, 10px) 16px; /* Padding interno ai box elastico */
-  margin-bottom: clamp(10px, 1.8vh, 16px); /* Margine tra i campi elastico */
-  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background 0.2s ease;
+  padding: 0 16px; 
+  margin-bottom: 16px;
+  height: 80px;                 /* Altezza fissa rigorosa */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;      /* Centra verticalmente etichetta + input */
+  transition: all 0.2s ease; 
 
   &:focus-within {
     background: rgba(0, 0, 0, 0.7);
@@ -126,54 +127,94 @@ form {
   }
 }
 
-/* Finto input per attivare il modale della regione */
+.custom-label {
+  display: block;
+  color: #79c0ff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 4px;           /* Margine identico ovunque */
+  text-shadow: 0 0 5px rgba(121, 192, 255, 0.4);
+  line-height: 1.2;
+}
+
+/* Regola universale per testo, select e input */
+ion-input, 
+ion-select, 
+.selected-value span,
+.placeholder-text {
+  --color: #f4f7fb;
+  --placeholder-color: rgba(244, 247, 251, 0.5);
+  --placeholder-font-family: 'Courier New', Courier, monospace;
+  --placeholder-font-weight: 500;
+  --padding-start: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --background: transparent;
+  
+  color: #f4f7fb !important;
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 0.95rem !important; 
+  font-weight: 500 !important;
+  letter-spacing: 0.5px;
+  margin-top: 2px;              /* Spazio costante sotto l'etichetta */
+  width: 100%;
+  min-height: auto;
+}
+
+/* Shadow DOM Fixes */
+ion-input::part(native) {
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 0.95rem !important;
+  font-weight: 500 !important;
+  padding: 0 !important;
+}
+
+ion-input::part(placeholder) {
+  font-family: 'Courier New', Courier, monospace !important;
+  color: rgba(244, 247, 251, 0.5);
+  opacity: 1;
+}
+
+/* Campo Regione (Select personalizzata) */
 .clickable-field {
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  
   .selected-value {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: #f4f7fb;
-    font-size: 0.85rem;
-    padding-top: 4px;
-    padding-bottom: 2px;
+    width: 100%;
     
-    .placeholder-text {
-      color: rgba(244, 247, 251, 0.5);
-    }
-
     ion-icon {
       color: #79c0ff;
-      font-size: 1.1rem;
+      font-size: 1.2rem;
       opacity: 0.8;
     }
   }
 }
 
-/* ==========================================================================
-   4. TIPOGRAFIA INTERNA AL FORM E INPUT
-   ========================================================================== */
+/* Gestione Password */
+.password-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
 
-.custom-label {
-  display: block;
-  color: #79c0ff;
-  font-size: clamp(0.55rem, 1.2vh, 0.65rem);
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  margin-bottom: 2px;
-  text-shadow: 0 0 5px rgba(121, 192, 255, 0.4);
+  ion-input { flex: 1; }
 }
 
-ion-input, ion-select {
-  --color: #f4f7fb;
-  --placeholder-color: rgba(244, 247, 251, 0.5);
+.toggle-eye-btn {
+  --color: rgba(201, 209, 217, 0.6);
   --padding-start: 0;
-  --background: transparent;
-  font-size: 0.85rem;
+  --padding-end: 0;
+  margin: 0;
+  height: 24px;
+  &::part(native) {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
 }
 
 /* ==========================================================================
@@ -181,26 +222,18 @@ ion-input, ion-select {
    ========================================================================== */
 
 ion-button {
-  margin-top: clamp(5px, 1.5vh, 10px); 
-  height: clamp(40px, 6vh, 48px);
+  margin-top: clamp(8px, 1.5vh, 12px); 
+  height: clamp(50px, 7vh, 60px); 
   font-weight: 700;
+  text-transform: uppercase;
   --background: linear-gradient(135deg, rgba(103, 184, 255, 0.22), rgba(45, 114, 210, 0.28));
   --border-radius: 8px;
   --color: #f4f7fb;
-  --box-shadow: none;
 
   &::part(native) {
     border: 1px solid rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(12px);
   }
-}
-
-.form-error {
-  display: block;
-  margin-top: 10px;
-  text-align: center;
-  font-size: 0.85rem;
-  font-weight: 600;
 }
 
 .form-footer {
@@ -212,9 +245,7 @@ ion-button {
   p {
     color: rgba(244, 247, 251, 0.7);
     font-size: clamp(0.75rem, 1.5vh, 0.85rem);
-    margin: 0;
     display: flex;
-    flex-direction: row;
     justify-content: center;
     align-items: center;
     gap: 6px;
@@ -222,124 +253,94 @@ ion-button {
 }
 
 .secondary-link {
-  display: inline-block;
   color: #58A6FF;
   text-decoration: none;
   font-weight: bold;
-  padding: 6px; 
   cursor: pointer;
+  transition: color 0.2s ease;
+  &:hover { color: #86d7ff; }
 }
 
-.password-wrapper {
+/* ==========================================================================
+   6. FOOTER HUD (STATUS BAR)
+   ========================================================================== */
+
+ion-footer {
+  --background: transparent;
+  background: transparent;
+}
+
+.hud-footer {
+  margin: 0 auto 10px;
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  border-radius: 12px;
+  background: rgba(5, 10, 20, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: 900px;
+  width: calc(100% - 24px);
+  padding: 8px 12px;
+  font-size: 0.55rem;
+  color: #c9d1d9;
+  z-index: 1000;
+  position: relative;
+}
+
+.hud-footer-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.toggle-eye-btn {
-  --color: rgba(201, 209, 217, 0.6);
-  --padding-start: 0;
-  --padding-end: 0;
-  margin: 0;
-  height: 24px;
-  transition: --color 0.2s ease;
-  &:hover { --color: #58a6ff; }
-  
-  &::part(native) {
-    border: none !important;
-    backdrop-filter: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-  }
+.status-dot {
+  width: 6px;
+  height: 6px;
+  background: #3fb950;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+  box-shadow: 0 0 8px rgba(63, 185, 80, 0.6);
 }
 
-ion-input {
-  flex: 1;
-  --padding-end: 8px;
+.status-online {
+  color: #3fb950;
+  font-weight: bold;
 }
 
-/* ==========================================================================
-   6. MODALE NAZIONI SCI-FI (HUD Olografico)
-   ========================================================================== */
-
-.sci-fi-modal {
-  --background: rgba(6, 11, 18, 0.95);
-  --backdrop-opacity: 0.6;
-  backdrop-filter: blur(10px);
-}
-
-.sci-fi-toolbar {
-  --background: rgba(9, 16, 30, 0.9);
-  --border-color: rgba(88, 166, 255, 0.2);
-  --border-width: 0 0 1px 0;
-  --border-style: solid;
-  
-  ion-title {
-    color: #58A6FF;
-    font-weight: 800;
-    letter-spacing: 2px;
-    font-size: 0.9rem;
-    text-shadow: 0 0 5px rgba(88, 166, 255, 0.4);
-  }
-
-  ion-button {
-    --color: #ff7b72; 
-    font-weight: bold;
-    --background: transparent !important;
-    margin: 0;
-
-    &::part(native) {
-      border: none !important;
-      backdrop-filter: none !important;
-      background: transparent !important;
-      box-shadow: none !important;
-    }
-  }
-}
-
-.sci-fi-searchbar {
-  --background: rgba(0, 0, 0, 0.5);
-  --color: #f4f7fb;
-  --placeholder-color: rgba(244, 247, 251, 0.5);
-  --icon-color: #79c0ff;
-  --clear-button-color: #79c0ff;
-  --border-radius: 8px;
-  --box-shadow: 0 0 10px rgba(0,0,0,0.5) inset;
-  padding-bottom: 10px;
-}
-
-.sci-fi-modal-content { --background: transparent; }
-.sci-fi-list { background: transparent; padding: 0; }
-
-.sci-fi-item {
-  --background: transparent;
-  --border-color: rgba(88, 166, 255, 0.1);
-  --color: #C9D1D9;
-  font-size: 0.85rem;
-  
-  &::part(native):hover {
-    background: rgba(88, 166, 255, 0.15);
-    color: #ffffff;
-  }
+.divider {
+  margin: 0 8px;
+  color: rgba(255, 255, 255, 0.2);
 }
 
 /* ==========================================================================
-   7. RESPONSIVE LOGIC FISSA (Mobile < 768px)
+   7. RESPONSIVE (MEDIA QUERIES)
    ========================================================================== */
 
+/* Tablet e Mobile */
 @media (max-width: 768px) {
-  
-  form {
-    padding: 24px 20px; 
-  }
+  .register-container { padding: 0 16px; }
+  form { padding: 35px 14px; }
+  .field-container { padding: 0 12px; }
 
-  .field-container {
-    padding: 6px 12px;
+  .hud-footer {
+    width: calc(100% - 16px);
   }
-
-  /* Incolonna i bottoni su schermi verticali */
-  .form-footer p {
+  .hud-footer-content {
     flex-direction: column;
-    gap: 2px;
+    gap: 6px;
+    text-align: center;
   }
+  .divider { display: none; }
+}
+
+/* Schermi a bassa altezza (es. iPhone SE) */
+@media (max-height: 700px) {
+  ion-content::part(scroll) { padding-top: 3vh; }
+  .title-block h1 { font-size: 1.8rem; }
+  .title-block .eyebrow { display: block; font-size: 0.5rem; margin-bottom: 2px; } 
+  .field-container { 
+    margin-bottom: 8px; 
+    height: 65px;       
+  }
+  ion-button { height: 48px; margin-top: 5px; }
 }

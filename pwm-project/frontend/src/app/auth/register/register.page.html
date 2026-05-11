@@ -11,7 +11,6 @@
 
   <div class="register-container">
     <form [formGroup]="RegisterForm" (ngSubmit)="onSubmit()">
-  
       <div class="field-container">
         <ion-label class="custom-label">USERNAME</ion-label>
         <ion-input type="text" formControlName="username" placeholder="nome utente"></ion-input>
@@ -34,67 +33,31 @@
       <div class="field-container">
         <ion-label class="custom-label">PASSWORD</ion-label>
         <div class="password-wrapper">
-          <ion-input [type]="showPassword ? 'text' : 'password'" 
-                    formControlName="password" 
-                    placeholder="••••••••"></ion-input>
-          
+          <ion-input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="••••••••"></ion-input>
           <ion-button fill="clear" size="small" (click)="togglePasswordVisibility()" class="toggle-eye-btn">
             <ion-icon slot="icon-only" [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
           </ion-button>
         </div>
       </div>
 
-      <ion-button expand="block" type="submit" [disabled]="!RegisterForm.valid || isSubmitting">
-        REGISTRAZIONE
-      </ion-button>
-
-      <ion-text class="form-error" color="danger" *ngIf="errorMessage">
-        {{ errorMessage }}
-      </ion-text>
+      <ion-button expand="block" type="submit" [disabled]="!RegisterForm.valid || isSubmitting">REGISTRAZIONE</ion-button>
+      <ion-text class="form-error" color="danger" *ngIf="errorMessage">{{ errorMessage }}</ion-text>
 
       <div class="form-footer">
         <p>Hai giá un account? <a class="secondary-link" routerLink="/login">Accedi ora</a></p>
       </div>
     </form>
   </div>
-
-  <ion-modal [isOpen]="isCountryModalOpen" (didDismiss)="closeCountryModal()" (didPresent)="focusSearchbar()" class="sci-fi-modal">
-    <ng-template>
-      <ion-header class="ion-no-border">
-        <ion-toolbar class="sci-fi-toolbar">
-          <ion-title>SELEZIONA REGIONE</ion-title>
-          <ion-buttons slot="end">
-            <ion-button fill="clear" (click)="closeCountryModal()">X</ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-        <ion-toolbar class="sci-fi-toolbar">
-          <ion-searchbar #countrySearchbar class="sci-fi-searchbar" placeholder="Ricerca nel database..." (ionInput)="filterCountries($event)"></ion-searchbar>
-        </ion-toolbar>
-      </ion-header>
-      <ion-content class="sci-fi-modal-content">
-        <ion-list class="sci-fi-list">
-          <ion-item *ngFor="let country of filteredCountries" button (click)="selectCountry(country)" class="sci-fi-item">
-            <ion-label>{{ country.flag }} &nbsp; {{ country.name }}</ion-label>
-          </ion-item>
-        </ion-list>
-      </ion-content>
-    </ng-template>
-  </ion-modal>
-
 </ion-content>
 
-<ion-footer class="ion-no-border" style="background: transparent;">
-  <div class="hud-footer transparent-element" style="margin: 0 auto 10px; border: 1px solid rgba(88, 166, 255, 0.4); border-radius: 12px; background: rgba(5, 10, 20, 0.6); backdrop-filter: blur(12px); z-index: 1000; position: relative; max-width: 900px; width: calc(100% - 28px); box-sizing: border-box; font-size: 0.55rem; padding: 8px 12px;">
+<ion-footer class="ion-no-border">
+  <div class="hud-footer">
     <div class="hud-footer-content">
       <div class="footer-left">
-        <span class="status-dot"></span> COMM-LINK: <span class="status-text" style="color: #3fb950; font-weight: bold;">ONLINE</span>
+        <span class="status-dot"></span> COMM-LINK: <span class="status-online">ONLINE</span>
       </div>
-      <div class="footer-center" style="color: #c9d1d9;">
-        &copy; 2026 PLANETARY WAR MANAGER <span class="divider" style="color: rgba(255,255,255,0.3); margin: 0 8px;">///</span> STRATEGIC COMMAND
-      </div>
-      <div class="footer-right" style="color: #c9d1d9;">
-        SYS.VER 1.0.4
-      </div>
+      <div class="footer-center">&copy; 2026 PLANETARY WAR MANAGER <span class="divider">///</span> STRATEGIC COMMAND</div>
+      <div class="footer-right">SYS.VER 1.0.4</div>
     </div>
   </div>
 </ion-footer>

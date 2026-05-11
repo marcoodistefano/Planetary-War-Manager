@@ -1,21 +1,20 @@
 /* ==========================================================================
-   1. SETTAGGI GLOBALI E BACKGROUND VIDEO
+   1. SETTAGGI GLOBALI E BACKGROUND
    ========================================================================== */
-
 ion-content {
   --background: #08111f;
-  --overflow: hidden; /* Blocca definitivamente lo scroll sugli assi */
+  --overflow: hidden; 
   font-family: 'Courier New', Courier, monospace;
 }
 
-/* IL SEGRETO È QUI: Rendiamo l'area interna di Ionic un contenitore Flex perfetto */
 ion-content::part(scroll) {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* <-- MODIFICATO: fa partire il contenuto dall'alto anziché dal centro */
+  justify-content: flex-start;
   align-items: center;
-  padding-top: 10vh; /* <-- Distanza esatta dal bordo superiore su Desktop */
-  padding-bottom: 2vh; 
+  padding-top: clamp(20px, 10vh, 12vh); 
+  padding-bottom: 20px; 
+  min-height: 100%;
 }
 
 .auth-background {
@@ -24,40 +23,31 @@ ion-content::part(scroll) {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-}
 
-.auth-background__video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-  filter: brightness(0.72) saturate(1.05) contrast(1.05);
-  transform: translateZ(0);
-  will-change: transform;
-  backface-visibility: hidden;
-}
+  &__video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    filter: brightness(0.72) saturate(1.05) contrast(1.05);
+  }
 
-.auth-background__overlay {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%);
-  backdrop-filter: blur(3px);
-}
-
-ion-toolbar {
-  --background: transparent;
-  --border-color: transparent;
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%);
+    backdrop-filter: blur(3px);
+  }
 }
 
 /* ==========================================================================
-   2. TITOLO
+   2. TITOLO (EYEBROW + H1)
    ========================================================================== */
-
 .title-block {
   width: 100%;
   text-align: center;
-  margin-bottom: 3vh; /* Distanza proporzionale dal form */
-  flex-shrink: 0; /* Impedisce al testo di schiacciarsi */
+  margin-bottom: 3vh; 
+  flex-shrink: 0; 
   z-index: 10;
   
   .eyebrow {
@@ -81,15 +71,14 @@ ion-toolbar {
 }
 
 /* ==========================================================================
-   3. LAYOUT DEL FORM E CONTENITORI 
+   3. LAYOUT DEL FORM
    ========================================================================== */
-
 .login-container {
   width: 100%;
   max-width: 420px;
   padding: 0 24px;
   z-index: 10;
-  flex-shrink: 0; /* Evita compressioni indesiderate del form */
+  flex-shrink: 0; 
   transform-style: preserve-3d;
 }
 
@@ -104,72 +93,104 @@ form {
   width: 100%;
   margin: 0; 
   transform: translateZ(0);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  backface-visibility: hidden;
 }
 
+/* ==========================================================================
+   4. CAMPI DI INPUT E TIPOGRAFIA (UNIFICATI A REGISTER)
+   ========================================================================== */
 .field-container {
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(95, 208, 255, 0.2);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) inset;
   border-radius: 9px;
-  padding: 10px 16px;
-  margin-bottom: 20px;
-  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background 0.2s ease;
+  padding: 0 16px;              /* Padding laterale come in registrazione */
+  margin-bottom: 16px;          
+  height: 80px;                 /* Altezza fissa */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;      /* Centratura verticale come in registrazione */
+  transition: all 0.2s ease;
+  width: 100%;
 
   &:focus-within {
     background: rgba(0, 0, 0, 0.7);
     border-color: rgba(95, 208, 255, 0.8);
-    box-shadow: 0 0 15px rgba(95, 208, 255, 0.15) inset, 0 0 15px rgba(95, 208, 255, 0.2);
+    box-shadow: 0 0 15px rgba(95, 208, 255, 0.2);
   }
 }
-
-/* ==========================================================================
-   4. TIPOGRAFIA INTERNA AL FORM
-   ========================================================================== */
 
 .custom-label {
   display: block;
   color: #79c0ff;
-  font-size: 0.65rem;
+  font-size: 0.65rem;           
   font-weight: 800;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  margin-bottom: 4px;
+  margin-bottom: 4px;           /* Margine inferiore come in registrazione */
   text-shadow: 0 0 5px rgba(121, 192, 255, 0.4);
+  line-height: 1.2;
 }
 
 ion-input {
   --color: #f4f7fb;
   --placeholder-color: rgba(244, 247, 251, 0.5);
+  --padding-top: 0;
+  --padding-bottom: 0;
   --padding-start: 0;
-  --padding-end: 8px;
-  flex: 1;
-  --background: transparent;
-  font-size: 0.85rem;
+  margin-top: 2px;              /* Margine superiore come in registrazione */
+  color: #f4f7fb !important;
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 0.95rem !important; 
+  font-weight: 500 !important;
+}
+
+ion-input::part(native) {
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 0.95rem !important;
+  padding: 0 !important;
+}
+
+/* Gestione Password: Occhiello a destra e centrato verticalmente */
+.password-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;          /* Centra l'occhio rispetto all'input */
+  width: 100%;
+  
+  ion-input { 
+    flex: 1; 
+  }
+}
+
+.toggle-eye-btn {
+  --color: rgba(201, 209, 217, 0.6);
+  --padding-start: 0;
+  --padding-end: 0;
+  margin: 0;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  &::part(native) {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
 }
 
 /* ==========================================================================
-   5. BOTTONI E FOOTER DEL FORM
+   5. BOTTONI E LINK
    ========================================================================== */
-
 ion-button {
   margin-top: 10px;
-  height: 48px;
+  height: 54px;
   font-weight: 700;
   --background: linear-gradient(135deg, rgba(103, 184, 255, 0.22), rgba(45, 114, 210, 0.28));
   --border-radius: 8px;
   --color: #f4f7fb;
-  --box-shadow: none;
 
   &::part(native) {
     border: 1px solid rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(12px);
-  }
-
-  &:hover::part(native) {
-    background: linear-gradient(135deg, rgba(103, 184, 255, 0.3), rgba(45, 114, 210, 0.4));
   }
 }
 
@@ -184,13 +205,11 @@ ion-button {
 .form-footer {
   text-align: center;
   margin-top: 25px;
-  position: relative;
   z-index: 10;
-
   p {
     color: rgba(244, 247, 251, 0.7);
     font-size: 0.85rem;
-    margin-bottom: 8px;
+    margin-top: 10px;
   }
 }
 
@@ -198,142 +217,88 @@ ion-button {
   display: inline-block;
   color: #58A6FF;
   text-decoration: none;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: bold;
   padding: 5px; 
   cursor: pointer;
   transition: color 0.2s ease;
-
-  &:hover {
-    color: #86d7ff;
-  }
+  &:hover { color: #86d7ff; }
 }
 
-.password-wrapper {
+/* ==========================================================================
+   6. FOOTER HUD
+   ========================================================================== */
+ion-footer {
+  --background: transparent;
+  background: transparent;
+}
+
+.hud-footer {
+  margin: 0 auto 10px;
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  border-radius: 12px;
+  background: rgba(5, 10, 20, 0.7); 
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: 900px;
+  width: calc(100% - 24px);
+  padding: 8px 12px;
+  font-size: 0.55rem;
+  color: #c9d1d9;
+  z-index: 1000;
+  position: relative;
+}
+
+.hud-footer-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.toggle-eye-btn {
-  --color: rgba(201, 209, 217, 0.6);
-  --padding-start: 0;
-  --padding-end: 0;
-  margin: 0;
-  height: 24px;
-  transition: --color 0.2s ease;
-  &:hover { --color: #58a6ff; }
+.status-dot {
+  width: 6px;
+  height: 6px;
+  background: #3fb950;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+  box-shadow: 0 0 8px rgba(63, 185, 80, 0.6);
+}
+
+.status-online {
+  color: #3fb950;
+  font-weight: bold;
+}
+
+.divider {
+  margin: 0 8px;
+  color: rgba(255, 255, 255, 0.2);
 }
 
 /* ==========================================================================
-   6. FOOTER HUD (Il footer esterno di Ionic)
+   7. RESPONSIVE (MEDIA QUERIES)
    ========================================================================== */
-
-.hud-footer {
-  margin: 0 auto 10px; 
-  border: 1px solid rgba(88, 166, 255, 0.4);
-  border-radius: 12px;
-  background: rgba(5, 10, 20, 0.6);
-  backdrop-filter: blur(12px);
-  z-index: 1000;
-  position: relative;
-  max-width: 900px;
-  width: calc(100% - 28px);
-  box-sizing: border-box;
-  font-size: 0.55rem;
-  padding: 8px 12px;
-}
-
-.hud-footer-content { 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-}
-
-.divider { margin: 0 8px; color: rgba(255,255,255,0.3); }
-.status-dot { width: 6px; height: 6px; background: #3fb950; border-radius: 50%; display: inline-block; margin-right: 4px; box-shadow: 0 0 8px rgba(63, 185, 80, 0.6); }
-
-/* ==========================================================================
-   7. RESPONSIVE LOGIC FISSA (Mobile < 768px)
-   ========================================================================== */
-
 @media (max-width: 768px) {
+  form { padding: 35px 14px; }
+  .field-container { padding: 14px 12px 0; }
   
-  ion-content::part(scroll) {
-    padding-top: 6vh; /* <-- Distanza ridotta dal bordo superiore per Mobile */
-  }
-
-  .title-block {
-    margin-bottom: 2vh; 
-    h1 { font-size: 2.2rem; }
-  }
-
-  form {
-    padding: 24px 20px; 
-  }
-
-  .field-container {
-    padding: 8px 12px;
-    margin-bottom: 12px; 
-  }
-
-  ion-button {
-    height: 44px; 
-    margin-top: 5px;
-  }
-
-  .form-footer {
-    margin-top: 15px;
-    
-    .secondary-link {
-      display: block;
-      padding: 8px;
-      margin-bottom: 2px;
-      font-size: 0.9rem;
-    }
-    
-    p {
-      margin-top: 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .register-link { font-size: 0.95rem; }
-  }
-
+  .hud-footer { width: calc(100% - 16px); }
   .hud-footer-content {
     flex-direction: column;
-    text-align: center;
     gap: 6px;
+    text-align: center;
   }
-
-  .hud-footer {
-    padding: 6px 10px;
-    margin-bottom: 8px; 
-    width: calc(100% - 16px);
-  }
-
-  .footer-center, .footer-right, .footer-left {
-    width: 100%;
-    font-size: 0.6rem;
-  }
-
   .divider { display: none; }
 }
 
-/* ==========================================================================
-   8. FIX EXTREME PER SCHERMI MOLTO BASSI (es. tastiere virtuali aperte)
-   ========================================================================== */
-@media (max-height: 600px) {
-  ion-content::part(scroll) {
-    padding-top: 2vh; /* <-- Si aggancia quasi al tetto dello schermo se è molto basso */
-  }
-  
-  .title-block .eyebrow { display: none; }
+@media (max-height: 700px) {
+  ion-content::part(scroll) { padding-top: 3vh; }
   .title-block h1 { font-size: 1.8rem; }
-  form { padding: 15px 20px; }
-  .field-container { margin-bottom: 8px; }
-  .form-footer { margin-top: 10px; }
+  .title-block .eyebrow { display: block; font-size: 0.5rem; margin-bottom: 2px; }
+  .field-container { 
+    margin-bottom: 8px; 
+    height: 65px;       
+    padding-top: 8px;   /* Margine ridotto per schermi bassi */
+  }
+  ion-button { height: 48px; margin-top: 5px; }
 }

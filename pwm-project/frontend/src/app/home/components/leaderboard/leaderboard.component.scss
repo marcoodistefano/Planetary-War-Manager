@@ -1,0 +1,90 @@
+:host {
+  --danger-color: #ff7b72;
+  --primary-blue: #58a6ff;
+  --glass-bg: rgba(5, 10, 20, 0.95);
+  background: transparent !important;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.transparent-bg {
+  --background: transparent !important;
+}
+
+.modal-wrapper {
+  padding: 40px 20px;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.panel {
+  width: 100%;
+  max-width: 450px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg);
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(88, 166, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border-radius: 18px;
+  padding: 30px 20px;
+  box-sizing: border-box;
+}
+
+/* BLOCCHI FISSI */
+.title-block {
+  text-align: center; margin-bottom: 20px; flex-shrink: 0; 
+  .eyebrow { color: #b6cee9; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px; }
+  h2 { font-size: 1.4rem; color: #fff; margin: 0; text-shadow: 0 0 10px var(--primary-blue); }
+}
+
+/* TOGGLE TATTICO */
+.leaderboard-toggle {
+  display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-shrink: 0;
+  button {
+    background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 10px 15px; border-radius: 8px; color: #8892b0; font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.3s;
+    font-size: 0.75rem; letter-spacing: 1px; flex: 1;
+    &:hover { background: rgba(88, 166, 255, 0.1); color: #fff; }
+    &.active { 
+      background: rgba(88, 166, 255, 0.2); border-color: var(--primary-blue); 
+      color: #fff; box-shadow: 0 0 10px rgba(88, 166, 255, 0.3); text-shadow: 0 0 5px var(--primary-blue);
+    }
+  }
+}
+
+/* AREA SCORREVOLE */
+.leaderboard-scroll-container {
+  flex: 1; overflow-y: auto; overflow-x: hidden; margin-bottom: 20px;
+  &::-webkit-scrollbar { display: none; } -ms-overflow-style: none; scrollbar-width: none;
+}
+
+.leaderboard-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* RIGHE CLASSIFICA */
+.leaderboard-entry {
+  display: grid; grid-template-columns: 40px 30px 1fr auto; align-items: center; gap: 10px;
+  padding: 12px 15px; border-radius: 8px; background: rgba(1, 36, 46, 0.2);
+  border: 1px solid rgba(88, 166, 255, 0.1); transition: 0.2s;
+  
+  &:hover { background: rgba(88, 166, 255, 0.1); border-color: rgba(88, 166, 255, 0.4); }
+  &.highlight { background: rgba(88, 166, 255, 0.15); border-left: 3px solid var(--primary-blue); }
+}
+
+.rank { font-weight: bold; color: #8892b0; font-size: 0.8rem; }
+.flag { font-size: 1.1rem; text-align: center; }
+.name { color: #fff; font-weight: bold; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.score { color: var(--primary-blue); font-weight: bold; font-size: 0.95rem; text-shadow: 0 0 8px rgba(88, 166, 255, 0.4); }
+
+/* AZIONI BOTTOM */
+.action-dock { flex-shrink: 0; display: flex; justify-content: center; }
+
+.logout-button {
+  background: transparent; border: none; color: rgba(255, 255, 255, 0.4); 
+  padding: 5px; font-size: 0.75rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; font-family: inherit;
+  &:hover { color: var(--danger-color); }
+}

@@ -232,7 +232,7 @@ ion-content {
   border-radius: 9px;
 }
 
-/* Fix per le bottom-section che contengono le liste: diventano contenitori flex espandibili */
+/* Fix per le bottom-section che contengono le liste */
 .bottom-section {
   flex: 1; /* Prende tutto lo spazio residuo verticale in basso */
   display: flex;
@@ -386,85 +386,159 @@ ion-content {
   }
 }
 
-/* Assicurati che il footer non venga schiacciato in flex */
+/* ==========================================================================
+   7. FOOTER HUD (Unificato e ripulito)
+   ========================================================================== */
+ion-footer {
+  --background: transparent;
+  background: transparent;
+}
+
 .hud-footer {
-  margin: 0 auto !important;
-  flex-shrink: 0;
+  margin: 0 auto 10px;
+  flex-shrink: 0; /* Assicura che non venga schiacciato in flex */
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  border-radius: 12px;
+  background: rgba(5, 10, 20, 0.7); 
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: 900px;
+  width: calc(100% - 24px);
+  padding: 8px 12px;
+  font-size: 0.55rem;
+  color: #c9d1d9;
+  z-index: 1000;
+  position: relative;
+}
+
+.hud-footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  background: #3fb950;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+  box-shadow: 0 0 8px rgba(63, 185, 80, 0.6);
+}
+
+.status-online {
+  color: #3fb950;
+  font-weight: bold;
+}
+
+.divider {
+  margin: 0 8px;
+  color: rgba(255, 255, 255, 0.2);
 }
 
 /* ==========================================================================
-   7. RESPONSIVE LOGIC CONSOLIDATA (Mobile/Tablet < 1100px)
+   8. RESPONSIVE LOGIC CONSOLIDATA (Mobile/Tablet < 1100px)
    ========================================================================== */
+
+.mobile-only { display: none; }
+.desktop-only { display: flex; }
+
 @media (max-width: 1100px) {
   
-  /* Reset essenziale per consentire lo scroll su dispositivi mobili/schermi piccoli */
+  .mobile-only { display: block; }
+  .desktop-only { display: none !important; }
+
+  /* MANTIENI IL FLEXBOX PER GESTIRE IL FOOTER E LE COLONNE */
   .home-page {
     height: auto;
     min-height: 100vh;
     overflow: visible;
-    display: block;
+    display: flex; 
+    flex-direction: column;
   }
 
-  /* 1. Mostra Header Mobile e nascondi Pannello Profilo Desktop */
-  .mobile-header { display: flex; }
+  /* RIPRISTINO BARRA IN ALTO */
+  .mobile-header { 
+    display: flex !important;
+    position: sticky;
+    top: 0;
+    z-index: 1001;
+  }
   
-  .desktop-only .profile-panel, 
-  .desktop-only .panel-divider:first-of-type { 
-    display: none; 
-  }
-
-  /* 2. Riformatta la Griglia Principale in Colonna Flat (No 3D) */
+  /* L'AREA CENTRALE PRENDE TUTTO LO SPAZIO */
   .top-row { 
-    display: flex; flex-direction: column; padding: 20px 10px; gap: 25px;
+    display: flex; 
+    flex-direction: column; 
+    flex: 1; /* Occupa tutto lo spazio tra header e footer */
+    justify-content: center; /* Centra verticalmente tutto */
+    padding: 10px; 
+    gap: 20px;
     perspective: none !important;
     transform-style: flat !important;
   }
   
-  /* 3. Annulla le trasformazioni 3D sui pannelli */
-  .left-column.panel, .right-column.panel {
-    transform: none !important;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
-    width: 100%; max-width: 600px; margin: 0 auto;
-    height: auto; /* Ripristina l'altezza automatica */
-  }
-
-  .right-column.panel {
-    background: transparent !important;
-    border: none !important;
-    backdrop-filter: none !important;
-    box-shadow: none !important;
-  }
-
-  /* 4. Porta la Colonna Centrale in cima allo schermo */
+  /* COLONNA CON TITOLO E BOTTONI */
   .center-column {
     order: -1; 
-    height: auto; min-height: auto; width: 100%; max-width: 600px;
-    margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 20px; 
+    width: 100%; 
+    max-width: 500px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 40px; /* Spazio tra titolo e bottoni */
   }
 
-  /* 5. Ripristina i posizionamenti */
-  .title-block, .games-container {
-    position: relative; top: auto; left: auto; bottom: auto; right: auto;
-    transform: none !important; width: 100%;
+  /* RESET POSIZIONAMENTI ASSOLUTI DESKTOP */
+  .title-block {
+    position: relative; 
+    top: auto; 
+    transform: none !important; 
   }
-  .title-block { padding: 0; }
 
-  /* 6. Nasconde il bottone circolare enorme */
+  .games-container {
+    position: relative; 
+    bottom: auto; 
+    transform: none !important;
+    width: 100%;
+  }
+
   .return-last-match { display: none !important; }
 
-  /* 7. Bottoni Azioni Impilati */
+  /* BOTTONI A LARGHEZZA PIENA SU MOBILE */
   .games-container .games-actions {
     flex-direction: column;
-    button { width: 100%; }
+    width: 100%;
+    button { 
+      width: 100%; 
+      padding: 18px; /* Pulsanti più grandi per il touch */
+      font-size: 0.9rem;
+    }
   }
 
-  /* Reset dell'altezza per le liste su mobile in modo da mostrare tutto */
-  .games-list {
-    max-height: none;
-    overflow-y: visible;
+  /* FOOTER MOBILE HUD (Stile IDENTICO alla pagina di Login) */
+  .hud-footer {
+    /* Mantiene l'ancoraggio in basso senza usare ion-footer */
+    margin: auto auto 20px auto !important; 
+    width: calc(100% - 16px) !important;
+    padding: 8px 12px; /* Ripristinato il padding originale del login */
   }
   
-  .hud-footer {
-    margin: 20px auto 10px !important;
+  .hud-footer-content {
+    flex-direction: column;
+    gap: 6px; /* Ripristinato il gap originale del login */
+    text-align: center;
   }
-}
+
+  /* Rimuoviamo il blocco degli "a capo" per farlo scorrere naturalmente come nel login */
+  .footer-left, .footer-center, .footer-right {
+    font-size: 0.55rem;
+    white-space: normal;
+  }
+  
+  .divider { 
+    display: none;
+  }
+} 

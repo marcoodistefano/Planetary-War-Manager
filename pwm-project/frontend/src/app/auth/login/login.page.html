@@ -17,25 +17,17 @@
       </div>
 
       <div class="field-container">
-      <ion-label class="custom-label">PASSWORD</ion-label>
-      <div class="password-wrapper">
-        <ion-input [type]="showPassword ? 'text' : 'password'" 
-                  formControlName="password" 
-                  placeholder="••••••••"></ion-input>
-        
-        <ion-button fill="clear" size="small" (click)="togglePasswordVisibility()" class="toggle-eye-btn">
-          <ion-icon slot="icon-only" [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
-        </ion-button>
-      </div>
+        <ion-label class="custom-label">PASSWORD</ion-label>
+        <div class="password-wrapper">
+          <ion-input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="••••••••"></ion-input>
+          <ion-button fill="clear" size="small" (click)="togglePasswordVisibility()" class="toggle-eye-btn">
+            <ion-icon slot="icon-only" [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+          </ion-button>
+        </div>
       </div>
 
-      <ion-button expand="block" type="submit" [disabled]="!loginForm.valid || isSubmitting">
-        AUTENTICAZIONE
-      </ion-button>
-
-      <ion-text class="form-error" color="danger" *ngIf="errorMessage">
-        {{ errorMessage }}
-      </ion-text>
+      <ion-button expand="block" type="submit" [disabled]="!loginForm.valid || isSubmitting">AUTENTICAZIONE</ion-button>
+      <ion-text class="form-error" color="danger" *ngIf="errorMessage">{{ errorMessage }}</ion-text>
 
       <div class="form-footer">
         <a class="secondary-link" routerLink="/login/recovery/password">Hai dimenticato la password?</a>
@@ -45,18 +37,14 @@
   </div>
 </ion-content>
 
-<ion-footer class="ion-no-border" style="background: transparent;">
-  <div class="hud-footer transparent-element">
+<ion-footer class="ion-no-border">
+  <div class="hud-footer">
     <div class="hud-footer-content">
       <div class="footer-left">
-        <span class="status-dot"></span> COMM-LINK: <span class="status-text" style="color: #3fb950; font-weight: bold;">ONLINE</span>
+        <span class="status-dot"></span> COMM-LINK: <span class="status-online">ONLINE</span>
       </div>
-      <div class="footer-center" style="color: #c9d1d9;">
-        &copy; 2026 PLANETARY WAR MANAGER <span class="divider">///</span> STRATEGIC COMMAND
-      </div>
-      <div class="footer-right" style="color: #c9d1d9;">
-        SYS.VER 1.0.4
-      </div>
+      <div class="footer-center">&copy; 2026 PLANETARY WAR MANAGER <span class="divider">///</span> STRATEGIC COMMAND</div>
+      <div class="footer-right">SYS.VER 1.0.4</div>
     </div>
   </div>
 </ion-footer>
