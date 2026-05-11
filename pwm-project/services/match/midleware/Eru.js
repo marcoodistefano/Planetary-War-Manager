@@ -10,6 +10,21 @@ const SQUAD = {
   FREE_FOR_ALL: 0b0, //tutti contro tutti
   SQUAD: 0b1, //partita a squadre; il numero di giocatori è determinato dai valori di sopra e moltiplicato per 2 (es. se max_players è 3v3 allora in realtà è 6v6)
 };
+const ALLEANZE_CONSENTITE = {
+  //1 bit
+  NO_ALLIANCES: 0b0, //non sono consentite alleanze tra giocatori
+  ALLIANCES_ALLOWED: 0b1, //sono consentite alleanze tra giocatori; in questo caso i giocatori possono formare alleanze tra di loro durante la partita, condividendo risorse, strategie e obiettivi. Le alleanze possono essere temporanee o durature, a seconda delle dinamiche della partita e delle decisioni dei giocatori.
+};
+const RANKED = {
+  //1 bit
+  UNRANKED: 0b0, //partita non classificata; i risultati della partita non influenzano il ranking dei giocatori e non vengono registrati nelle classifiche ufficiali.
+  RANKED: 0b1, //partita classificata; i risultati della partita influenzano il ranking dei giocatori e vengono registrati nelle classifiche ufficiali. Le partite classificate sono generalmente più competitive e richiedono un impegno maggiore da parte dei giocatori, poiché le loro prestazioni avranno un impatto diretto sulla loro posizione nella classifica.
+}
+const ALLEANZE_WIN = {
+    //1 bit
+    NO_ALLIANCES_WIN: 0b0, //le alleanze non portano alla vittoria; in questo caso, anche se i giocatori formano alleanze durante la partita, la vittoria viene assegnata al giocatore o alla squadra che raggiunge per primo l'obiettivo finale della partita (es. conquista di una certa area, eliminazione completa di un avversario, ecc.), indipendentemente dalle alleanze formate.
+    ALLIANCES_CAN_WIN: 0b1, //le alleanze possono portare alla vittoria; in questo caso, se i giocatori formano alleanze durante la partita e raggiungono insieme l'obiettivo finale della partita (es. conquista di una certa area, eliminazione completa di un avversario, ecc.), la vittoria viene assegnata a tutti i membri dell'alleanza che hanno contribuito al raggiungimento dell'obiettivo, indipendentemente dalle prestazioni individuali dei singoli giocatori all'interno dell'alleanza.
+};
 const MAX_PLAYERS = {
   //3 bit
   ten: 0b000,
@@ -22,14 +37,14 @@ const MAX_PLAYERS = {
   //il valore 111 è riservato per le partite a squadre. Se il campo "Is_squad" è pari a 1 allora il
   //max_players sarà determinato dai valori qui sotto. Se "Is_squad" è 0 ma questo campo ha assunto il
   //valore 111 allora i valori di base sono moltiplicati per 2 e sono considerati solo i valori di sopra.
-  "1v1": 0b000,
-  "2v2": 0b001,
-  "3v3": 0b010,
-  "4v4": 0b011,
-  "5v5": 0b100,
-  "10v10": 0b101,
-  "25v25": 0b110,
-  "50v50": 0b111,
+  v1: 0b000,
+  v2: 0b001,
+  v3: 0b010,
+  v4: 0b011,
+  v5: 0b100,
+  v10: 0b101,
+  v25: 0b110,
+  v50: 0b111,
 };
 const DURATION_MAX = {
   //4 bit
@@ -53,21 +68,21 @@ const DURATION_MAX = {
 const MOLTIPLICATORE_TEMPORALE = {
   //4 bit
   //NON INFLUENZA LA DURATA MASSIMA DELLA PARTITA, MA INFLUISCE SULLA VELOCITÀ DI PRODUZIONE RISORSE/RICERCA ETC DELLA PARTITA
-  "1x": 0b0000,
-  "2x": 0b0001,
-  "3x": 0b0010,
-  "4x": 0b0011,
-  "5x": 0b0100,
-  "10x": 0b0101,
-  "20x": 0b0110,
-  "30x": 0b0111,
-  "40x": 0b0111,
-  "50x": 0b1000,
-  "60x": 0b1001,
-  "100x": 0b1010,
-  "200x": 0b1011,
-  "500x": 0b1100,
-  "1000x": 0b1101,
+  x1: 0b0000,
+  x2: 0b0001,
+  x3: 0b0010,
+  x4: 0b0011,
+  x5: 0b0100,
+  x10: 0b0101,
+  x20: 0b0110,
+  x30: 0b0111,
+  x40: 0b0111,
+  x50: 0b1000,
+  x60: 0b1001,
+  x100: 0b1010,
+  x200: 0b1011,
+  x500: 0b1100,
+  x1000: 0b1101,
   UNLIMITED: 0b1111, //PRODUZIONE ISTANTANEA DI TUTTE LE RICERCHE, COSTRUZIONI, UNITÀ;
 };
 
@@ -90,82 +105,261 @@ const MODALITA = {
   OTHER8: 0b1111, //non implementata, da definire
 };
 const REGIONI = {
-  //32 bit
-  WORLD: 0b1000000000000000000000000000000000,
-  EUROPE: 0b0100000000000000000000000000000000,
-  ASIA: 0b0010000000000000000000000000000000,
-  AFRICA: 0b0001000000000000000000000000000000,
-  OCEANIA: 0b0000100000000000000000000000000000,
-  AMERICA_NORTH: 0b0000010000000000000000000000000000,
-  AMERICA_SOUTH: 0b0000001000000000000000000000000000,
-  ANTARTICA: 0b0000000100000000000000000000000000,
-  MIDDLE_EAST: 0b0000000010000000000000000000000000,
-  ITALY: 0b0000000001000000000000000000000000,
-  OLD_WORLD: 0b0000000000100000000000000000000000,
-  PANGEA: 0b0000000000010000000000000000000000,
-  ASIA: 0b0000000000001000000000000000000000,
-  RUSSIA: 0b0000000000000100000000000000000000,
-  CUSTOM: 0b0000000000000010000000000000000000,
+  //29 bit
+  WORLD: 0b1000000000000000000000000000000,
+  EUROPE: 0b0100000000000000000000000000000,
+  ASIA: 0b0010000000000000000000000000000,
+  AFRICA: 0b0001000000000000000000000000000,
+  OCEANIA: 0b0000100000000000000000000000000,
+  AMERICA_NORTH: 0b000001000000000000000000000000,
+  AMERICA_SOUTH: 0b000000100000000000000000000000,
+  ANTARTICA: 0b0000000100000000000000000000000,
+  MIDDLE_EAST: 0b0000000010000000000000000000000,
+  ITALY: 0b0000000001000000000000000000000,
+  OLD_WORLD: 0b0000000000100000000000000000000,
+  PANGEA: 0b0000000000010000000000000000000,
+  ASIA: 0b0000000000001000000000000000000,
+  RUSSIA: 0b0000000000000100000000000000000,
+  CUSTOM: 0b0000000000000010000000000000000,
   //NOT YET IMPLEMENTED
-  OTHER:  0b0000000000000001000000000000000000,
-  OTHER1: 0b0000000000000000100000000000000000,
-  OTHER2: 0b0000000000000000010000000000000000,
-  OTHER3: 0b0000000000000000001000000000000000,
-  OTHER4: 0b0000000000000000000100000000000000,
-  OTHER5: 0b0000000000000000000010000000000000,
-  OTHER6: 0b0000000000000000000001000000000000,
-  OTHER7: 0b0000000000000000000000100000000000,
-  OTHER8: 0b0000000000000000000000010000000000,
-  OTHER9: 0b0000000000000000000000001000000000,
-  OTHER10: 0b000000000000000000000000100000000,
-  OTHER11: 0b0000000000000000000000000100000000,
-  OTHER12: 0b0000000000000000000000000010000000,
-  OTHER13: 0b0000000000000000000000000001000000,
-  OTHER14: 0b0000000000000000000000000000100000,
-  OTHER15: 0b0000000000000000000000000000010000,
-  OTHER16: 0b0000000000000000000000000000001000,
-  OTHER17: 0b0000000000000000000000000000000100,
-  OTHER18: 0b0000000000000000000000000000000010,
-  OTHER19: 0b0000000000000000000000000000000001,
+  OTHER:  0b0000000000000001000000000000000,
+  OTHER1: 0b0000000000000000100000000000000,
+  OTHER2: 0b0000000000000000010000000000000,
+  OTHER3: 0b0000000000000000001000000000000,
+  OTHER4: 0b0000000000000000000100000000000,
+  OTHER5: 0b0000000000000000000010000000000,
+  OTHER6: 0b0000000000000000000001000000000,
+  OTHER7: 0b0000000000000000000000100000000,
+  OTHER8: 0b0000000000000000000000010000000,
+  OTHER9: 0b0000000000000000000000001000000,
+  OTHER10: 0b0000000000000000000000001000000,
+  OTHER11: 0b0000000000000000000000000100000,
+  OTHER12: 0b0000000000000000000000000010000,
+  OTHER13: 0b0000000000000000000000000001000,
+  OTHER14: 0b0000000000000000000000000000100,
+  OTHER15: 0b0000000000000000000000000000010,
+  OTHER16: 0b0000000000000000000000000000001,
 };
 
 const Eru ={
     switch_max_players: (maxPlayers) => {
         switch (maxPlayers) {
-            case 1:
-                return 0b0001;
-            case 2:
-                return 0b0010;
-            case 3:
-                return 0b0011;
-            case 4:
-                return 0b0100;
-            case 5:
-                return 0b0101;
-            case 10:
-                return 0b0110;
-            case 20:
-                return 0b0111;
-            case 30:
-                return 0b1000;
-            case 40:
-                return 0b1001;
-            case 50:
-                return 0b1010;
-            case 60:
-                return 0b1011;
-            case 100:
-                return 0b1100;
-            case 200:
-                return 0b1101;
-            case 500:
-                return 0b1110;
-            case 1000:
-                return 0b1111;
+            case "1v1":
+                return MAX_PLAYER.v1;
+            case "2v2":
+                return MAX_PLAYER.v2;
+            case "3v3":
+                return MAX_PLAYER.v3;
+            case "4v4":
+                return MAX_PLAYER.v4;
+            case "5v5":
+                return MAX_PLAYER.v5;
+            case "10v10":
+                return MAX_PLAYER.v10;
+            case "25v25":
+                return MAX_PLAYER.v25;
+            case "50v50":
+                return MAX_PLAYER.v50;
+            case "ten":
+                return MAX_PLAYER.ten;
+            case "twenty":
+                return MAX_PLAYER.twenty;
+            case "thirty":
+                return MAX_PLAYER.thirty;
+            case "fifty":
+                return MAX_PLAYER.fifty;
+            case "hundred":
+                return MAX_PLAYER.hundred;
+            case "twohundred_fifty":
+                return MAX_PLAYER.twohundred_fifty;
+            case "fivehundred":
+                return MAX_PLAYER.fivehundred;
+            case "twohundred_fifty":
+                return MAX_PLAYER.twohundred_fifty;
             default:
                 throw new Error("Numero di giocatori non valido");
         }
-    }
+    },
+    switch_max_duration: (maxDuration) => {
+        switch (maxDuration) {
+            case "1 ora":
+                return MAX_DURATION.RUSH;
+            case "6 ore":
+                return MAX_DURATION.CRAZY;
+            case "12 ore":
+                return MAX_DURATION.INSANE;
+            case "1 giorno":
+                return MAX_DURATION.FAST;
+            case "3 giorni":
+                return MAX_DURATION.SHORT;
+            case "5 giorni":
+                return MAX_DURATION.MEDIUM;
+            case "7 giorni":
+                return MAX_DURATION.DEFAULT;
+            case "10 giorni":
+                return MAX_DURATION.MEDIUM_LONG;
+            case "14 giorni":
+                return MAX_DURATION.LONG;
+            case "32 giorni":
+                return MAX_DURATION.CHILL;
+            case "60 giorni":
+                return MAX_DURATION.VERY_LONG;
+            case "90 giorni":
+                return MAX_DURATION.HARD;
+            case "120 giorni":
+                return MAX_DURATION.MAX;
+            case "nessun limite di tempo":
+                return MAX_DURATION.UNLIMITED;
+            default:
+                throw new Error("Durata massima non valida");
+        }
+    },
+
+    switch_moltiplicatore_temporale : (moltiplicatoreTemporale) => {
+        switch (moltiplicatoreTemporale) {
+            case "x1":
+                return MOLTIPLICATORE_TEMPORALE.x1;
+            case "x2":
+                return MOLTIPLICATORE_TEMPORALE.x2;
+            case "x3":
+                return MOLTIPLICATORE_TEMPORALE.x3;
+            case "x4":
+                return MOLTIPLICATORE_TEMPORALE.x4;
+            case "x5":
+                return MOLTIPLICATORE_TEMPORALE.x5;
+            case "x10":
+                return MOLTIPLICATORE_TEMPORALE.x10;
+            case "x20":
+                return MOLTIPLICATORE_TEMPORALE.x20;
+            case "x30":
+                return MOLTIPLICATORE_TEMPORALE.x30;
+            case "x40":
+                return MOLTIPLICATORE_TEMPORALE.x40;
+            case "x50":
+                return MOLTIPLICATORE_TEMPORALE.x50;
+            case "x60":
+                return MOLTIPLICATORE_TEMPORALE.x60;
+            case "x100":
+                return MOLTIPLICATORE_TEMPORALE.x100;
+            case "x200":
+                return MOLTIPLICATORE_TEMPORALE.x200;
+            case "x500":
+                return MOLTIPLICATORE_TEMPORALE.x500;
+            case "x1000":
+                return MOLTIPLICATORE_TEMPORALE.x1000;
+            case "produzione istantanea":
+                return MOLTIPLICATORE_TEMPORALE.UNLIMITED;
+            default:
+                throw new Error("Moltiplicatore temporale non valido");
+        }
+    },
+
+    switch_modalita: (modalita) => {
+        switch (modalita) {
+            case "Tutti contro tutti":
+                return MODALITA.FREE_FOR_ALL;
+            case "Capture the Flag":
+                return MODALITA.CAPTURE_THE_FLAG;
+            case "King of the Hill":
+                return MODALITA.KING_OF_THE_HILL;
+            case "Domination":
+                return MODALITA.DOMINATION;
+            case "Destruction":
+                return MODALITA.DESTRUCTION;
+            case "Other":
+                return MODALITA.OTHER;
+            case "Other1":
+                return MODALITA.OTHER1;
+            case "Other2":
+                return MODALITA.OTHER2;
+            case "Other3":
+                return MODALITA.OTHER3;
+            case "Other4":  
+                return MODALITA.OTHER4;
+            case "Other5":
+                return MODALITA.OTHER5; 
+            case "Other6":
+                return MODALITA.OTHER6;
+            case "Other7":
+                return MODALITA.OTHER7;
+            case "Other8":
+                return MODALITA.OTHER8;
+            default:
+                throw new Error("Modalità di gioco non valida");
+        }
+    },
+    switch_regioni: (regione) => {
+        switch (regione) {
+            case "World":
+                return REGIONI.WORLD;
+            case "Europe":
+                return REGIONI.EUROPE;
+            case "Asia":
+                return REGIONI.ASIA;
+            case "Africa":
+                return REGIONI.AFRICA;
+            case "Oceania":
+                return REGIONI.OCEANIA;
+            case "America North":
+                return REGIONI.AMERICA_NORTH;
+            case "America South":
+                return REGIONI.AMERICA_SOUTH;
+            case "Antartica":
+                return REGIONI.ANTARTICA;
+            case "Middle East":
+                return REGIONI.MIDDLE_EAST;
+            case "Italy":
+                return REGIONI.ITALY;
+            case "Old World":
+                return REGIONI.OLD_WORLD;
+            case "Pangea":
+                return REGIONI.PANGEA;
+            case "Russia":
+                return REGIONI.RUSSIA;
+            case "Custom":
+                return REGIONI.CUSTOM;
+            case "Other":
+                return REGIONI.OTHER;
+            case "Other1":
+                return REGIONI.OTHER1;
+            case "Other2":
+                return REGIONI.OTHER2;  
+            case "Other3":
+                return REGIONI.OTHER3;
+            case "Other4":
+                return REGIONI.OTHER4;
+            case "Other5":
+                return REGIONI.OTHER5;
+            case "Other6":
+                return REGIONI.OTHER6;
+            case "Other7":
+                return REGIONI.OTHER7;
+            case "Other8":
+                return REGIONI.OTHER8;
+            case "Other9":
+                return REGIONI.OTHER9;
+            case "Other10":
+                return REGIONI.OTHER10;
+            case "Other11":
+                return REGIONI.OTHER11;
+            case "Other12":
+                return REGIONI.OTHER12;
+            case "Other13":
+                return REGIONI.OTHER13;
+            case "Other14":
+                return REGIONI.OTHER14;
+            case "Other15":
+                return REGIONI.OTHER15;
+            case "Other16":
+                return REGIONI.OTHER16;
+            default:
+                throw new Error("Regione non valida");
+        }
+    },
+
+    procedure_enstablish_regions: (regioni) => {},
+
 };
 
+  
 module.exports = Eru;
