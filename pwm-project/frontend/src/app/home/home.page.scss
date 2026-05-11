@@ -11,7 +11,10 @@ ion-content {
 
 .home-page {
   position: relative;
-  min-height: 100%;
+  height: 100vh; /* Forza l'altezza della singola pagina */
+  overflow: hidden; /* Blocca lo scroll della pagina su desktop */
+  display: flex;
+  flex-direction: column;
   padding: 14px;
   color: #f4f7fb;
   font-family: 'Courier New', Courier, monospace;
@@ -25,7 +28,7 @@ ion-content {
 
 /* Classi per il video di sfondo animato */
 .auth-background {
-  position: fixed; /* Mantiene lo sfondo incollato allo schermo */
+  position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
@@ -67,13 +70,13 @@ ion-content {
   perspective: 1200px;
   transform-style: preserve-3d;
   display: grid;
-  /* Griglia fluida: Pannelli laterali min 280px max 350px. Centro prende lo spazio rimanente */
   grid-template-columns: minmax(280px, 350px) 1fr minmax(280px, 350px); 
-  gap: clamp(15px, 3vw, 40px); /* Spaziatura proporzionale */
+  gap: clamp(15px, 3vw, 40px);
   justify-content: center;
-  align-items: center;
-  min-height: calc(100vh - 48px);
-  padding: 0 2vw; 
+  align-items: stretch; /* Permette alle colonne di estendersi in altezza */
+  flex: 1; /* Occupa lo spazio rimanente al netto di header/footer */
+  min-height: 0; /* Fondamentale per far funzionare lo scroll flex interno */
+  padding: 1vh 2vw; /* Leggero padding in vh per adattarsi ai monitor */
   max-width: 1800px; 
   margin: 0 auto;
   width: 100%;
@@ -87,12 +90,12 @@ ion-content {
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 500px;
+  min-height: 0; /* Rimosso l'altezza fissa per evitare sbordamenti */
 }
 
 .title-block {
   position: absolute;
-  top: 20px;
+  top: 10px;
   left: 0;
   width: 100%;
   z-index: 10;
@@ -126,8 +129,9 @@ ion-content {
   transform: translate(-50%, -50%) translateZ(0);
   z-index: 2;
   
-  width: clamp(280px, 40vw, 575px);
-  height: clamp(280px, 40vw, 575px);
+  /* Usa VH invece di VW per scalare in base all'altezza e non sbordare */
+  width: clamp(220px, 45vh, 480px);
+  height: clamp(220px, 45vh, 480px);
   border-radius: 50%; 
   border: 1px solid rgba(120, 210, 255, 0.15);
   background: transparent !important; 
@@ -159,7 +163,7 @@ ion-content {
 .games-container {
   position: absolute;
   left: 0;
-  bottom: 20px;
+  bottom: 10px;
   z-index: 10;
   width: 100%;
   display: flex;
@@ -182,6 +186,8 @@ ion-content {
   display: flex;
   flex-direction: column;
   gap: 15px; 
+  height: 100%; /* Si adatta all'altezza della top-row */
+  min-height: 0;
 }
 
 .left-column.panel {
@@ -224,6 +230,14 @@ ion-content {
   backdrop-filter: blur(15px) saturate(140%) !important;
   padding: 14px;
   border-radius: 9px;
+}
+
+/* Fix per le bottom-section che contengono le liste: diventano contenitori flex espandibili */
+.bottom-section {
+  flex: 1; /* Prende tutto lo spazio residuo verticale in basso */
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Fondamentale per abilitare lo scroll interno della lista */
 }
 
 .panel-divider {
@@ -280,7 +294,7 @@ ion-content {
 .profile-level { font-size: 0.75rem; color: rgba(244, 247, 251, 0.7); }
 
 .avatar {
-  display: grid; place-items: center; width: 100px; height: 100px; border-radius: 50%;
+  display: grid; place-items: center; width: 80px; height: 80px; border-radius: 50%;
   background: linear-gradient(135deg, #67e0ff, #12394b); color: #ffffff; font-size: 1.5rem; font-weight: 800;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25); cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;
   &:hover { transform: scale(1.1); box-shadow: 0 0 15px rgba(103, 224, 255, 0.5); }
@@ -301,8 +315,11 @@ ion-content {
 .ghost-button { padding: 0 10px; min-height: 33px; background: rgba(255, 255, 255, 0.02); }
 .join-button { padding: 4px 9px; background: linear-gradient(135deg, rgba(103, 184, 255, 0.18), rgba(45, 114, 210, 0.24)); border-color: rgba(255, 255, 255, 0.06); }
 
+/* La lista assorbe lo spazio senza forzare limiti fissi in vh */
 .games-list {
-  display: flex; flex-direction: column; gap: 6px; width: 100%; max-height: 40vh; overflow-y: auto; padding-right: 4px;
+  display: flex; flex-direction: column; gap: 6px; width: 100%; 
+  flex: 1; /* Espandi per riempire lo spazio residuo */
+  overflow-y: auto; padding-right: 4px;
 }
 .games-list::-webkit-scrollbar { width: 4px; }
 .games-list::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
@@ -356,7 +373,7 @@ ion-content {
 }
 
 .mobile-header {
-  display: none; /* Nascosto su Desktop, attivato dalle media queries */
+  display: none; 
   justify-content: space-between; align-items: center; padding: 10px 20px;
   position: sticky; top: 0; z-index: 1001; background: rgba(5, 10, 20, 0.6);
   backdrop-filter: blur(10px); border-bottom: 1px solid rgba(88, 166, 255, 0.2);
@@ -369,11 +386,25 @@ ion-content {
   }
 }
 
+/* Assicurati che il footer non venga schiacciato in flex */
+.hud-footer {
+  margin: 0 auto !important;
+  flex-shrink: 0;
+}
+
 /* ==========================================================================
    7. RESPONSIVE LOGIC CONSOLIDATA (Mobile/Tablet < 1100px)
    ========================================================================== */
 @media (max-width: 1100px) {
   
+  /* Reset essenziale per consentire lo scroll su dispositivi mobili/schermi piccoli */
+  .home-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+    display: block;
+  }
+
   /* 1. Mostra Header Mobile e nascondi Pannello Profilo Desktop */
   .mobile-header { display: flex; }
   
@@ -394,9 +425,9 @@ ion-content {
     transform: none !important;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
     width: 100%; max-width: 600px; margin: 0 auto;
+    height: auto; /* Ripristina l'altezza automatica */
   }
 
-  /* Rimuove sfondi e bordi superflui per la colonna destra che ora contiene solo le partite create */
   .right-column.panel {
     background: transparent !important;
     border: none !important;
@@ -425,5 +456,15 @@ ion-content {
   .games-container .games-actions {
     flex-direction: column;
     button { width: 100%; }
+  }
+
+  /* Reset dell'altezza per le liste su mobile in modo da mostrare tutto */
+  .games-list {
+    max-height: none;
+    overflow-y: visible;
+  }
+  
+  .hud-footer {
+    margin: 20px auto 10px !important;
   }
 }

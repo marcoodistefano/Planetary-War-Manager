@@ -4,8 +4,18 @@
 
 ion-content {
   --background: #08111f;
-  position: relative;
+  --overflow: hidden; /* Blocca definitivamente lo scroll sugli assi */
   font-family: 'Courier New', Courier, monospace;
+}
+
+/* IL SEGRETO È QUI: Rendiamo l'area interna di Ionic un contenitore Flex perfetto */
+ion-content::part(scroll) {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start; /* <-- MODIFICATO: fa partire il contenuto dall'alto anziché dal centro */
+  align-items: center;
+  padding-top: 10vh; /* <-- Distanza esatta dal bordo superiore su Desktop */
+  padding-bottom: 2vh; 
 }
 
 .auth-background {
@@ -22,8 +32,6 @@ ion-content {
   object-fit: cover;
   object-position: center;
   filter: brightness(0.72) saturate(1.05) contrast(1.05);
-
-  /* FIX HARDWARE: Forza il rendering nativo GPU per evitare sfocature del video */
   transform: translateZ(0);
   will-change: transform;
   backface-visibility: hidden;
@@ -42,24 +50,18 @@ ion-toolbar {
 }
 
 /* ==========================================================================
-   2. TITOLO (Stile identico alla HomePage)
+   2. TITOLO
    ========================================================================== */
 
 .title-block {
-  position: absolute;
-  top: 6vh;
-  left: 0;
   width: 100%;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
   text-align: center;
-  padding: 14px 0;
-
+  margin-bottom: 3vh; /* Distanza proporzionale dal form */
+  flex-shrink: 0; /* Impedisce al testo di schiacciarsi */
+  z-index: 10;
+  
   .eyebrow {
-    margin: 0 0 10px;
+    margin: 0 0 8px;
     color: #b6cee9;
     font-size: 0.62rem;
     letter-spacing: 0.16em;
@@ -68,7 +70,7 @@ ion-toolbar {
 
   h1 {
     color: #f4f7fb;
-    font-size: clamp(1.8rem, 3.75vw, 3.6rem);
+    font-size: clamp(1.8rem, 4vw, 3.6rem);
     line-height: 0.95;
     letter-spacing: 0.04em;
     font-weight: 800;
@@ -79,22 +81,15 @@ ion-toolbar {
 }
 
 /* ==========================================================================
-   3. LAYOUT DEL FORM E CONTENITORI (Corazzati e Scuriti)
+   3. LAYOUT DEL FORM E CONTENITORI 
    ========================================================================== */
 
 .login-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  min-height: 100%;
-  padding: 20px 24px;
+  width: 100%;
   max-width: 420px;
-  margin: 0 auto;
-  position: relative;
-  z-index: 1;
-
-  /* FIX LAYER: Separa il contesto 3D per impedire conflitti con il video sottostante */
+  padding: 0 24px;
+  z-index: 10;
+  flex-shrink: 0; /* Evita compressioni indesiderate del form */
   transform-style: preserve-3d;
 }
 
@@ -105,11 +100,9 @@ form {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-radius: 18px;
-  padding: 40px 24px;
+  padding: 35px 24px;
   width: 100%;
-  margin-top: 60px;
-
-  /* FIX ANTI-BLUR: Forza il livello rendering separato */
+  margin: 0; 
   transform: translateZ(0);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -133,7 +126,7 @@ form {
 }
 
 /* ==========================================================================
-   4. TIPOGRAFIA INTERNA AL FORM (Etichette e Input)
+   4. TIPOGRAFIA INTERNA AL FORM
    ========================================================================== */
 
 .custom-label {
@@ -151,8 +144,9 @@ ion-input {
   --color: #f4f7fb;
   --placeholder-color: rgba(244, 247, 251, 0.5);
   --padding-start: 0;
+  --padding-end: 8px;
+  flex: 1;
   --background: transparent;
-  font-family: 'Courier New', Courier, monospace;
   font-size: 0.85rem;
 }
 
@@ -164,7 +158,6 @@ ion-button {
   margin-top: 10px;
   height: 48px;
   font-weight: 700;
-  font-family: 'Courier New', Courier, monospace;
   --background: linear-gradient(135deg, rgba(103, 184, 255, 0.22), rgba(45, 114, 210, 0.28));
   --border-radius: 8px;
   --color: #f4f7fb;
@@ -205,7 +198,7 @@ ion-button {
   display: inline-block;
   color: #58A6FF;
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: bold;
   padding: 5px; 
   cursor: pointer;
@@ -216,39 +209,12 @@ ion-button {
   }
 }
 
-/* ==========================================================================
-   6. FOOTER HUD (Sincronizzato con HomePage)
-   ========================================================================== */
-
-.hud-footer-content { 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-}
-
-.status-dot { 
-  width: 6px; 
-  height: 6px; 
-  background: #3fb950; 
-  border-radius: 50%; 
-  display: inline-block; 
-  margin-right: 4px; 
-  box-shadow: 0 0 8px rgba(63, 185, 80, 0.6); /* Leggero bagliore sul led di stato */
-}
-
-/* Gestione della classe di trasparenza standard usata nel footer */
-.transparent-element {
-  background: rgba(255, 255, 255, 0.02) !important;
-  backdrop-filter: blur(8px);
-}
-
 .password-wrapper {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-/* Stile dell'icona ereditato dal design del profilo */
 .toggle-eye-btn {
   --color: rgba(201, 209, 217, 0.6);
   --padding-start: 0;
@@ -256,14 +222,118 @@ ion-button {
   margin: 0;
   height: 24px;
   transition: --color 0.2s ease;
-  
-  &:hover { 
-    --color: #58a6ff; /* Colore neon quando si passa sopra */
-  }
+  &:hover { --color: #58a6ff; }
 }
 
-/* Assicuriamoci che l'input occupi lo spazio necessario */
-ion-input {
-  flex: 1;
-  --padding-end: 8px;
+/* ==========================================================================
+   6. FOOTER HUD (Il footer esterno di Ionic)
+   ========================================================================== */
+
+.hud-footer {
+  margin: 0 auto 10px; 
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  border-radius: 12px;
+  background: rgba(5, 10, 20, 0.6);
+  backdrop-filter: blur(12px);
+  z-index: 1000;
+  position: relative;
+  max-width: 900px;
+  width: calc(100% - 28px);
+  box-sizing: border-box;
+  font-size: 0.55rem;
+  padding: 8px 12px;
+}
+
+.hud-footer-content { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+}
+
+.divider { margin: 0 8px; color: rgba(255,255,255,0.3); }
+.status-dot { width: 6px; height: 6px; background: #3fb950; border-radius: 50%; display: inline-block; margin-right: 4px; box-shadow: 0 0 8px rgba(63, 185, 80, 0.6); }
+
+/* ==========================================================================
+   7. RESPONSIVE LOGIC FISSA (Mobile < 768px)
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  
+  ion-content::part(scroll) {
+    padding-top: 6vh; /* <-- Distanza ridotta dal bordo superiore per Mobile */
+  }
+
+  .title-block {
+    margin-bottom: 2vh; 
+    h1 { font-size: 2.2rem; }
+  }
+
+  form {
+    padding: 24px 20px; 
+  }
+
+  .field-container {
+    padding: 8px 12px;
+    margin-bottom: 12px; 
+  }
+
+  ion-button {
+    height: 44px; 
+    margin-top: 5px;
+  }
+
+  .form-footer {
+    margin-top: 15px;
+    
+    .secondary-link {
+      display: block;
+      padding: 8px;
+      margin-bottom: 2px;
+      font-size: 0.9rem;
+    }
+    
+    p {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .register-link { font-size: 0.95rem; }
+  }
+
+  .hud-footer-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 6px;
+  }
+
+  .hud-footer {
+    padding: 6px 10px;
+    margin-bottom: 8px; 
+    width: calc(100% - 16px);
+  }
+
+  .footer-center, .footer-right, .footer-left {
+    width: 100%;
+    font-size: 0.6rem;
+  }
+
+  .divider { display: none; }
+}
+
+/* ==========================================================================
+   8. FIX EXTREME PER SCHERMI MOLTO BASSI (es. tastiere virtuali aperte)
+   ========================================================================== */
+@media (max-height: 600px) {
+  ion-content::part(scroll) {
+    padding-top: 2vh; /* <-- Si aggancia quasi al tetto dello schermo se è molto basso */
+  }
+  
+  .title-block .eyebrow { display: none; }
+  .title-block h1 { font-size: 1.8rem; }
+  form { padding: 15px 20px; }
+  .field-container { margin-bottom: 8px; }
+  .form-footer { margin-top: 10px; }
 }

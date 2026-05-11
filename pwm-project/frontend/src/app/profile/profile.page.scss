@@ -8,7 +8,10 @@ ion-content {
 
 .home-page {
   position: relative;
-  min-height: 100%;
+  height: 100vh; /* FORZA L'ALTEZZA ALLA SINGOLA PAGINA */
+  overflow: hidden; /* BLOCCA LO SCROLL SU DESKTOP */
+  display: flex;
+  flex-direction: column;
   padding: 14px;
   background: linear-gradient(180deg, rgba(3, 8, 18, 0.45) 0%, rgba(3, 8, 18, 0.82) 100%),
               url('/assets/background/background.png') center/cover no-repeat;
@@ -29,8 +32,9 @@ ion-content {
   justify-content: center;
   align-items: center;
   gap: 30px; 
-  min-height: calc(100vh - 80px);
-  max-width: 950px; 
+  flex: 1; /* Prende lo spazio residuo verticale */
+  min-height: 0; /* Fondamentale per i layout fluidi flex */
+  max-width: 1000px; 
   margin: 0 auto;
   perspective: 1200px;
 }
@@ -42,6 +46,10 @@ ion-content {
   backface-visibility: hidden;
   transform-style: preserve-3d;
   transition: transform 0.4s ease-out;
+  display: flex;
+  flex-direction: column;
+  max-height: 100%; /* Garantisce che i pannelli non escano dai limiti verticali */
+  justify-content: center; /* Centra i pannelli verticalmente se c'è spazio */
 }
 
 /* Colonna Sinistra */
@@ -57,7 +65,11 @@ ion-content {
 /* Colonna Centrale */
 .center-column { 
   flex: 0 0 300px; 
-  margin-top: -100px; 
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
 } 
 
 /* Colonna Destra */
@@ -81,14 +93,20 @@ ion-content {
   border-radius: 18px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto; 
+  
+  /* Nasconde la scrollbar estetica ma mantiene la funzione se forzata su schermi minuscoli */
+  -ms-overflow-style: none;  
+  scrollbar-width: none;  
+  &::-webkit-scrollbar { display: none; }
 }
 
 .inner-panel {
   background: rgba(1, 36, 46, 0.101) !important;
   border: 1px solid rgba(95, 208, 255, 0.28) !important;
-  padding: 14px;
+  padding: 10px; /* Ridotto da 12px */
   border-radius: 9px;
-  margin: 10px;
+  margin: 8px 10px; /* Compattato margine verticale */
 }
 
 .transparent-element {
@@ -99,27 +117,29 @@ ion-content {
 .panel-divider { 
   border: none; 
   border-top: 1px solid rgba(255, 255, 255, 0.05); 
-  margin: 0 14px; 
+  margin: 0 10px; /* Allineato ai nuovi margini */
 }
 
 /* ==========================================================================
    4. TIPOGRAFIA UNIFORME E OFFUSCAMENTO
    ========================================================================== */
 .panel-heading {
-  margin-bottom: 12px;
+  margin-bottom: 6px; /* Ridotto da 10px */
   span { display: block; font-size: 0.85rem; font-weight: 700; color: #fff; }
-  small { display: block; font-size: 0.6rem; color: #86d7ff; text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; }
+  small { display: block; font-size: 0.6rem; color: #86d7ff; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
 }
 
 .title-block {
-  text-align: center; margin-bottom: 20px;
-  .eyebrow { margin: 0 0 10px; color: #b6cee9; font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; }
-  h1 { font-size: clamp(1.6rem, 3vw, 2.4rem); line-height: 0.95; letter-spacing: 0.04em; text-transform: uppercase; text-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); margin: 0; color: #fff; }
+  text-align: center; margin-bottom: 12px; /* Ridotto da 20px */
+  .eyebrow { margin: 0 0 8px; color: #b6cee9; font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; }
+  h1 { font-size: clamp(1.4rem, 2.5vw, 2.2rem); line-height: 0.95; letter-spacing: 0.04em; text-transform: uppercase; text-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); margin: 0; color: #fff; }
 }
 
 /* Wrapper dei campi crittografati */
 .field-container {
-  padding: 10px; margin-bottom: 8px; border-radius: 6px;
+  padding: 8px; /* Ridotto da 10px */
+  margin-bottom: 6px; /* Ridotto da 8px */
+  border-radius: 6px;
   
   .custom-label { 
     font-size: 0.6rem; 
@@ -142,7 +162,6 @@ ion-content {
   transition: filter 0.3s ease, opacity 0.3s ease; 
 }
 
-/* Effetto di sfocatura tipo vetro smerigliato */
 .obfuscated-text {
   filter: blur(5px); 
   opacity: 0.5; 
@@ -150,14 +169,12 @@ ion-content {
   pointer-events: none;
 }
 
-/* Icone Toggle Occhio */
 .toggle-eye-btn {
   --color: rgba(201, 209, 217, 0.6);
   --padding-start: 0;
   --padding-end: 0;
   margin: 0;
   height: 24px;
-  
   &:hover { --color: #fff; }
 }
 
@@ -170,7 +187,9 @@ ion-content {
    5. GRAFICI E STATISTICHE HUD
    ========================================================================== */
 .chart-container {
-  height: 90px; padding: 10px; margin-top: 10px; border-radius: 8px;
+  height: 65px; /* Compattata l'altezza del grafico */
+  padding: 8px; /* Ridotto da 10px */
+  border-radius: 8px;
   .bars { display: flex; align-items: flex-end; justify-content: space-around; height: 100%; border-bottom: 1px solid rgba(88, 166, 255, 0.2); padding-bottom: 5px; }
   .bar-unit { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; width: 25px; }
   .bar-fill { width: 100%; background: linear-gradient(0deg, #1d4ed8, #58a6ff); border-radius: 3px 3px 0 0; }
@@ -178,25 +197,28 @@ ion-content {
 }
 
 .radial-container {
-  display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; margin-top: 10px; border-radius: 8px;
-  .chart-wrap { position: relative; width: 55px; height: 55px; }
+  display: flex; justify-content: space-between; align-items: center; 
+  padding: 8px 10px; /* Ridotto padding */
+  border-radius: 8px;
+  .chart-wrap { position: relative; width: 45px; height: 45px; } /* Leggermente rimpicciolito */
   .circular-chart { width: 100%; height: 100%; }
   .circle { fill: none; stroke: #58a6ff; stroke-width: 2.8; stroke-linecap: round; }
   .circle-bg { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 2.8; }
-  .percentage { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; font-weight: bold; color: #fff; }
-  .text-wrap { text-align: right; h3 { margin: 0; font-size: 1.1rem; color: #58a6ff; } p { margin: 0; font-size: 0.55rem; color: #86d7ff; text-transform: uppercase; } }
+  .percentage { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.7rem; font-weight: bold; color: #fff; }
+  .text-wrap { text-align: right; h3 { margin: 0; font-size: 1rem; color: #58a6ff; } p { margin: 0; font-size: 0.55rem; color: #86d7ff; text-transform: uppercase; } }
 }
 
 .kd-container {
-  padding: 10px; margin-top: 10px; border-radius: 8px;
+  padding: 8px; /* Ridotto da 10px */
+  border-radius: 8px;
   .kd-labels { display: flex; justify-content: space-between; font-size: 0.65rem; font-weight: bold; margin-bottom: 6px; .kill-text { color: #58a6ff; } .death-text { color: #ff7b72; } }
   .progress-bar-dual { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.1); .fill-kill { background: #58a6ff; box-shadow: 0 0 8px #58a6ff; } .fill-death { background: #ff7b72; box-shadow: 0 0 8px #ff7b72; } }
 }
 
 .stats-linear {
-  margin-top: 15px;
-  .stat-row { margin-bottom: 8px; &:last-child { margin-bottom: 0; } }
-  .stat-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: #c9d1d9; margin-bottom: 4px; font-weight: bold; }
+  margin-top: 10px; /* Ridotto da 15px */
+  .stat-row { margin-bottom: 6px; &:last-child { margin-bottom: 0; } }
+  .stat-labels { display: flex; justify-content: space-between; font-size: 0.6rem; color: #c9d1d9; margin-bottom: 4px; font-weight: bold; }
   .progress-bar-single { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; .fill { height: 100%; background: #58a6ff; box-shadow: 0 0 8px #58a6ff; } &.danger .fill { background: #ff7b72; box-shadow: 0 0 8px #ff7b72; } }
 }
 
@@ -206,44 +228,49 @@ ion-content {
 .avatar-core {
   text-align: center;
   .avatar-frame {
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  border: 1px solid #58a6ff;
-  margin: 0 auto;
-  padding: 5px; /* Spazio per l'effetto ologramma */
-  box-shadow: 0 0 20px rgba(88, 166, 255, 0.2);
-  overflow: hidden; /* Taglia l'immagine a cerchio */
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover; /* Mantiene le proporzioni tagliando gli eccessi */
-  border-radius: 50%;
-  filter: brightness(1.1) contrast(1.1); /* Effetto leggermente più vivido per l'HUD */
-}
- .avatar-main { width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle, #1d4ed8, #050a14); display: grid; place-items: center; font-size: 2.2rem; font-weight: bold; color: #fff; }
-  .elo-badge { margin-top: 12px; h2 { color: #58a6ff; font-size: 1.6rem; margin: 0; text-shadow: 0 0 10px rgba(88, 166, 255, 0.4); } p { font-size: 0.65rem; color: #b6cee9; letter-spacing: 1px; margin-top: 4px; } }
+    width: 130px; /* Compattato per bilanciare il ridimensionamento laterale */
+    height: 130px;
+    border-radius: 50%;
+    border: 1px solid #58a6ff;
+    margin: 0 auto;
+    padding: 5px; 
+    box-shadow: 0 0 20px rgba(88, 166, 255, 0.2);
+    overflow: hidden; 
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; 
+    border-radius: 50%;
+    filter: brightness(1.1) contrast(1.1); 
+  }
+  .elo-badge { 
+    margin-top: 10px; 
+    h2 { color: #58a6ff; font-size: 1.4rem; margin: 0; text-shadow: 0 0 10px rgba(88, 166, 255, 0.4); } 
+    p { font-size: 0.6rem; color: #b6cee9; letter-spacing: 1px; margin-top: 4px; } 
+  }
 }
 
 .action-dock {
-  margin-top: 25px;
+  margin-top: 15px; /* Ridotto da 20px */
   display: flex;
   justify-content: center;
   width: 100%;
 }
 
 .quick-actions {
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex; flex-direction: column; gap: 6px; /* Ridotto gap dei pulsanti */
 }
 
 .action-btn {
-  width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #c9d1d9; border-radius: 6px; font-size: 0.75rem; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;
+  width: 100%; 
+  padding: 8px; /* Pulsanti compattati */
+  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #c9d1d9; border-radius: 6px; font-size: 0.7rem; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;
   cursor: pointer; transition: 0.2s; backdrop-filter: blur(8px);
   &:hover { background: rgba(88, 166, 255, 0.1); border-color: #58a6ff; color: #fff; }
 }
@@ -252,12 +279,14 @@ ion-content {
   display: flex; justify-content: center; align-items: center;
   background: rgba(29, 78, 216, 0.2) !important; border: 1px solid #58a6ff !important;
   color: #fff !important; box-shadow: 0 0 15px rgba(88, 166, 255, 0.2);
-  font-size: 0.8rem !important; padding: 12px 20px !important; cursor: pointer;
+  font-size: 0.75rem !important; padding: 10px 15px !important; cursor: pointer;
   &:hover { background: rgba(29, 78, 216, 0.4) !important; box-shadow: 0 0 20px rgba(88, 166, 255, 0.5); }
 }
 
 .logout-button {
-  width: 100%; padding: 12px; background: rgba(255, 123, 114, 0.1); border: 1px solid #ff7b72;
+  width: 100%; 
+  padding: 10px; /* Ridotto da 12px */
+  background: rgba(255, 123, 114, 0.1); border: 1px solid #ff7b72;
   color: #ff7b72; border-radius: 6px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
   cursor: pointer; transition: 0.2s;
   &:hover { background: rgba(255, 123, 114, 0.2); box-shadow: 0 0 15px rgba(255, 123, 114, 0.3); color: #fff; }
@@ -266,6 +295,10 @@ ion-content {
 /* ==========================================================================
    7. FOOTER HUD
    ========================================================================== */
+.hud-footer {
+  flex-shrink: 0;
+}
+
 .hud-footer-content { 
   display: flex; 
   justify-content: space-between; 
@@ -281,3 +314,45 @@ ion-content {
   margin-right: 4px; 
 }
 
+/* ==========================================================================
+   8. RESPONSIVE LOGIC (Mobile/Tablet < 1100px)
+   ========================================================================== */
+@media (max-width: 1100px) {
+  .home-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+    display: block;
+  }
+  
+  .top-row {
+    flex-direction: column;
+    perspective: none !important;
+    gap: 20px;
+    padding: 20px 10px;
+    height: auto;
+  }
+
+  .left-column, .right-column {
+    transform: none !important;
+    width: 100%;
+    max-width: 500px;
+    flex: none;
+    overflow: visible;
+  }
+  
+  .left-column:hover, .right-column:hover {
+    transform: none !important;
+  }
+
+  .center-column {
+    order: -1;
+    width: 100%;
+    max-width: 500px;
+    margin-top: 0;
+  }
+  
+  .hud-footer {
+    margin: 20px auto 10px !important;
+  }
+}

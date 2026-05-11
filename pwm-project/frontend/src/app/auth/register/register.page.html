@@ -1,4 +1,4 @@
-<ion-content [fullscreen]="true">
+<ion-content [fullscreen]="true" [scrollY]="false">
   <div class="auth-background" aria-hidden="true">
     <video #backgroundVideo class="auth-background__video" autoplay muted loop playsinline preload="metadata" src="assets/background_gif/background_gif.mp4"></video>
     <div class="auth-background__overlay"></div>
@@ -17,7 +17,6 @@
         <ion-input type="text" formControlName="username" placeholder="nome utente"></ion-input>
       </div>
 
-      <!-- REGIONE UTENTE (Pulsante Custom per aprire Modale) -->
       <div class="field-container clickable-field" (click)="openCountryModal()">
         <ion-label class="custom-label">REGIONE UTENTE</ion-label>
         <div class="selected-value">
@@ -59,20 +58,16 @@
     </form>
   </div>
 
-  <!-- MODALE RICERCA NAZIONI TATTICO -->
-  <!-- Aggiunto (didPresent) per lanciare l'autofocus alla fine dell'apertura -->
   <ion-modal [isOpen]="isCountryModalOpen" (didDismiss)="closeCountryModal()" (didPresent)="focusSearchbar()" class="sci-fi-modal">
     <ng-template>
       <ion-header class="ion-no-border">
         <ion-toolbar class="sci-fi-toolbar">
           <ion-title>SELEZIONA REGIONE</ion-title>
           <ion-buttons slot="end">
-            <!-- Aggiunto fill="clear" per rimuovere il riquadro di sfondo -->
             <ion-button fill="clear" (click)="closeCountryModal()">X</ion-button>
           </ion-buttons>
         </ion-toolbar>
         <ion-toolbar class="sci-fi-toolbar">
-          <!-- Aggiunto identificatore #countrySearchbar -->
           <ion-searchbar #countrySearchbar class="sci-fi-searchbar" placeholder="Ricerca nel database..." (ionInput)="filterCountries($event)"></ion-searchbar>
         </ion-toolbar>
       </ion-header>
@@ -88,10 +83,8 @@
 
 </ion-content>
 
-<!-- Il FOOTER HUD rimane in basso invariato -->
 <ion-footer class="ion-no-border" style="background: transparent;">
-<!-- (Usa lo stesso footer che ti ho mandato prima per login e register) -->
-  <div class="hud-footer transparent-element" style="margin: 0 auto 14px; border: 1px solid rgba(88, 166, 255, 0.4); border-radius: 12px; background: rgba(5, 10, 20, 0.6); backdrop-filter: blur(12px); z-index: 1000; position: relative; max-width: 900px; width: calc(100% - 28px); box-sizing: border-box; font-size: 0.55rem; padding: 8px 12px;">
+  <div class="hud-footer transparent-element" style="margin: 0 auto 10px; border: 1px solid rgba(88, 166, 255, 0.4); border-radius: 12px; background: rgba(5, 10, 20, 0.6); backdrop-filter: blur(12px); z-index: 1000; position: relative; max-width: 900px; width: calc(100% - 28px); box-sizing: border-box; font-size: 0.55rem; padding: 8px 12px;">
     <div class="hud-footer-content">
       <div class="footer-left">
         <span class="status-dot"></span> COMM-LINK: <span class="status-text" style="color: #3fb950; font-weight: bold;">ONLINE</span>
