@@ -114,7 +114,6 @@ CREATE TABLE IF NOT EXISTS partite (
     -- stato VARCHAR(20),
     struttura_partita BIT(56) DEFAULT B'00000000000000000000000000000000000000000000000000000000', --HO AGGIUNTO 16 BIT IN PIU, DA CAPIRE IL REALE UTILIZZO, OLTRE CONFIGURAZIONI DI CONTROLLO. 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    nome_json VARCHAR(255),
     CONSTRAINT fk_host FOREIGN KEY (id_host) REFERENCES utenti(id_user)
 );
 
@@ -128,8 +127,8 @@ CREATE TABLE IF NOT EXISTS partite (
 // ->N_player_max -> conteggio classico… 10, 20, 30, 50, 100, 250, 500 -> si potrebbero usare, allora, solo 3 bit… {000 001 010 011 100 101 110 111} dove il valore 111 è assunto SOLO per modalità 1v1 e 2v2 (NvN < 10 giocatori totali)
 // ->duration_max -> default è 7, quindi 0111, max è 1111 che indica 32 giorni; 0000 è controllo, NON UTILIZZATO
 // ->moltiplicatore -> {1x 0000; 2x 0001; 3x 0010; 4x 0011; 5x 0100; 10x 0101; 20x 0110; 30x 0111; 40x 1000; 50x 1001; 60x 1010; 100x 1011; 200x 1100; 500x 1101; 1000x 1110; [ILLIMITATA (produzione istantanea di tutto eccetto che delle risorse) oppure 5000x 1111}
-// -> tipo partita -> {1v1 0000; 2v2 0001; 3v3 0010; 5v5 0011; tutti_contro_tutti 0100…altro da definire}
-// -> modalità ->SI CAMBIA SOLO UN BIT! {tempo 0000 (def.); distruzione 0001; conquista 0010; altro}
+// -> Is_squad -> 1 bit -> 0 o 1, per indicare se è una partita a squadre o free for all (tutti contro tutti)
+// -> modalità [NO; NON SI CAMBIA SOLO 1 bit!]->SI CAMBIA SOLO UN BIT! {tempo 0000 (def.); distruzione 0001; conquista 0010; altro}
 // -> regioni giocabili -> SI CAMBIA SOLO UN BIT! {0000000000000000} [DA MSB A LSB}
 // MSB (bit 1^): tutto il mondobit 2: europabit 3: Asiabit 4: africa
 // bit 5: oceaniabit 6: america NORDbit 7: america SUD

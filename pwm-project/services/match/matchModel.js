@@ -1,5 +1,7 @@
 const aslan = require("./middleware/Aslan.js");
 const db = require("../shared/postgresClient.js");
+const redis = require("../shared/redisClient.js");
+
 
 const mapUniqueViolation = (error) => {
   if (!error || error.code !== "23505") return null;
@@ -16,95 +18,72 @@ const mapUniqueViolation = (error) => {
   return "Utente già esistente";
 };
 
-const registerUser = async ({ username, email, password }) => {
-  const passwordHash = await aslan.hash_password(password);
+const createMatch = async ({ playerId, gameMode }) => {
+  try {
+    //verifico che il giocatore non abbia già una partita in corso come host
+    let rows = await db.query(
+      "SELECT count(id_partita) FROM partite, utenti WHERE (utenti.id_user = $1 AND partite.id_host = $1) AND SUBSTRING(partite.struttura_partita FROM 1 FOR 2) = B'10';",
+      [playerId],
+    );
+    if (rows[0].count > 0) {
+      console.log("Il giocatore è già host di una partita in corso");
+      return {
+        status: "400",
+        message:
+          "Il giocatore ha già creato una partita in corso e questa è ancora in corso.",
+      };
+    } else {
+      const id_partita_hash = await aslan.generateSecureToken(256); //ASLAN NON é ANCORA NELLA CARTELLA
+      const id_partita_visualizzato = await aslan.generateSecureToken(10);
+      const struttura_partita = await generateMatchStructure(gameMode); //torna: stato, messaggio e content (stringa di 56 bit)
+      if (struttura_partita.status == "200") {
+        //ISTANZA REDIS
+        rows = await db.query(
+          "INSERT INTO partite (id_partita_hash, id_partita_visualizzato, id_host, struttura_partita, has_elo) VALUES ($1, $2, $3, $4, $5);",
+          [
+            id_partita_hash,
+            id_partita_visualizzato,
+            playerId,
+            struttura_partita.message,
+            gameMode.hasElo,
+          ],
+        );
+        return struttura_partita;
+      } else {
+        console.log(
+          "Errore durante la generazione della struttura della partita:",
+          struttura_partita.message,
+        );
+        return {
+          status: struttura_partita.status,
+          message: struttura_partita.message,
+        };
+      }
+    }
+  } catch (error) {
+    console.error("Errore durante la verifica delle partite in corso:", error);
+    return {
+      status: "500",
+      message:
+        "Errore interno del server durante la verifica delle partite in corso.",
+    };
+  }
+};
+
+const generateMatchStructure = async (gameMode) => {
+  let struttura_partita = STATO.IN_ATTESA;
 
   try {
-    const { rows } = await db.query(
-      "INSERT INTO utenti (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id_user",
-      [username, email, passwordHash],
-    );
-    return { passwordHash, uuid: rows[0]?.id_user };
+    //generazione della struttura della partita in base alla modalità di gioco
   } catch (error) {
-    const mapped = mapUniqueViolation(error);
-    if (mapped) {
-      const err = new Error(mapped);
-      err.code = "USER_EXISTS";
-      throw err;
-    }
-    throw error;
+    console.error(
+      "Errore durante la generazione della struttura della partita:",
+      error,
+    );
+    return {
+      status: "500",
+      message:
+        "Errore interno del server durante la generazione della struttura della partita.",
+    };
   }
-};
-
-const verifyLogin = async ({ username, password }) => {
-  const { rows } = await db.query(
-    "SELECT id_user, password_hash FROM utenti WHERE username = $1 LIMIT 1",
-    [username],
-  );
-
-  const user = rows[0];
-  if (!user) {
-    return { ok: false, error: "Credenziali non valide" };
-  }
-
-  const isMatch = await aslan.verify_password(password, user.password_hash);
-  if (!isMatch) {
-    return { ok: false, error: "Credenziali non valide" };
-  }
-
-  return { ok: true, uuid: user.id_user };
-};
-
-// recoverUsername rimane invariato...
-const recoverUsername = async ({ email, password }) => {
-  const { rows } = await db.query(
-    "SELECT username, password_hash FROM utenti WHERE email = $1 LIMIT 1",
-    [email],
-  );
-
-  const user = rows[0];
-  if (!user) {
-    return { ok: false, error: "Email non valida" };
-  }
-
-  const isMatch = await aslan.verify_password(password, user.password_hash);
-  if (!isMatch) {
-    return { ok: false, error: "Credenziali non valide" };
-  }
-
-  return { ok: true, username: user.username };
-};
-
-
-const resetPassword = async ({ username, email, newPassword }) => {
-  const passwordHash = await aslan.hash_password(newPassword);
-
-  const { rows } = await db.query(
-    "UPDATE utenti SET password_hash = $1, last_password_change = NOW() WHERE username = $2 AND email = $3 RETURNING id_user",
-    [passwordHash, username, email],
-  );
-
-  const updated = rows[0];
-  if (!updated) {
-    return { ok: false, error: "Utente o email non validi" };
-  }
-
-  return { ok: true, passwordHash, uuid: updated.id_user };
-};
-
-const createAccessSession = async ({ userId, ipAddress, cookieToken, expireTime }) => {
-  const { rows } = await db.query(
-    "INSERT INTO accessi (user_id, ip_address, cookie_token, expire_time) VALUES ($1, $2, $3, $4) RETURNING id_access, login_time, expire_time",
-    [userId, ipAddress, cookieToken, expireTime],
-  );
-
-  return rows[0];
-};
-
-module.exports = {
-  registerUser,
-  verifyLogin,
-  recoverUsername,
-  resetPassword,
-  createAccessSession,
 };

@@ -1,4 +1,3 @@
-const Sauron = require("./middleware/Sauron.js");
 const authModel = require("./authModel.js");
 const redisClient = require("../shared/redisClient.js");
 const jwt = require("jsonwebtoken");
@@ -20,27 +19,22 @@ const getClientIp = (req) => {
 };
 
 const register = async (req, res) => {
-  console.log("--- Ricevuto dato grezzo ---");
-  console.log(req.body);
-
   try {
-    const result = await Sauron.process_register(req.body);
-    if (!result.isValid) return res.status(400).json(result);
+    const { username, email, password } = req.body;
 
     const saved = await authModel.registerUser({
-      username: result.data.username,
-      email: result.data.email,
-      password: result.data.password,
+      username,
+      email,
+      password,
     });
-
-    result.data.password = saved.passwordHash;
-
-    console.log("--- Dato X sicuro generato ---");
-    console.log(result.data);
 
     return res.json({
       message: "Registrazione ok",
-      dato_x_sicuro: result.data,
+      dato_x_sicuro: {
+        username,
+        email,
+        password: saved.passwordHash,
+      },
     });
   } catch (error) {
     if (error && error.code === "USER_EXISTS") {
@@ -61,15 +55,11 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const result = await Sauron.process_login(req.body);
-
-    if (!result.isValid) {
-      return res.status(400).json(result);
-    }
+    const { username, password } = req.body;
 
     const authResult = await authModel.verifyLogin({
-      username: result.data.username,
-      password: result.data.password,
+      username,
+      password,
     });
 
     if (!authResult.ok) {
@@ -135,20 +125,12 @@ const login = async (req, res) => {
 };
 
 const recoveryUsername = async (req, res) => {
-  console.log("--- Ricevuto dato da recupero username ---");
-  console.log(req.body);
-
   try {
-    const result = await Sauron.process_recovery_username(req.body);
-
-    if (!result.isValid) {
-      console.log("--- Validazione fallita ---");
-      return res.status(400).json(result);
-    }
+    const { email, password } = req.body;
 
     const recovery = await authModel.recoverUsername({
-      email: result.data.email,
-      password: result.data.password,
+      email,
+      password,
     });
 
     if (!recovery.ok) {
@@ -158,11 +140,13 @@ const recoveryUsername = async (req, res) => {
       });
     }
 
-    result.data.username = recovery.username;
-
     return res.json({
       message: "Username recuperato con successo",
-      dato_x_sicuro: result.data,
+      dato_x_sicuro: {
+        email,
+        password,
+        username: recovery.username,
+      },
     });
   } catch (error) {
     console.error("--- Errore durante l'elaborazione ---");
@@ -176,14 +160,10 @@ const recoveryUsername = async (req, res) => {
 
 const recoveryPassword = async (req, res) => {
   try {
-    const result = await Sauron.process_recovery_password(req.body);
-
-    if (!result.isValid) {
-      return res.status(400).json(result);
-    }
+    const { email } = req.body;
 
     const recovery = await authModel.recoveryPassword({
-      email: result.data.email,
+      email,
     });
 
     if (recovery.status !== 200) {
@@ -205,10 +185,6 @@ const recoveryPassword = async (req, res) => {
 
 const recoveryPasswordToken = async (req, res) => {
   try {
-    const result = await Sauron.process_recovery_password(req.body);
-    if (!result.isValid) {
-      return res.status(400).json(result);
-    }
     const { token } = req.params;
     const { newPassword } = req.body;
 
