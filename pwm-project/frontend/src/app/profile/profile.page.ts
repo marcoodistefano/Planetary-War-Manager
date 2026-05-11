@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController } from '@ionic/angular';
@@ -16,15 +16,19 @@ import { SettingsComponent } from './components/settings/settings.component';
   standalone: true,
   imports: [IonicModule, CommonModule, FormsModule, RouterModule]
 })
-export class ProfilePage implements OnInit {
+export class ProfilePage implements OnInit, AfterViewInit {
+
+  // === RIFERIMENTO AL VIDEO DI SFONDO ===
+  @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
 
   // Variabili di stato per l'offuscamento dati
   showEmail: boolean = false;
   showFriendCode: boolean = false;
 
   user: any = {
+    // ... MANTIENI I TUOI DATI USER QUI ...
     username: '',
-    avatar: 'assets/profile_icons/id_1.jpeg', // Default avatar
+    avatar: 'assets/profile_icons/id_1.jpeg',
     email: '',
     reg: '',
     elo_rating: 0,
@@ -45,6 +49,25 @@ export class ProfilePage implements OnInit {
   ngOnInit() {
     this.titleService.setTitle('PWM | Profilo Comandante');
     this.loadUserData();
+  }
+
+  // === METODI PER IL PLAYBACK DEL VIDEO ===
+  ngAfterViewInit() {
+    this.playBackgroundVideo();
+  }
+
+  ionViewDidEnter() {
+    this.playBackgroundVideo();
+  }
+
+  private playBackgroundVideo() {
+    const video = this.backgroundVideo?.nativeElement;
+    if (!video) return;
+    
+    video.muted = true;
+    video.playsInline = true;
+    video.load();
+    video.play().catch(() => undefined);
   }
 
   loadUserData() {

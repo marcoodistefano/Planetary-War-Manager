@@ -1,5 +1,5 @@
 /* ==========================================================================
-   1. BASE & BACKGROUND VIDEO
+   1. BASE & SFONDO
    ========================================================================== */
 :host {
   display: block;
@@ -11,14 +11,15 @@ ion-content {
 
 .home-page {
   position: relative;
-  height: 100vh; /* Forza l'altezza della singola pagina */
-  overflow: hidden; /* Blocca lo scroll della pagina su desktop */
   display: flex;
   flex-direction: column;
+  height: 100vh;
   padding: 14px;
+  overflow: hidden;
+  z-index: 1; 
+
   color: #f4f7fb;
   font-family: 'Courier New', Courier, monospace;
-  z-index: 1; 
   
   /* FIX SFOCATURA: Forza il rendering vettoriale dei testi */
   -webkit-font-smoothing: antialiased;
@@ -26,71 +27,78 @@ ion-content {
   text-rendering: optimizeLegibility;
 }
 
-/* Classi per il video di sfondo animato */
 .auth-background {
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100vw;
   height: 100vh;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-}
 
-.auth-background__video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-  filter: brightness(0.72) saturate(1.05) contrast(1.05);
-  
-  /* FIX HARDWARE: Forza il rendering nativo GPU per evitare sfocature */
-  transform: translateZ(0);
-  will-change: transform;
-  backface-visibility: hidden;
-}
+  &__video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    filter: brightness(0.72) saturate(1.05) contrast(1.05);
+    
+    /* FIX HARDWARE: Forza il rendering nativo GPU per evitare sfocature */
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
 
-.auth-background__overlay {
-  position: absolute; 
-  inset: 0;
-  background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%);
-  backdrop-filter: blur(2px);
+  &__overlay {
+    position: absolute; 
+    inset: 0;
+    background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%);
+    backdrop-filter: blur(2px);
+  }
 }
 
 /* ==========================================================================
-   2. LAYOUT GRID PRINCIPALE (Fluido per tutti i Monitor Desktop)
+   2. CLASSI DI UTILITÀ GLOBALI
    ========================================================================== */
-.top-row, .bottom-section {
-  position: relative;
-  z-index: 1;
+.mobile-only { display: none; }
+.desktop-only { display: flex; }
+
+.transparent-element {
+  background: rgba(255, 255, 255, 0.02) !important;
+  backdrop-filter: blur(8px);
 }
 
+/* ==========================================================================
+   3. LAYOUT & GRIGLIA PRINCIPALE
+   ========================================================================== */
 .top-row {
-  perspective: 1200px;
-  transform-style: preserve-3d;
+  position: relative;
   display: grid;
   grid-template-columns: minmax(280px, 350px) 1fr minmax(280px, 350px); 
   gap: clamp(15px, 3vw, 40px);
   justify-content: center;
-  align-items: stretch; /* Permette alle colonne di estendersi in altezza */
-  flex: 1; /* Occupa lo spazio rimanente al netto di header/footer */
-  min-height: 0; /* Fondamentale per far funzionare lo scroll flex interno */
-  padding: 1vh 2vw; /* Leggero padding in vh per adattarsi ai monitor */
-  max-width: 1800px; 
-  margin: 0 auto;
+  align-items: stretch;
+  flex: 1;
   width: 100%;
+  max-width: 1800px; 
+  min-height: 0; 
+  margin: 0 auto;
+  padding: 1vh 2vw;
+  z-index: 1;
+
+  perspective: 1200px;
+  transform-style: preserve-3d;
 }
 
 /* ==========================================================================
-   3. COLONNA CENTRALE (Titolo, Bottone Tondo, Azioni)
+   4. COLONNA CENTRALE (Hero & Azioni)
    ========================================================================== */
 .center-column {
   position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 0; /* Rimosso l'altezza fissa per evitare sbordamenti */
+  min-height: 0;
 }
 
 .title-block {
@@ -113,12 +121,12 @@ ion-content {
   }
 
   h1 {
+    margin: 0;
     font-size: clamp(1.8rem, 3vw, 3.6rem); 
     line-height: 0.95;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     text-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-    margin: 0;
   }
 }
 
@@ -126,46 +134,50 @@ ion-content {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) translateZ(0);
   z-index: 2;
   
-  /* Usa VH invece di VW per scalare in base all'altezza e non sbordare */
+  display: flex;
+  justify-content: center;
+  align-items: center;
   width: clamp(220px, 45vh, 480px);
   height: clamp(220px, 45vh, 480px);
-  border-radius: 50%; 
-  border: 1px solid rgba(120, 210, 255, 0.15);
+  padding: 20px; 
+  
   background: transparent !important; 
+  border: 1px solid rgba(120, 210, 255, 0.15);
+  border-radius: 50%; 
   box-shadow: none;
   
   color: rgba(244, 247, 251, 0.8);
   font-size: 0.65rem;
-  letter-spacing: 0.1em;
   text-transform: uppercase;
+  letter-spacing: 0.1em;
   text-align: center;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px; 
   line-height: 1.4;
   cursor: pointer;
+  
+  transform: translate(-50%, -50%) translateZ(0);
   transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
 
   &:hover {
-    transform: translate(-50%, -50%) scale(1.02) translateZ(0); 
-    border-color: rgba(120, 210, 255, 0.5);
     color: #ffffff;
+    border-color: rgba(120, 210, 255, 0.5);
     box-shadow: 0 0 25px rgba(88, 166, 255, 0.4), 0 0 50px rgba(88, 166, 255, 0.15);
+    transform: translate(-50%, -50%) scale(1.02) translateZ(0); 
   }
 
-  &:focus-visible { outline: none; box-shadow: 0 0 20px rgba(88, 166, 255, 0.8); }
+  &:focus-visible { 
+    outline: none; 
+    box-shadow: 0 0 20px rgba(88, 166, 255, 0.8); 
+  }
 }
 
 .games-container {
   position: absolute;
   left: 0;
   bottom: 10px;
-  z-index: 10;
   width: 100%;
+  z-index: 10;
   display: flex;
   justify-content: center;
 
@@ -175,255 +187,586 @@ ion-content {
     justify-content: center;
     gap: 15px;
     width: 100%;
-    button { min-width: 140px; }
+    
+    button { 
+      min-width: 140px; 
+    }
   }
 }
 
 /* ==========================================================================
-   4. PANNELLI LATERALI (Glassmorphism 3D per Desktop)
+   5. PANNELLI LATERALI & STRUTTURE CONTENITORI
    ========================================================================== */
 .left-column, .right-column {
   display: flex;
   flex-direction: column;
   gap: 15px; 
-  height: 100%; /* Si adatta all'altezza della top-row */
+  height: 100%; 
   min-height: 0;
-}
-
-.left-column.panel {
-  transform: rotateY(12deg) scale(0.98) translateZ(0);
-  transform-origin: right center;
-  transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
-  box-shadow: 20px 10px 30px rgba(0, 0, 0, 0.2) !important;
-  -webkit-font-smoothing: antialiased; backface-visibility: hidden;
-  
-  &:hover {
-    transform: rotateY(8deg) scale(0.98) translateZ(0);
-    box-shadow: 10px 10px 30px rgba(0, 0, 0, 0.25) !important;
-  }
-}
-
-.right-column.panel {
-  transform: rotateY(-12deg) scale(0.98) translateZ(0);
-  transform-origin: left center;
-  transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
-  box-shadow: -20px 10px 30px rgba(0, 0, 0, 0.2) !important;
-  -webkit-font-smoothing: antialiased; backface-visibility: hidden;
-
-  &:hover {
-    transform: rotateY(-8deg) scale(0.98) translateZ(0);
-    box-shadow: -10px 10px 30px rgba(0, 0, 0, 0.25) !important;
-  }
 }
 
 .panel {
   background: rgba(9, 16, 30, 0.15);
   border: 1px solid rgba(95, 208, 255, 0.06);
-  backdrop-filter: blur(15px) saturate(140%);
   border-radius: 18px;
+  backdrop-filter: blur(15px) saturate(140%);
+  -webkit-font-smoothing: antialiased; 
+  backface-visibility: hidden;
+  transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
+
+  &.left-column {
+    transform: rotateY(12deg) scale(0.98) translateZ(0);
+    transform-origin: right center;
+    box-shadow: 20px 10px 30px rgba(0, 0, 0, 0.2) !important;
+    &:hover {
+      transform: rotateY(8deg) scale(0.98) translateZ(0);
+      box-shadow: 10px 10px 30px rgba(0, 0, 0, 0.25) !important;
+    }
+  }
+
+  &.right-column {
+    transform: rotateY(-12deg) scale(0.98) translateZ(0);
+    transform-origin: left center;
+    box-shadow: -20px 10px 30px rgba(0, 0, 0, 0.2) !important;
+    &:hover {
+      transform: rotateY(-8deg) scale(0.98) translateZ(0);
+      box-shadow: -10px 10px 30px rgba(0, 0, 0, 0.25) !important;
+    }
+  }
 }
 
 .inner-panel {
+  padding: 14px;
   background: rgba(1, 36, 46, 0.101) !important;
   border: 1px solid rgba(95, 208, 255, 0.28) !important;
+  border-radius: 9px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.114) !important;
   backdrop-filter: blur(15px) saturate(140%) !important;
-  padding: 14px;
-  border-radius: 9px;
 }
 
-/* Fix per le bottom-section che contengono le liste */
 .bottom-section {
-  flex: 1; /* Prende tutto lo spazio residuo verticale in basso */
+  position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 0; /* Fondamentale per abilitare lo scroll interno della lista */
+  flex: 1; 
+  min-height: 0;
+  z-index: 1;
 }
 
 .panel-divider {
+  margin: 0 14px;
   border: none;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
-  margin: 0 14px;
-}
-
-.transparent-element {
-  background: rgba(255, 255, 255, 0.02) !important;
-  backdrop-filter: blur(8px);
 }
 
 /* ==========================================================================
-   5. COMPONENTI UI INTERNI (Leaderboard, Card, Bottoni Desktop)
+   6. HEADER MOBILE (Isola Fluttuante)
+   ========================================================================== */
+.mobile-header {
+  display: none; /* Gestito da media query */
+  position: fixed; 
+  top: 12px; 
+  left: 12px; 
+  z-index: 1001; 
+  
+  width: calc(100% - 24px); 
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between; 
+  align-items: center; 
+  
+  background: rgba(9, 16, 30, 0.45); 
+  border: 1px solid rgba(95, 208, 255, 0.2); 
+  border-radius: 16px; 
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(15px) saturate(140%);
+  -webkit-backdrop-filter: blur(15px) saturate(140%);
+
+  .mini-avatar {
+    width: 42px; 
+    height: 42px; 
+    border-radius: 50%; 
+    border: 2px solid rgba(134, 215, 255, 0.5); 
+    box-shadow: 0 0 10px rgba(103, 224, 255, 0.2);
+    overflow: hidden;
+    cursor: pointer; 
+    transition: all 0.3s ease;
+    
+    img { 
+      width: 150%; 
+      height: 150%; 
+      object-fit: cover; 
+      display: block;
+    }
+  }
+
+  .header-title {
+    position: absolute;
+    left: 50%;
+    margin: 0;
+    
+    color: #86d7ff; 
+    font-size: 1.3rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 10px rgba(134, 215, 255, 0.6);
+    
+    transform: translateX(-50%);
+  }
+
+  .menu-trigger { 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer; 
+  }
+
+  .hamburger-menu {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    
+    ion-icon {
+      font-size: 2.2rem; 
+      color: #86d7ff; 
+      filter: drop-shadow(0 0 6px rgba(134, 215, 255, 0.5)); 
+      transition: all 0.2s ease;
+    }
+
+    &:hover ion-icon, &:active ion-icon {
+      color: #ffffff;
+      transform: scale(0.95);
+      filter: drop-shadow(0 0 12px rgba(134, 215, 255, 0.8));
+    }
+  }
+}
+
+/* ==========================================================================
+   7. COMPONENTI INTERNI UI (Bottoni, Liste, Form)
    ========================================================================== */
 .leaderboard-panel, .profile-panel, .bottom-section { padding: 14px; }
-.panel-heading, .section-header, .profile-card, .game-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+.panel-heading, .section-header, .profile-card, .game-card { 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  gap: 8px; 
+}
 
 .panel-heading {
   margin-bottom: 9px;
-  span { font-size: 0.8rem; font-weight: 700; display: block; }
-  small { color: rgba(244, 247, 251, 0.68); font-size: 0.65rem; display: block; }
+  span { display: block; font-size: 0.8rem; font-weight: 700; }
+  small { display: block; font-size: 0.65rem; color: rgba(244, 247, 251, 0.68); }
 }
 
 .leaderboard-group h2, .section-header h2, .profile-card h2, .game-card h3 { margin: 0; }
-.leaderboard-group h2 { margin-bottom: 8px; font-size: 0.7rem; color: rgba(244, 247, 251, 0.78); text-transform: uppercase; letter-spacing: 0.08em; }
+.leaderboard-group h2 { 
+  margin-bottom: 8px; 
+  color: rgba(244, 247, 251, 0.78); 
+  font-size: 0.7rem; 
+  text-transform: uppercase; 
+  letter-spacing: 0.08em; 
+}
 
+/* Leaderboard */
 .leaderboard-toggle {
-  display: flex; gap: 6px; margin-bottom: 9px;
+  display: flex; 
+  gap: 6px; 
+  margin-bottom: 9px;
+
   button {
-    background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 6px 9px; border-radius: 9px; color: #eaf6ff; font-weight: 700; cursor: pointer; backdrop-filter: blur(10px);
+    padding: 6px 9px; 
+    background: rgba(255, 255, 255, 0.03); 
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 9px; 
+    color: #eaf6ff; 
+    font-weight: 700; 
+    cursor: pointer; 
+    backdrop-filter: blur(10px);
+    
     &.active { background: linear-gradient(135deg, rgba(120, 205, 255, 0.20), rgba(30, 120, 160, 0.16)); }
   }
-  .view-full { margin-left: auto; background: rgba(255, 255, 255, 0.025); }
+  .view-full { 
+    margin-left: auto; 
+    background: rgba(255, 255, 255, 0.025); 
+  }
 }
 
 .leaderboard-entry {
-  display: grid; grid-template-columns: 40px 22px 1fr auto; align-items: center; gap: 8px;
-  padding: 8px 9px; border-radius: 8px; background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.045); backdrop-filter: blur(10px); margin-bottom: 6px;
+  display: grid; 
+  grid-template-columns: 40px 22px 1fr auto; 
+  align-items: center; 
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 8px 9px; 
+  
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.045); 
+  border-radius: 8px; 
+  backdrop-filter: blur(10px); 
+
   &.secondary { background: rgba(15, 28, 48, 0.22); }
+  
+  .rank, .score { font-weight: 700; }
+  .name { color: #ffffff; }
+  .flag { font-size: 0.85rem; text-align: center; }
+  .score { color: #86d7ff; }
 }
 
-.rank, .score, .status-badge { font-weight: 700; }
-.name { color: #ffffff; }
-.flag { font-size: 0.85rem; text-align: center; }
-.score { color: #86d7ff; }
-
-.profile-card { flex-direction: column; text-align: center; gap: 6px; margin-bottom: 9px; justify-content: center; }
-.profile-label { margin: 0 0 1px; color: rgba(244, 247, 251, 0.65); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em; }
-.profile-name { font-size: 1rem; }
-.profile-level { font-size: 0.75rem; color: rgba(244, 247, 251, 0.7); }
+/* Profilo Avatar e Card */
+.profile-card { 
+  flex-direction: column; 
+  justify-content: center; 
+  text-align: center; 
+  gap: 6px; 
+  margin-bottom: 9px; 
+  
+  .profile-label { margin: 0 0 1px; color: rgba(244, 247, 251, 0.65); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em; }
+  .profile-name { font-size: 1rem; }
+  .profile-level { font-size: 0.75rem; color: rgba(244, 247, 251, 0.7); }
+}
 
 .avatar {
-  display: grid; place-items: center; width: 80px; height: 80px; border-radius: 50%;
-  background: linear-gradient(135deg, #67e0ff, #12394b); color: #ffffff; font-size: 1.5rem; font-weight: 800;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25); cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;
-  &:hover { transform: scale(1.1); box-shadow: 0 0 15px rgba(103, 224, 255, 0.5); }
+  display: grid; 
+  place-items: center; 
+  width: 80px; 
+  height: 80px; 
+  
+  color: #ffffff; 
+  font-size: 1.5rem; 
+  font-weight: 800;
+  background: linear-gradient(135deg, #67e0ff, #12394b); 
+  border-radius: 50%;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25); 
+  
+  cursor: pointer; 
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  
+  &:hover { 
+    transform: scale(1.1); 
+    box-shadow: 0 0 15px rgba(103, 224, 255, 0.5); 
+  }
 }
 
+/* Bottoni (Primary, Ghost, Join) */
 .quick-actions {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+  display: grid; 
+  grid-template-columns: repeat(2, minmax(0, 1fr)); 
+  gap: 8px;
+
   button {
-    border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; min-height: 33px; padding: 0 10px;
-    font-weight: 700; color: #f4f7fb; cursor: pointer; background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px);
+    min-height: 33px; 
+    padding: 0 10px;
+    background: rgba(255, 255, 255, 0.03); 
+    border: 1px solid rgba(255, 255, 255, 0.05); 
+    border-radius: 8px; 
+    color: #f4f7fb; 
+    font-weight: 700; 
+    cursor: pointer; 
+    backdrop-filter: blur(12px);
   }
 }
 
 .primary-button, .ghost-button, .join-button {
-  border-radius: 8px; font-weight: 700; color: #f4f7fb; cursor: pointer; backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px; 
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #f4f7fb; 
+  font-weight: 700; 
+  cursor: pointer; 
+  backdrop-filter: blur(12px); 
 }
-.primary-button { padding: 0 10px; min-height: 33px; background: linear-gradient(135deg, rgba(103, 184, 255, 0.22), rgba(45, 114, 210, 0.28)); }
-.ghost-button { padding: 0 10px; min-height: 33px; background: rgba(255, 255, 255, 0.02); }
-.join-button { padding: 4px 9px; background: linear-gradient(135deg, rgba(103, 184, 255, 0.18), rgba(45, 114, 210, 0.24)); border-color: rgba(255, 255, 255, 0.06); }
 
-/* La lista assorbe lo spazio senza forzare limiti fissi in vh */
-.games-list {
-  display: flex; flex-direction: column; gap: 6px; width: 100%; 
-  flex: 1; /* Espandi per riempire lo spazio residuo */
-  overflow-y: auto; padding-right: 4px;
+.primary-button { 
+  min-height: 33px; 
+  padding: 0 10px; 
+  background: linear-gradient(135deg, rgba(103, 184, 255, 0.22), rgba(45, 114, 210, 0.28)); 
 }
-.games-list::-webkit-scrollbar { width: 4px; }
-.games-list::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
-.games-list::-webkit-scrollbar-thumb { background: rgba(95, 208, 255, 0.3); border-radius: 4px; }
+
+.ghost-button { 
+  min-height: 33px; 
+  padding: 0 10px; 
+  background: rgba(255, 255, 255, 0.02); 
+}
+
+.join-button { 
+  padding: 4px 9px; 
+  background: linear-gradient(135deg, rgba(103, 184, 255, 0.18), rgba(45, 114, 210, 0.24)); 
+  border-color: rgba(255, 255, 255, 0.06); 
+}
+
+/* Liste e Card Partite */
+.games-list {
+  display: flex; 
+  flex-direction: column; 
+  flex: 1; 
+  gap: 6px; 
+  width: 100%; 
+  padding-right: 4px;
+  overflow-y: auto; 
+  
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
+  &::-webkit-scrollbar-thumb { background: rgba(95, 208, 255, 0.3); border-radius: 4px; }
+}
 
 .game-card {
-  padding: 8px 9px; border-radius: 9px; background: rgba(255, 255, 255, 0.025); border: 1px solid rgba(255, 255, 255, 0.035); backdrop-filter: blur(10px);
+  padding: 8px 9px; 
+  background: rgba(255, 255, 255, 0.025); 
+  border: 1px solid rgba(255, 255, 255, 0.035); 
+  border-radius: 9px; 
+  backdrop-filter: blur(10px);
+  
   .meta { color: rgba(244, 247, 251, 0.72); font-size: 0.7rem; margin-top: 4px; }
 }
 
-.status-badge { padding: 5px 8px; border-radius: 999px; background: rgba(134, 215, 255, 0.08); border: 1px solid rgba(134, 215, 255, 0.1); color: #86d7ff; white-space: nowrap; }
+.status-badge { 
+  padding: 5px 8px; 
+  background: rgba(134, 215, 255, 0.08); 
+  border: 1px solid rgba(134, 215, 255, 0.1); 
+  border-radius: 999px; 
+  color: #86d7ff; 
+  font-weight: 700;
+  white-space: nowrap; 
+}
 
+/* Searchbar */
 .glass-searchbar {
-  --background: rgba(255, 255, 255, 0.03); --color: #f4f7fb; --placeholder-color: rgba(244, 247, 251, 0.5); --icon-color: rgba(244, 247, 251, 0.7);
-  --clear-button-color: rgba(244, 247, 251, 0.7); --border-radius: 9px; --box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 9px; backdrop-filter: blur(10px); padding: 0; margin-bottom: 9px;
+  --background: rgba(255, 255, 255, 0.03); 
+  --color: #f4f7fb; 
+  --placeholder-color: rgba(244, 247, 251, 0.5); 
+  --icon-color: rgba(244, 247, 251, 0.7);
+  --clear-button-color: rgba(244, 247, 251, 0.7); 
+  --border-radius: 9px; 
+  --box-shadow: none;
+  
+  margin-bottom: 9px;
+  padding: 0; 
+  border: 1px solid rgba(255, 255, 255, 0.05); 
+  border-radius: 9px; 
+  backdrop-filter: blur(10px); 
 }
 
 /* ==========================================================================
-   6. HEADER E MENU LATERALE (MOBILE DRAWER)
+   8. TACTICAL DRAWER (Menu Laterale)
    ========================================================================== */
 .tactical-drawer {
-  --background: rgba(5, 10, 20, 0.95);
-  --width: 280px;
+  --background: rgba(9, 16, 30, 0.85); 
+  --width: 320px;
+  backdrop-filter: blur(15px) saturate(140%);
+  border-left: 1px solid rgba(95, 208, 255, 0.2);
+  
+  .drawer-content { --background: transparent; }
 
   .drawer-container {
-    padding: 40px 20px;
-    display: flex; flex-direction: column; gap: 30px; height: 100%;
-    backdrop-filter: blur(15px); border-left: 1px solid rgba(88, 166, 255, 0.3);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0;
+    color: #f4f7fb;
+    font-family: 'Courier New', Courier, monospace;
   }
-}
 
-.profile-card-mobile {
-  text-align: center;
-  .avatar { 
-    margin: 0 auto 15px; border: 1px solid #58a6ff; 
-    width: 80px; height: 80px; box-shadow: 0 0 15px rgba(88,166,255,0.3);
+  .drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 20px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(95, 208, 255, 0.15);
+
+    .logo-mark {
+      width: 50px; 
+      height: 50px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 8px rgba(134, 215, 255, 0.4));
+    }
+
+    .avatar {
+      width: 50px;
+      height: 50px;
+      border: 1px solid rgba(134, 215, 255, 0.5);
+      border-radius: 50%;
+      box-shadow: 0 0 15px rgba(103, 224, 255, 0.2);
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      img { width: 100%; height: 100%; object-fit: cover; }
+
+      &:hover {
+        transform: scale(1.1);
+        border-color: #86d7ff;
+        box-shadow: 0 0 20px rgba(103, 224, 255, 0.6);
+      }
+    }
   }
-  .profile-name { font-size: 1.2rem; color: #fff; margin: 0; }
-  .profile-level { color: #86d7ff; font-size: 0.7rem; text-transform: uppercase; }
-}
 
-.quick-actions-vertical {
-  .menu-label { color: #58a6ff; font-size: 0.6rem; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px; }
-  .action-item {
-    width: 100%; padding: 15px; margin-bottom: 10px; text-align: left;
-    border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; color: #fff; font-size: 0.8rem; cursor: pointer;
-    background: transparent;
-    &:hover { border-color: #58a6ff; background: rgba(88, 166, 255, 0.1); }
+  .drawer-nav {
+    flex: 1;
+    padding: 24px 0;
+    overflow-y: auto;
+
+    .nav-label {
+      margin: 0 0 12px 0;
+      padding: 0 24px;
+      color: rgba(244, 247, 251, 0.65);
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    .nav-divider {
+      height: 1px;
+      margin: 16px 24px 24px 24px;
+      background: rgba(95, 208, 255, 0.1);
+    }
   }
-}
 
-.mobile-header {
-  display: none; 
-  justify-content: space-between; align-items: center; padding: 10px 20px;
-  position: sticky; top: 0; z-index: 1001; background: rgba(5, 10, 20, 0.6);
-  backdrop-filter: blur(10px); border-bottom: 1px solid rgba(88, 166, 255, 0.2);
+  .nav-item {
+    display: flex;
+    align-items: center;
+    width: calc(100% - 32px);
+    margin: 0 16px 8px 16px;
+    padding: 12px 16px;
+    
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.035);
+    border-radius: 9px;
+    backdrop-filter: blur(10px);
+    
+    color: #c9d1d9;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
 
-  .logo { font-weight: 900; color: #fff; letter-spacing: 2px; }
-  .menu-trigger { cursor: pointer; }
-  .mini-avatar {
-    width: 35px; height: 35px; border-radius: 50%; border: 1px solid #58a6ff; overflow: hidden;
-    img { width: 100%; height: 100%; object-fit: cover; }
+    ion-icon {
+      margin-right: 16px;
+      color: rgba(244, 247, 251, 0.7);
+      font-size: 1.25rem;
+      transition: all 0.2s ease;
+    }
+
+    span {
+      flex: 1;
+      text-align: left;
+      letter-spacing: 0.05em;
+    }
+
+    .chevron {
+      margin-right: 0;
+      font-size: 1rem;
+      opacity: 0;
+      transform: translateX(-10px);
+      transition: all 0.2s ease;
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(95, 208, 255, 0.2);
+      color: #ffffff;
+      
+      ion-icon { color: #86d7ff; filter: drop-shadow(0 0 5px rgba(134, 215, 255, 0.5)); }
+      .chevron { opacity: 0.8; transform: translateX(0); color: #86d7ff; }
+    }
+
+    &.active {
+      background: linear-gradient(135deg, rgba(103, 184, 255, 0.15), rgba(45, 114, 210, 0.2));
+      border-color: rgba(95, 208, 255, 0.4);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 0 10px rgba(95, 208, 255, 0.1);
+      color: #ffffff;
+      font-weight: 700;
+
+      ion-icon { color: #86d7ff; filter: drop-shadow(0 0 8px rgba(134, 215, 255, 0.6)); }
+      .chevron { opacity: 1; transform: translateX(0); color: #86d7ff; }
+    }
+  }
+
+  .drawer-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    background: rgba(1, 36, 46, 0.3);
+    border-top: 1px solid rgba(95, 208, 255, 0.15);
+
+    .user-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .user-name { color: #ffffff; font-size: 0.95rem; font-weight: bold; letter-spacing: 0.05em; }
+      .user-level { color: #86d7ff; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; }
+    }
+
+    .logout-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      
+      background: rgba(255, 107, 107, 0.05);
+      border: 1px solid rgba(255, 107, 107, 0.2);
+      border-radius: 8px;
+      
+      color: #ff6b6b;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: rgba(255, 107, 107, 0.15);
+        border-color: rgba(255, 107, 107, 0.5);
+        box-shadow: 0 0 10px rgba(255, 107, 107, 0.2);
+        transform: scale(1.05);
+      }
+    }
   }
 }
 
 /* ==========================================================================
-   7. FOOTER HUD (Unificato e ripulito)
+   9. FOOTER HUD
    ========================================================================== */
 ion-footer {
-  --background: transparent;
   background: transparent;
+  --background: transparent;
 }
 
 .hud-footer {
+  position: relative;
+  z-index: 1000;
+  flex-shrink: 0; 
+  
+  width: calc(100% - 24px);
+  max-width: 900px;
   margin: 0 auto 10px;
-  flex-shrink: 0; /* Assicura che non venga schiacciato in flex */
+  padding: 8px 12px;
+  
+  background: rgba(5, 10, 20, 0.7); 
   border: 1px solid rgba(88, 166, 255, 0.4);
   border-radius: 12px;
-  background: rgba(5, 10, 20, 0.7); 
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  max-width: 900px;
-  width: calc(100% - 24px);
-  padding: 8px 12px;
-  font-size: 0.55rem;
+  
   color: #c9d1d9;
-  z-index: 1000;
-  position: relative;
-}
+  font-size: 0.55rem;
 
-.hud-footer-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  &-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
 }
 
 .status-dot {
+  display: inline-block;
   width: 6px;
   height: 6px;
+  margin-right: 4px;
   background: #3fb950;
   border-radius: 50%;
-  display: inline-block;
-  margin-right: 4px;
   box-shadow: 0 0 8px rgba(63, 185, 80, 0.6);
 }
 
@@ -438,60 +781,52 @@ ion-footer {
 }
 
 /* ==========================================================================
-   8. RESPONSIVE LOGIC CONSOLIDATA (Mobile/Tablet < 1100px)
+   10. RESPONSIVE (Mobile/Tablet < 1100px)
    ========================================================================== */
-
-.mobile-only { display: none; }
-.desktop-only { display: flex; }
-
 @media (max-width: 1100px) {
   
   .mobile-only { display: block; }
   .desktop-only { display: none !important; }
 
-  /* MANTIENI IL FLEXBOX PER GESTIRE IL FOOTER E LE COLONNE */
   .home-page {
-    height: auto;
-    min-height: 100vh;
-    overflow: visible;
     display: flex; 
     flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    padding-top: 85px !important; /* Spazio per header fisso */
+    overflow: visible;
   }
 
-  /* RIPRISTINO BARRA IN ALTO */
   .mobile-header { 
     display: flex !important;
-    position: sticky;
-    top: 0;
+    position: fixed !important; 
+    top: 12px !important; 
     z-index: 1001;
   }
   
-  /* L'AREA CENTRALE PRENDE TUTTO LO SPAZIO */
   .top-row { 
     display: flex; 
     flex-direction: column; 
-    flex: 1; /* Occupa tutto lo spazio tra header e footer */
-    justify-content: center; /* Centra verticalmente tutto */
-    padding: 10px; 
+    flex: 1; 
+    justify-content: center; 
     gap: 20px;
+    padding: 10px; 
     perspective: none !important;
     transform-style: flat !important;
   }
   
-  /* COLONNA CON TITOLO E BOTTONI */
   .center-column {
     order: -1; 
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 40px; 
     width: 100%; 
     max-width: 500px;
     margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 40px; /* Spazio tra titolo e bottoni */
   }
 
-  /* RESET POSIZIONAMENTI ASSOLUTI DESKTOP */
   .title-block {
     position: relative; 
     top: auto; 
@@ -501,44 +836,39 @@ ion-footer {
   .games-container {
     position: relative; 
     bottom: auto; 
-    transform: none !important;
     width: 100%;
+    transform: none !important;
+
+    .games-actions {
+      flex-direction: column;
+      width: 100%;
+      
+      button { 
+        width: 100%; 
+        padding: 18px; 
+        font-size: 0.9rem;
+      }
+    }
   }
 
   .return-last-match { display: none !important; }
 
-  /* BOTTONI A LARGHEZZA PIENA SU MOBILE */
-  .games-container .games-actions {
-    flex-direction: column;
-    width: 100%;
-    button { 
-      width: 100%; 
-      padding: 18px; /* Pulsanti più grandi per il touch */
-      font-size: 0.9rem;
+  .hud-footer {
+    width: calc(100% - 16px) !important;
+    margin: auto auto 20px auto !important; 
+    padding: 8px 12px; 
+    
+    &-content {
+      flex-direction: column;
+      gap: 6px; 
+      text-align: center;
     }
   }
 
-  /* FOOTER MOBILE HUD (Stile IDENTICO alla pagina di Login) */
-  .hud-footer {
-    /* Mantiene l'ancoraggio in basso senza usare ion-footer */
-    margin: auto auto 20px auto !important; 
-    width: calc(100% - 16px) !important;
-    padding: 8px 12px; /* Ripristinato il padding originale del login */
-  }
-  
-  .hud-footer-content {
-    flex-direction: column;
-    gap: 6px; /* Ripristinato il gap originale del login */
-    text-align: center;
-  }
-
-  /* Rimuoviamo il blocco degli "a capo" per farlo scorrere naturalmente come nel login */
   .footer-left, .footer-center, .footer-right {
     font-size: 0.55rem;
     white-space: normal;
   }
   
-  .divider { 
-    display: none;
-  }
-} 
+  .divider { display: none; }
+}

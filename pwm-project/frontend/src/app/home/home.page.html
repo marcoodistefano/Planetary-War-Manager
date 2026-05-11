@@ -1,27 +1,60 @@
 <ion-menu side="end" contentId="main-content" menuId="profile-menu" class="tactical-drawer">
-  <ion-content class="transparent-bg">
+  <ion-content class="drawer-content">
     <div class="drawer-container">
-      <div class="profile-card-mobile">
-        <div class="avatar transparent-element" routerLink="/profile">
-          <img [src]="'assets/profile_icons/id_1.jpeg'" style="width: 100%; height: 100%; object-fit: cover;">
+      
+      <div class="drawer-header">
+        <img src="assets/icon/favicon.svg" class="logo-mark" alt="PWM">
+        <div class="avatar" routerLink="/profile">
+          <img [src]="'assets/profile_icons/id_1.jpeg'" alt="Profile">
         </div>
-        <h2 class="profile-name">{{ currentPlayer.name }}</h2>
-        <small class="profile-level">Livello 24</small>
       </div>
 
-      <div class="quick-actions-vertical mobile-only">
-        <p class="menu-label">Rapporti Tattici</p>
-        <button type="button" class="action-item transparent-element" (click)="handleQuickAction('Leaderboard')">Leaderboard</button>
-        <button type="button" class="action-item transparent-element" (click)="handleQuickAction('Partite Attive')">Partite Attive</button>
-        <button type="button" class="action-item transparent-element" (click)="handleQuickAction('Nuove Partite')">Ultime Partite Create</button>
-      </div>
+      <nav class="drawer-nav">
+        
+        <p class="nav-label mobile-only">Rapporti Tattici</p>
+        
+        <button type="button" class="nav-item mobile-only" (click)="handleQuickAction('Leaderboard')">
+          <ion-icon name="trophy-outline"></ion-icon>
+          <span>Leaderboard</span>
+          <ion-icon name="chevron-forward-outline" class="chevron"></ion-icon>
+        </button>
+        
+        <button type="button" class="nav-item mobile-only" (click)="handleQuickAction('Partite Attive')">
+          <ion-icon name="game-controller-outline"></ion-icon>
+          <span>Partite Attive</span>
+          <ion-icon name="chevron-forward-outline" class="chevron"></ion-icon>
+        </button>
+        
+        <button type="button" class="nav-item mobile-only" (click)="handleQuickAction('Nuove Partite')">
+          <ion-icon name="time-outline"></ion-icon>
+          <span>Ultime Create</span>
+          <ion-icon name="chevron-forward-outline" class="chevron"></ion-icon>
+        </button>
 
-      <div class="quick-actions-vertical">
-        <p class="menu-label">Protocolli Rapidi</p>
-        <button type="button" class="action-item transparent-element" *ngFor="let action of quickActions" (click)="handleQuickAction(action)"> 
-          {{ action }}
+        <div class="nav-divider mobile-only"></div>
+
+        <p class="nav-label">Protocolli Rapidi</p>
+        
+        <button type="button" class="nav-item" 
+                *ngFor="let action of quickActions; let i = index" 
+                (click)="handleQuickAction(action)"
+                [class.active]="i === 0"> 
+          <ion-icon name="flash-outline"></ion-icon>
+          <span>{{ action }}</span>
+          <ion-icon name="chevron-forward-outline" class="chevron"></ion-icon>
+        </button>
+      </nav>
+
+      <div class="drawer-footer">
+        <div class="user-info">
+          <span class="user-name">{{ currentPlayer.name }}</span>
+          <span class="user-level">Livello 24</span>
+        </div>
+        <button type="button" class="logout-btn" aria-label="Esci">
+          <ion-icon name="log-out-outline"></ion-icon>
         </button>
       </div>
+
     </div>
   </ion-content>
 </ion-menu>
@@ -35,12 +68,17 @@
   <div class="home-page">
     
     <header class="mobile-header">
-      <div class="logo">PWM</div>
-      <ion-menu-button menu="profile-menu" class="menu-trigger">
-        <div class="mini-avatar">
-          <img [src]="'assets/profile_icons/id_1.jpeg'">
+      <div class="mini-avatar" routerLink="/profile">
+        <img [src]="'assets/profile_icons/id_1.jpeg'" alt="Vai al Profilo">
+      </div>
+
+      <div class="header-title">PWM</div>
+
+      <ion-menu-toggle menu="profile-menu" auto-hide="false" class="menu-trigger">
+        <div class="hamburger-menu">
+          <ion-icon name="menu-outline"></ion-icon>
         </div>
-      </ion-menu-button>
+      </ion-menu-toggle>
     </header>
     
     <section class="top-row">

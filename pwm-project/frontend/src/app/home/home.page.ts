@@ -49,6 +49,7 @@ export class HomePage implements OnInit, AfterViewInit {
   ];
 
   quickActions = [
+    'Profilo', 
     'Notifiche',
     'Impostazioni',
     'Obiettivi',
@@ -183,6 +184,9 @@ filterNewGames(event: any) {
   // Funzione universale per gestire i pulsanti HUD
   async handleQuickAction(action: string) {
     switch (action) {
+      case 'Profilo':
+        this.router.navigate(['/profile']);
+        break;
       case 'Notifiche':
         await this.openModal(NotificationsComponent);
         break;

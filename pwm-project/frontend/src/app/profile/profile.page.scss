@@ -1,45 +1,143 @@
 /* ==========================================================================
-   1. BACKGROUND E OVERLAY BASE
+   1. BACKGROUND VIDEO FISSO E OVERLAY BASE
    ========================================================================== */
 ion-content {
   --background: #08111f;
   font-family: 'Courier New', Courier, monospace;
 }
 
-.home-page {
-  position: relative;
-  height: 100vh; /* FORZA L'ALTEZZA ALLA SINGOLA PAGINA */
-  overflow: hidden; /* BLOCCA LO SCROLL SU DESKTOP */
-  display: flex;
-  flex-direction: column;
-  padding: 14px;
-  background: linear-gradient(180deg, rgba(3, 8, 18, 0.45) 0%, rgba(3, 8, 18, 0.82) 100%),
-              url('/assets/background/background.png') center/cover no-repeat;
+/* 1. Sfondo Animato: Rimane fisso (fixed) e non scrolla */
+.auth-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none; /* Rende il video "cliccabile-attraverso" */
 }
 
-.overlay {
+.auth-background__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: brightness(0.72) saturate(1.05) contrast(1.05);
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.auth-background__overlay {
   position: absolute; 
   inset: 0;
   background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%);
+  backdrop-filter: blur(2px);
+}
+
+/* 2. Contenitore principale: Ora è trasparente e permette lo scroll */
+.home-page {
+  position: relative;
+  min-height: 100vh; /* Permette alla pagina di allungarsi per lo scroll */
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  z-index: 1; /* Tutti i contenuti si posizionano SOPRA il video */
+  
+  /* RIMOSSO: Lo sfondo immagine statico */
+  /* RIMOSSO: overflow: hidden; (Così gli elementi possono scrollare) */
+  background: transparent; 
+}
+
+/* 3. Bagliore azzurro tattico fisso in alto */
+.overlay {
+  position: fixed; /* Fixed in modo che il bagliore resti in alto anche scrollando */
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at top center, rgba(134, 215, 255, 0.05), transparent 40%);
   pointer-events: none;
+  z-index: -1; /* Sotto i pannelli, ma sopra la home-page base */
 }
 
 /* ==========================================================================
-   2. LAYOUT CENTRATO (Visuale 3D Inclinata a 15 Gradi)
+   HEADER / NAVBAR SUPERIORE (Stile Screenshot)
+   ========================================================================== */
+
+.mobile-header {
+  display: none; /* Nascondi l'header di default sulla visualizzazione Desktop */
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 15px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  z-index: 1001;
+  
+  /* Effetto vetro scuro come da immagine */
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+  .header-left, .header-right {
+    flex: 1;
+    display: flex;
+    align-items: center;
+  }
+
+  .header-center {
+    flex: 2;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* Link "Home" con Chevron */
+  .back-link {
+    --color: #58a6ff; // Azzurro specifico per il link
+    font-size: 1rem;
+    font-weight: 500;
+    margin: 0;
+    --padding-start: 0;
+    --padding-end: 0;
+    text-transform: none;
+    letter-spacing: 0.5px;
+    
+    ion-icon {
+      font-size: 1.4rem;
+      margin-right: -2px; // Avvicina il chevron al testo
+    }
+  }
+
+  /* Titolo PROFILO bold e centrato */
+  .nav-title {
+    color: #ffffff;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* ==========================================================================
+   2. LAYOUT CENTRATO (Visuale 3D)
    ========================================================================== */
 .top-row {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 30px; 
-  flex: 1; /* Prende lo spazio residuo verticale */
-  min-height: 0; /* Fondamentale per i layout fluidi flex */
-  max-width: 1000px; 
+  flex: 1; 
+  min-height: 0; 
+  max-width: 1100px; 
   margin: 0 auto;
   perspective: 1200px;
+  z-index: 10;
 }
 
-/* Stile base condiviso */
 .left-column, .right-column {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -48,178 +146,140 @@ ion-content {
   transition: transform 0.4s ease-out;
   display: flex;
   flex-direction: column;
-  max-height: 100%; /* Garantisce che i pannelli non escano dai limiti verticali */
-  justify-content: center; /* Centra i pannelli verticalmente se c'è spazio */
+  max-height: 100%; 
+  justify-content: center; 
 }
 
-/* Colonna Sinistra */
-.left-column { 
-  flex: 0 0 280px; 
-  transform: rotateY(15deg) translateZ(0) scale(0.999); 
-  transform-origin: right center; 
-}
-.left-column:hover {
-  transform: rotateY(10deg) translateZ(0) scale(0.999);
-}
+.left-column { flex: 0 0 290px; transform: rotateY(12deg) translateZ(0); transform-origin: right center; }
+.left-column:hover { transform: rotateY(6deg) translateZ(0); }
 
-/* Colonna Centrale */
-.center-column { 
-  flex: 0 0 300px; 
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  z-index: 10;
-} 
+.center-column { flex: 0 0 320px; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; } 
 
-/* Colonna Destra */
-.right-column { 
-  flex: 0 0 280px; 
-  transform: rotateY(-15deg) translateZ(0) scale(0.999); 
-  transform-origin: left center; 
-}
-.right-column:hover {
-  transform: rotateY(-10deg) translateZ(0) scale(0.999);
-}
+.right-column { flex: 0 0 290px; transform: rotateY(-12deg) translateZ(0); transform-origin: left center; }
+.right-column:hover { transform: rotateY(-6deg) translateZ(0); }
 
 /* ==========================================================================
    3. STILE VETRO E CONTENITORI PANNELLI
    ========================================================================== */
 .panel {
-  background: rgba(9, 16, 30, 0.15);
-  border: 1px solid rgba(95, 208, 255, 0.06);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.32), 0 0 18px rgba(95, 208, 255, 0.04) inset;
-  backdrop-filter: blur(15px) saturate(140%);
+  background: rgba(9, 16, 30, 0.25);
+  border: 1px solid rgba(95, 208, 255, 0.1);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(95, 208, 255, 0.05);
+  backdrop-filter: blur(20px) saturate(150%);
   border-radius: 18px;
   display: flex;
   flex-direction: column;
   overflow-y: auto; 
-  
-  /* Nasconde la scrollbar estetica ma mantiene la funzione se forzata su schermi minuscoli */
   -ms-overflow-style: none;  
   scrollbar-width: none;  
   &::-webkit-scrollbar { display: none; }
 }
 
 .inner-panel {
-  background: rgba(1, 36, 46, 0.101) !important;
-  border: 1px solid rgba(95, 208, 255, 0.28) !important;
-  padding: 10px; /* Ridotto da 12px */
-  border-radius: 9px;
-  margin: 8px 10px; /* Compattato margine verticale */
+  background: rgba(1, 36, 46, 0.15) !important;
+  border: 1px solid rgba(95, 208, 255, 0.2) !important;
+  padding: 12px;
+  border-radius: 12px;
+  margin: 10px;
 }
 
 .transparent-element {
   background: rgba(255, 255, 255, 0.02) !important;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .panel-divider { 
   border: none; 
-  border-top: 1px solid rgba(255, 255, 255, 0.05); 
-  margin: 0 10px; /* Allineato ai nuovi margini */
+  border-top: 1px solid rgba(95, 208, 255, 0.1); 
+  margin: 0 10px; 
 }
 
 /* ==========================================================================
-   4. TIPOGRAFIA UNIFORME E OFFUSCAMENTO
+   4. TIPOGRAFIA E OFFUSCAMENTO
    ========================================================================== */
 .panel-heading {
-  margin-bottom: 6px; /* Ridotto da 10px */
-  span { display: block; font-size: 0.85rem; font-weight: 700; color: #fff; }
-  small { display: block; font-size: 0.6rem; color: #86d7ff; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+  margin-bottom: 10px; 
+  span { display: block; font-size: 0.85rem; font-weight: 700; color: #fff; letter-spacing: 0.05em; }
+  small { display: block; font-size: 0.6rem; color: #86d7ff; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px; opacity: 0.8; }
 }
 
 .title-block {
-  text-align: center; margin-bottom: 12px; /* Ridotto da 20px */
-  .eyebrow { margin: 0 0 8px; color: #b6cee9; font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; }
-  h1 { font-size: clamp(1.4rem, 2.5vw, 2.2rem); line-height: 0.95; letter-spacing: 0.04em; text-transform: uppercase; text-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); margin: 0; color: #fff; }
+  text-align: center; margin-bottom: 15px; 
+  .eyebrow { margin: 0 0 8px; color: #86d7ff; font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; font-weight: bold; }
+  h1 { font-size: clamp(1.6rem, 2.8vw, 2.4rem); line-height: 1; letter-spacing: 0.05em; text-transform: uppercase; color: #fff; text-shadow: 0 0 20px rgba(134, 215, 255, 0.5); margin: 0; }
 }
 
-/* Wrapper dei campi crittografati */
 .field-container {
-  padding: 8px; /* Ridotto da 10px */
-  margin-bottom: 6px; /* Ridotto da 8px */
-  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px; 
+  border-radius: 8px;
   
-  .custom-label { 
-    font-size: 0.6rem; 
-    color: #79c0ff; 
-    margin: 0 0 4px 0; 
-    font-weight: bold; 
-    letter-spacing: 1px; 
-  }
+  .custom-label { font-size: 0.6rem; color: #86d7ff; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 1px; opacity: 0.8; }
 }
 
-.data-value-wrapper {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+.data-value-wrapper { display: flex; justify-content: space-between; align-items: center; }
 
-.data-value { 
-  font-size: 0.85rem; 
-  color: #fff; 
-  transition: filter 0.3s ease, opacity 0.3s ease; 
-}
+.data-value { font-size: 0.9rem; color: #fff; transition: filter 0.3s ease, opacity 0.3s ease; }
+.friend-code { color: #86d7ff; font-weight: bold; letter-spacing: 2px; text-shadow: 0 0 8px rgba(134, 215, 255, 0.4); }
 
-.obfuscated-text {
-  filter: blur(5px); 
-  opacity: 0.5; 
-  user-select: none; 
-  pointer-events: none;
-}
+.obfuscated-text { filter: blur(6px); opacity: 0.4; user-select: none; pointer-events: none; }
 
-.toggle-eye-btn {
-  --color: rgba(201, 209, 217, 0.6);
-  --padding-start: 0;
-  --padding-end: 0;
-  margin: 0;
-  height: 24px;
-  &:hover { --color: #fff; }
-}
-
-.highlight-eye {
-  --color: rgba(88, 166, 255, 0.7);
-  &:hover { --color: #58a6ff; }
-}
+.toggle-eye-btn { --color: rgba(201, 209, 217, 0.6); --padding-start: 0; --padding-end: 0; margin: 0; height: 24px; &:hover { --color: #fff; } }
+.highlight-eye { --color: rgba(134, 215, 255, 0.7); &:hover { --color: #86d7ff; filter: drop-shadow(0 0 5px rgba(134, 215, 255, 0.6)); } }
 
 /* ==========================================================================
-   5. GRAFICI E STATISTICHE HUD
+   5. GRAFICI E STATISTICHE HUD (Stile Olografico)
    ========================================================================== */
 .chart-container {
-  height: 65px; /* Compattata l'altezza del grafico */
-  padding: 8px; /* Ridotto da 10px */
+  height: 80px; 
+  padding: 10px;
   border-radius: 8px;
-  .bars { display: flex; align-items: flex-end; justify-content: space-around; height: 100%; border-bottom: 1px solid rgba(88, 166, 255, 0.2); padding-bottom: 5px; }
-  .bar-unit { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; width: 25px; }
-  .bar-fill { width: 100%; background: linear-gradient(0deg, #1d4ed8, #58a6ff); border-radius: 3px 3px 0 0; }
-  .bar-label { font-size: 0.55rem; color: #c9d1d9; margin-top: 4px; }
+  .bars { display: flex; align-items: flex-end; justify-content: space-around; height: 100%; border-bottom: 1px solid rgba(134, 215, 255, 0.2); padding-bottom: 5px; }
+  .bar-unit { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; width: 30px; }
+  
+  /* Nuovo stile "Olografico" per le barre */
+  .bar-fill { 
+    width: 100%; 
+    background: linear-gradient(180deg, rgba(88, 166, 255, 0.6) 0%, rgba(29, 78, 216, 0.1) 100%); 
+    border-radius: 2px 2px 0 0; 
+    position: relative;
+    box-shadow: 0 -5px 15px rgba(88, 166, 255, 0.2);
+    
+    .bar-glow-top {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 2px;
+      background: #86d7ff;
+      box-shadow: 0 0 8px #86d7ff, 0 0 15px #fff;
+    }
+  }
+  .bar-label { font-size: 0.6rem; color: #86d7ff; margin-top: 6px; font-weight: bold; opacity: 0.8; }
 }
 
 .radial-container {
   display: flex; justify-content: space-between; align-items: center; 
-  padding: 8px 10px; /* Ridotto padding */
+  padding: 10px;
   border-radius: 8px;
-  .chart-wrap { position: relative; width: 45px; height: 45px; } /* Leggermente rimpicciolito */
-  .circular-chart { width: 100%; height: 100%; }
-  .circle { fill: none; stroke: #58a6ff; stroke-width: 2.8; stroke-linecap: round; }
+  .chart-wrap { position: relative; width: 55px; height: 55px; }
+  .circular-chart { width: 100%; height: 100%; filter: drop-shadow(0 0 4px rgba(134, 215, 255, 0.5)); }
+  .circle { fill: none; stroke: #86d7ff; stroke-width: 2.8; stroke-linecap: round; }
   .circle-bg { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 2.8; }
-  .percentage { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.7rem; font-weight: bold; color: #fff; }
-  .text-wrap { text-align: right; h3 { margin: 0; font-size: 1rem; color: #58a6ff; } p { margin: 0; font-size: 0.55rem; color: #86d7ff; text-transform: uppercase; } }
+  .percentage { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.8rem; font-weight: bold; color: #fff; text-shadow: 0 0 5px rgba(134, 215, 255, 0.5); }
+  .text-wrap { text-align: right; h3 { margin: 0; font-size: 1.1rem; color: #86d7ff; text-shadow: 0 0 8px rgba(134, 215, 255, 0.3); } p { margin: 0; font-size: 0.6rem; color: #fff; text-transform: uppercase; opacity: 0.7; } }
 }
 
 .kd-container {
-  padding: 8px; /* Ridotto da 10px */
+  padding: 10px;
   border-radius: 8px;
-  .kd-labels { display: flex; justify-content: space-between; font-size: 0.65rem; font-weight: bold; margin-bottom: 6px; .kill-text { color: #58a6ff; } .death-text { color: #ff7b72; } }
-  .progress-bar-dual { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.1); .fill-kill { background: #58a6ff; box-shadow: 0 0 8px #58a6ff; } .fill-death { background: #ff7b72; box-shadow: 0 0 8px #ff7b72; } }
+  .kd-labels { display: flex; justify-content: space-between; font-size: 0.65rem; font-weight: bold; margin-bottom: 8px; .kill-text { color: #86d7ff; text-shadow: 0 0 5px rgba(134, 215, 255, 0.4); } .death-text { color: #ff7b72; text-shadow: 0 0 5px rgba(255, 123, 114, 0.4); } }
+  .progress-bar-dual { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); .fill-kill { background: #86d7ff; box-shadow: 0 0 10px #86d7ff; } .fill-death { background: #ff7b72; box-shadow: 0 0 10px #ff7b72; } }
 }
 
 .stats-linear {
-  margin-top: 10px; /* Ridotto da 15px */
-  .stat-row { margin-bottom: 6px; &:last-child { margin-bottom: 0; } }
-  .stat-labels { display: flex; justify-content: space-between; font-size: 0.6rem; color: #c9d1d9; margin-bottom: 4px; font-weight: bold; }
-  .progress-bar-single { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; .fill { height: 100%; background: #58a6ff; box-shadow: 0 0 8px #58a6ff; } &.danger .fill { background: #ff7b72; box-shadow: 0 0 8px #ff7b72; } }
+  margin-top: 15px; 
+  .stat-row { margin-bottom: 8px; &:last-child { margin-bottom: 0; } }
+  .stat-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: #fff; margin-bottom: 4px; font-weight: bold; }
+  .progress-bar-single { height: 4px; background: rgba(0,0,0,0.3); border-radius: 2px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); .fill { height: 100%; background: #86d7ff; box-shadow: 0 0 10px #86d7ff; } &.danger .fill { background: #ff7b72; box-shadow: 0 0 10px #ff7b72; } }
 }
 
 /* ==========================================================================
@@ -228,131 +288,120 @@ ion-content {
 .avatar-core {
   text-align: center;
   .avatar-frame {
-    width: 130px; /* Compattato per bilanciare il ridimensionamento laterale */
-    height: 130px;
+    width: 140px; 
+    height: 140px;
     border-radius: 50%;
-    border: 1px solid #58a6ff;
+    border: 2px solid rgba(134, 215, 255, 0.6);
     margin: 0 auto;
-    padding: 5px; 
-    box-shadow: 0 0 20px rgba(88, 166, 255, 0.2);
+    padding: 6px; 
+    box-shadow: 0 0 25px rgba(103, 224, 255, 0.3), inset 0 0 15px rgba(103, 224, 255, 0.2);
     overflow: hidden; 
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      transform: scale(1.05);
+      border-color: #86d7ff;
+      box-shadow: 0 0 35px rgba(103, 224, 255, 0.5), inset 0 0 20px rgba(103, 224, 255, 0.4);
+    }
   }
-  .avatar-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover; 
-    border-radius: 50%;
-    filter: brightness(1.1) contrast(1.1); 
-  }
+  .avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; filter: brightness(1.1) contrast(1.1); }
+  
   .elo-badge { 
-    margin-top: 10px; 
-    h2 { color: #58a6ff; font-size: 1.4rem; margin: 0; text-shadow: 0 0 10px rgba(88, 166, 255, 0.4); } 
-    p { font-size: 0.6rem; color: #b6cee9; letter-spacing: 1px; margin-top: 4px; } 
+    margin-top: 15px; 
+    h2 { color: #86d7ff; font-size: 1.6rem; margin: 0; font-weight: bold; text-shadow: 0 0 15px rgba(134, 215, 255, 0.6); } 
+    p { font-size: 0.65rem; color: #fff; letter-spacing: 2px; margin-top: 6px; opacity: 0.8; } 
   }
 }
 
-.action-dock {
-  margin-top: 15px; /* Ridotto da 20px */
-  display: flex;
-  justify-content: center;
-  width: 100%;
+.action-dock { margin-top: 25px; display: flex; justify-content: center; width: 100%; }
+
+.quick-actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* Bottoni Standard */
+.standard-btn {
+  width: 100%; padding: 10px;
+  background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(95, 208, 255, 0.1);
+  color: #fff; border-radius: 8px; font-size: 0.75rem; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;
+  cursor: pointer; transition: 0.3s ease; backdrop-filter: blur(8px);
+  &:hover { background: rgba(88, 166, 255, 0.1); border-color: #86d7ff; box-shadow: 0 0 15px rgba(134, 215, 255, 0.2); }
 }
 
-.quick-actions {
-  display: flex; flex-direction: column; gap: 6px; /* Ridotto gap dei pulsanti */
-}
-
-.action-btn {
-  width: 100%; 
-  padding: 8px; /* Pulsanti compattati */
-  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #c9d1d9; border-radius: 6px; font-size: 0.7rem; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;
-  cursor: pointer; transition: 0.2s; backdrop-filter: blur(8px);
-  &:hover { background: rgba(88, 166, 255, 0.1); border-color: #58a6ff; color: #fff; }
-}
-
+/* Bottone Archivio Glow */
 .primary-glow {
-  display: flex; justify-content: center; align-items: center;
-  background: rgba(29, 78, 216, 0.2) !important; border: 1px solid #58a6ff !important;
-  color: #fff !important; box-shadow: 0 0 15px rgba(88, 166, 255, 0.2);
-  font-size: 0.75rem !important; padding: 10px 15px !important; cursor: pointer;
-  &:hover { background: rgba(29, 78, 216, 0.4) !important; box-shadow: 0 0 20px rgba(88, 166, 255, 0.5); }
+  display: flex; justify-content: center; align-items: center; width: 100%;
+  background: linear-gradient(135deg, rgba(103, 184, 255, 0.15), rgba(45, 114, 210, 0.2)) !important; 
+  border: 1px solid rgba(95, 208, 255, 0.4) !important;
+  color: #fff !important; 
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 0 10px rgba(95, 208, 255, 0.1) !important;
+  font-size: 0.8rem !important; padding: 12px 20px !important; border-radius: 8px; font-weight: bold; letter-spacing: 1px; cursor: pointer; transition: all 0.3s ease;
+  
+  &:hover { 
+    border-color: #86d7ff !important;
+    box-shadow: 0 0 20px rgba(134, 215, 255, 0.4), inset 0 0 15px rgba(134, 215, 255, 0.2) !important; 
+    transform: translateY(-2px);
+  }
 }
 
 .logout-button {
-  width: 100%; 
-  padding: 10px; /* Ridotto da 12px */
-  background: rgba(255, 123, 114, 0.1); border: 1px solid #ff7b72;
-  color: #ff7b72; border-radius: 6px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
-  cursor: pointer; transition: 0.2s;
-  &:hover { background: rgba(255, 123, 114, 0.2); box-shadow: 0 0 15px rgba(255, 123, 114, 0.3); color: #fff; }
+  width: 100%; padding: 12px;
+  background: rgba(255, 123, 114, 0.05); border: 1px solid rgba(255, 123, 114, 0.3);
+  color: #ff7b72; border-radius: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+  cursor: pointer; transition: 0.3s;
+  &:hover { background: rgba(255, 123, 114, 0.15); border-color: #ff7b72; box-shadow: 0 0 15px rgba(255, 123, 114, 0.3); color: #fff; }
 }
 
 /* ==========================================================================
    7. FOOTER HUD
    ========================================================================== */
 .hud-footer {
-  flex-shrink: 0;
+  margin: 0 auto;
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  border-radius: 12px;
+  background: rgba(5, 10, 20, 0.6);
+  backdrop-filter: blur(12px);
+  z-index: 1000;
+  position: relative;
+  max-width: 900px;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.55rem;
+  padding: 8px 12px;
+  color: #c9d1d9;
 }
 
-.hud-footer-content { 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-}
-
-.status-dot { 
-  width: 6px; 
-  height: 6px; 
-  background: #3fb950; 
-  border-radius: 50%; 
-  display: inline-block; 
-  margin-right: 4px; 
-}
+.hud-footer-content { display: flex; justify-content: space-between; align-items: center; }
+.status-dot { width: 6px; height: 6px; background: #3fb950; border-radius: 50%; display: inline-block; margin-right: 4px; box-shadow: 0 0 8px rgba(63, 185, 80, 0.6); }
+.status-text { color: #3fb950; font-weight: bold; }
+.divider { color: rgba(255,255,255,0.3); margin: 0 8px; }
 
 /* ==========================================================================
    8. RESPONSIVE LOGIC (Mobile/Tablet < 1100px)
    ========================================================================== */
 @media (max-width: 1100px) {
   .home-page {
-    height: auto;
-    min-height: 100vh;
-    overflow: visible;
-    display: block;
+    height: auto; min-height: 100vh; overflow: visible; display: flex; flex-direction: column;
+    padding-top: 75px !important; /* Spazio per l'header fisso */
   }
   
+  .mobile-header { display: flex !important;} /* Mostra l'header su mobile */
+  
   .top-row {
-    flex-direction: column;
-    perspective: none !important;
-    gap: 20px;
-    padding: 20px 10px;
-    height: auto;
+    flex-direction: column; perspective: none !important; gap: 20px; padding: 10px; height: auto;
   }
 
   .left-column, .right-column {
-    transform: none !important;
-    width: 100%;
-    max-width: 500px;
-    flex: none;
-    overflow: visible;
+    transform: none !important; width: 100%; max-width: 500px; flex: none; overflow: visible;
   }
   
-  .left-column:hover, .right-column:hover {
-    transform: none !important;
-  }
+  .left-column:hover, .right-column:hover { transform: none !important; }
 
-  .center-column {
-    order: -1;
-    width: 100%;
-    max-width: 500px;
-    margin-top: 0;
-  }
+  .center-column { order: -1; width: 100%; max-width: 500px; margin-top: 0; padding-bottom: 10px; }
   
-  .hud-footer {
-    margin: 20px auto 10px !important;
-  }
+  .hud-footer { margin: 20px auto 20px auto !important; }
+  
+  .hud-footer-content { flex-direction: column; gap: 6px; text-align: center; }
+  .footer-left, .footer-center, .footer-right { font-size: 0.55rem; white-space: normal; }
+  .divider { display: none; }
 }
