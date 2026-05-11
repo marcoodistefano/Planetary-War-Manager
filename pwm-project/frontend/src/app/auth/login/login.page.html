@@ -1,16 +1,14 @@
-<ion-content [fullscreen]="true">
+<ion-content [fullscreen]="true" [scrollY]="false">
   <div class="auth-background" aria-hidden="true">
     <video #backgroundVideo class="auth-background__video" autoplay muted loop playsinline preload="metadata" src="assets/background_gif/background_gif.mp4"></video>
     <div class="auth-background__overlay"></div>
   </div>
 
-  <!-- TITOLO -->
   <div class="title-block">
     <p class="eyebrow">Strategia, alleanze, conquista</p>
     <h1>Planetary War Manager</h1>
   </div>
 
-  <!-- FORM DI LOGIN -->
   <div class="login-container">
     <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
       <div class="field-container">
@@ -19,47 +17,34 @@
       </div>
 
       <div class="field-container">
-      <ion-label class="custom-label">PASSWORD</ion-label>
-      <div class="password-wrapper">
-        <ion-input [type]="showPassword ? 'text' : 'password'" 
-                  formControlName="password" 
-                  placeholder="••••••••"></ion-input>
-        
-        <ion-button fill="clear" size="small" (click)="togglePasswordVisibility()" class="toggle-eye-btn">
-          <ion-icon slot="icon-only" [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
-        </ion-button>
-      </div>
+        <ion-label class="custom-label">PASSWORD</ion-label>
+        <div class="password-wrapper">
+          <ion-input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="••••••••"></ion-input>
+          <ion-button fill="clear" size="small" (click)="togglePasswordVisibility()" class="toggle-eye-btn">
+            <ion-icon slot="icon-only" [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+          </ion-button>
+        </div>
       </div>
 
-      <ion-button expand="block" type="submit" [disabled]="!loginForm.valid || isSubmitting">
-        AUTENTICAZIONE
-      </ion-button>
-
-      <ion-text class="form-error" color="danger" *ngIf="errorMessage">
-        {{ errorMessage }}
-      </ion-text>
+      <ion-button expand="block" type="submit" [disabled]="!loginForm.valid || isSubmitting">AUTENTICAZIONE</ion-button>
+      <ion-text class="form-error" color="danger" *ngIf="errorMessage">{{ errorMessage }}</ion-text>
 
       <div class="form-footer">
         <a class="secondary-link" routerLink="/login/recovery/password">Hai dimenticato la password?</a>
-        <p>Non hai un account? <a class="secondary-link" routerLink="/register">Registrati ora</a></p>
+        <p>Non hai un account? <a class="secondary-link register-link" routerLink="/register">Registrati ora</a></p>
       </div>
     </form>
   </div>
 </ion-content>
 
-<!-- FOOTER HUD (Sincronizzato con la HomePage) -->
-<ion-footer class="ion-no-border" style="background: transparent;">
-  <div class="hud-footer transparent-element" style="margin: 0 auto 14px; border: 1px solid rgba(88, 166, 255, 0.4); border-radius: 12px; background: rgba(5, 10, 20, 0.6); backdrop-filter: blur(12px); z-index: 1000; position: relative; max-width: 900px; width: calc(100% - 28px); box-sizing: border-box; font-size: 0.55rem; padding: 8px 12px;">
+<ion-footer class="ion-no-border">
+  <div class="hud-footer">
     <div class="hud-footer-content">
       <div class="footer-left">
-        <span class="status-dot"></span> COMM-LINK: <span class="status-text" style="color: #3fb950; font-weight: bold;">ONLINE</span>
+        <span class="status-dot"></span> COMM-LINK: <span class="status-online">ONLINE</span>
       </div>
-      <div class="footer-center" style="color: #c9d1d9;">
-        &copy; 2026 PLANETARY WAR MANAGER <span class="divider" style="color: rgba(255,255,255,0.3); margin: 0 8px;">///</span> STRATEGIC COMMAND
-      </div>
-      <div class="footer-right" style="color: #c9d1d9;">
-        SYS.VER 1.0.4
-      </div>
+      <div class="footer-center">&copy; 2026 PLANETARY WAR MANAGER <span class="divider">///</span> STRATEGIC COMMAND</div>
+      <div class="footer-right">SYS.VER 1.0.4</div>
     </div>
   </div>
 </ion-footer>

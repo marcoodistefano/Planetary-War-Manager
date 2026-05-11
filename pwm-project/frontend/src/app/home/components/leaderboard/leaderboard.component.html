@@ -1,0 +1,36 @@
+<ion-content class="transparent-bg">
+  <div class="modal-wrapper">
+    <div class="panel">
+      
+      <div class="title-block">
+        <p class="eyebrow">Classifiche Settore</p>
+        <h2>LEADERBOARD</h2>
+      </div>
+
+      <div class="leaderboard-toggle">
+        <button [class.active]="currentView === 'global'" (click)="switchView('global')">GLOBALE</button>
+        <button [class.active]="currentView === 'regional'" (click)="switchView('regional')">REGIONALE (EU)</button>
+      </div>
+
+      <div class="leaderboard-scroll-container">
+        <div class="leaderboard-list">
+          
+          <div class="leaderboard-entry" *ngFor="let player of leaderboard" [class.highlight]="player.player === 'Generale_Inverno'">
+            <span class="rank">#{{ player.rank }}</span>
+            <span class="flag">{{ flagEmoji(player.region) }}</span>
+            <span class="name">{{ player.player }}</span>
+            <span class="score">{{ player.score | number }}</span>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="action-dock">
+        <button class="logout-button" (click)="close()">
+          [ CHIUDI TERMINALE ]
+        </button>
+      </div>
+
+    </div>
+  </div>
+</ion-content>

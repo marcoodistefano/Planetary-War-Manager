@@ -1,0 +1,36 @@
+<ion-content class="transparent-bg">
+  <div class="modal-wrapper">
+    <div class="panel">
+      
+      <div class="title-block">
+        <p class="eyebrow">Rapporto Operativo</p>
+        <h2>PARTITE ATTIVE</h2>
+      </div>
+
+      <div class="games-scroll-container">
+        <div class="games-list">
+          
+          <div class="game-card" *ngFor="let game of activeGames">
+            <div class="game-info">
+              <h3>{{ game.name }}</h3>
+              <div class="meta">{{ game.players }} GIOCATORI · {{ activeGameTimeText(game) | uppercase }}</div>
+            </div>
+            <span class="status-badge">{{ game.status }}</span>
+          </div>
+
+          <div *ngIf="activeGames.length === 0" class="no-results">
+            [ NESSUNA PARTITA IN CORSO ]
+          </div>
+
+        </div>
+      </div>
+
+      <div class="action-dock">
+        <button class="logout-button" (click)="close()">
+          [ CHIUDI TERMINALE ]
+        </button>
+      </div>
+
+    </div>
+  </div>
+</ion-content>

@@ -1,0 +1,90 @@
+:host {
+  --danger-color: #ff7b72;
+  --primary-blue: #58a6ff;
+  --glass-bg: rgba(5, 10, 20, 0.95);
+  background: transparent !important;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.transparent-bg {
+  --background: transparent !important;
+}
+
+.modal-wrapper {
+  padding: 40px 20px;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.panel {
+  width: 100%;
+  max-width: 500px; /* Leggermente più largo per ospitare i nomi delle missioni */
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg);
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(88, 166, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border-radius: 18px;
+  padding: 30px 20px;
+  box-sizing: border-box;
+}
+
+/* BLOCCHI FISSI (Non si rimpiccioliscono col flex) */
+.title-block {
+  text-align: center; margin-bottom: 20px; flex-shrink: 0; 
+  .eyebrow { color: #b6cee9; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px; }
+  h2 { font-size: 1.4rem; color: #fff; margin: 0; text-shadow: 0 0 10px var(--primary-blue); }
+}
+
+.search-container { flex-shrink: 0; margin-bottom: 15px; }
+
+/* INPUT DI RICERCA */
+.tactical-input {
+  width: 100%; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(88, 166, 255, 0.3);
+  color: #fff; padding: 14px 15px; border-radius: 8px; font-family: inherit; font-size: 0.85rem; outline: none; transition: 0.3s;
+  &:focus { border-color: var(--primary-blue); box-shadow: 0 0 10px rgba(88, 166, 255, 0.2); background: rgba(0, 0, 0, 0.6); }
+  &::placeholder { color: rgba(255,255,255,0.3); }
+}
+
+/* AREA SCORREVOLE INVISIBILE */
+.games-scroll-container {
+  flex: 1; overflow-y: auto; overflow-x: hidden; margin-bottom: 20px;
+  &::-webkit-scrollbar { display: none; } -ms-overflow-style: none; scrollbar-width: none;
+}
+
+.games-list { display: flex; flex-direction: column; gap: 10px; }
+
+/* CARTE DELLE PARTITE */
+.game-card {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 15px; background: rgba(1, 36, 46, 0.2); border: 1px solid rgba(88, 166, 255, 0.2);
+  border-radius: 9px; transition: 0.2s;
+  &:hover { background: rgba(88, 166, 255, 0.1); border-color: var(--primary-blue); }
+  
+  .game-info {
+    h3 { margin: 0 0 5px 0; color: #fff; font-size: 1rem; }
+    .meta { color: #8892b0; font-size: 0.65rem; font-weight: bold; letter-spacing: 0.5px; }
+  }
+}
+
+.join-button {
+  background: rgba(88, 166, 255, 0.15); border: 1px solid var(--primary-blue); color: #fff;
+  padding: 8px 12px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: inherit;
+  &:hover { background: var(--primary-blue); box-shadow: 0 0 10px rgba(88, 166, 255, 0.4); }
+}
+
+.no-results { text-align: center; padding: 30px 10px; color: var(--danger-color); font-size: 0.8rem; font-weight: bold; letter-spacing: 1px;}
+
+.action-dock { flex-shrink: 0; display: flex; justify-content: center; }
+
+.logout-button {
+  background: transparent; border: none; color: rgba(255, 255, 255, 0.4); 
+  padding: 5px; font-size: 0.75rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; font-family: inherit;
+  &:hover { color: var(--danger-color); }
+}

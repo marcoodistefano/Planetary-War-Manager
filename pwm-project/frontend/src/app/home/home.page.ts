@@ -10,6 +10,9 @@ import { NotificationsComponent } from './components/notifications/notifications
 import { ObjectivesComponent } from './components/objectives/objectives.component';
 import { FriendsComponent } from './components/friends/friends.component';
 import { CreateMatchComponent } from './components/create-match/create-match.component';
+import { NewgamesComponent } from './components/newgames/newgames.component';
+import { ActivegamesComponent } from './components/activegames/activegames.component';
+import { LeaderboardComponent } from './components/leaderboard/leaderboard.component';
 
 @Component({
   selector: 'app-home',
@@ -192,6 +195,16 @@ filterNewGames(event: any) {
       case 'Amici':
         await this.openModal(FriendsComponent);
         break;
+      case 'Leaderboard':
+      // Si assume la creazione di componenti dedicati che wrappano il contenuto esistente
+      await this.openModal(LeaderboardComponent);
+      break;
+    case 'Partite Attive':
+      await this.openModal(ActivegamesComponent);
+      break;
+    case 'Nuove Partite':
+      await this.openModal(NewgamesComponent);
+      break;
     }
   }
 

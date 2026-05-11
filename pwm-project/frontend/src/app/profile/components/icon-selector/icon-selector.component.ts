@@ -10,15 +10,16 @@ import { CommonModule } from '@angular/common';
   imports: [IonicModule, CommonModule]
 })
 export class IconSelectorComponent {
-  // Trasformiamo l'array in oggetti pre-elaborati
-  icons = Array.from({ length: 20 }, (_, i) => ({
-    path: `assets/icons/icon-${i + 1}.png`,
+  // Aggiornato a 37 icone con estensione .jpeg e prefisso id_
+  icons = Array.from({ length: 37 }, (_, i) => ({
+    path: `assets/profile_icons/id_${i + 1}.jpeg`,
     id: i + 1
   }));
 
   constructor(private modalCtrl: ModalController) {}
 
   select(iconPath: string) {
+    // Restituisce il percorso dell'icona selezionata al componente chiamante
     this.modalCtrl.dismiss(iconPath);
   }
 

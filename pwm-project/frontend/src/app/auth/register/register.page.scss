@@ -4,8 +4,18 @@
 
 ion-content {
   --background: #08111f;
-  position: relative;
+  --overflow: hidden; 
   font-family: 'Courier New', Courier, monospace;
+}
+
+ion-content::part(scroll) {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  padding-top: clamp(20px, 10vh, 12vh); 
+  padding-bottom: 10px; 
+  min-height: 100%;
 }
 
 .auth-background {
@@ -14,56 +24,48 @@ ion-content {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-}
 
-.auth-background__video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-  filter: brightness(0.72) saturate(1.05) contrast(1.05);
-}
+  &__video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    filter: brightness(0.72) saturate(1.05) contrast(1.05);
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
 
-.auth-background__overlay {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%);
-  backdrop-filter: blur(3px);
-}
-
-ion-toolbar {
-  --background: transparent;
-  --border-color: transparent;
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%);
+    backdrop-filter: blur(3px);
+  }
 }
 
 /* ==========================================================================
-   2. TITOLO (Stile identico alla HomePage)
+   2. TITOLO E SCRITTA SUPERIORE (EYEBROW)
    ========================================================================== */
 
 .title-block {
-  position: absolute;
-  top: 6vh;
-  left: 0;
   width: 100%;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
   text-align: center;
-  padding: 14px 0;
-
+  margin-bottom: clamp(10px, 3vh, 30px); 
+  flex-shrink: 0; 
+  z-index: 10;
+  
   .eyebrow {
-    margin: 0 0 10px;
+    margin: 0 0 6px;
     color: #b6cee9;
-    font-size: 0.62rem;
+    font-size: clamp(0.55rem, 1.5vh, 0.62rem);
     letter-spacing: 0.16em;
     text-transform: uppercase;
   }
 
   h1 {
     color: #f4f7fb;
-    font-size: clamp(1.8rem, 3.75vw, 3.6rem);
+    font-size: clamp(1.8rem, 4vw, 3.6rem); 
     line-height: 0.95;
     letter-spacing: 0.04em;
     font-weight: 800;
@@ -74,20 +76,16 @@ ion-toolbar {
 }
 
 /* ==========================================================================
-   3. LAYOUT DEL FORM E CONTENITORI (Corazzati e Scuriti)
+   3. LAYOUT DEL FORM
    ========================================================================== */
 
 .register-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  min-height: 100%;
-  padding: 20px 24px;
-  max-width: 420px;
-  margin: 0 auto;
-  position: relative;
-  z-index: 1;
+  width: 100%;
+  max-width: 460px; 
+  padding: 0 24px; 
+  z-index: 10;
+  flex-shrink: 1; 
+  transform-style: preserve-3d;
 }
 
 form {
@@ -97,19 +95,30 @@ form {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-radius: 18px;
-  padding: 40px 24px;
+  padding: clamp(15px, 3.5vh, 30px) 24px; 
   width: 100%;
-  margin-top: 60px;
+  margin: 0; 
+  transform: translateZ(0);
+  -webkit-font-smoothing: antialiased;
+  backface-visibility: hidden;
 }
+
+/* ==========================================================================
+   4. CAMPI DI INPUT (STILE E UNIFORMITÀ)
+   ========================================================================== */
 
 .field-container {
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(95, 208, 255, 0.2);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) inset;
   border-radius: 9px;
-  padding: 10px 16px;
-  margin-bottom: 20px;
-  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background 0.2s ease;
+  padding: 0 16px; 
+  margin-bottom: 16px;
+  height: 80px;                 /* Altezza fissa rigorosa */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;      /* Centra verticalmente etichetta + input */
+  transition: all 0.2s ease; 
 
   &:focus-within {
     background: rgba(0, 0, 0, 0.7);
@@ -118,38 +127,6 @@ form {
   }
 }
 
-/* Finto input per attivare il modale della regione */
-.clickable-field {
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  
-  .selected-value {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: #f4f7fb;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 0.85rem;
-    padding-top: 6px;
-    padding-bottom: 2px;
-    
-    .placeholder-text {
-      color: rgba(244, 247, 251, 0.5);
-    }
-
-    ion-icon {
-      color: #79c0ff;
-      font-size: 1.1rem;
-      opacity: 0.8;
-    }
-  }
-}
-
-/* ==========================================================================
-   4. TIPOGRAFIA INTERNA AL FORM E INPUT
-   ========================================================================== */
-
 .custom-label {
   display: block;
   color: #79c0ff;
@@ -157,211 +134,74 @@ form {
   font-weight: 800;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  margin-bottom: 4px;
+  margin-bottom: 4px;           /* Margine identico ovunque */
   text-shadow: 0 0 5px rgba(121, 192, 255, 0.4);
+  line-height: 1.2;
 }
 
-ion-input, ion-select {
+/* Regola universale per testo, select e input */
+ion-input, 
+ion-select, 
+.selected-value span,
+.placeholder-text {
   --color: #f4f7fb;
   --placeholder-color: rgba(244, 247, 251, 0.5);
+  --placeholder-font-family: 'Courier New', Courier, monospace;
+  --placeholder-font-weight: 500;
   --padding-start: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
   --background: transparent;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 0.85rem;
-}
-
-ion-select {
+  
+  color: #f4f7fb !important;
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 0.95rem !important; 
+  font-weight: 500 !important;
+  letter-spacing: 0.5px;
+  margin-top: 2px;              /* Spazio costante sotto l'etichetta */
   width: 100%;
-  --placeholder-opacity: 1;
-  padding-top: 10px;
-
-  &::part(icon) {
-    color: #79c0ff;
-    opacity: 0.8;
-  }
+  min-height: auto;
 }
 
-/* ==========================================================================
-   5. BOTTONI E FOOTER DEL FORM
-   ========================================================================== */
-
-ion-button {
-  margin-top: 10px;
-  height: 48px;
-  font-weight: 700;
-  font-family: 'Courier New', Courier, monospace;
-  --background: linear-gradient(135deg, rgba(103, 184, 255, 0.22), rgba(45, 114, 210, 0.28));
-  --border-radius: 8px;
-  --color: #f4f7fb;
-  --box-shadow: none;
-
-  &::part(native) {
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(12px);
-  }
-
-  &:hover::part(native) {
-    background: linear-gradient(135deg, rgba(103, 184, 255, 0.3), rgba(45, 114, 210, 0.4));
-  }
+/* Shadow DOM Fixes */
+ion-input::part(native) {
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 0.95rem !important;
+  font-weight: 500 !important;
+  padding: 0 !important;
 }
 
-.form-error {
-  display: block;
-  margin-top: 12px;
-  text-align: center;
-  font-size: 0.85rem;
-  font-weight: 600;
+ion-input::part(placeholder) {
+  font-family: 'Courier New', Courier, monospace !important;
+  color: rgba(244, 247, 251, 0.5);
+  opacity: 1;
 }
 
-.form-footer {
-  text-align: center;
-  margin-top: 25px;
-  position: relative;
-  z-index: 10;
-
-  p {
-    color: rgba(244, 247, 251, 0.7);
-    font-size: 0.85rem;
-    margin-bottom: 8px;
-  }
-}
-
-.secondary-link {
-  display: inline-block;
-  color: #58A6FF;
-  text-decoration: none;
-  font-size: 0.85rem;
-  font-weight: bold;
-  padding: 5px; 
+/* Campo Regione (Select personalizzata) */
+.clickable-field {
   cursor: pointer;
-  transition: color 0.2s ease;
-
-  &:hover {
-    color: #86d7ff;
-  }
-}
-
-/* ==========================================================================
-   6. FOOTER HUD (Sincronizzato con HomePage)
-   ========================================================================== */
-
-.hud-footer-content { 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-}
-
-.status-dot { 
-  width: 6px; 
-  height: 6px; 
-  background: #3fb950; 
-  border-radius: 50%; 
-  display: inline-block; 
-  margin-right: 4px; 
-  box-shadow: 0 0 8px rgba(63, 185, 80, 0.6);
-}
-
-.transparent-element {
-  background: rgba(255, 255, 255, 0.02) !important;
-  backdrop-filter: blur(8px);
-}
-
-/* ==========================================================================
-   7. MODALE NAZIONI SCI-FI (HUD Olografico)
-   ========================================================================== */
-
-.sci-fi-modal {
-  --background: rgba(6, 11, 18, 0.95);
-  --backdrop-opacity: 0.6;
-  backdrop-filter: blur(10px);
-}
-
-.sci-fi-toolbar {
-  --background: rgba(9, 16, 30, 0.9);
-  --border-color: rgba(88, 166, 255, 0.2);
-  --border-width: 0 0 1px 0;
-  --border-style: solid;
-  
-  ion-title {
-    color: #58A6FF;
-    font-family: 'Courier New', Courier, monospace;
-    font-weight: 800;
-    letter-spacing: 2px;
-    font-size: 0.9rem;
-    text-shadow: 0 0 5px rgba(88, 166, 255, 0.4);
-  }
-
-  /* STILE SPECIFICO PER IL BOTTONE DI CHIUSURA (X) */
-  ion-button {
-    --color: #ff7b72; 
-    font-weight: bold;
-    font-family: 'Courier New', Courier, monospace;
-    --background: transparent !important;
-    --background-hover: transparent !important;
-    --background-activated: transparent !important;
-    --background-focused: transparent !important;
-    --ripple-color: transparent !important;
-    --box-shadow: none !important;
-    margin: 0;
-
-    /* Disabilita i bordi e il vetro ereditati dai bottoni principali */
-    &::part(native) {
-      border: none !important;
-      backdrop-filter: none !important;
-      background: transparent !important;
-      box-shadow: none !important;
-    }
-
-    /* Annulla l'hover ereditato e aggiunge solo un bagliore al testo */
-    &:hover::part(native) {
-      background: transparent !important;
-      border: none !important;
-      text-shadow: 0 0 10px rgba(255, 123, 114, 0.9); 
+  .selected-value {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    
+    ion-icon {
+      color: #79c0ff;
+      font-size: 1.2rem;
+      opacity: 0.8;
     }
   }
 }
 
-.sci-fi-searchbar {
-  --background: rgba(0, 0, 0, 0.5);
-  --color: #f4f7fb;
-  --placeholder-color: rgba(244, 247, 251, 0.5);
-  --icon-color: #79c0ff;
-  --clear-button-color: #79c0ff;
-  --border-radius: 8px;
-  --box-shadow: 0 0 10px rgba(0,0,0,0.5) inset;
-  font-family: 'Courier New', Courier, monospace;
-  padding-bottom: 10px;
-}
-
-.sci-fi-modal-content {
-  --background: transparent;
-}
-
-.sci-fi-list {
-  background: transparent;
-  padding: 0;
-}
-
-.sci-fi-item {
-  --background: transparent;
-  --border-color: rgba(88, 166, 255, 0.1);
-  --color: #C9D1D9;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 0.85rem;
-  
-  /* Effetto hover tattico sulla nazione */
-  &::part(native):hover {
-    background: rgba(88, 166, 255, 0.15);
-    color: #ffffff;
-  }
-}
-
-/* Aggiungi queste definizioni nel file register.page.scss */
-
+/* Gestione Password */
 .password-wrapper {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
+
+  ion-input { flex: 1; }
 }
 
 .toggle-eye-btn {
@@ -370,23 +210,137 @@ ion-button {
   --padding-end: 0;
   margin: 0;
   height: 24px;
-  transition: --color 0.2s ease;
-  
-  &:hover { 
-    --color: #58a6ff; /* Effetto neon in hover */
-  }
-
-  /* Rimuove i bordi e gli effetti dei bottoni standard */
   &::part(native) {
     border: none !important;
-    backdrop-filter: none !important;
     background: transparent !important;
     box-shadow: none !important;
   }
 }
 
-/* Assicura che l'input non schiacci l'icona */
-ion-input {
-  flex: 1;
-  --padding-end: 8px;
+/* ==========================================================================
+   5. BOTTONI E FOOTER DEL FORM
+   ========================================================================== */
+
+ion-button {
+  margin-top: clamp(8px, 1.5vh, 12px); 
+  height: clamp(50px, 7vh, 60px); 
+  font-weight: 700;
+  text-transform: uppercase;
+  --background: linear-gradient(135deg, rgba(103, 184, 255, 0.22), rgba(45, 114, 210, 0.28));
+  --border-radius: 8px;
+  --color: #f4f7fb;
+
+  &::part(native) {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+  }
+}
+
+.form-footer {
+  text-align: center;
+  margin-top: clamp(12px, 2.5vh, 20px);
+  position: relative;
+  z-index: 10;
+
+  p {
+    color: rgba(244, 247, 251, 0.7);
+    font-size: clamp(0.75rem, 1.5vh, 0.85rem);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.secondary-link {
+  color: #58A6FF;
+  text-decoration: none;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  &:hover { color: #86d7ff; }
+}
+
+/* ==========================================================================
+   6. FOOTER HUD (STATUS BAR)
+   ========================================================================== */
+
+ion-footer {
+  --background: transparent;
+  background: transparent;
+}
+
+.hud-footer {
+  margin: 0 auto 10px;
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  border-radius: 12px;
+  background: rgba(5, 10, 20, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: 900px;
+  width: calc(100% - 24px);
+  padding: 8px 12px;
+  font-size: 0.55rem;
+  color: #c9d1d9;
+  z-index: 1000;
+  position: relative;
+}
+
+.hud-footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  background: #3fb950;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+  box-shadow: 0 0 8px rgba(63, 185, 80, 0.6);
+}
+
+.status-online {
+  color: #3fb950;
+  font-weight: bold;
+}
+
+.divider {
+  margin: 0 8px;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+/* ==========================================================================
+   7. RESPONSIVE (MEDIA QUERIES)
+   ========================================================================== */
+
+/* Tablet e Mobile */
+@media (max-width: 768px) {
+  .register-container { padding: 0 16px; }
+  form { padding: 35px 14px; }
+  .field-container { padding: 0 12px; }
+
+  .hud-footer {
+    width: calc(100% - 16px);
+  }
+  .hud-footer-content {
+    flex-direction: column;
+    gap: 6px;
+    text-align: center;
+  }
+  .divider { display: none; }
+}
+
+/* Schermi a bassa altezza (es. iPhone SE) */
+@media (max-height: 700px) {
+  ion-content::part(scroll) { padding-top: 3vh; }
+  .title-block h1 { font-size: 1.8rem; }
+  .title-block .eyebrow { display: block; font-size: 0.5rem; margin-bottom: 2px; } 
+  .field-container { 
+    margin-bottom: 8px; 
+    height: 65px;       
+  }
+  ion-button { height: 48px; margin-top: 5px; }
 }
