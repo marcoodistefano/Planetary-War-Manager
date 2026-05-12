@@ -3,6 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 
+// 1. Assicurati che il percorso sia corretto (../../ per uscire da game/match)
+import { TacticalTerminalComponent } from './components/tactical-terminal/tactical-terminal.component';
+
 // Librerie esterne caricate via CDN
 declare var maplibregl: any;
 declare var topojson: any;
@@ -14,7 +17,12 @@ declare var THREE: any;
   templateUrl: './match.page.html',
   styleUrls: ['./match.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule]
+  imports: [
+    IonicModule, 
+    CommonModule, 
+    FormsModule, 
+    TacticalTerminalComponent // Assicurati che sia presente qui
+  ]
 })
 export class MatchPage implements OnInit, AfterViewInit {
 
@@ -56,6 +64,71 @@ export class MatchPage implements OnInit, AfterViewInit {
         { label: 'Drone', path: 'air_troops/drone.glb' },
         { label: 'Elicottero', path: 'air_troops/elicottero.glb' }
     ]
+  };
+
+  // Configurazione Risorse
+  playerResources: any = {
+    denaro: 100000,
+    legno: 5000,
+    piombo: 2500,
+    acciaio: 3000,
+    mattoni: 4000,
+    petrolio: 1500,
+    gas_naturale: 1200,
+    uranio: 100,
+    oro: 50 // Risorsa Premium 
+  };
+
+  // Configurazione per icone e label (mappata sugli ID del CDB) 
+  resourceConfig = [
+    { id: 'denaro', icon: '💵', label: 'DEN' },
+    { id: 'legno', icon: '🪵', label: 'LEG' },
+    { id: 'piombo', icon: '🔘', label: 'PIO' },
+    { id: 'acciaio', icon: '🏗️', label: 'ACC' },
+    { id: 'mattoni', icon: '🧱', label: 'MAT' },
+    { id: 'petrolio', icon: '🛢️', label: 'PET' },
+    { id: 'gas_naturale', icon: '🔥', label: 'GAS' },
+    { id: 'uranio', icon: '☢️', label: 'URA' },
+    { id: 'truppe', icon: '👥', label: 'UNITÀ', isTrigger: true },
+    { id: 'oro', icon: '🪙', label: 'ORO' }
+  ];
+
+  // Truppe basate sui nomi definiti nel CDB 
+  playerTroops: any = {
+    "Fante": 150,
+    "Veicolo Leggero": 20,
+    "Fanteria Speciale": 10,
+    "Carro Armato": 5,
+    "Caccia": 2,
+    "Missile Balistico": 1
+  };
+
+  isProfileModalOpen = false; // Stato della modale profilo
+
+  // Metodi per la modale
+  setOpenProfile(isOpen: boolean) {
+    this.isProfileModalOpen = isOpen;
+  }
+
+  // Esempio dati profilo
+  userProfile = {
+    username: 'Comandante_Alpha',
+    rank: 'Generale di Brigata',
+    experience: 85,
+    matchesWon: 24,
+    matchesLost: 5
+  };
+
+  // All'interno della classe MatchPage
+  activeTab: 'profile' | 'settings' = 'profile';
+
+  audioSettings = {
+    music: 75,
+    sfx: 90
+  };
+
+  uiSettings = {
+    showAdvancedLabels: true
   };
 
   constructor() { }

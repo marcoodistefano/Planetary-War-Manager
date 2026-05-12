@@ -1,0 +1,89 @@
+<div class="terminal-frame">
+  <div class="scanlines"></div>
+  <div class="glow-overlay"></div>
+  
+  <div class="terminal-container">
+    <div class="terminal-sidebar">
+      <div class="brand">
+        <span class="system-name">HQ_OS</span>
+        <span class="version">V.4.2.0-HUD</span>
+      </div>
+      
+      <nav>
+        <div class="nav-item" [class.active]="activeTab === 'profile'" (click)="setTab('profile')">
+          <span class="glitch-text">01. PROFILO</span>
+        </div>
+        <div class="nav-item" [class.active]="activeTab === 'settings'" (click)="setTab('settings')">
+          <span class="glitch-text">02. SISTEMA</span>
+        </div>
+      </nav>
+
+      <div class="spacer"></div>
+      
+    </div>
+
+    <div class="terminal-main">
+      <div class="terminal-header">
+        <div class="title-wrap">
+          <h1 *ngIf="activeTab === 'profile'">COMANDO_CENTRALE // SCHEDA_UTENTE</h1>
+          <h1 *ngIf="activeTab === 'settings'">IMPOSTAZIONI_SISTEMA // AUDIO_UI</h1>
+        </div>
+        <button class="exit-button" (click)="closeTerminal()">[ ESC ]</button>
+      </div>
+
+      <div class="terminal-body scrollable">
+        <div class="tab-content" *ngIf="activeTab === 'profile'">
+          <div class="profile-layout">
+            <div class="avatar-column">
+              <div class="hex-monitor">
+                <span class="user-icon">👤</span>
+              </div>
+              <div class="rank-tag">{{ profile?.rank }}</div>
+            </div>
+            
+            <div class="data-column">
+              <div class="data-group">
+                <label>IDENTIFICATIVO_OPERATIVO</label>
+                <div class="data-value">{{ profile?.username }}</div>
+              </div>
+              <div class="data-group">
+                <label>ESPERIENZA_DI_COMANDO</label>
+                <div class="xp-gauge">
+                  <div class="xp-fill" [style.width.%]="profile?.experience"></div>
+                </div>
+              </div>
+              <div class="stats-grid">
+                <div class="stat-box"><span>WIN</span><p>{{ profile?.matchesWon }}</p></div>
+                <div class="stat-box"><span>LOSS</span><p>{{ profile?.matchesLost }}</p></div>
+                <div class="stat-box"><span>K/D</span><p>4.8</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content" *ngIf="activeTab === 'settings'">
+          <div class="settings-section">
+            <h3>MODULI_AUDIO</h3>
+            <div class="ctrl-row">
+              <label>BGM_VOLUME</label>
+              <input type="range" [(ngModel)]="audioSettings.music" class="tactical-slider">
+              <span class="pct">{{ audioSettings.music }}%</span>
+            </div>
+            <div class="ctrl-row">
+              <label>SFX_VOLUME</label>
+              <input type="range" [(ngModel)]="audioSettings.sfx" class="tactical-slider">
+              <span class="pct">{{ audioSettings.sfx }}%</span>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h3>VISUAL_FEED</h3>
+            <div class="ctrl-row checkbox">
+              <label>SENSORI_AVANZATI_HUD</label>
+              <ion-checkbox [(ngModel)]="uiSettings.showAdvancedLabels"></ion-checkbox>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

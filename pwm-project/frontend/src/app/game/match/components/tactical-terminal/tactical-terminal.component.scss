@@ -1,0 +1,391 @@
+/* ==========================================================================
+   TACTICAL TERMINAL COMPONENT - PROFILE PAGE LOOK & FEEL
+   Mimics the style of profile.page.scss with glow effects, colors, and gradients
+   while maintaining all component-specific information.
+   ========================================================================== */
+
+:host {
+  display: block;
+  height: 100%;
+  font-family: 'Inter', sans-serif; /* Consistente con profile.page */
+  color: #ffffff; /* */
+
+  /* Definizione Variabili Locali (Copia di profile.page.scss) */
+  --primary: #1e1e2e; /* */
+  --secondary: #2a2a40; /* */
+  --accent: #00ffd5; /* - Colore Glow principale */
+  --accent-rgb: 0, 255, 213; /* - RGB per trasparenze glow */
+  --accent-secondary: #ff00ff; /* - Colore Glow secondario */
+  --text-muted: #a0a0b0; /* */
+  --success-green: #00ff88; /* */
+  --danger-red: #ff4444; /* */
+
+  /* Variabili per gradienti */
+  --accent-gradient: linear-gradient(135deg, var(--accent), #0099ff); /* */
+  --exp-gradient: linear-gradient(90deg, var(--accent), #a0fe0a); /* */
+
+  /* Effetti Glow */
+  --main-glow: drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.8)); /* */
+  --accent-drop-shadow: drop-shadow(0 0 5px var(--accent)); /* */
+}
+
+/* --- FRAME PRINCIPALE DEL TERMINALE --- */
+.terminal-frame {
+  position: relative;
+  height: 100%;
+  background: var(--primary); /* Sfondo scuro di profile.page */
+  border: 1px solid var(--accent); /* Bordo luminescente accent */
+  overflow: hidden;
+  border-radius: 4px; /* Come tactical modal precedente */
+  filter: var(--main-glow); /* Applica glow all'intero frame */
+
+  /* Rimuovo scanlines originali per look più pulito come in profile.page */
+  .scanlines {
+    display: none;
+  }
+}
+
+/* --- LAYOUT DEL TERMINALE --- */
+.terminal-container {
+  display: flex;
+  height: 100%;
+  z-index: 10;
+  position: relative;
+}
+
+/* --- SIDEBAR (Navigazione Interna) --- */
+.terminal-sidebar {
+  width: 200px;
+  border-right: 1px solid rgba(var(--accent-rgb), 0.3); /* Bordo luminescente debole */
+  background: rgba(var(--primary), 0.5); /* Sfondo scuro trasparente */
+  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+
+  .brand {
+    padding: 0 25px 30px;
+    .system-name { 
+      display: block; 
+      font-weight: bold; 
+      color: var(--accent); /* Colore accent luminescente */
+      letter-spacing: 3px; 
+      filter: var(--accent-drop-shadow); /* Bagliore sul testo */
+    }
+    .version { 
+      font-size: 0.6rem; 
+      color: var(--text-muted); 
+    }
+  }
+
+  .nav-item {
+    padding: 15px 25px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: 0.3s;
+    border-left: 3px solid transparent;
+
+    &:hover {
+      color: #ffffff;
+      background: rgba(var(--accent-rgb), 0.1);
+    }
+
+    &.active {
+      color: #ffffff;
+      background: rgba(var(--accent-rgb), 0.2);
+      border-left: 3px solid var(--accent); /* Bordo luminescente active */
+      text-shadow: 0 0 10px var(--accent); /* Bagliore sul testo active */
+    }
+  }
+}
+
+/* --- AREA PRINCIPALE DEL CONTENUTO --- */
+.terminal-main {
+  flex: 1;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(var(--secondary), 0.3); /* Sfondo leggermente più chiaro di secondary */
+
+  .terminal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(var(--accent-rgb), 0.4); /* Bordo luminescente debole */
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+
+    h1 { 
+      font-size: 1rem; 
+      color: #ffffff; 
+      margin: 0; 
+      letter-spacing: 2px; 
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .exit-button { 
+      background: none; 
+      color: var(--danger-red); /* Colore danger di profile.page */
+      font-weight: bold; 
+      cursor: pointer; 
+      font-family: inherit;
+      border: 1px solid transparent;
+      padding: 5px 10px;
+      transition: 0.3s;
+
+      &:hover {
+        border-color: var(--danger-red);
+        filter: drop-shadow(0 0 5px var(--danger-red));
+        background: rgba(var(--danger-red), 0.1);
+      }
+    }
+  }
+}
+
+/* --- LAYOUT DEL PROFILO UTENTE (TAB 01) --- */
+.profile-layout {
+  display: flex;
+  gap: 30px;
+  align-items: flex-start;
+}
+
+/* Colonna Avatar */
+.avatar-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+
+  /* Restyling dell'Avatar Monitor per look luminescente circolare */
+  .hex-monitor {
+    width: 120px; 
+    height: 120px;
+    border: 3px solid var(--accent); /* Bordo luminescente accent */
+    background: rgba(var(--secondary), 0.8); /* Sfondo card scura */
+    border-radius: 50%; /* Diventa circolare come l'avatar in profile.page */
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    font-size: 4rem;
+    box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.5); /* Bagliore esterno accent */
+    filter: var(--accent-drop-shadow); /* Bagliore interno sull'icona */
+    overflow: hidden; /* Mantiene l'icona all'interno del cerchio */
+  }
+
+  .rank-tag {
+    background: var(--accent-gradient); /* Gradiente accent per il tag */
+    color: var(--primary); /* Testo scuro su fondo chiaro */
+    padding: 5px 15px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    border-radius: 20px; /* Arrotondato */
+    text-transform: uppercase;
+    filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.5));
+  }
+}
+
+/* Colonna Dati */
+.data-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  .data-group {
+    margin-bottom: 5px;
+    label { 
+      font-size: 0.6rem; 
+      color: var(--text-muted); 
+      display: block; 
+      margin-bottom: 5px; 
+      letter-spacing: 1px;
+    }
+    .data-value { 
+      font-size: 1.4rem; 
+      color: #ffffff; 
+      font-weight: bold; 
+      filter: var(--accent-drop-shadow); /* Bagliore sull'username */
+    }
+  }
+
+  /* Indicatore Esperienza (Gage) */
+  .xp-gauge {
+    width: 100%; 
+    height: 10px; 
+    background: var(--secondary); /* Sfondo scuro debole */
+    border: 1px solid rgba(var(--accent-rgb), 0.3); /* Bordo luminescente debole */
+    border-radius: 5px;
+    overflow: hidden;
+    filter: drop-shadow(0 0 3px rgba(var(--accent-rgb), 0.3));
+
+    .xp-fill { 
+      height: 100%; 
+      background: var(--exp-gradient); /* Gradiente XP di profile.page */
+      box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.7); /* Forte bagliore accent */
+      border-radius: 5px;
+    }
+  }
+
+  /* Griglia Statistiche */
+  .stats-grid {
+    display: flex; 
+    gap: 15px; 
+    margin-top: 10px;
+
+    /* Restyling Stat Box come le card statistiche di profile.page */
+    .stat-box {
+      flex: 1; 
+      background: var(--secondary); /* Sfondo card scura */
+      border: 1px solid rgba(var(--accent-rgb), 0.3); /* Bordo luminescente debole */
+      padding: 15px; 
+      text-align: center;
+      border-radius: 8px; /* Arrotondato */
+      transition: 0.3s;
+      filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.3)); /* Bagliore di base */
+
+      &:hover {
+        border-color: var(--accent);
+        filter: var(--main-glow); /* Forte bagliore hover accent */
+        transform: translateY(-2px); /* Effetto hover di movimento */
+      }
+
+      span { 
+        font-size: 0.6rem; 
+        color: var(--text-muted); 
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 5px;
+        letter-spacing: 1px;
+      }
+
+      p { 
+        font-size: 1.8rem; 
+        margin: 0; 
+        font-weight: bold;
+        color: var(--accent); /* Colore accent di base */
+      }
+      
+      /* Colore specifico per i valori delle statistiche (Win/Loss come in profile.page) */
+      p.stat-win {
+        color: var(--success-green); /* Verde vivace di profile.page */
+        filter: drop-shadow(0 0 5px rgba(0, 255, 136, 0.5));
+      }
+      
+      p.stat-loss {
+        color: var(--danger-red); /* Rosso vivace di profile.page */
+        filter: drop-shadow(0 0 5px rgba(255, 68, 68, 0.5));
+      }
+      
+      p.stat-kdr {
+        color: var(--accent); /* Cyan vivace di profile.page */
+        filter: var(--accent-drop-shadow);
+      }
+    }
+  }
+}
+
+/* --- TAB IMPOSTAZIONI (TAB 02) --- */
+.settings-section {
+  margin-bottom: 30px;
+  background: var(--secondary); /* Sfondo card scura */
+  border: 1px solid rgba(var(--accent-rgb), 0.3); /* Bordo luminescente debole */
+  padding: 20px;
+  border-radius: 8px;
+  filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.3));
+
+  h3 { 
+    font-size: 0.8rem; 
+    color: var(--accent); /* Titolo luminescente accent */
+    margin-top: 0; 
+    margin-bottom: 15px; 
+    text-transform: uppercase; 
+    letter-spacing: 2px;
+    filter: var(--accent-drop-shadow);
+  }
+
+  .ctrl-row {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 15px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+
+    &:last-child {
+      margin-bottom: 0;
+      border-bottom: none;
+    }
+
+    label { 
+      font-size: 0.8rem; 
+      color: #ffffff; /* Testo chiaro per le etichette */
+    }
+
+    .pct { 
+      color: var(--accent); /* Valore luminescente accent */
+      font-weight: bold; 
+      min-width: 50px; 
+      text-align: right; 
+      filter: var(--accent-drop-shadow);
+    }
+  }
+
+  /* Slider Tattico luminescente */
+  .tactical-slider {
+    -webkit-appearance: none; 
+    appearance: none;
+    width: 60%; /* Ridotto per lasciare spazio al valore */
+    height: 6px; 
+    background: rgba(var(--accent-rgb), 0.2); /* Sfondo slider trasparente accent */
+    border-radius: 3px;
+    outline: none;
+    transition: 0.2s;
+
+    &:hover {
+      background: rgba(var(--accent-rgb), 0.3);
+    }
+
+    &::-webkit-slider-thumb { 
+      -webkit-appearance: none; 
+      appearance: none;
+      width: 18px; 
+      height: 18px; 
+      background: var(--accent); /* Colore thumb accent */
+      cursor: pointer; 
+      border-radius: 50%;
+      border: 2px solid #ffffff; /* Bordo bianco per visibilità thumb */
+      box-shadow: 0 0 10px var(--accent); /* Forte bagliore thumb accent */
+      filter: drop-shadow(0 0 5px var(--accent));
+      transition: 0.2s;
+    }
+
+    &::-moz-range-thumb { 
+      width: 18px; 
+      height: 18px; 
+      background: var(--accent); 
+      cursor: pointer; 
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 10px var(--accent);
+      filter: drop-shadow(0 0 5px var(--accent));
+      transition: 0.2s;
+    }
+  }
+
+  /* Checkbox luminescente (Styling specifico Ion-Checkbox) */
+  ion-checkbox {
+    --size: 20px;
+    --checkbox-background-checked: var(--accent); /* Sfondo checked accent */
+    --border-color: rgba(var(--accent-rgb), 0.5); /* Bordo luminescente accent */
+    --border-color-checked: var(--accent); /* Bordo luminescente checked accent */
+    --checkmark-color: var(--primary); /* Colore checkmark scuro */
+    
+    filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.5));
+    transition: 0.3s;
+
+    &.checkbox-checked {
+      filter: drop-shadow(0 0 8px var(--accent)); /* Forte bagliorechecked accent */
+    }
+  }
+}
