@@ -1,7 +1,4 @@
 <div class="terminal-frame">
-  <div class="scanlines"></div>
-  <div class="glow-overlay"></div>
-  
   <div class="terminal-container">
     <div class="terminal-sidebar">
       <div class="brand">
@@ -11,15 +8,21 @@
       
       <nav>
         <div class="nav-item" [class.active]="activeTab === 'profile'" (click)="setTab('profile')">
-          <span class="glitch-text">01. PROFILO</span>
+          <span>01. PROFILO</span>
         </div>
         <div class="nav-item" [class.active]="activeTab === 'settings'" (click)="setTab('settings')">
-          <span class="glitch-text">02. SISTEMA</span>
+          <span>02. SISTEMA</span>
         </div>
       </nav>
 
       <div class="spacer"></div>
-      
+
+      <div class="sidebar-footer">
+        <button class="nav-profile-btn" (click)='navigateToFullProfile()'>
+          <ion-icon name="person-circle-outline"></ion-icon>
+          VAI AL PROFILO
+        </button>
+      </div>
     </div>
 
     <div class="terminal-main">
@@ -53,9 +56,18 @@
                 </div>
               </div>
               <div class="stats-grid">
-                <div class="stat-box"><span>WIN</span><p>{{ profile?.matchesWon }}</p></div>
-                <div class="stat-box"><span>LOSS</span><p>{{ profile?.matchesLost }}</p></div>
-                <div class="stat-box"><span>K/D</span><p>4.8</p></div>
+                <div class="stat-box">
+                  <span>WIN</span>
+                  <p style="color: var(--success-green)">{{ profile?.matchesWon }}</p>
+                </div>
+                <div class="stat-box">
+                  <span>LOSS</span>
+                  <p style="color: var(--danger-red)">{{ profile?.matchesLost }}</p>
+                </div>
+                <div class="stat-box">
+                  <span>K/D</span>
+                  <p style="color: var(--accent)">4.8</p>
+                </div>
               </div>
             </div>
           </div>

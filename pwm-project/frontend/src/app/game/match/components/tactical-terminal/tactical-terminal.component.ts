@@ -1,7 +1,9 @@
+// tactical-terminal.component.ts
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule } from '@ionic/angular';
+import { IonicModule, ModalController } from '@ionic/angular'; // <--- Aggiunto ModalController
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-tactical-terminal',
@@ -18,11 +20,27 @@ export class TacticalTerminalComponent {
 
   activeTab: 'profile' | 'settings' = 'profile';
 
+  constructor(
+    private router: Router,
+    private modalCtrl: ModalController // <--- Inietta il ModalController
+  ) {}
+
   setTab(tab: 'profile' | 'settings') {
     this.activeTab = tab;
   }
 
-  closeTerminal() {
-    this.close.emit();
+  // Modificato per chiudere effettivamente la modale
+  async closeTerminal() {
+    this.close.emit(); // Notifica comunque il genitore se necessario
+    await this.modalCtrl.dismiss(); // Chiude fisicamente la modale Ionic
+  }
+
+  // Navigazione con chiusura garantita
+  async navigateToFullProfile() {
+    // 1. Chiudiamo la modale (il comando await assicura che l'animazione inizi/avvenga)
+    await this.modalCtrl.dismiss(); 
+    
+    // 2. Reindirizziamo alla pagina del profilo
+    this.router.navigate(['/profile']); 
   }
 }

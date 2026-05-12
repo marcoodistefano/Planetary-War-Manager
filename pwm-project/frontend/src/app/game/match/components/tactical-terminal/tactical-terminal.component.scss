@@ -1,64 +1,70 @@
 /* ==========================================================================
-   TACTICAL TERMINAL COMPONENT - PROFILE PAGE LOOK & FEEL
-   Mimics the style of profile.page.scss with glow effects, colors, and gradients
-   while maintaining all component-specific information.
+   TACTICAL TERMINAL - REORGANIZED GLASSMORPHISM
    ========================================================================== */
 
 :host {
   display: block;
   height: 100%;
-  font-family: 'Inter', sans-serif; /* Consistente con profile.page */
-  color: #ffffff; /* */
+  font-family: 'Inter', sans-serif;
+  color: #ffffff;
 
-  /* Definizione Variabili Locali (Copia di profile.page.scss) */
-  --primary: #1e1e2e; /* */
-  --secondary: #2a2a40; /* */
-  --accent: #00ffd5; /* - Colore Glow principale */
-  --accent-rgb: 0, 255, 213; /* - RGB per trasparenze glow */
-  --accent-secondary: #ff00ff; /* - Colore Glow secondario */
-  --text-muted: #a0a0b0; /* */
-  --success-green: #00ff88; /* */
-  --danger-red: #ff4444; /* */
-
-  /* Variabili per gradienti */
-  --accent-gradient: linear-gradient(135deg, var(--accent), #0099ff); /* */
-  --exp-gradient: linear-gradient(90deg, var(--accent), #a0fe0a); /* */
-
-  /* Effetti Glow */
-  --main-glow: drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.8)); /* */
-  --accent-drop-shadow: drop-shadow(0 0 5px var(--accent)); /* */
+  /* Palette & Theme Variables */
+  --glass-bg: rgba(7, 12, 22, 0.85); 
+  --glass-border: rgba(134, 215, 255, 0.3);
+  --accent: #86d7ff;
+  --accent-rgb: 134, 215, 255;
+  --text-muted: #a0a0b0;
+  --danger-red: #ff7b72;
+  --success-green: #3fb950;
+  
+  /* Effects */
+  --glass-blur: blur(25px) saturate(150%);
+  --panel-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
 }
 
-/* --- FRAME PRINCIPALE DEL TERMINALE --- */
+/* 1. MAIN FRAME & LAYOUT
+   ========================================================================== */
+
 .terminal-frame {
   position: relative;
   height: 100%;
-  background: var(--primary); /* Sfondo scuro di profile.page */
-  border: 1px solid var(--accent); /* Bordo luminescente accent */
+  background: linear-gradient(135deg, var(--glass-bg) 0%, rgba(13, 25, 48, 0.95) 100%);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: 18px;
   overflow: hidden;
-  border-radius: 4px; /* Come tactical modal precedente */
-  filter: var(--main-glow); /* Applica glow all'intero frame */
-
-  /* Rimuovo scanlines originali per look più pulito come in profile.page */
-  .scanlines {
-    display: none;
+  box-shadow: var(--panel-shadow), inset 0 0 20px rgba(var(--accent-rgb), 0.05);
+  
+  /* Overlay di scansione (Scanlines) */
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+    background-size: 100% 3px, 3px 100%;
+    pointer-events: none;
+    opacity: 0.2;
+    z-index: 2;
   }
 }
 
-/* --- LAYOUT DEL TERMINALE --- */
 .terminal-container {
   display: flex;
   height: 100%;
-  z-index: 10;
   position: relative;
+  z-index: 10;
 }
 
-/* --- SIDEBAR (Navigazione Interna) --- */
+/* 2. SIDEBAR & NAVIGATION
+   ========================================================================== */
+
 .terminal-sidebar {
-  width: 200px;
-  border-right: 1px solid rgba(var(--accent-rgb), 0.3); /* Bordo luminescente debole */
-  background: rgba(var(--primary), 0.5); /* Sfondo scuro trasparente */
-  padding: 40px 0;
+  width: 220px;
+  background: rgba(0, 0, 0, 0.4);
+  border-right: 1px solid var(--glass-border);
+  padding: 40px 0 0 0;
   display: flex;
   flex-direction: column;
 
@@ -66,326 +72,239 @@
     padding: 0 25px 30px;
     .system-name { 
       display: block; 
-      font-weight: bold; 
-      color: var(--accent); /* Colore accent luminescente */
-      letter-spacing: 3px; 
-      filter: var(--accent-drop-shadow); /* Bagliore sul testo */
+      font-weight: 800; 
+      color: var(--accent); 
+      letter-spacing: 2px; 
+      text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.5);
     }
-    .version { 
-      font-size: 0.6rem; 
-      color: var(--text-muted); 
+    .version { font-size: 0.6rem; color: var(--text-muted); opacity: 0.6; }
+  }
+
+  nav {
+    flex: 1;
+    .nav-item {
+      padding: 16px 25px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: 0.3s ease;
+      border-left: 4px solid transparent;
+
+      &:hover {
+        color: #ffffff;
+        background: rgba(var(--accent-rgb), 0.1);
+      }
+
+      &.active {
+        color: #ffffff;
+        background: rgba(var(--accent-rgb), 0.15);
+        border-left: 4px solid var(--accent);
+        text-shadow: 0 0 8px rgba(var(--accent-rgb), 0.6);
+      }
     }
   }
 
-  .nav-item {
-    padding: 15px 25px;
-    font-size: 0.7rem;
-    cursor: pointer;
-    color: var(--text-muted);
-    transition: 0.3s;
-    border-left: 3px solid transparent;
-
-    &:hover {
-      color: #ffffff;
-      background: rgba(var(--accent-rgb), 0.1);
-    }
-
-    &.active {
-      color: #ffffff;
-      background: rgba(var(--accent-rgb), 0.2);
-      border-left: 3px solid var(--accent); /* Bordo luminescente active */
-      text-shadow: 0 0 10px var(--accent); /* Bagliore sul testo active */
-    }
+  .sidebar-footer {
+    padding: 20px;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.2);
   }
 }
 
-/* --- AREA PRINCIPALE DEL CONTENUTO --- */
+/* 3. BUTTONS
+   ========================================================================== */
+
+.nav-profile-btn {
+  width: 100%;
+  padding: 12px;
+  background: rgba(var(--accent-rgb), 0.15);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: 0.3s ease;
+
+  &:hover {
+    background: var(--accent);
+    color: #050a14;
+    box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.4);
+    transform: translateY(-2px);
+  }
+}
+
+.exit-button { 
+  background: rgba(var(--danger-red), 0.1); 
+  color: var(--danger-red); 
+  border: 1px solid rgba(var(--danger-red), 0.3);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+
+  &:hover {
+    background: var(--danger-red);
+    color: white;
+    box-shadow: 0 0 15px rgba(var(--danger-red), 0.4);
+  }
+}
+
+/* 4. MAIN CONTENT AREA
+   ========================================================================== */
+
 .terminal-main {
   flex: 1;
-  padding: 30px;
+  padding: 40px;
   display: flex;
   flex-direction: column;
-  background: rgba(var(--secondary), 0.3); /* Sfondo leggermente più chiaro di secondary */
 
   .terminal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid rgba(var(--accent-rgb), 0.4); /* Bordo luminescente debole */
+    margin-bottom: 30px;
+    border-bottom: 1px solid var(--glass-border);
     padding-bottom: 15px;
-    margin-bottom: 20px;
 
     h1 { 
-      font-size: 1rem; 
+      font-size: 1.2rem; 
       color: #ffffff; 
       margin: 0; 
-      letter-spacing: 2px; 
+      letter-spacing: 3px; 
       text-transform: uppercase;
-      font-weight: bold;
+      text-shadow: 0 0 15px rgba(var(--accent-rgb), 0.4);
     }
+  }
 
-    .exit-button { 
-      background: none; 
-      color: var(--danger-red); /* Colore danger di profile.page */
-      font-weight: bold; 
-      cursor: pointer; 
-      font-family: inherit;
-      border: 1px solid transparent;
-      padding: 5px 10px;
-      transition: 0.3s;
-
-      &:hover {
-        border-color: var(--danger-red);
-        filter: drop-shadow(0 0 5px var(--danger-red));
-        background: rgba(var(--danger-red), 0.1);
-      }
-    }
+  .terminal-body {
+    flex: 1;
+    overflow-y: auto;
+    
+    &::-webkit-scrollbar { width: 4px; }
+    &::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 2px; }
   }
 }
 
-/* --- LAYOUT DEL PROFILO UTENTE (TAB 01) --- */
+/* 5. TAB: PROFILE SECTION
+   ========================================================================== */
+
 .profile-layout {
   display: flex;
-  gap: 30px;
-  align-items: flex-start;
+  gap: 40px;
 }
 
-/* Colonna Avatar */
 .avatar-column {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 15px;
-
-  /* Restyling dell'Avatar Monitor per look luminescente circolare */
   .hex-monitor {
-    width: 120px; 
-    height: 120px;
-    border: 3px solid var(--accent); /* Bordo luminescente accent */
-    background: rgba(var(--secondary), 0.8); /* Sfondo card scura */
-    border-radius: 50%; /* Diventa circolare come l'avatar in profile.page */
-    display: flex; 
-    align-items: center; 
-    justify-content: center;
+    width: 130px; height: 130px;
+    border: 2px solid var(--accent);
+    background: rgba(var(--accent-rgb), 0.1);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
     font-size: 4rem;
-    box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.5); /* Bagliore esterno accent */
-    filter: var(--accent-drop-shadow); /* Bagliore interno sull'icona */
-    overflow: hidden; /* Mantiene l'icona all'interno del cerchio */
+    box-shadow: 0 0 25px rgba(var(--accent-rgb), 0.2);
+    margin-bottom: 20px;
   }
-
+  
   .rank-tag {
-    background: var(--accent-gradient); /* Gradiente accent per il tag */
-    color: var(--primary); /* Testo scuro su fondo chiaro */
-    padding: 5px 15px;
+    background: linear-gradient(135deg, var(--accent), #58a6ff);
+    color: #050a14;
+    padding: 6px 18px;
     font-size: 0.7rem;
-    font-weight: bold;
-    border-radius: 20px; /* Arrotondato */
-    text-transform: uppercase;
-    filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.5));
+    font-weight: 800;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 0 15px rgba(var(--accent-rgb), 0.3);
   }
 }
 
-/* Colonna Dati */
 .data-column {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-
+  
   .data-group {
-    margin-bottom: 5px;
-    label { 
-      font-size: 0.6rem; 
-      color: var(--text-muted); 
-      display: block; 
-      margin-bottom: 5px; 
-      letter-spacing: 1px;
-    }
-    .data-value { 
-      font-size: 1.4rem; 
-      color: #ffffff; 
-      font-weight: bold; 
-      filter: var(--accent-drop-shadow); /* Bagliore sull'username */
-    }
+    margin-bottom: 25px;
+    label { font-size: 0.65rem; color: var(--accent); letter-spacing: 2px; font-weight: bold; opacity: 0.8; }
+    .data-value { font-size: 1.8rem; font-weight: 800; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
   }
 
-  /* Indicatore Esperienza (Gage) */
   .xp-gauge {
-    width: 100%; 
-    height: 10px; 
-    background: var(--secondary); /* Sfondo scuro debole */
-    border: 1px solid rgba(var(--accent-rgb), 0.3); /* Bordo luminescente debole */
-    border-radius: 5px;
-    overflow: hidden;
-    filter: drop-shadow(0 0 3px rgba(var(--accent-rgb), 0.3));
-
+    height: 8px; background: rgba(0,0,0,0.3); border-radius: 4px; overflow: hidden;
+    border: 1px solid var(--glass-border);
     .xp-fill { 
       height: 100%; 
-      background: var(--exp-gradient); /* Gradiente XP di profile.page */
-      box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.7); /* Forte bagliore accent */
-      border-radius: 5px;
-    }
-  }
-
-  /* Griglia Statistiche */
-  .stats-grid {
-    display: flex; 
-    gap: 15px; 
-    margin-top: 10px;
-
-    /* Restyling Stat Box come le card statistiche di profile.page */
-    .stat-box {
-      flex: 1; 
-      background: var(--secondary); /* Sfondo card scura */
-      border: 1px solid rgba(var(--accent-rgb), 0.3); /* Bordo luminescente debole */
-      padding: 15px; 
-      text-align: center;
-      border-radius: 8px; /* Arrotondato */
-      transition: 0.3s;
-      filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.3)); /* Bagliore di base */
-
-      &:hover {
-        border-color: var(--accent);
-        filter: var(--main-glow); /* Forte bagliore hover accent */
-        transform: translateY(-2px); /* Effetto hover di movimento */
-      }
-
-      span { 
-        font-size: 0.6rem; 
-        color: var(--text-muted); 
-        text-transform: uppercase;
-        display: block;
-        margin-bottom: 5px;
-        letter-spacing: 1px;
-      }
-
-      p { 
-        font-size: 1.8rem; 
-        margin: 0; 
-        font-weight: bold;
-        color: var(--accent); /* Colore accent di base */
-      }
-      
-      /* Colore specifico per i valori delle statistiche (Win/Loss come in profile.page) */
-      p.stat-win {
-        color: var(--success-green); /* Verde vivace di profile.page */
-        filter: drop-shadow(0 0 5px rgba(0, 255, 136, 0.5));
-      }
-      
-      p.stat-loss {
-        color: var(--danger-red); /* Rosso vivace di profile.page */
-        filter: drop-shadow(0 0 5px rgba(255, 68, 68, 0.5));
-      }
-      
-      p.stat-kdr {
-        color: var(--accent); /* Cyan vivace di profile.page */
-        filter: var(--accent-drop-shadow);
-      }
+      background: linear-gradient(90deg, var(--accent), #3fb950);
+      box-shadow: 0 0 15px rgba(var(--accent-rgb), 0.5);
     }
   }
 }
 
-/* --- TAB IMPOSTAZIONI (TAB 02) --- */
-.settings-section {
-  margin-bottom: 30px;
-  background: var(--secondary); /* Sfondo card scura */
-  border: 1px solid rgba(var(--accent-rgb), 0.3); /* Bordo luminescente debole */
-  padding: 20px;
-  border-radius: 8px;
-  filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.3));
+/* 6. STATISTICS & GRID
+   ========================================================================== */
 
-  h3 { 
-    font-size: 0.8rem; 
-    color: var(--accent); /* Titolo luminescente accent */
-    margin-top: 0; 
-    margin-bottom: 15px; 
-    text-transform: uppercase; 
-    letter-spacing: 2px;
-    filter: var(--accent-drop-shadow);
-  }
+.stats-grid {
+  display: flex; 
+  gap: 15px; 
+  margin-top: 25px;
 
-  .ctrl-row {
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    margin-bottom: 15px;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-
-    &:last-child {
-      margin-bottom: 0;
-      border-bottom: none;
-    }
-
-    label { 
-      font-size: 0.8rem; 
-      color: #ffffff; /* Testo chiaro per le etichette */
-    }
-
-    .pct { 
-      color: var(--accent); /* Valore luminescente accent */
-      font-weight: bold; 
-      min-width: 50px; 
-      text-align: right; 
-      filter: var(--accent-drop-shadow);
-    }
-  }
-
-  /* Slider Tattico luminescente */
-  .tactical-slider {
-    -webkit-appearance: none; 
-    appearance: none;
-    width: 60%; /* Ridotto per lasciare spazio al valore */
-    height: 6px; 
-    background: rgba(var(--accent-rgb), 0.2); /* Sfondo slider trasparente accent */
-    border-radius: 3px;
-    outline: none;
-    transition: 0.2s;
-
-    &:hover {
-      background: rgba(var(--accent-rgb), 0.3);
-    }
-
-    &::-webkit-slider-thumb { 
-      -webkit-appearance: none; 
-      appearance: none;
-      width: 18px; 
-      height: 18px; 
-      background: var(--accent); /* Colore thumb accent */
-      cursor: pointer; 
-      border-radius: 50%;
-      border: 2px solid #ffffff; /* Bordo bianco per visibilità thumb */
-      box-shadow: 0 0 10px var(--accent); /* Forte bagliore thumb accent */
-      filter: drop-shadow(0 0 5px var(--accent));
-      transition: 0.2s;
-    }
-
-    &::-moz-range-thumb { 
-      width: 18px; 
-      height: 18px; 
-      background: var(--accent); 
-      cursor: pointer; 
-      border-radius: 50%;
-      border: 2px solid #ffffff;
-      box-shadow: 0 0 10px var(--accent);
-      filter: drop-shadow(0 0 5px var(--accent));
-      transition: 0.2s;
-    }
-  }
-
-  /* Checkbox luminescente (Styling specifico Ion-Checkbox) */
-  ion-checkbox {
-    --size: 20px;
-    --checkbox-background-checked: var(--accent); /* Sfondo checked accent */
-    --border-color: rgba(var(--accent-rgb), 0.5); /* Bordo luminescente accent */
-    --border-color-checked: var(--accent); /* Bordo luminescente checked accent */
-    --checkmark-color: var(--primary); /* Colore checkmark scuro */
-    
-    filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.5));
+  .stat-box {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(var(--accent-rgb), 0.2) !important;
+    padding: 15px;
+    border-radius: 12px;
+    text-align: center;
     transition: 0.3s;
 
-    &.checkbox-checked {
-      filter: drop-shadow(0 0 8px var(--accent)); /* Forte bagliorechecked accent */
+    &:hover {
+      background: rgba(var(--accent-rgb), 0.08) !important;
+      border-color: var(--accent) !important;
+      transform: translateY(-3px);
+    }
+
+    span { font-size: 0.6rem; color: var(--accent); font-weight: bold; }
+    p { font-size: 1.5rem; margin: 0; font-weight: 800; }
+  }
+}
+
+/* 7. TAB: SETTINGS SECTION
+   ========================================================================== */
+
+.settings-section {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+
+  h3 { color: var(--accent); font-size: 0.9rem; margin-bottom: 20px; letter-spacing: 2px; }
+
+  .ctrl-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    label { font-size: 0.85rem; font-weight: 500; }
+  }
+
+  .tactical-slider {
+    -webkit-appearance: none;
+    width: 60%; height: 4px;
+    background: rgba(var(--accent-rgb), 0.2);
+    border-radius: 2px;
+    
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent);
+      cursor: pointer;
     }
   }
 }
