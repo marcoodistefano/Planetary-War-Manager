@@ -1,92 +1,120 @@
 :host {
   --primary-blue: #58a6ff;
-  --danger-color: #ff7b72;
-  --glass-bg: rgba(5, 10, 20, 0.95);
+  --accent-cyan: #00d4ff;
+  --danger-red: #ff7b72;
+  --glass-bg: rgba(7, 13, 24, 0.98);
+  --border-color: rgba(88, 166, 255, 0.3);
+  
   font-family: 'Courier New', Courier, monospace;
+  display: block;
+  height: 100%;
 }
 
-.transparent-bg { --background: transparent !important; }
+/* Rimuoviamo lo scroll dalla ion-content per gestirlo noi internamente */
+ion-content {
+  --background: transparent !important;
+  --overflow: hidden; 
+  height: 100%;
+}
 
+/* 1. CONTENITORE PRINCIPALE */
 .modal-wrapper {
-  padding: 20px; // Ridotto il padding esterno per dare più respiro al modale
+  width: 100%;
   height: 100%;
   display: flex;
   justify-content: center;
-  align-items: center;
-  box-sizing: border-box;
-}
-
-/* PANNELLO ULTRA-WIDE E BASSO */
-.panel.extra-wide-panel {
-  width: 100%;
-  max-width: 1300px;  // Aumentato da 1100px per renderlo più largo
-  height: auto;
-  max-height: 80vh;   // Ridotto da 92vh per renderlo più stretto in altezza
-  display: flex;
-  flex-direction: column;
-  background: var(--glass-bg);
-  border: 1px solid rgba(88, 166, 255, 0.4);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(88, 166, 255, 0.08);
-  backdrop-filter: blur(12px);
-  border-radius: 20px;
-  padding: 20px 30px; // Padding interno più compatto
+  align-items: flex-start; /* Cambiato da center a flex-start per evitare tagli simmetrici */
+  padding: 2vh 10px; /* Usa unità vh per garantire margini proporzionali allo schermo */
   box-sizing: border-box;
   overflow: hidden;
 }
 
-.title-block {
-  text-align: center;
-  margin-bottom: 15px; // Ridotto margine
-  flex-shrink: 0;
-  .eyebrow { color: var(--danger-color); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 2px; }
-  h2 { font-size: 1.3rem; color: #fff; margin: 2px 0 0; text-shadow: 0 0 10px var(--primary-blue); }
-}
-
-/* Griglia a 3 colonne ottimizzata */
-.sections-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px; // Gap ridotto
+.panel.extra-wide-panel {
   width: 100%;
+  max-width: 1300px;
+  /* Forza il pannello a non essere MAI più alto della finestra disponibile */
+  height: 100%; 
+  max-height: 92vh; 
   
-  .inner-panel {
-    background: rgba(1, 36, 46, 0.2);
-    border: 1px solid rgba(88, 166, 255, 0.2);
-    padding: 12px 15px; // Padding interno dei settori ridotto
-    border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px; // Spazio tra gli item ridotto
-  }
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(15px);
+  border-radius: 12px;
+  overflow: hidden; 
+  margin: auto; /* Centra verticalmente finché c'è spazio, poi si blocca in alto */
 }
 
-.settings-scroll-container {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-  padding-right: 10px;
-  margin-bottom: 15px;
+/* 2. HEADER E FOOTER FISSI */
+.title-block, .action-dock {
+  flex-shrink: 0; /* Impedisce a header e footer di rimpicciolirsi */
+}
 
+.title-block {
+  padding: 15px 30px;
+  text-align: center;
+  border-bottom: 1px solid rgba(88, 166, 255, 0.1);
+
+  h2 { margin: 5px 0 0; font-size: 1.4rem; color: #fff; letter-spacing: 2px; }
+}
+
+/* 3. AREA DI SCROLL - IL CUORE DEL FIX */
+.settings-scroll-container {
+  flex: 1; 
+  overflow-y: auto; /* Attiva lo scroll qui e solo qui */
+  min-height: 0;   /* Permette al flex-child di collassare correttamente */
+  padding: 20px 25px;
+
+  /* Scrollbar sottile */
   &::-webkit-scrollbar { width: 4px; }
   &::-webkit-scrollbar-thumb { background: var(--primary-blue); border-radius: 10px; }
 }
 
-.custom-label { 
-  color: var(--primary-blue); 
-  font-size: 0.65rem; 
-  font-weight: bold; 
-  margin: 0 0 5px 0; 
-  letter-spacing: 1px; 
+.sections-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); 
+  gap: 20px;
+  padding-bottom: 10px; /* Respiro extra in fondo alla griglia */
+}
+
+/* 4. INNER PANEL - Altezza uniforme */
+.inner-panel {
+  background: rgba(88, 166, 255, 0.03);
+  border: 1px solid rgba(88, 166, 255, 0.15);
+  padding: 15px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%; /* Si allineano tutti sulla stessa riga */
+}
+
+/* 5. FOOTER */
+.action-dock {
+  padding: 15px 30px;
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid rgba(88, 166, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .setting-item {
-  margin-bottom: 5px; // Margine tra i campi ridotto
-  label { font-size: 0.6rem; color: #8892b0; display: block; margin-bottom: 4px; }
-  
+  label { 
+    font-size: 0.65rem; 
+    color: #8892b0; 
+    display: block; 
+    margin-bottom: 6px; 
+    text-transform: uppercase;
+  }
+
   &.toggle-group {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 5px 0;
     label { margin-bottom: 0; }
   }
 }
@@ -94,59 +122,86 @@
 .tactical-input, .tactical-select {
   width: 100%;
   background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(88, 166, 255, 0.3);
+  border: 1px solid var(--border-color);
   color: #fff;
-  padding: 8px 12px; // Input più sottili
-  border-radius: 6px;
+  padding: 10px;
+  border-radius: 4px;
   font-family: inherit;
-  font-size: 0.8rem;
-  outline: none;
-  &:focus { border-color: var(--primary-blue); }
+  font-size: 0.85rem;
+  
+  &:focus { border-color: var(--accent-cyan); outline: none; }
 }
 
+/* 5. FOOTER AZIONI */
+/* 5. FOOTER AZIONI - Ora impilato verticalmente */
 .action-dock {
-  flex-shrink: 0;
+  padding: 20px 30px;
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid rgba(88, 166, 255, 0.1);
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  flex-direction: column; /* Forza la disposizione dall'alto verso il basso */
+  align-items: center;    /* Centra i pulsanti orizzontalmente */
+  gap: 15px;              /* Spazio tra i due pulsanti */
+  flex-shrink: 0;
 }
 
 .primary-glow {
-  width: 100%;
-  max-width: 350px;
+  width: 100%;            /* Occupa tutta la larghezza disponibile */
+  max-width: 500px;       /* Ma non esagerare su schermi enormi */
   background: rgba(88, 166, 255, 0.1);
   border: 1px solid var(--primary-blue);
   color: #fff;
-  padding: 12px; // Bottone più basso
-  border-radius: 10px;
+  padding: 14px 25px;
+  border-radius: 6px;
   font-weight: bold;
-  cursor: pointer;
   text-transform: uppercase;
-  font-size: 0.85rem;
-  transition: 0.3s;
-  &:hover { background: var(--primary-blue); box-shadow: 0 0 20px var(--primary-blue); color: #000; }
+  font-size: 1rem;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 15px rgba(88, 166, 255, 0.1);
+
+  &:hover { 
+    background: var(--primary-blue); 
+    color: #000;
+    box-shadow: 0 0 25px rgba(88, 166, 255, 0.4);
+    transform: translateY(-2px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
 }
 
 .logout-button {
-  background: transparent; border: none; color: rgba(255, 255, 255, 0.4); 
-  font-size: 0.65rem; text-transform: uppercase; cursor: pointer;
-  &:hover { color: var(--danger-color); }
-}
+  background: transparent; 
+  border: none; 
+  color: rgba(255, 255, 255, 0.3); 
+  font-size: 0.75rem; 
+  text-transform: uppercase;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: color 0.2s;
+  
+  /* Rimuoviamo la sottolineatura per un look più "terminale" */
+  text-decoration: none; 
 
-/* RESPONSIVENESS */
-@media (max-width: 1200px) {
-  .panel.extra-wide-panel { max-width: 950px; }
+  &:hover { 
+    color: var(--danger-red); 
+    text-shadow: 0 0 8px rgba(255, 123, 114, 0.4);
+  }
 }
+/* 6. MEDIA QUERIES PER TABLET E MOBILE */
 
 @media (max-width: 1024px) {
   .sections-grid { grid-template-columns: repeat(2, 1fr); }
-  .panel.extra-wide-panel { max-height: 85vh; }
+  .inner-panel:last-child { grid-column: span 2; }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
+  .modal-wrapper { padding: 0; }
+  .panel.extra-wide-panel { border-radius: 0; max-height: 100vh; }
   .sections-grid { grid-template-columns: 1fr; }
-  .panel.extra-wide-panel { padding: 15px; max-height: 90vh; }
+  .inner-panel:last-child { grid-column: span 1; }
+  .action-dock { flex-direction: column; gap: 15px; }
 }

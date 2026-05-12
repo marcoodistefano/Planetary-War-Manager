@@ -3,7 +3,6 @@
     <div class="panel extra-wide-panel">
       
       <div class="title-block">
-        <p class="eyebrow">Protocollo di Configurazione Operativa</p>
         <h2>CREA NUOVA PARTITA</h2>
       </div>
 
@@ -11,7 +10,7 @@
         <div class="sections-grid">
           
           <div class="inner-panel">
-            <p class="custom-label">SETTORE 01: LOGISTICA</p>
+            <p class="custom-label">SETTORE 01: GEOGRAFIA</p>
             <div class="setting-item">
               <label>IDENTIFICATIVO MISSIONE</label>
               <input type="text" class="tactical-input" placeholder="Operazione...">
@@ -19,73 +18,80 @@
             <div class="setting-item">
               <label>REGIONE OPERATIVA</label>
               <select class="tactical-select">
-                <option>Mondo</option>
-                <option>Italia</option>
-                <option>Cina</option>
+                <option *ngFor="let r of regioni" [value]="r">{{ r }}</option>
               </select>
             </div>
             <div class="setting-item">
-              <label>CAPACITÀ COMANDANTI (MAX: 12)</label>
-              <ion-range min="2" max="12" step="1" snaps="true" class="tactical-range"></ion-range>
+              <label>SCALA SETTORE (MAP_SIZE)</label>
+              <select class="tactical-select">
+                <option>Small</option>
+                <option>Medium</option>
+                <option>Large</option>
+                <option>XLarge</option>
+                <option>Huge</option>
+              </select>
             </div>
             <div class="setting-item">
-              <label>QUORUM MINIMO AVVIO</label>
-              <input type="number" class="tactical-input" placeholder="Giocatori richiesti">
-            </div>
-            <div class="setting-item toggle-group">
-              <label>LATE-JOIN (DROP-IN)</label>
-              <ion-toggle class="tactical-toggle"></ion-toggle>
+              <label>CAPACITÀ COMANDANTI</label>
+              <select class="tactical-select">
+                <option *ngFor="let p of maxPlayers" [value]="p">{{ p }} Partecipanti</option>
+              </select>
             </div>
           </div>
 
           <div class="inner-panel">
-            <p class="custom-label">SETTORE 02: REGOLE D'INGAGGIO</p>
+            <p class="custom-label">SETTORE 02: OBIETTIVI</p>
             <div class="setting-item">
-              <label>MODALITÀ DI VITTORIA</label>
+              <label>MODALITÀ DI GIOCO</label>
               <select class="tactical-select">
-                <option>Distruzione Globale</option>
-                <option>Conquista Territoriale</option>
-                <option>Partita a Tempo</option>
+                <option *ngFor="let mod of modalitaGioco" [value]="mod">{{ mod }}</option>
               </select>
             </div>
             <div class="setting-item">
               <label>SOGLIA VITTORIA (%)</label>
-              <ion-range min="20" max="100" step="5" pin="true" class="tactical-range"></ion-range>
+              <ion-range min="10" max="100" step="5" snaps="true" pin="true" color="primary" class="tactical-range"></ion-range>
             </div>
-            <div class="setting-item">
-              <label>MEMBRI MAX ALLEANZA</label>
-              <input type="number" class="tactical-input" value="3">
+            <div class="setting-item toggle-group">
+              <label>GIOCO A SQUADRE (SQUAD)</label>
+              <ion-toggle class="tactical-toggle"></ion-toggle>
             </div>
             <div class="setting-item toggle-group">
               <label>PARTITA CLASSIFICATA (ELO)</label>
-              <ion-toggle class="tactical-toggle" color="primary"></ion-toggle>
+              <ion-toggle class="tactical-toggle" color="primary" checked></ion-toggle>
             </div>
             <div class="setting-item toggle-group">
-              <label>VITTORIA DI COALIZIONE</label>
-              <ion-toggle class="tactical-toggle"></ion-toggle>
+              <label>ALLEANZE CONSENTITE</label>
+              <ion-toggle class="tactical-toggle" checked></ion-toggle>
             </div>
           </div>
 
           <div class="inner-panel">
-            <p class="custom-label">SETTORE 03: MODULI TATTICI</p>
+            <p class="custom-label">SETTORE 03: CRONOLOGIA</p>
             <div class="setting-item">
-              <label>MOLTIPLICATORE TEMPORALE</label>
+              <label>DURATA MASSIMA OPERAZIONE</label>
               <select class="tactical-select">
-                <option>x30 (Standard)</option>
-                <option>x60 (Blitz)</option>
+                <option *ngFor="let d of durataMax" [value]="d">{{ d }}</option>
               </select>
             </div>
             <div class="setting-item">
-              <label>TIER TECNOLOGICO INIZIALE</label>
-              <ion-range min="1" max="3" step="1" snaps="true" class="tactical-range"></ion-range>
+              <label>MOLTIPLICATORE TEMPORALE</label>
+              <select class="tactical-select">
+                <option *ngFor="let m of moltiplicatori" [value]="m">{{ m }}</option>
+              </select>
             </div>
-            <div class="setting-item toggle-group">
-              <label>MODULO INTELLIGENCE</label>
-              <ion-toggle class="tactical-toggle"></ion-toggle>
+            <div class="setting-item">
+              <label>PROGRAMMAZIONE AVVIO</label>
+              <select class="tactical-select">
+                <option>Immediato</option>
+                <option>Tra 1 Ora</option>
+                <option>Tra 6 Ore</option>
+                <option>Tra 12 Ore</option>
+                <option>Tra 24 Ore</option>
+              </select>
             </div>
-            <div class="setting-item toggle-group">
-              <label>SUPERARMI (END-GAME)</label>
-              <ion-toggle class="tactical-toggle"></ion-toggle>
+            <div class="setting-item">
+              <label>QUORUM MINIMO AVVIO</label>
+              <input type="number" class="tactical-input" value="2" min="2">
             </div>
           </div>
 

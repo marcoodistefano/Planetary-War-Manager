@@ -1,63 +1,100 @@
 <ion-content [fullscreen]="true">
+  
   <div class="auth-background" aria-hidden="true">
     <video #backgroundVideo class="auth-background__video" autoplay muted loop playsinline preload="metadata" src="assets/background_gif/background_gif.mp4"></video>
     <div class="auth-background__overlay"></div>
   </div>
 
-  <div class="browser-container">
-    
-    <div class="header-nav">
-      <ion-button fill="clear" routerLink="/home" class="back-link">
-        [ <ion-icon name="chevron-back"></ion-icon> TORNA AL COMANDO ]
-      </ion-button>
-      <div class="title-block">
-        <p class="eyebrow">Dossier Operativo</p>
-        <h1>ARCHIVIO OPERAZIONI</h1>
+  <div class="browser-page">
+    <div class="overlay"></div> <header class="mobile-header">
+      <div class="header-left">
+        <ion-button fill="clear" class="back-link" routerLink="/home">
+          <ion-icon name="chevron-back-outline"></ion-icon>
+          Home
+        </ion-button>
+      </div>
+      <div class="header-center">
+        <div class="nav-title">DOSSIER</div>
+      </div>
+      <div class="header-right"></div>
+    </header>
+
+    <div class="browser-container">
+      
+      <div class="header-nav desktop-only">
+        <ion-button fill="clear" class="back-link" routerLink="/home">
+          <ion-icon name="chevron-back-outline"></ion-icon>
+          TORNA AL COMANDO
+        </ion-button>
+        <div class="title-block">
+          <p class="eyebrow">Dossier Operativo</p>
+          <h1>ARCHIVIO OPERAZIONI</h1>
+        </div>
+      </div>
+
+      <div class="panel main-panel">
+        
+        <div class="panel-controls">
+          <div class="tabs-dock-center">
+            <button [class.active]="view === 'active'" (click)="view = 'active'">OPERAZIONI ATTIVE</button>
+            <button [class.active]="view === 'finished'" (click)="view = 'finished'">ARCHIVIO STORICO</button>
+          </div>
+      
+          <div class="search-section">
+            <ion-searchbar class="glass-searchbar transparent-element" placeholder="Filtra per nome missione, creatore o settore..."></ion-searchbar>
+          </div>
+        </div>
+
+        <div class="results-container">
+          <div class="scroll-area">
+            
+            <article class="mission-card-extended inner-panel" *ngFor="let m of mockMatches">
+              
+              <div class="card-main-info">
+                <div class="card-header">
+                  <span class="sector-tag">SETTORE_{{m.id}}</span>
+                  <span class="m-status" [class.done]="view === 'finished'">
+                    {{ view === 'active' ? '● OPERATIVA' : '■ TERMINATA' }}
+                  </span>
+                </div>
+                <h3>{{ m.name }}</h3>
+                <p class="creator-info">Comandante: <strong>{{ m.creator }}</strong></p>
+              </div>
+
+              <div class="card-stats-block">
+                <div class="stat-unit">
+                  <span class="stat-label">REGIONE GIOCATA</span>
+                  <span class="stat-value">{{ m.region }}</span>
+                </div>
+                <div class="stat-unit">
+                  <span class="stat-label">ARROLATI</span>
+                  <span class="stat-value highlight">{{ m.joined }}/{{ m.total }}</span>
+                </div>
+                <div class="stat-unit">
+                  <span class="stat-label">TEMPO TRASCORSO</span>
+                  <span class="stat-value">14H 20M</span>
+                </div>
+              </div>
+
+              <div class="card-actions">
+                <button class="primary-glow">{{ view === 'active' ? 'ENTRA IN PARTITA' : 'REPLAY DATI' }}</button>
+              </div>
+            </article>
+
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="tabs-dock-center">
-      <button [class.active]="view === 'active'" (click)="view = 'active'">OPERAZIONI ATTIVE</button>
-      <button [class.active]="view === 'finished'" (click)="view = 'finished'">ARCHIVIO STORICO</button>
-    </div>
-
-    <div class="search-section">
-      <ion-searchbar class="glass-searchbar" placeholder="Filtra per nome missione, creatore o settore..."></ion-searchbar>
-    </div>
-
-    <div class="results-container">
-      <div class="scroll-area">
-        <article class="mission-card-extended" *ngFor="let m of mockMatches">
-          <div class="card-main-info">
-            <div class="card-header">
-              <span class="sector-tag">SETTORE_{{m.id}}</span>
-              <span class="m-status" [class.done]="view === 'finished'">
-                {{ view === 'active' ? '● OPERATIVA' : '■ TERMINATA' }}
-              </span>
-            </div>
-            <h3>{{ m.name }}</h3>
-            <p class="creator-info">Comandante Incaricato: <strong>{{ m.creator }}</strong></p>
-          </div>
-
-          <div class="card-stats-block">
-            <div class="stat-unit">
-              <span class="stat-label">REGIONE GIOCATA</span>
-              <span class="stat-value">{{ m.region }}</span>
-            </div>
-            <div class="stat-unit">
-              <span class="stat-label">ARROLATI</span>
-              <span class="stat-value">{{ m.joined }}/{{ m.total }}</span>
-            </div>
-            <div class="stat-unit">
-              <span class="stat-label">TEMPO TRASCORSO</span>
-              <span class="stat-value">14H 20M</span>
-            </div>
-          </div>
-
-          <div class="card-actions">
-            <button class="action-btn-main">{{ view === 'active' ? 'ENTRA IN PARTITA' : 'REPLAY OPERAZIONE' }}</button>
-          </div>
-        </article>
+    <div class="hud-footer">
+      <div class="hud-footer-content">
+        <div class="footer-left">
+          <span class="status-dot"></span> COMM-LINK: <span class="status-text">ONLINE</span>
+        </div>
+        <div class="footer-center">
+          &copy; 2026 PLANETARY WAR MANAGER <span class="divider">///</span> STRATEGIC COMMAND
+        </div>
+        <div class="footer-right">SYS.VER 1.0.4</div>
       </div>
     </div>
 

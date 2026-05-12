@@ -1,146 +1,221 @@
-:host {
+/* ==========================================================================
+   1. BASE & BACKGROUND FISSO
+   ========================================================================== */
+ion-content {
+  --background: #08111f;
   font-family: 'Courier New', Courier, monospace;
 }
 
-/* SFONDO (Ereditato) */
 .auth-background {
-  position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1;
-  &__video { width: 100%; height: 100%; object-fit: cover; }
-  &__overlay { position: absolute; inset: 0; background: rgba(5, 10, 20, 0.7); backdrop-filter: blur(4px); }
+  position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; overflow: hidden; pointer-events: none;
+  &__video { width: 100%; height: 100%; object-fit: cover; object-position: center; filter: brightness(0.72) saturate(1.05) contrast(1.05); transform: translateZ(0); }
+  &__overlay { position: absolute; inset: 0; background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 30%); backdrop-filter: blur(2px); }
 }
 
-.browser-container {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 40px 20px;
+.browser-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100vh;
-  box-sizing: border-box;
+  padding: 14px;
+  overflow: hidden;
+  z-index: 1; 
+  color: #f4f7fb;
+}
+
+.overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: -1;
+  background: radial-gradient(circle at top center, rgba(134, 215, 255, 0.05), transparent 40%);
+}
+
+.desktop-only { display: block; }
+.mobile-header { display: none; }
+
+/* ==========================================================================
+   2. HEADER & TITOLI
+   ========================================================================== */
+.browser-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  max-width: 1100px; /* Stessa larghezza del profilo */
+  margin: 0 auto;
+  min-height: 0;
+  z-index: 10;
 }
 
 .header-nav {
-  text-align: center;
-  margin-bottom: 30px;
-  .back-link { color: #58a6ff; font-weight: bold; margin-bottom: 10px; }
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+  
+  .back-link {
+    --color: #86d7ff; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px;
+    margin-bottom: 5px; transition: 0.3s;
+    &:hover { --color: #fff; filter: drop-shadow(0 0 8px rgba(134, 215, 255, 0.6)); }
+    ion-icon { font-size: 1.2rem; margin-right: 4px; margin-bottom: -2px; }
+  }
 }
 
 .title-block {
-  .eyebrow { color: #ff7b72; font-size: 0.7rem; letter-spacing: 3px; text-transform: uppercase; margin: 0; }
-  h1 { color: #fff; font-size: 2.2rem; margin: 5px 0 0; text-shadow: 0 0 15px rgba(255,255,255,0.2); }
+  text-align: center; 
+  .eyebrow { margin: 0 0 8px; color: #86d7ff; font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; font-weight: bold; }
+  h1 { font-size: clamp(1.6rem, 2.8vw, 2.4rem); line-height: 1; letter-spacing: 0.05em; text-transform: uppercase; color: #fff; text-shadow: 0 0 20px rgba(134, 215, 255, 0.5); margin: 0; }
 }
 
-/* 1. TABS AL CENTRO */
+/* ==========================================================================
+   3. PANNELLO VETRO E CONTROLLI (Tabs & Search)
+   ========================================================================== */
+.panel {
+  background: rgba(9, 16, 30, 0.25); border: 1px solid rgba(95, 208, 255, 0.1);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(95, 208, 255, 0.05);
+  backdrop-filter: blur(20px) saturate(150%); border-radius: 18px;
+  display: flex; flex-direction: column; flex: 1; overflow: hidden;
+  padding: 15px;
+}
+
+.panel-controls {
+  padding-bottom: 15px; border-bottom: 1px solid rgba(95, 208, 255, 0.1); margin-bottom: 15px;
+}
+
 .tabs-dock-center {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin-bottom: 20px;
+  display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;
   
   button {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(88, 166, 255, 0.2);
-    color: #8892b0;
-    padding: 12px 25px;
-    border-radius: 12px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: 0.3s;
+    background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(95, 208, 255, 0.2);
+    color: #8892b0; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 0.75rem; letter-spacing: 1px;
+    cursor: pointer; transition: 0.3s; backdrop-filter: blur(10px); flex: 1; max-width: 250px;
     
     &.active {
-      background: rgba(88, 166, 255, 0.1);
-      border-color: #58a6ff;
-      color: #fff;
-      box-shadow: 0 0 15px rgba(88, 166, 255, 0.2);
+      background: linear-gradient(135deg, rgba(103, 184, 255, 0.15), rgba(45, 114, 210, 0.2));
+      border-color: #86d7ff; color: #fff; box-shadow: 0 0 15px rgba(134, 215, 255, 0.2);
     }
   }
 }
 
-/* 2. RICERCA */
-.search-section {
-  margin-bottom: 30px;
-  .glass-searchbar {
-    --background: rgba(0, 0, 0, 0.3);
-    --color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 15px;
-  }
+.transparent-element { background: rgba(255, 255, 255, 0.02) !important; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.03); }
+
+.glass-searchbar {
+  --background: rgba(0, 0, 0, 0.2); --color: #fff; --placeholder-color: rgba(255, 255, 255, 0.5); --icon-color: #86d7ff;
+  padding: 0; border: 1px solid rgba(95, 208, 255, 0.15); border-radius: 10px; font-size: 0.8rem;
 }
 
-/* 3. CARTE LARGHE E ALTE */
+/* ==========================================================================
+   4. LISTA MISSIONI E CARDS
+   ========================================================================== */
 .results-container {
-  flex: 1;
-  min-height: 0;
+  flex: 1; min-height: 0;
   .scroll-area {
-    height: 100%;
-    overflow-y: auto;
-    padding-right: 10px;
-    &::-webkit-scrollbar { width: 4px; }
-    &::-webkit-scrollbar-thumb { background: #58a6ff; border-radius: 10px; }
+    height: 100%; overflow-y: auto; padding-right: 10px; display: flex; flex-direction: column; gap: 12px;
+    &::-webkit-scrollbar { width: 6px; }
+    &::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
+    &::-webkit-scrollbar-thumb { background: rgba(134, 215, 255, 0.3); border-radius: 4px; }
   }
 }
 
 .mission-card-extended {
-  background: rgba(9, 16, 30, 0.4);
-  border: 1px solid rgba(88, 166, 255, 0.15);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  padding: 25px;
-  margin-bottom: 20px;
-  display: grid;
-  grid-template-columns: 1fr auto auto; /* Tre sezioni orizzontali */
-  align-items: center;
-  gap: 30px;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  background: rgba(1, 36, 46, 0.15) !important; border: 1px solid rgba(95, 208, 255, 0.2) !important;
+  padding: 16px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  transition: all 0.2s ease; flex-shrink: 0;
 
-  &:hover {
-    transform: translateY(-3px);
-    border-color: rgba(88, 166, 255, 0.5);
-    background: rgba(9, 16, 30, 0.6);
+  &:hover { background: rgba(1, 36, 46, 0.3) !important; border-color: rgba(134, 215, 255, 0.4) !important; transform: translateX(4px); }
+
+  .card-main-info { flex: 1.5; min-width: 0; } /* min-width: 0 salva dal flex overflow text */
+
+  .card-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
+    .sector-tag { color: #86d7ff; font-size: 0.6rem; font-weight: bold; letter-spacing: 1px; }
+    .m-status { font-size: 0.65rem; font-weight: bold; color: #3fb950; letter-spacing: 1px; &.done { color: #ff7b72; } }
   }
 
-  h3 { color: #fff; margin: 5px 0; font-size: 1.3rem; }
-  .sector-tag { color: #58a6ff; font-size: 0.6rem; font-weight: bold; }
-  .creator-info { color: #8892b0; font-size: 0.8rem; margin: 0; }
-  
-  .m-status {
-    font-size: 0.7rem; font-weight: bold; color: #3fb950;
-    &.done { color: #ff7b72; }
-  }
+  h3 { color: #fff; margin: 0 0 4px; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
+  .creator-info { color: rgba(255,255,255,0.6); font-size: 0.7rem; margin: 0; strong { color: #fff; } }
 }
-
-/* ... resto del codice scss invariato ... */
 
 .card-stats-block {
-  display: flex;
-  gap: 25px; /* Aumentato leggermente il gap per far spazio al terzo campo */
-  border-left: 1px solid rgba(255,255,255,0.1);
-  padding-left: 25px;
-  min-width: 320px; /* Garantisce che le statistiche non si schiaccino troppo */
+  flex: 2; display: flex; gap: 15px; border-left: 1px solid rgba(95, 208, 255, 0.15); padding-left: 20px;
   
   .stat-unit {
-    display: flex;
-    flex-direction: column;
-    .stat-label { 
-      color: #8892b0; 
-      font-size: 0.55rem; 
-      text-transform: uppercase; 
-      white-space: nowrap; /* Evita che l'etichetta vada a capo */
-    }
-    .stat-value { 
-      color: #fff; 
-      font-size: 1.1rem; 
-      font-weight: bold; 
-      margin-top: 4px; 
-      text-shadow: 0 0 8px rgba(88, 166, 255, 0.3); /* Effetto ologramma */
-    }
+    display: flex; flex-direction: column; flex: 1;
+    .stat-label { color: #86d7ff; font-size: 0.55rem; text-transform: uppercase; font-weight: bold; opacity: 0.8; margin-bottom: 4px; }
+    .stat-value { color: #fff; font-size: 1rem; font-weight: bold; &.highlight { color: #86d7ff; text-shadow: 0 0 8px rgba(134, 215, 255, 0.4); } }
   }
 }
 
-/* Aggiornamento responsive per tre colonne */
-@media (max-width: 900px) {
-  .mission-card-extended {
-    grid-template-columns: 1fr auto;
-    .card-stats-block { border-left: none; padding-left: 0; margin-top: 15px; }
+.card-actions {
+  flex: 0.8; display: flex; justify-content: flex-end;
+}
+
+/* Bottone Azione Glow (Preso dal Profilo) */
+.primary-glow {
+  background: linear-gradient(135deg, rgba(103, 184, 255, 0.15), rgba(45, 114, 210, 0.2)); 
+  border: 1px solid rgba(95, 208, 255, 0.4); color: #fff; 
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 0 10px rgba(95, 208, 255, 0.1);
+  font-size: 0.75rem; padding: 10px 16px; border-radius: 8px; font-weight: bold; letter-spacing: 1px; cursor: pointer; transition: all 0.3s ease; white-space: nowrap;
+  
+  &:hover { border-color: #86d7ff; box-shadow: 0 0 20px rgba(134, 215, 255, 0.4), inset 0 0 15px rgba(134, 215, 255, 0.2); transform: translateY(-2px); }
+}
+
+/* ==========================================================================
+   5. HUD FOOTER
+   ========================================================================== */
+.hud-footer {
+  margin: 15px auto 5px; border: 1px solid rgba(88, 166, 255, 0.4); border-radius: 12px;
+  background: rgba(5, 10, 20, 0.6); backdrop-filter: blur(12px); z-index: 1000; position: relative;
+  max-width: 900px; width: 100%; box-sizing: border-box; font-size: 0.55rem; padding: 8px 12px; color: #c9d1d9; flex-shrink: 0;
+}
+.hud-footer-content { display: flex; justify-content: space-between; align-items: center; }
+.status-dot { width: 6px; height: 6px; background: #3fb950; border-radius: 50%; display: inline-block; margin-right: 4px; box-shadow: 0 0 8px rgba(63, 185, 80, 0.6); }
+.status-text { color: #3fb950; font-weight: bold; }
+.divider { color: rgba(255,255,255,0.3); margin: 0 8px; }
+
+
+/* ==========================================================================
+   6. RESPONSIVE (Mobile/Tablet < 1100px)
+   ========================================================================== */
+@media (max-width: 1100px) {
+  .browser-page { padding-top: 75px !important; overflow: visible; height: auto; min-height: 100vh; }
+  
+  /* Rimpiazza header desktop con header mobile in stile profilo */
+  .desktop-only { display: none !important; }
+  .mobile-header { 
+    display: flex !important; position: fixed; top: 0; left: 0; width: 100%; height: 60px; z-index: 1001;
+    background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(15px); border-bottom: 1px solid rgba(95, 208, 255, 0.2);
+    align-items: center; justify-content: space-between; padding: 10px 15px;
+    
+    .header-left, .header-right { flex: 1; display: flex; align-items: center; }
+    .header-center { flex: 2; display: flex; justify-content: center; align-items: center; }
+    
+    .back-link { --color: #86d7ff; font-size: 0.9rem; font-weight: bold; margin: 0; --padding-start: 0; --padding-end: 0; text-transform: none; ion-icon { font-size: 1.4rem; margin-right: -2px; } }
+    .nav-title { color: #ffffff; font-size: 1rem; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 10px rgba(134, 215, 255, 0.4); }
   }
+
+  .browser-container { padding: 0; height: auto; }
+  
+  /* Il pannello diventa più fluido su mobile */
+  .panel { border-radius: 12px; box-shadow: none; border-color: rgba(95, 208, 255, 0.2); padding: 10px; overflow: visible; }
+  .results-container .scroll-area { overflow: visible; height: auto; }
+
+  /* Impila la Card della missione in verticale */
+  .mission-card-extended {
+    flex-direction: column; align-items: flex-start; gap: 15px; padding: 15px;
+    
+    .card-main-info { width: 100%; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; }
+    
+    .card-stats-block { 
+      flex-direction: row; border-left: none; padding-left: 0; width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+      .stat-unit { align-items: flex-start; }
+    }
+    
+    .card-actions { width: 100%; button { width: 100%; padding: 12px; font-size: 0.85rem; } }
+  }
+
+  /* Footer Mobile */
+  .hud-footer { width: calc(100% - 16px); margin: 20px auto !important; }
+  .hud-footer-content { flex-direction: column; gap: 6px; text-align: center; }
+  .footer-left, .footer-center, .footer-right { font-size: 0.55rem; white-space: normal; }
+  .divider { display: none; }
 }
