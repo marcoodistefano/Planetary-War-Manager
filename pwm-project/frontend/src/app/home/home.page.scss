@@ -72,16 +72,19 @@ ion-content {
    3. LAYOUT & GRIGLIA PRINCIPALE
    ========================================================================== */
 .top-row {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(280px, 350px) 1fr minmax(280px, 350px); 
-  gap: clamp(15px, 3vw, 40px);
+  display: flex; 
   justify-content: center;
-  align-items: stretch;
-  flex: 1;
-  width: 100%;
-  max-width: 1800px; 
+  align-items: stretch; 
+  
+  /* AUMENTATO: Maggiore distanza tra il centro e i pannelli laterali */
+  gap: clamp(140px, 20vw, 600px); 
+  
+  flex: 1; 
   min-height: 0; 
+  
+  /* AUMENTATO: Spazio massimo più largo per accogliere il gap */
+  max-width: 1600px; 
+  
   margin: 0 auto;
   padding: 1vh 2vw;
   z-index: 1;
@@ -89,7 +92,6 @@ ion-content {
   perspective: 1200px;
   transform-style: preserve-3d;
 }
-
 /* ==========================================================================
    4. COLONNA CENTRALE (Hero & Azioni)
    ========================================================================== */
@@ -97,7 +99,7 @@ ion-content {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1; /* Prende dinamicamente lo spazio tra i due pannelli */
   min-height: 0;
 }
 
@@ -118,15 +120,17 @@ ion-content {
     font-size: 0.62rem;
     letter-spacing: 0.16em;
     text-transform: uppercase;
+    white-space: nowrap; 
   }
 
   h1 {
     margin: 0;
     font-size: clamp(1.8rem, 3vw, 3.6rem); 
-    line-height: 0.95;
+    line-height: 1.15; /* Leggermente aumentato per non far toccare le due righe */
     letter-spacing: 0.04em;
     text-transform: uppercase;
     text-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+    white-space: nowrap; /* CRITICO: Impedisce che le parole vadano a capo da sole! */
   }
 }
 
@@ -139,17 +143,31 @@ ion-content {
   display: flex;
   justify-content: center;
   align-items: center;
-  width: clamp(220px, 45vh, 480px);
-  height: clamp(220px, 45vh, 480px);
-  padding: 20px; 
+
+  /* =========================================================
+     MOTORE DI TRACCIAMENTO OLOGRAFICO 16:9
+     Modifica solo il numero qui sotto per calibrare la 
+     dimensione del cerchio rispetto al tuo video.
+     ========================================================= */
+  --globe-scale: 55; 
   
+  /* Formule matematiche per simulare l'object-fit: cover */
+  --vh-size: calc(var(--globe-scale) * 1vh);
+  --vw-size: calc(var(--globe-scale) * 0.5625vw); /* 0.5625 è il rapporto esatto di 9/16 */
+  
+  width: max(var(--vh-size), var(--vw-size));
+  aspect-ratio: 1 / 1; /* Mantiene il cerchio perfetto */
+  /* ========================================================= */
+  
+  padding: 20px; 
   background: transparent !important; 
-  border: 1px solid rgba(120, 210, 255, 0.15);
+  /* MODIFICA: Bordo invisibile di base */
+  border: 1px solid transparent;
   border-radius: 50%; 
   box-shadow: none;
   
   color: rgba(244, 247, 251, 0.8);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   text-align: center;
@@ -161,8 +179,8 @@ ion-content {
 
   &:hover {
     color: #ffffff;
-    border-color: rgba(120, 210, 255, 0.5);
-    box-shadow: 0 0 25px rgba(88, 166, 255, 0.4), 0 0 50px rgba(88, 166, 255, 0.15);
+    border-color: rgba(120, 210, 255, 0.6);
+    box-shadow: 0 0 25px rgba(88, 166, 255, 0.4), inset 0 0 15px rgba(88, 166, 255, 0.15);
     transform: translate(-50%, -50%) scale(1.02) translateZ(0); 
   }
 
@@ -175,7 +193,7 @@ ion-content {
 .games-container {
   position: absolute;
   left: 0;
-  bottom: 10px;
+  bottom: 2vh; 
   width: 100%;
   z-index: 10;
   display: flex;
@@ -183,13 +201,53 @@ ion-content {
 
   .games-actions {
     display: flex;
-    flex-wrap: wrap; 
+    flex-direction: row; 
     justify-content: center;
-    gap: 15px;
+    flex-wrap: nowrap; /* CRITICO: Forza i bottoni a restare su un'unica riga! */
+    align-items: center;
+    gap: 15px; 
     width: 100%;
     
-    button { 
-      min-width: 140px; 
+    .primary-button, .ghost-button { 
+      width: auto; 
+      padding: 0 24px; 
+      min-height: 40px; 
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap; 
+      backdrop-filter: blur(12px);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .primary-button {
+      background: linear-gradient(135deg, rgba(103, 184, 255, 0.25), rgba(45, 114, 210, 0.3));
+      border: 1px solid rgba(134, 215, 255, 0.3);
+      color: #ffffff;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+
+      &:hover {
+        background: linear-gradient(135deg, rgba(103, 184, 255, 0.4), rgba(45, 114, 210, 0.5));
+        border-color: #86d7ff;
+        box-shadow: 0 0 15px rgba(134, 215, 255, 0.5);
+        transform: translateY(-2px);
+      }
+    }
+
+    .ghost-button {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #c9d1d9;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(134, 215, 255, 0.3);
+        color: #ffffff;
+        transform: translateY(-2px);
+      }
     }
   }
 }
@@ -198,50 +256,50 @@ ion-content {
    5. PANNELLI LATERALI & STRUTTURE CONTENITORI
    ========================================================================== */
 .left-column, .right-column {
+  flex: 0 0 290px; 
+  align-self: center; 
   display: flex;
   flex-direction: column;
-  gap: 15px; 
-  height: 100%; 
-  min-height: 0;
+  gap: 0; 
+  
+  /* MODIFICA: Altezza fissa invece di auto per forzare lo scroll interno */
+  height: 72vh; 
 }
 
 .panel {
-  background: rgba(9, 16, 30, 0.15);
-  border: 1px solid rgba(95, 208, 255, 0.06);
+  background: rgba(9, 16, 30, 0.25);
+  border: 1px solid rgba(95, 208, 255, 0.1);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(95, 208, 255, 0.05);
+  backdrop-filter: blur(20px) saturate(150%);
   border-radius: 18px;
-  backdrop-filter: blur(15px) saturate(140%);
+  
+  display: flex;
+  flex-direction: column;
+  
+  /* MODIFICA: Blocca l'overflow esterno, nulla può uscire dal vetro! */
+  overflow: hidden; 
+
   -webkit-font-smoothing: antialiased; 
   backface-visibility: hidden;
-  transition: transform 0.4s ease-out, box-shadow 0.4s ease-out;
+  transform-style: preserve-3d;
+  transition: transform 0.4s ease-out;
 
-  &.left-column {
-    transform: rotateY(12deg) scale(0.98) translateZ(0);
-    transform-origin: right center;
-    box-shadow: 20px 10px 30px rgba(0, 0, 0, 0.2) !important;
-    &:hover {
-      transform: rotateY(8deg) scale(0.98) translateZ(0);
-      box-shadow: 10px 10px 30px rgba(0, 0, 0, 0.25) !important;
-    }
-  }
-
-  &.right-column {
-    transform: rotateY(-12deg) scale(0.98) translateZ(0);
-    transform-origin: left center;
-    box-shadow: -20px 10px 30px rgba(0, 0, 0, 0.2) !important;
-    &:hover {
-      transform: rotateY(-8deg) scale(0.98) translateZ(0);
-      box-shadow: -10px 10px 30px rgba(0, 0, 0, 0.25) !important;
-    }
-  }
+  &.left-column { transform: rotateY(12deg) translateZ(0); transform-origin: right center; }
+  &.left-column:hover { transform: rotateY(6deg) translateZ(0); }
+  &.right-column { transform: rotateY(-12deg) translateZ(0); transform-origin: left center; }
+  &.right-column:hover { transform: rotateY(-6deg) translateZ(0); }
 }
 
 .inner-panel {
-  padding: 14px;
-  background: rgba(1, 36, 46, 0.101) !important;
-  border: 1px solid rgba(95, 208, 255, 0.28) !important;
-  border-radius: 9px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.114) !important;
-  backdrop-filter: blur(15px) saturate(140%) !important;
+  background: rgba(1, 36, 46, 0.15) !important;
+  border: 1px solid rgba(95, 208, 255, 0.2) !important;
+  padding: 12px;
+  border-radius: 12px;
+  margin: 10px; 
+  box-shadow: none !important; 
+  
+  display: flex;
+  flex-direction: column;
 }
 
 .bottom-section {
@@ -249,21 +307,18 @@ ion-content {
   display: flex;
   flex-direction: column;
   flex: 1; 
-  min-height: 0;
+  min-height: 0; /* FONDAMENTALE per lo scroll flexbox */
   z-index: 1;
+  margin-bottom: 10px; /* Dà respiro rispetto al bordo inferiore del pannello */
 }
 
-.panel-divider {
-  margin: 0 14px;
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
+.panel-divider { border: none; border-top: 1px solid rgba(95, 208, 255, 0.1); margin: 0 10px; }
 
 /* ==========================================================================
    6. HEADER MOBILE (Isola Fluttuante)
    ========================================================================== */
 .mobile-header {
-  display: none; /* Gestito da media query */
+  display: none !important; /* Gestito da media query */
   position: fixed; 
   top: 12px; 
   left: 12px; 
@@ -345,7 +400,8 @@ ion-content {
 /* ==========================================================================
    7. COMPONENTI INTERNI UI (Bottoni, Liste, Form)
    ========================================================================== */
-.leaderboard-panel, .profile-panel, .bottom-section { padding: 14px; }
+
+.leaderboard-panel, .profile-panel, .bottom-section { padding: 12px; }
 
 .panel-heading, .section-header, .profile-card, .game-card { 
   display: flex; 
@@ -354,174 +410,231 @@ ion-content {
   gap: 8px; 
 }
 
+/* NUOVO: Stile ridotto per "Ultime 5 partite" e "Ultime partite create" */
+.section-header {
+  margin-bottom: 10px;
+  width: 100%;
+  
+  .eyebrow {
+    margin: 0 0 2px 0;
+    font-size: 0.55rem; /* Stessa dimensione del sottotitolo Leaderboard */
+    color: #86d7ff;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.8;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 0.85rem; /* Dimensione hi-tech, molto più discreta */
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.05em;
+  }
+}
+/* Tipografia Rimpicciolita e Pulita */
 .panel-heading {
-  margin-bottom: 9px;
-  span { display: block; font-size: 0.8rem; font-weight: 700; }
-  small { display: block; font-size: 0.65rem; color: rgba(244, 247, 251, 0.68); }
+  margin-bottom: 10px;
+  span { 
+    display: block; 
+    font-size: 0.75rem; /* Ridotto */
+    font-weight: 700; 
+    color: #fff; 
+    letter-spacing: 0.05em; 
+  }
+  small { 
+    display: block; 
+    font-size: 0.55rem; /* Ridotto */
+    color: #86d7ff; 
+    text-transform: uppercase; 
+    letter-spacing: 0.1em; 
+    margin-top: 2px; 
+    opacity: 0.8; 
+  }
 }
 
 .leaderboard-group h2, .section-header h2, .profile-card h2, .game-card h3 { margin: 0; }
 .leaderboard-group h2 { 
   margin-bottom: 8px; 
   color: rgba(244, 247, 251, 0.78); 
-  font-size: 0.7rem; 
+  font-size: 0.65rem; /* Ridotto */
   text-transform: uppercase; 
   letter-spacing: 0.08em; 
 }
 
-/* Leaderboard */
+/* Leaderboard Toggle - Dimensioni Bottoni Perfette */
 .leaderboard-toggle {
   display: flex; 
+  flex-wrap: wrap; /* Permette ai bottoni di andare a capo */
   gap: 6px; 
   margin-bottom: 9px;
+  width: 100%;
 
   button {
-    padding: 6px 9px; 
+    flex: 1; /* Globale e Regionale si dividono la riga a metà */
+    padding: 6px; 
     background: rgba(255, 255, 255, 0.03); 
     border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 9px; 
+    border-radius: 6px; 
     color: #eaf6ff; 
+    font-size: 0.65rem; 
     font-weight: 700; 
     cursor: pointer; 
     backdrop-filter: blur(10px);
+    text-align: center;
     
     &.active { background: linear-gradient(135deg, rgba(120, 205, 255, 0.20), rgba(30, 120, 160, 0.16)); }
   }
+  
   .view-full { 
-    margin-left: auto; 
+    flex: 0 0 100%; /* Forza questo bottone ad andare a capo e prendere il 100% */
+    margin-top: 2px;
     background: rgba(255, 255, 255, 0.025); 
+    font-size: 0.6rem; 
+    white-space: normal; /* Permette al testo di non strabordare */
   }
 }
-
 .leaderboard-entry {
   display: grid; 
-  grid-template-columns: 40px 22px 1fr auto; 
+  grid-template-columns: 30px 20px 1fr auto; /* Regolate le colonne per far respirare il testo */
   align-items: center; 
   gap: 8px;
-  margin-bottom: 6px;
-  padding: 8px 9px; 
+  margin-bottom: 5px;
+  padding: 6px 8px; /* Padding ridotto */
   
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.045); 
-  border-radius: 8px; 
+  border-radius: 6px; 
   backdrop-filter: blur(10px); 
+  font-size: 0.75rem; /* Font globale della riga ridotto */
 
   &.secondary { background: rgba(15, 28, 48, 0.22); }
   
   .rank, .score { font-weight: 700; }
-  .name { color: #ffffff; }
-  .flag { font-size: 0.85rem; text-align: center; }
+  .name { color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .flag { font-size: 0.75rem; text-align: center; }
   .score { color: #86d7ff; }
 }
 
 /* Profilo Avatar e Card */
 .profile-card { 
+  display: flex;
   flex-direction: column; 
   justify-content: center; 
+  align-items: center;
   text-align: center; 
-  gap: 6px; 
-  margin-bottom: 9px; 
+  gap: 4px; 
+  margin-bottom: 12px; 
   
-  .profile-label { margin: 0 0 1px; color: rgba(244, 247, 251, 0.65); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em; }
-  .profile-name { font-size: 1rem; }
-  .profile-level { font-size: 0.75rem; color: rgba(244, 247, 251, 0.7); }
-}
+  .profile-label { margin: 0; color: rgba(244, 247, 251, 0.65); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.12em; }
+  
+  /* MODIFICA: Avatar perfettamente rotondo */
+  .avatar {
+    width: 100px;   /* Larghezza e altezza identiche */
+    height: 100px;  /* Larghezza e altezza identiche */
+    margin: 8px 0;
+    border-radius: 50%; /* Questo crea il cerchio perfetto */
+    border: 2px solid rgba(134, 215, 255, 0.4); /* Bordo leggermente più marcato per il cerchio */
+    box-shadow: 0 0 15px rgba(103, 224, 255, 0.1);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      transform: scale(1.05);
+      border-color: #86d7ff;
+      box-shadow: 0 0 20px rgba(103, 224, 255, 0.3);
+    }
 
-.avatar {
-  display: grid; 
-  place-items: center; 
-  width: 80px; 
-  height: 80px; 
-  
-  color: #ffffff; 
-  font-size: 1.5rem; 
-  font-weight: 800;
-  background: linear-gradient(135deg, #67e0ff, #12394b); 
-  border-radius: 50%;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25); 
-  
-  cursor: pointer; 
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  
-  &:hover { 
-    transform: scale(1.1); 
-    box-shadow: 0 0 15px rgba(103, 224, 255, 0.5); 
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
   }
-}
 
-/* Bottoni (Primary, Ghost, Join) */
+  .profile-name { font-size: 0.95rem; font-weight: bold; margin: 0; color: #ffffff; }
+  .profile-level { font-size: 0.65rem; color: #86d7ff; }
+}
+/* Bottoni Azioni Rapide (Griglia) */
 .quick-actions {
-  display: grid; 
-  grid-template-columns: repeat(2, minmax(0, 1fr)); 
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* Due colonne uguali */
   gap: 8px;
-
+  
   button {
-    min-height: 33px; 
-    padding: 0 10px;
-    background: rgba(255, 255, 255, 0.03); 
-    border: 1px solid rgba(255, 255, 255, 0.05); 
-    border-radius: 8px; 
-    color: #f4f7fb; 
-    font-weight: 700; 
-    cursor: pointer; 
-    backdrop-filter: blur(12px);
+    width: 100%;
+    min-height: 28px;
+    padding: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    color: #f4f7fb;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(134, 215, 255, 0.3);
+      color: #ffffff;
+    }
   }
-}
-
-.primary-button, .ghost-button, .join-button {
-  border-radius: 8px; 
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  color: #f4f7fb; 
-  font-weight: 700; 
-  cursor: pointer; 
-  backdrop-filter: blur(12px); 
-}
-
-.primary-button { 
-  min-height: 33px; 
-  padding: 0 10px; 
-  background: linear-gradient(135deg, rgba(103, 184, 255, 0.22), rgba(45, 114, 210, 0.28)); 
-}
-
-.ghost-button { 
-  min-height: 33px; 
-  padding: 0 10px; 
-  background: rgba(255, 255, 255, 0.02); 
 }
 
 .join-button { 
-  padding: 4px 9px; 
+  font-size: 0.65rem; 
+  padding: 4px 10px; 
   background: linear-gradient(135deg, rgba(103, 184, 255, 0.18), rgba(45, 114, 210, 0.24)); 
   border-color: rgba(255, 255, 255, 0.06); 
+  border-radius: 6px;
+  color: #ffffff;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    background: linear-gradient(135deg, rgba(103, 184, 255, 0.28), rgba(45, 114, 210, 0.34));
+    border-color: rgba(134, 215, 255, 0.4);
+  }
 }
 
 /* Liste e Card Partite */
 .games-list {
   display: flex; 
   flex-direction: column; 
-  flex: 1; 
+  flex: 1; /* Si espande occupando lo spazio rimanente */
   gap: 6px; 
   width: 100%; 
   padding-right: 4px;
-  overflow-y: auto; 
   
+  overflow-y: auto; /* SCROLL INTERNO ATTIVATO */
+  min-height: 0; /* FONDAMENTALE per non sforare l'altezza padre */
+  
+  /* Scrollbar stile Cyber/Neon */
   &::-webkit-scrollbar { width: 4px; }
   &::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
-  &::-webkit-scrollbar-thumb { background: rgba(95, 208, 255, 0.3); border-radius: 4px; }
+  &::-webkit-scrollbar-thumb { background: rgba(134, 215, 255, 0.3); border-radius: 4px; }
 }
 
 .game-card {
-  padding: 8px 9px; 
+  padding: 8px; 
   background: rgba(255, 255, 255, 0.025); 
   border: 1px solid rgba(255, 255, 255, 0.035); 
-  border-radius: 9px; 
+  border-radius: 8px; 
   backdrop-filter: blur(10px);
+  /* Per assicurarci che la card non si schiacci quando c'è scroll */
+  flex-shrink: 0; 
   
-  .meta { color: rgba(244, 247, 251, 0.72); font-size: 0.7rem; margin-top: 4px; }
+  h3 { font-size: 0.8rem; margin: 0 0 2px; } 
+  .meta { color: rgba(244, 247, 251, 0.72); font-size: 0.6rem; margin-top: 2px; line-height: 1.2; }
 }
 
 .status-badge { 
-  padding: 5px 8px; 
+  padding: 3px 6px; 
+  font-size: 0.6rem; /* Badge più piccolo */
   background: rgba(134, 215, 255, 0.08); 
   border: 1px solid rgba(134, 215, 255, 0.1); 
   border-radius: 999px; 
@@ -539,6 +652,7 @@ ion-content {
   --clear-button-color: rgba(244, 247, 251, 0.7); 
   --border-radius: 9px; 
   --box-shadow: none;
+  font-size: 0.75rem; /* Font ricerca più piccolo */
   
   margin-bottom: 9px;
   padding: 0; 
