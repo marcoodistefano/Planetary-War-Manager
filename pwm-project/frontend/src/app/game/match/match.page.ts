@@ -2,11 +2,12 @@ import { Component, OnInit, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
+import { Router } from '@angular/router';
 
-// 1. Assicurati che il percorso sia corretto (../../ per uscire da game/match)
+// Assicurati che il percorso sia corretto per il tuo progetto
 import { TacticalTerminalComponent } from './components/tactical-terminal/tactical-terminal.component';
 
-// Librerie esterne caricate via CDN
+// Librerie esterne caricate via CDN o definite globalmente
 declare var maplibregl: any;
 declare var topojson: any;
 declare var io: any;
@@ -21,18 +22,74 @@ declare var THREE: any;
     IonicModule, 
     CommonModule, 
     FormsModule, 
-    TacticalTerminalComponent // Assicurati che sia presente qui
+    TacticalTerminalComponent
   ]
 })
 export class MatchPage implements OnInit, AfterViewInit {
 
+  // --- 1. PROPRIETÀ E STATO DELLA MAPPA ---
   map: any;
   isGlobe = false;
-  hoveredState = { id: null as any, source: null as any };
-  gameRules: any = null;
-  sensorSocket: any;
-  currentHoveredName = ''; // Proprietà per il nome del territorio attivo
   MAPTILER_KEY = 'PGAzmQH2OduY9E8gSi6n';
+  hoveredState = { id: null as any, source: null as any };
+  currentHoveredName = '';
+  sensorSocket: any;
+
+  // --- 2. STATO DELL'INTERFACCIA (UI) ---
+  isProfileModalOpen = false;
+  isBuildPanelOpen = false;
+  isTechModalOpen = false; 
+  activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
+  activeTab: 'profile' | 'settings' = 'profile';
+
+  // --- 3. DATI DI GIOCO E REGOLE ---
+  gameRules: any = null;
+
+  playerResources: any = {
+    denaro: 100000,
+    legno: 5000,
+    piombo: 2500,
+    acciaio: 3000,
+    mattoni: 4000,
+    petrolio: 1500,
+    gas_naturale: 1200,
+    uranio: 100,
+    oro: 50 
+  };
+
+  userProfile = {
+    username: 'Comandante_Alpha',
+    rank: 'Generale di Brigata',
+    experience: 85,
+    matchesWon: 24,
+    matchesLost: 5
+  };
+
+  playerTroops: any = {
+    "Fante": 150,
+    "Veicolo Leggero": 20,
+    "Fanteria Speciale": 10,
+    "Carro Armato": 5,
+    "Caccia": 2,
+    "Missile Balistico": 1
+  };
+
+  audioSettings = { music: 75, sfx: 90 };
+  uiSettings = { showAdvancedLabels: true };
+
+  // --- 4. CONFIGURAZIONI STATICHE ---
+  resourceConfig = [
+    { id: 'denaro', icon: '💵', label: 'DEN' },
+    { id: 'legno', icon: '🪵', label: 'LEG' },
+    { id: 'piombo', icon: '🔘', label: 'PIO' },
+    { id: 'acciaio', icon: '🏗️', label: 'ACC' },
+    { id: 'mattoni', icon: '🧱', label: 'MAT' },
+    { id: 'petrolio', icon: '🛢️', label: 'PET' },
+    { id: 'gas_naturale', icon: '🔥', label: 'GAS' },
+    { id: 'uranio', icon: '☢️', label: 'URA' },
+    { id: 'truppe', icon: '👥', label: 'UNITÀ', isTrigger: true },
+    { id: 'oro', icon: '🪙', label: 'ORO' }
+  ];
 
   modelDB: any = {
     land: [
@@ -66,77 +123,15 @@ export class MatchPage implements OnInit, AfterViewInit {
     ]
   };
 
-  // Configurazione Risorse
-  playerResources: any = {
-    denaro: 100000,
-    legno: 5000,
-    piombo: 2500,
-    acciaio: 3000,
-    mattoni: 4000,
-    petrolio: 1500,
-    gas_naturale: 1200,
-    uranio: 100,
-    oro: 50 // Risorsa Premium 
-  };
+  constructor(private router: Router) { }
 
-  // Configurazione per icone e label (mappata sugli ID del CDB) 
-  resourceConfig = [
-    { id: 'denaro', icon: '💵', label: 'DEN' },
-    { id: 'legno', icon: '🪵', label: 'LEG' },
-    { id: 'piombo', icon: '🔘', label: 'PIO' },
-    { id: 'acciaio', icon: '🏗️', label: 'ACC' },
-    { id: 'mattoni', icon: '🧱', label: 'MAT' },
-    { id: 'petrolio', icon: '🛢️', label: 'PET' },
-    { id: 'gas_naturale', icon: '🔥', label: 'GAS' },
-    { id: 'uranio', icon: '☢️', label: 'URA' },
-    { id: 'truppe', icon: '👥', label: 'UNITÀ', isTrigger: true },
-    { id: 'oro', icon: '🪙', label: 'ORO' }
-  ];
-
-  // Truppe basate sui nomi definiti nel CDB 
-  playerTroops: any = {
-    "Fante": 150,
-    "Veicolo Leggero": 20,
-    "Fanteria Speciale": 10,
-    "Carro Armato": 5,
-    "Caccia": 2,
-    "Missile Balistico": 1
-  };
-
-  isProfileModalOpen = false; // Stato della modale profilo
-
-  // Metodi per la modale
-  setOpenProfile(isOpen: boolean) {
-    this.isProfileModalOpen = isOpen;
-  }
-
-  // Esempio dati profilo
-  userProfile = {
-    username: 'Comandante_Alpha',
-    rank: 'Generale di Brigata',
-    experience: 85,
-    matchesWon: 24,
-    matchesLost: 5
-  };
-
-  // All'interno della classe MatchPage
-  activeTab: 'profile' | 'settings' = 'profile';
-
-  audioSettings = {
-    music: 75,
-    sfx: 90
-  };
-
-  uiSettings = {
-    showAdvancedLabels: true
-  };
-
-  constructor() { }
+  // --- 5. CICLO DI VITA ANGULAR ---
 
   ngOnInit() {
     this.loadGameRules();
+    // Inizializzazione Socket per Sensor Feed
     this.sensorSocket = io('http://localhost:3030', {
-        auth: { token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZF91c2VyIjoxLCJpYXQiOjE3NzY4ODg3MzcsImV4cCI6MTgwODQyNDczN30.R6fcvXXeDA_sOrZ1pMWmz3acNfnxcwvfn0yu24bGl0E" }
+        auth: { token: "IL_TUO_JWT_TOKEN" }
     });
     this.sensorSocket.on('point_data', (data: any) => this.handlePointData(data));
   }
@@ -149,14 +144,57 @@ export class MatchPage implements OnInit, AfterViewInit {
     }, 150);
   }
 
-  async loadGameRules() {
-      try {
-          const response = await fetch('/assets/game_rules.cdb'); 
-          if (response.ok) this.gameRules = await response.json();
-      } catch (err) {
-          console.error("Errore Intelligence: Regole non caricate", err);
-      }
+  // --- 6. AZIONI HUD E CONTROLLI UI ---
+
+  toggleBuildPanel() {
+    this.isBuildPanelOpen = !this.isBuildPanelOpen;
+    if (this.isBuildPanelOpen) this.isTechModalOpen = false;
   }
+
+  openTechTree() {
+    console.log("Accesso all'Accademia: Caricamento Albero Tecnologico...");
+    this.isTechModalOpen = !this.isTechModalOpen;
+    if (this.isTechModalOpen) this.isBuildPanelOpen = false;
+  }
+
+  setBuildCategory(cat: 'risorse' | 'armamenti') {
+    this.activeBuildCategory = cat;
+  }
+
+  setOpenProfile(isOpen: boolean) {
+    this.isProfileModalOpen = isOpen;
+  }
+
+  // --- 7. LOGICA DELLE REGOLE (CDB) ---
+
+  async loadGameRules() {
+    try {
+        const response = await fetch('/assets/game_rules.cdb'); 
+        if (response.ok) this.gameRules = await response.json();
+    } catch (err) {
+        console.error("Errore Intelligence: Regole non caricate", err);
+    }
+  }
+
+  getFilteredBuildItems() {
+    if (!this.gameRules || !this.gameRules.sheets) return [];
+
+    if (this.activeBuildCategory === 'risorse') {
+      // Estrae gli estrattori (Segherie, Miniere, Pozzi)
+      return this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
+    } else {
+      // Estrae strutture Militari: Caserma, Fabbrica, Aeroporto, Porto
+      const strutture = this.gameRules.sheets.find((s: any) => s.name === 'Strutture')?.lines || [];
+      const prodIds = ['caserma', 'fabbrica', 'aeroporto', 'porto'];
+      return strutture.filter((s: any) => prodIds.some(id => s.id_struttura.includes(id)));
+    }
+  }
+
+  startConstruction(item: any) {
+    console.log("Inizio costruzione di:", item.name || item.nome);
+  }
+
+  // --- 8. LOGICA MAPPA E SENSORI ---
 
   initMap() {
     this.map = new maplibregl.Map({
@@ -178,6 +216,7 @@ export class MatchPage implements OnInit, AfterViewInit {
     });
 
     this.map.on('load', () => {
+        // Aggiunta sorgenti terreno e curve di livello
         this.map.addSource('terrain-source', { type: 'raster-dem', url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${this.MAPTILER_KEY}`, tileSize: 256 });
         this.map.setTerrain({ source: 'terrain-source', exaggeration: 1.2 });
         this.map.addSource('contours', { type: 'vector', url: `https://api.maptiler.com/tiles/contours-v2/tiles.json?key=${this.MAPTILER_KEY}` });
@@ -190,7 +229,6 @@ export class MatchPage implements OnInit, AfterViewInit {
 
         this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3.5);
         this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
-
         this.setupThreeJSLayer();
     });
 
@@ -208,12 +246,7 @@ export class MatchPage implements OnInit, AfterViewInit {
     if(outCoords) outCoords.innerText = `${wrappedLng.toFixed(3)}, ${e.lngLat.lat.toFixed(3)}`;
 
     if (this.map.getZoom() > 6) {
-        if (this.hoveredState.id !== null) {
-            this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: false });
-            this.hoveredState = { id: null, source: null };
-            this.currentHoveredName = '';
-        }
-        this.map.getCanvas().style.cursor = '';
+        this.clearHoverState();
         return;
     }
     
@@ -221,30 +254,69 @@ export class MatchPage implements OnInit, AfterViewInit {
 
     const features = this.map.queryRenderedFeatures(e.point, { layers: ['nazioni-layer', 'regioni-layer'] });
     
-    if (features.length > 0 && features[0].id !== undefined && features[0].id !== null) {
-        const featureId = features[0].id;
-        const featureSource = features[0].source;
-        const territoryName = features[0].properties.name || features[0].properties.ADMIN || 'SCONOSCIUTO';
+    if (features.length > 0 && features[0].id !== undefined) {
+        const f = features[0];
+        const territoryName = f.properties.name || f.properties.ADMIN || 'SCONOSCIUTO';
         this.currentHoveredName = territoryName.toUpperCase();
 
-        if (this.hoveredState.id !== null && this.hoveredState.id !== featureId) {
+        if (this.hoveredState.id !== null && this.hoveredState.id !== f.id) {
             this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: false });
         }
         
-        this.hoveredState = { id: featureId, source: featureSource };
+        this.hoveredState = { id: f.id, source: f.source };
         this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: true });
         this.map.getCanvas().style.cursor = 'pointer';
     } else {
-        if (this.hoveredState.id !== null) {
-            this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: false });
-            this.hoveredState = { id: null, source: null };
-            this.currentHoveredName = '';
-        }
-        this.map.getCanvas().style.cursor = '';
+        this.clearHoverState();
     }
   }
 
-  // Correzione riga 183: aggiunta virgoletta mancante a 'spawn-model'
+  private clearHoverState() {
+    if (this.hoveredState.id !== null) {
+        this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: false });
+        this.hoveredState = { id: null, source: null };
+        this.currentHoveredName = '';
+    }
+    this.map.getCanvas().style.cursor = '';
+  }
+
+  handlePointData(data: any) {
+    if (!this.gameRules || !this.gameRules.sheets) return;
+    const alt = Math.floor(data.altitude);
+    const outAlt = document.getElementById('out-alt');
+    if(outAlt) outAlt.innerText = `${alt} M`;
+
+    const terreniSheet = this.gameRules.sheets.find((s: any) => s.name === "Terreni")?.lines;
+    if (!terreniSheet) return;
+
+    let terrainInfo = null;
+    if ((data.biomeId === 17 || data.biomeId === 0 || data.biomeId === 255) && alt < 0) {
+        terrainInfo = terreniSheet.find((t: any) => t.id_terreno === 'ocean_deep');
+    } else if (data.biomeId >= 1 && data.biomeId <= 17) {
+        terrainInfo = terreniSheet[data.biomeId - 1];
+    }
+
+    const outType = document.getElementById('out-type');
+    const outResCom = document.getElementById('out-res-com');
+    const outResRare = document.getElementById('out-res-rare');
+    
+    if (terrainInfo && outType && outResCom && outResRare) {
+        outType.innerText = terrainInfo.nome.toUpperCase();
+        const tid = terrainInfo.id_terreno;
+        // Colorazione dinamica basata sul bioma
+        if (tid === 'urban') outType.style.color = "#f87171";
+        else if (tid.includes('forest')) outType.style.color = "#34d399";
+        else if (tid === 'ocean_deep') outType.style.color = "#60a5fa";
+        else if (tid === 'snow_ice') outType.style.color = "#ffffff";
+        else outType.style.color = "#fde047";
+
+        outResCom.innerText = terrainInfo.risorsa_comune ? terrainInfo.risorsa_comune.replace('_', ' ').toUpperCase() : "NESSUNA";
+        outResRare.innerText = terrainInfo.risorsa_rara ? terrainInfo.risorsa_rara.replace('_', ' ').toUpperCase() : "NESSUNA";
+    }
+  }
+
+  // --- 9. HELPERS E METODI PRIVATI ---
+
   updateModelSelect() {
     const domainSelect = document.getElementById('spawn-domain') as HTMLSelectElement;
     const modelSelect = document.getElementById('spawn-model') as HTMLSelectElement;
@@ -278,42 +350,8 @@ export class MatchPage implements OnInit, AfterViewInit {
     });
   }
 
-  handlePointData(data: any) {
-    if (!this.gameRules || !this.gameRules.sheets) return;
-    const alt = Math.floor(data.altitude);
-    const outAlt = document.getElementById('out-alt');
-    if(outAlt) outAlt.innerText = `${alt} M`;
-
-    const terreniSheet = this.gameRules.sheets.find((s: any) => s.name === "Terreni")?.lines;
-    if (!terreniSheet) return;
-
-    let terrainInfo = null;
-    if ((data.biomeId === 17 || data.biomeId === 0 || data.biomeId === 255) && alt < 0) {
-        terrainInfo = terreniSheet.find((t: any) => t.id_terreno === 'ocean_deep');
-    } else if (data.biomeId >= 1 && data.biomeId <= 17) {
-        terrainInfo = terreniSheet[data.biomeId - 1];
-    }
-
-    const outType = document.getElementById('out-type');
-    const outResCom = document.getElementById('out-res-com');
-    const outResRare = document.getElementById('out-res-rare');
-    
-    if (terrainInfo && outType && outResCom && outResRare) {
-        outType.innerText = terrainInfo.nome.toUpperCase();
-        const tid = terrainInfo.id_terreno;
-        if (tid === 'urban') outType.style.color = "#f87171";
-        else if (tid.includes('forest')) outType.style.color = "#34d399";
-        else if (tid === 'ocean_deep') outType.style.color = "#60a5fa";
-        else if (tid === 'snow_ice') outType.style.color = "#ffffff";
-        else outType.style.color = "#fde047";
-
-        outResCom.innerText = terrainInfo.risorsa_comune ? terrainInfo.risorsa_comune.replace('_', ' ').toUpperCase() : "NESSUNA";
-        outResRare.innerText = terrainInfo.risorsa_rara ? terrainInfo.risorsa_rara.replace('_', ' ').toUpperCase() : "NESSUNA";
-    }
-  }
-
   setupThreeJSLayer() {
-      // Logica Three.js invariata ma pulita da riferimenti Stats
+      // Logica Three.js per unità 3D
   }
 
   changeBasemap(event: any) {
@@ -325,7 +363,7 @@ export class MatchPage implements OnInit, AfterViewInit {
 
   toggleLayer(type: string) {
     if (type === 'contours') {
-        const ids = ['contour-lines', 'contour-labels'];
+        const ids = ['contour-lines'];
         const vis = this.map.getLayoutProperty(ids[0], 'visibility');
         const nextVis = (vis === 'visible' ? 'none' : 'visible');
         ids.forEach(id => this.map.setLayoutProperty(id, 'visibility', nextVis));

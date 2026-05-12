@@ -29,10 +29,8 @@ export class TacticalTerminalComponent {
     this.activeTab = tab;
   }
 
-  // Modificato per chiudere effettivamente la modale
-  async closeTerminal() {
-    this.close.emit(); // Notifica comunque il genitore se necessario
-    await this.modalCtrl.dismiss(); // Chiude fisicamente la modale Ionic
+  closeTerminal() {
+    this.close.emit();
   }
 
   // Navigazione con chiusura garantita

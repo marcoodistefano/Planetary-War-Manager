@@ -1,7 +1,17 @@
 <ion-content [fullscreen]="true" class="transparent-bg" [scrollY]="false">
   
   <div class="hud-panel top-navbar">
-    <div class="navbar-spacer"></div>
+    <div class="nav-group-left">
+      <button class="nav-action-btn mini" [class.active]="isBuildPanelOpen" (click)="toggleBuildPanel()">
+        <ion-icon name="construct-outline"></ion-icon>
+        <span>COSTRUZIONI</span>
+      </button>
+      <button class="nav-action-btn mini" [class.active]="isTechModalOpen" (click)="openTechTree()">
+        <ion-icon name="flask-outline"></ion-icon>
+        <span>RICERCA</span>
+      </button>
+    </div>
+
     <div class="resource-bar">
       <div *ngFor="let res of resourceConfig" 
            class="res-item" 
@@ -9,17 +19,16 @@
            [class.trigger-item]="res.isTrigger">
         
         <span class="res-icon">{{ res.icon }}</span>
-        
         <div class="res-data">
           <span class="res-label">{{ res.label }}</span>
           <span class="res-val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number }}</span>
           <span class="res-val" *ngIf="res.isTrigger">STATUS</span>
         </div>
-
+        
         <div class="troops-dropdown" *ngIf="res.isTrigger">
-          <div class="dropdown-header">ARMATA ATTIVA</div>
+          <div class="dropdown-header">ARMATA DISPIEGATA</div>
           <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
-            <span class="t-key">{{ troop.key }}:</span>
+            <span class="t-key">{{ troop.key }}</span>
             <span class="t-val">{{ troop.value }}</span>
           </div>
         </div>
@@ -27,28 +36,39 @@
     </div>
 
     <div class="profile-section">
-      <div class="profile-icon" (click)="setOpenProfile(true)">👤</div>
+      <div class="profile-trigger" (click)="setOpenProfile(true)">
+        <div class="profile-info">
+          <span class="p-rank">GENERALE DI BRIGATA</span>
+          <span class="p-name">{{ userProfile.username }}</span>
+        </div>
+        <div class="profile-avatar-circle">
+          <span class="user-symbol">👤</span>
+        </div>
+      </div>
     </div>
   </div>
 
   <div id="map-container"></div>
 
   <div class="hud-stack-left">
-    
     <div class="hud-panel combined-control">
       <div class="hud-sub-section">
         <div class="title-block compact">
           <p class="eyebrow">Visual Engine</p>
           <h2>MAP SETTINGS</h2>
         </div>
-        <select id="basemap-select" class="tactical-select" (change)="changeBasemap($event)">
-          <option value="esri-sat">🛰️ ESRI Satellite</option>
-          <option value="maptiler-hybrid">🌍 MapTiler Hybrid</option>
-          <option value="carto-light">🛡️ Carto Stealth</option>
-        </select>
-        <div class="action-dock mini">
-          <button class="ghost-button mini" (click)="toggleLayer('contours')">Contours</button>
-          <button class="ghost-button mini" (click)="toggleLayer('bathymetry-layer')">Bathy</button>
+        
+        <div class="glass-select-container">
+          <select id="basemap-select" class="tactical-select" (change)="changeBasemap($event)">
+            <option value="esri-sat">🛰️ ESRI SATELLITE</option>
+            <option value="maptiler-hybrid">🌍 MAPTILER HYBRID</option>
+            <option value="carto-light">🛡️ CARTO STEALTH</option>
+          </select>
+        </div>
+
+        <div class="action-dock mini-grid">
+          <button class="ghost-button mini" (click)="toggleLayer('contours')">CONTOURS</button>
+          <button class="ghost-button mini" (click)="switchGlobe()">3D GLOBE</button>
         </div>
       </div>
 
@@ -63,26 +83,45 @@
           <div class="sensor-row"><span>TER:</span><span class="sensor-val">{{ currentHoveredName || '--' }}</span></div>
           <div class="sensor-row"><span>POS:</span> <span id="out-coords" class="sensor-val">--</span></div>
           <div class="sensor-row"><span>ALT:</span> <span id="out-alt" class="sensor-val">--</span></div>
-          <div class="sensor-row"><span>SUR:</span> <span id="out-type" class="sensor-val">--</span></div>
-          <div class="sensor-row"><span>COM:</span> <span id="out-res-com" class="sensor-val" style="color: #a3e635;">--</span></div>
-          <div class="sensor-row"><span>RAR:</span> <span id="out-res-rare" class="sensor-val" style="color: #c084fc;">--</span></div>
+          <div class="sensor-row"><span>COM:</span> <span id="out-res-com" class="sensor-val res-glow">--</span></div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="button-container">
-      <button id="toggle-btn" class="primary-glow" (click)="switchGlobe()">SWITCH TO 3D GLOBE</button>
+  <div class="hud-stack-right">
+    <div class="hud-panel build-panel" *ngIf="isBuildPanelOpen">
+      <div class="title-block compact">
+        <p class="eyebrow">Ingegneria di Campo</p>
+        <h2>COSTRUZIONE</h2>
+      </div>
+
+      <div class="category-toggle">
+        <button [class.active]="activeBuildCategory === 'risorse'" (click)="setBuildCategory('risorse')">RISORSE</button>
+        <button [class.active]="activeBuildCategory === 'armamenti'" (click)="setBuildCategory('armamenti')">ARMAMENTI</button>
+      </div>
+
+      <div class="hud-separator"></div>
+
+      <div class="build-grid scrollable-y">
+        <div *ngFor="let item of getFilteredBuildItems()" class="build-card" (click)="startConstruction(item)">
+          <div class="build-info">
+            <span class="item-name">{{ item.name || item.nome }}</span>
+            <span class="item-tier">TIER {{ item.tier }}</span>
+          </div>
+          <div class="build-cost">
+            <span class="cost-unit">💵 {{ item.costo_denaro | number }}</span>
+            <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio }}</span>
+            <span class="cost-unit" *ngIf="item.costo_mattoni > 0 && !item.costo_acciaio">🧱 {{ item.costo_mattoni }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <ion-modal [isOpen]="isProfileModalOpen" (didDismiss)="setOpenProfile(false)" class="tactical-modal">
-  <ng-template>
-    <app-tactical-terminal 
-      [profile]="userProfile" 
-      [audioSettings]="audioSettings" 
-      [uiSettings]="uiSettings"
-      (close)="setOpenProfile(false)">
-    </app-tactical-terminal>
-  </ng-template>
-</ion-modal>
+  <app-tactical-terminal 
+    *ngIf="isProfileModalOpen" 
+    (close)="setOpenProfile(false)">
+  </app-tactical-terminal>
+
 </ion-content>
