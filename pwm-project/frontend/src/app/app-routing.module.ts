@@ -48,6 +48,10 @@ const routes: Routes = [
     pathMatch: 'full'
   },
   {
+    path: 'game/match',
+    loadComponent: () => import('./game/match/match.page').then(m => m.MatchPage)
+  },
+  {
     path: 'game/match/:id',
     loadComponent: () => import('./game/match/match.page').then(m => m.MatchPage)
   },

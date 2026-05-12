@@ -1,13 +1,42 @@
-<ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>match</ion-title>
-  </ion-toolbar>
-</ion-header>
+<ion-content [fullscreen]="true" class="transparent-bg" [scrollY]="false">
+  
+  <div id="map-container"></div>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">match</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <div class="hud-panel top-left">
+    <div class="title-block">
+      <p class="eyebrow">Visual Engine</p>
+      <h2>BASEMAPS & OVERLAYS</h2>
+    </div>
+    
+    <div class="setting-item">
+      <select id="basemap-select" class="tactical-select" (change)="changeBasemap($event)">
+        <option value="esri-sat">🛰️ ESRI Satellite</option>
+        <option value="maptiler-hybrid">🌍 MapTiler Hybrid</option>
+        <option value="carto-light">🛡️ Carto Stealth (White)</option>
+      </select>
+    </div>
+
+    <div class="action-dock" style="flex-direction: column; gap: 8px; margin-top: 15px;">
+      <button id="btn-contours" class="ghost-button" (click)="toggleLayer('contours')">Elevation Lines</button>
+      <button id="btn-bathymetry" class="ghost-button" (click)="toggleLayer('bathymetry-layer')">Bathymetry</button>
+    </div>
+  </div>
+
+  <div class="hud-panel bottom-right">
+    <div class="title-block">
+      <p class="eyebrow">Sensori</p>
+      <h2>INTELLIGENCE FEED</h2>
+    </div>
+    <div class="sensor-row"><span>TERRITORIO:</span><span class="sensor-val">{{ currentHoveredName || '--' }}</span></div>
+    <div class="sensor-row"><span>COORDS:</span> <span id="out-coords" class="sensor-val">--</span></div>
+    <div class="sensor-row"><span>ALTITUDE:</span> <span id="out-alt" class="sensor-val">-- M</span></div>
+    <div class="sensor-row"><span>SURFACE:</span> <span id="out-type" class="sensor-val">--</span></div>
+    <div class="sensor-row"><span>RES (COM):</span> <span id="out-res-com" class="sensor-val" style="color: #a3e635;">--</span></div>
+    <div class="sensor-row"><span>RES (RARE):</span> <span id="out-res-rare" class="sensor-val" style="color: #c084fc;">--</span></div>
+  </div>
+
+  <div class="hud-panel bottom-left" style="padding: 10px;">
+    <button id="toggle-btn" class="primary-glow" (click)="switchGlobe()">SWITCH TO 3D GLOBE</button>
+  </div>
+
 </ion-content>

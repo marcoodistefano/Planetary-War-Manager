@@ -1,0 +1,98 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  --danger-color: #ff7b72;
+  --primary-blue: #58a6ff;
+  --glass-bg: rgba(5, 10, 20, 0.85);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.transparent-bg {
+  /* Impostiamo uno sfondo nero in caso di ritardo della mappa */
+  --background: #000 !important; 
+}
+
+#map-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  overflow: hidden;
+}
+/* BASE PER I PANNELLI OLOGRAFICI SULLA MAPPA */
+.hud-panel {
+  position: absolute;
+  z-index: 15;
+  background: var(--glass-bg);
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(88, 166, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 20px;
+  color: #fff;
+  transition: all 0.3s ease;
+}
+
+/* POSIZIONAMENTI */
+.top-left { top: 20px; left: 20px; width: 280px; }
+.top-right { top: 20px; right: 20px; width: 280px; border-top: 3px solid #10b981; }
+.bottom-right { bottom: 20px; right: 20px; min-width: 320px; border-left: 3px solid var(--primary-blue); }
+.bottom-left { bottom: 20px; left: 20px; width: 220px; background: transparent; border: none; box-shadow: none; backdrop-filter: none;}
+
+/* TITOLI COME NEI SETTINGS */
+.title-block {
+  margin-bottom: 15px;
+  .eyebrow { color: #b6cee9; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 5px 0; }
+  h2 { font-size: 1.1rem; color: #fff; margin: 0; text-shadow: 0 0 10px var(--primary-blue); }
+}
+
+/* ELEMENTI INTERNI */
+.setting-item {
+  margin-bottom: 10px;
+  label { font-size: 0.65rem; color: #8892b0; display: block; margin-bottom: 4px; font-weight: bold;}
+}
+
+.tactical-select, .tactical-input {
+  width: 100%; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(88, 166, 255, 0.3);
+  color: #fff; padding: 8px 10px; border-radius: 6px; font-family: inherit; font-size: 0.8rem; outline: none;
+}
+
+/* RIGHE SENSORI */
+.sensor-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 6px 0; font-size: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;
+  span:first-child { color: #8892b0; font-weight: bold;}
+}
+.sensor-val { font-weight: bold; color: #fde047; text-shadow: 0 0 5px rgba(253, 224, 71, 0.4); }
+
+/* BOTTONI */
+.primary-glow {
+  width: 100%; background: rgba(88, 166, 255, 0.15); border: 1px solid var(--primary-blue);
+  color: #fff; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.2s; font-family: inherit;
+  &:hover { background: rgba(88, 166, 255, 0.3); box-shadow: 0 0 15px var(--primary-blue); }
+}
+
+.ghost-button {
+  width: 100%; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #8892b0; padding: 8px; border-radius: 6px; font-size: 0.7rem; cursor: pointer; transition: 0.3s; font-family: inherit; text-transform: uppercase;
+  &:hover { border-color: var(--primary-blue); color: #fff; }
+  &.active { background: rgba(88, 166, 255, 0.2); border-color: var(--primary-blue); color: #fff; }
+}
+
+.logout-button {
+  width: 100%; background: transparent; border: 1px solid rgba(255, 123, 114, 0.3); color: var(--danger-color); 
+  padding: 8px; border-radius: 6px; font-size: 0.75rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; font-family: inherit;
+  &:hover { background: rgba(255, 123, 114, 0.1); border-color: var(--danger-color); box-shadow: 0 0 10px rgba(255, 123, 114, 0.4);}
+}
+
+#stats-wrapper {
+  position: relative; width: 100%; height: 60px; margin-bottom: 15px;
+  background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px; overflow: hidden; display: flex; justify-content: center; align-items: center;
+  > div { transform: scale(1.2); transform-origin: center center; }
+}
