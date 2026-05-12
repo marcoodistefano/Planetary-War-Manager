@@ -1,11 +1,10 @@
-import { Component, OnInit, AfterViewInit } from '@angular/core';
+import { Component, OnInit, AfterViewInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { Router } from '@angular/router';
-
-// Assicurati che il percorso sia corretto per il tuo progetto
 import { TacticalTerminalComponent } from './components/tactical-terminal/tactical-terminal.component';
+import { TechTreeComponent } from './components/tech-tree/tech-tree.component';
 
 // Librerie esterne caricate via CDN o definite globalmente
 declare var maplibregl: any;
@@ -22,7 +21,8 @@ declare var THREE: any;
     IonicModule, 
     CommonModule, 
     FormsModule, 
-    TacticalTerminalComponent
+    TacticalTerminalComponent,
+    TechTreeComponent
   ]
 })
 export class MatchPage implements OnInit, AfterViewInit {
@@ -39,6 +39,7 @@ export class MatchPage implements OnInit, AfterViewInit {
   isProfileModalOpen = false;
   isBuildPanelOpen = false;
   isTechModalOpen = false; 
+  isMapSettingsOpen = false;
   activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
   activeTab: 'profile' | 'settings' = 'profile';
 
@@ -123,7 +124,7 @@ export class MatchPage implements OnInit, AfterViewInit {
     ]
   };
 
-  constructor(private router: Router) { }
+  constructor(private router: Router, private cdr: ChangeDetectorRef) { }
 
   // --- 5. CICLO DI VITA ANGULAR ---
 
@@ -151,6 +152,10 @@ export class MatchPage implements OnInit, AfterViewInit {
     if (this.isBuildPanelOpen) this.isTechModalOpen = false;
   }
 
+  toggleMapSettings() {
+    this.isMapSettingsOpen = !this.isMapSettingsOpen;
+  }
+
   openTechTree() {
     console.log("Accesso all'Accademia: Caricamento Albero Tecnologico...");
     this.isTechModalOpen = !this.isTechModalOpen;
@@ -169,8 +174,17 @@ export class MatchPage implements OnInit, AfterViewInit {
 
   async loadGameRules() {
     try {
-        const response = await fetch('/assets/game_rules.cdb'); 
-        if (response.ok) this.gameRules = await response.json();
+        const response = await fetch('/assets/game_rules.json'); 
+        if (response.ok) {
+            this.gameRules = await response.json();
+            
+            // Forza Angular ad aggiornare l'interfaccia ora che i dati ci sono!
+            this.cdr.detectChanges(); 
+            
+            console.log("Regole caricate con successo:", this.gameRules);
+        } else {
+            console.error("File CDB non trovato. Status:", response.status);
+        }
     } catch (err) {
         console.error("Errore Intelligence: Regole non caricate", err);
     }
@@ -180,13 +194,11 @@ export class MatchPage implements OnInit, AfterViewInit {
     if (!this.gameRules || !this.gameRules.sheets) return [];
 
     if (this.activeBuildCategory === 'risorse') {
-      // Estrae gli estrattori (Segherie, Miniere, Pozzi)
+      // Estrae TUTTI gli estrattori dal CDB
       return this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
     } else {
-      // Estrae strutture Militari: Caserma, Fabbrica, Aeroporto, Porto
-      const strutture = this.gameRules.sheets.find((s: any) => s.name === 'Strutture')?.lines || [];
-      const prodIds = ['caserma', 'fabbrica', 'aeroporto', 'porto'];
-      return strutture.filter((s: any) => prodIds.some(id => s.id_struttura.includes(id)));
+      // Estrae TUTTE le strutture Militari/Difesa/Logistica dal CDB
+      return this.gameRules.sheets.find((s: any) => s.name === 'Strutture')?.lines || [];
     }
   }
 

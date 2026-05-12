@@ -38,7 +38,14 @@
 
 .terminal-frame {
   position: relative;
-  height: 100%;
+  
+  /* --- MODIFICHE PER LE DIMENSIONI DELLA MODALE --- */
+  width: 90vw;
+  max-width: 850px; /* Larghezza massima della finestra */
+  height: 80vh; 
+  max-height: 600px; /* Altezza massima della finestra */
+  /* ------------------------------------------------ */
+
   background: linear-gradient(135deg, var(--glass-bg) 0%, rgba(13, 25, 48, 0.95) 100%);
   border: 1px solid var(--glass-border);
   backdrop-filter: var(--glass-blur);
@@ -152,19 +159,28 @@
 }
 
 .exit-button { 
-  background: rgba(var(--danger-red), 0.1); 
+  /* Usiamo i valori RGB diretti del tuo --danger-red (#ff7b72) per la trasparenza */
+  background: rgba(255, 123, 114, 0.1); 
   color: var(--danger-red); 
-  border: 1px solid rgba(var(--danger-red), 0.3);
+  border: 1px solid rgba(255, 123, 114, 0.3);
   padding: 6px 14px;
   border-radius: 6px;
   cursor: pointer;
   font-weight: bold;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 1px;
   transition: 0.3s;
+  
+  /* Evita che la parentesi quadra vada a capo */
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   &:hover {
     background: var(--danger-red);
     color: white;
-    box-shadow: 0 0 15px rgba(var(--danger-red), 0.4);
+    box-shadow: 0 0 15px rgba(255, 123, 114, 0.5);
   }
 }
 

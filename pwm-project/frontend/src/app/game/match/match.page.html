@@ -52,40 +52,47 @@
 
   <div class="hud-stack-left">
     <div class="hud-panel combined-control">
-      <div class="hud-sub-section">
+      
+      <div class="panel-header" (click)="toggleMapSettings()">
         <div class="title-block compact">
           <p class="eyebrow">Visual Engine</p>
           <h2>MAP SETTINGS</h2>
         </div>
-        
-        <div class="glass-select-container">
-          <select id="basemap-select" class="tactical-select" (change)="changeBasemap($event)">
-            <option value="esri-sat">🛰️ ESRI SATELLITE</option>
-            <option value="maptiler-hybrid">🌍 MAPTILER HYBRID</option>
-            <option value="carto-light">🛡️ CARTO STEALTH</option>
-          </select>
-        </div>
-
-        <div class="action-dock mini-grid">
-          <button class="ghost-button mini" (click)="toggleLayer('contours')">CONTOURS</button>
-          <button class="ghost-button mini" (click)="switchGlobe()">3D GLOBE</button>
-        </div>
+        <ion-icon [name]="isMapSettingsOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
       </div>
 
-      <div class="hud-separator"></div>
+      <div class="panel-content" *ngIf="isMapSettingsOpen">
+        <div class="hud-sub-section">
+          <div class="glass-select-container">
+            <select id="basemap-select" class="tactical-select" (change)="changeBasemap($event)">
+              <option value="esri-sat">🛰️ ESRI SATELLITE</option>
+              <option value="maptiler-hybrid">🌍 MAPTILER HYBRID</option>
+              <option value="carto-light">🛡️ CARTO STEALTH</option>
+            </select>
+          </div>
 
-      <div class="hud-sub-section">
-        <div class="title-block compact">
-          <p class="eyebrow">Intelligence</p>
-          <h2>SENSOR FEED</h2>
+          <div class="action-dock mini-grid">
+            <button class="ghost-button mini" (click)="toggleLayer('contours')">CONTOURS</button>
+            <button class="ghost-button mini" (click)="switchGlobe()">3D GLOBE</button>
+          </div>
         </div>
-        <div class="sensor-grid">
-          <div class="sensor-row"><span>TER:</span><span class="sensor-val">{{ currentHoveredName || '--' }}</span></div>
-          <div class="sensor-row"><span>POS:</span> <span id="out-coords" class="sensor-val">--</span></div>
-          <div class="sensor-row"><span>ALT:</span> <span id="out-alt" class="sensor-val">--</span></div>
-          <div class="sensor-row"><span>COM:</span> <span id="out-res-com" class="sensor-val res-glow">--</span></div>
+
+        <div class="hud-separator"></div>
+
+        <div class="hud-sub-section">
+          <div class="title-block compact">
+            <p class="eyebrow">Intelligence</p>
+            <h2>SENSOR FEED</h2>
+          </div>
+          <div class="sensor-grid">
+            <div class="sensor-row"><span>TER:</span><span class="sensor-val">{{ currentHoveredName || '--' }}</span></div>
+            <div class="sensor-row"><span>POS:</span> <span id="out-coords" class="sensor-val">--</span></div>
+            <div class="sensor-row"><span>ALT:</span> <span id="out-alt" class="sensor-val">--</span></div>
+            <div class="sensor-row"><span>COM:</span> <span id="out-res-com" class="sensor-val res-glow">--</span></div>
+          </div>
         </div>
       </div>
+      
     </div>
   </div>
 
@@ -109,10 +116,14 @@
             <span class="item-name">{{ item.name || item.nome }}</span>
             <span class="item-tier">TIER {{ item.tier }}</span>
           </div>
+          
           <div class="build-cost">
-            <span class="cost-unit">💵 {{ item.costo_denaro | number }}</span>
-            <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio }}</span>
-            <span class="cost-unit" *ngIf="item.costo_mattoni > 0 && !item.costo_acciaio">🧱 {{ item.costo_mattoni }}</span>
+            <span class="cost-unit" *ngIf="item.costo_denaro > 0">💵 {{ item.costo_denaro | number }}</span>
+            <span class="cost-unit" *ngIf="item.costo_legno > 0">🪵 {{ item.costo_legno | number }}</span>
+            <span class="cost-unit" *ngIf="item.costo_mattoni > 0">🧱 {{ item.costo_mattoni | number }}</span>
+            <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio | number }}</span>
+            <span class="cost-unit" *ngIf="item.costo_petrolio > 0">🛢️ {{ item.costo_petrolio | number }}</span>
+            <span class="cost-unit" *ngIf="item.costo_piombo > 0 || item.costo_piombio > 0">🔘 {{ (item.costo_piombo || item.costo_piombio) | number }}</span>
           </div>
         </div>
       </div>
@@ -123,5 +134,12 @@
     *ngIf="isProfileModalOpen" 
     (close)="setOpenProfile(false)">
   </app-tactical-terminal>
+
+  <app-tech-tree
+    *ngIf="isTechModalOpen"
+    [gameRules]="gameRules"
+    [playerResources]="playerResources"
+    (close)="isTechModalOpen = false">
+  </app-tech-tree>
 
 </ion-content>

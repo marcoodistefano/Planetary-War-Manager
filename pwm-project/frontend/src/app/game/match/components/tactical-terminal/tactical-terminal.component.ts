@@ -1,8 +1,7 @@
-// tactical-terminal.component.ts
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController } from '@ionic/angular'; // <--- Aggiunto ModalController
+import { IonicModule, ModalController } from '@ionic/angular';
 import { Router } from '@angular/router';
 
 @Component({
@@ -13,16 +12,25 @@ import { Router } from '@angular/router';
   imports: [CommonModule, FormsModule, IonicModule]
 })
 export class TacticalTerminalComponent {
-  @Input() profile: any;
-  @Input() audioSettings: any;
-  @Input() uiSettings: any;
+  // Aggiunti valori Placeholder di default
+  @Input() profile: any = {
+    username: 'GHOST_OPERATIVE',
+    rank: 'COMANDANTE SUPREMO',
+    experience: 78,
+    matchesWon: 142,
+    matchesLost: 29
+  };
+
+  @Input() audioSettings: any = { music: 65, sfx: 85 };
+  @Input() uiSettings: any = { showAdvancedLabels: true };
+  
   @Output() close = new EventEmitter<void>();
 
   activeTab: 'profile' | 'settings' = 'profile';
 
   constructor(
     private router: Router,
-    private modalCtrl: ModalController // <--- Inietta il ModalController
+    private modalCtrl: ModalController
   ) {}
 
   setTab(tab: 'profile' | 'settings') {
@@ -33,12 +41,11 @@ export class TacticalTerminalComponent {
     this.close.emit();
   }
 
-  // Navigazione con chiusura garantita
   async navigateToFullProfile() {
-    // 1. Chiudiamo la modale (il comando await assicura che l'animazione inizi/avvenga)
-    await this.modalCtrl.dismiss(); 
+    // 1. Emette l'evento "close" al genitore (match.page.ts) che imposterà isProfileModalOpen = false
+    this.close.emit(); 
     
-    // 2. Reindirizziamo alla pagina del profilo
+    // 2. Naviga verso la rotta del profilo
     this.router.navigate(['/profile']); 
   }
 }

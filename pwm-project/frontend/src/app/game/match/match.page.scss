@@ -308,20 +308,47 @@
 .build-card {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(134, 215, 255, 0.1);
-  padding: 10px; border-radius: 8px; margin-bottom: 8px; cursor: pointer;
+  padding: 10px; 
+  border-radius: 8px; 
+  margin-bottom: 8px; 
+  cursor: pointer;
   transition: 0.2s;
+
   &:hover {
     background: rgba(134, 215, 255, 0.1);
     border-color: var(--primary-blue);
     box-shadow: 0 0 15px var(--primary-glow);
   }
+
   .build-info {
-    display: flex; justify-content: space-between;
+    display: flex; 
+    justify-content: space-between;
+    margin-bottom: 8px; /* Spazio tra il nome e le risorse */
+    
     .item-name { font-size: 0.7rem; color: #fff; font-weight: 800; }
     .item-tier { font-size: 0.55rem; color: var(--primary-blue); font-weight: 900; }
   }
-}
 
+  /* Badge per i Costi delle risorse */
+  .build-cost {
+    display: flex;
+    flex-wrap: wrap; /* Manda a capo le risorse se sono troppe */
+    gap: 6px;
+
+    .cost-unit {
+      font-size: 0.6rem;
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(134, 215, 255, 0.15);
+      padding: 3px 6px;
+      border-radius: 4px;
+      color: var(--text-accent);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+  }
+}
 /* ==========================================================================
    6. PULSANTI TATTICI (UNIFICATI)
    ========================================================================== */
@@ -375,4 +402,38 @@
 @keyframes popupFade {
   from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  /* Rimuove il margine inferiore dal titolo per centrarlo con la freccia */
+  .title-block {
+    margin-bottom: 0 !important;
+  }
+
+  ion-icon {
+    color: var(--primary-blue);
+    font-size: 1.4rem;
+    transition: transform 0.3s ease;
+  }
+}
+
+.panel-content {
+  margin-top: 15px;
+  animation: panelSlideDown 0.25s ease-out forwards;
+  transform-origin: top;
+}
+
+@keyframes panelSlideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }

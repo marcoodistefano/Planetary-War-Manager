@@ -1,0 +1,288 @@
+/* ==========================================================================
+   TECH TREE - TACTICAL GLASSMORPHISM STYLE
+   ========================================================================== */
+
+:host {
+  /* Variabili sincronizzate con il Match Page */
+  --primary-blue: #86d7ff;
+  --primary-glow: rgba(134, 215, 255, 0.3);
+  --danger-red: #ff7b72;
+  --glass-bg: rgba(7, 15, 28, 0.85);
+  --glass-border: rgba(134, 215, 255, 0.25);
+  --panel-blur: blur(20px);
+  --text-muted: #a0a0b0;
+  --text-accent: #b6cee9;
+  
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(5px);
+  font-family: 'Inter', sans-serif;
+}
+
+/* 1. FRAME PRINCIPALE */
+.tech-frame {
+  position: relative;
+  width: 95vw;
+  max-width: 1300px;
+  height: 85vh;
+  max-height: 800px;
+  background: linear-gradient(135deg, var(--glass-bg) 0%, rgba(13, 25, 48, 0.95) 100%);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--panel-blur);
+  border-radius: 18px;
+  display: flex;
+  overflow: hidden;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(134, 215, 255, 0.05);
+
+  /* Scanlines Overlay */
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+    background-size: 100% 3px, 3px 100%;
+    pointer-events: none;
+    opacity: 0.2;
+    z-index: 2;
+  }
+}
+
+/* 2. SIDEBAR DI NAVIGAZIONE */
+.tech-sidebar {
+  width: 240px;
+  background: rgba(0, 0, 0, 0.4);
+  border-right: 1px solid var(--glass-border);
+  padding: 40px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 10;
+  user-select: none;
+
+  .brand {
+    padding: 0 25px 30px;
+    .system-name {
+      display: block;
+      font-weight: 800;
+      color: var(--primary-blue);
+      letter-spacing: 2px;
+      text-shadow: 0 0 10px var(--primary-glow);
+      margin-bottom: 4px;
+    }
+    .version { font-size: 0.6rem; color: var(--text-muted); opacity: 0.6; font-family: 'JetBrains Mono', monospace; }
+  }
+
+  nav {
+    flex: 1;
+    .nav-item {
+      padding: 16px 25px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: 0.3s ease;
+      border-left: 4px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-transform: uppercase;
+
+      ion-icon { font-size: 1.1rem; }
+
+      &:hover { color: #ffffff; background: rgba(134, 215, 255, 0.1); }
+
+      &.active {
+        color: #ffffff;
+        background: rgba(134, 215, 255, 0.15);
+        border-left: 4px solid var(--primary-blue);
+        text-shadow: 0 0 8px rgba(134, 215, 255, 0.6);
+      }
+    }
+  }
+
+  .sidebar-footer {
+    padding: 20px;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.2);
+    
+    .exit-btn {
+      width: 100%;
+      background: rgba(255, 123, 114, 0.1); 
+      color: var(--danger-red); 
+      border: 1px solid rgba(255, 123, 114, 0.3);
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 1px;
+      transition: 0.3s;
+      display: flex; justify-content: center;
+
+      &:hover { background: var(--danger-red); color: white; box-shadow: 0 0 15px rgba(255, 123, 114, 0.5); }
+    }
+  }
+}
+
+/* 3. AREA CENTRALE (GRIGLIA E NODI) */
+.tech-main {
+  flex: 1;
+  padding: 40px;
+  overflow-x: auto;
+  overflow-y: auto;
+  position: relative;
+  z-index: 10;
+  user-select: none;
+  
+  /* Griglia di sfondo radar */
+  background-image: radial-gradient(rgba(134, 215, 255, 0.15) 1px, transparent 1px);
+  background-size: 30px 30px;
+
+  &::-webkit-scrollbar { height: 8px; width: 8px; }
+  &::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 4px; }
+}
+
+.tree-container {
+  display: flex;
+  flex-direction: column;
+  gap: 60px;
+  min-width: max-content;
+}
+
+.track-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--primary-blue);
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-bottom: 10px;
+  border-bottom: 1px dashed rgba(134, 215, 255, 0.2);
+  padding-bottom: 5px;
+  display: inline-block;
+}
+
+.nodes-row { display: flex; align-items: center; }
+.tech-node-wrapper { display: flex; align-items: center; }
+
+/* Linee Connettori */
+.connector-line {
+  width: 50px;
+  height: 2px;
+  background: rgba(134, 215, 255, 0.3);
+  position: relative;
+  
+  &::after {
+    content: '';
+    position: absolute; right: 0; top: -4px;
+    border-left: 6px solid rgba(134, 215, 255, 0.4);
+    border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  }
+}
+
+/* Stile Carte Tecnologiche (Identico al Build Panel) */
+.tech-node {
+  width: 240px;
+  min-height: 90px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(134, 215, 255, 0.15);
+  border-radius: 8px;
+  padding: 12px;
+  position: relative;
+  cursor: pointer;
+  transition: 0.2s;
+  display: flex;
+  flex-direction: column;
+
+  &:hover {
+    background: rgba(134, 215, 255, 0.1);
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 15px var(--primary-glow);
+    transform: translateY(-3px);
+  }
+
+  .node-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 12px;
+    
+    .node-name { font-size: 0.8rem; color: #fff; font-weight: 800; line-height: 1.2; width: 70%; }
+    .node-tier { font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; font-weight: 900; color: var(--primary-blue); }
+  }
+
+  /* Badge Costi */
+  .node-costs {
+    margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px;
+
+    .cost-unit {
+      font-size: 0.6rem;
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(134, 215, 255, 0.15);
+      padding: 3px 6px;
+      border-radius: 4px;
+      color: var(--text-accent);
+      display: flex; align-items: center; gap: 4px;
+    }
+  }
+
+  /* Miniature Unità Sbloccate */
+  .unlocked-units {
+    position: absolute; bottom: -12px; right: 10px;
+    display: flex; gap: 4px;
+    
+    .unit-dot {
+      width: 24px; height: 24px;
+      background: #050a14;
+      border: 1px solid var(--primary-blue);
+      border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 0.7rem; color: var(--primary-blue);
+      box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    }
+  }
+}
+
+/* Modalità non disponibili */
+.locked { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
+
+/* 4. DETTAGLI POPUP */
+.node-details {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  width: 320px;
+  background: var(--glass-bg);
+  border: 1px solid var(--primary-blue);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.8), inset 0 0 15px rgba(134,215,255,0.1);
+  z-index: 20;
+  backdrop-filter: var(--panel-blur);
+
+  .details-header h2 { font-size: 1rem; color: #fff; margin: 0 0 5px 0; text-transform: uppercase; }
+  .details-header p { font-size: 0.6rem; color: var(--primary-blue); margin: 0 0 15px 0; font-family: 'JetBrains Mono', monospace; }
+  
+  .requirement-item {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; color: #fff;
+    margin-bottom: 15px; border-bottom: 1px dashed rgba(134, 215, 255, 0.2);
+    padding-bottom: 8px;
+    
+    label { color: var(--text-muted); font-size: 0.65rem; }
+  }
+  
+  .research-btn {
+    width: 100%; padding: 12px; background: rgba(134, 215, 255, 0.1);
+    border: 1px solid var(--primary-blue); color: #fff; border-radius: 6px;
+    font-weight: 800; letter-spacing: 1px; cursor: pointer; transition: 0.3s;
+    &:hover:not(:disabled) { background: var(--primary-blue); color: #000; box-shadow: 0 0 15px var(--primary-glow); }
+    &:disabled { opacity: 0.3; border-color: gray; cursor: not-allowed; }
+  }
+}
