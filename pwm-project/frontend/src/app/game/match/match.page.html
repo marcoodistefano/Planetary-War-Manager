@@ -42,9 +42,9 @@
   <div class="hud-stack-left">
     
     <div class="tactical-actions-row secondary-actions">
-      <button class="nav-action-btn primary-glow" [class.active]="isArmyModalOpen" (click)="toggleArmyModal()">
+      <button class="nav-action-btn primary-glow" [class.active]="isDiplomacyModalOpen" (click)="toggleDiplomacyModal()">
         <ion-icon name="shield-half-outline"></ion-icon>
-        <span>ESERCITO</span>
+        <span>DIPLOMAZIA</span>
       </button>
       <button class="nav-action-btn primary-glow" [class.active]="isIntelligenceModalOpen" (click)="toggleIntelligenceModal()">
         <ion-icon name="eye-outline"></ion-icon>
@@ -57,9 +57,9 @@
         <ion-icon name="construct-outline"></ion-icon>
         <span>COSTRUZIONI</span>
       </button>
-      <button class="nav-action-btn primary-glow" [class.active]="isAcademyModalOpen" (click)="toggleAcademyModal()">
+      <button class="nav-action-btn primary-glow" [class.active]="isTechModalOpen" (click)="toggleTechModal()">
         <ion-icon name="flask-outline"></ion-icon>
-        <span>ACCADEMIA</span>
+        <span>RICERCHE</span>
       </button>
     </div>
 
@@ -149,9 +149,9 @@
 
   </div> <app-tactical-terminal *ngIf="isProfileModalOpen" (close)="setOpenProfile(false)"></app-tactical-terminal>
   
-  <app-academy-modal *ngIf="isAcademyModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isAcademyModalOpen = false"></app-academy-modal>
+  <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>
 
-  <app-army-modal *ngIf="isArmyModalOpen" (close)="isArmyModalOpen = false"></app-army-modal>
+  <app-diplomacy-modal *ngIf="isDiplomacyModalOpen" (close)="isDiplomacyModalOpen = false"></app-diplomacy-modal>
   
   <app-intelligence-modal *ngIf="isIntelligenceModalOpen" (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
 

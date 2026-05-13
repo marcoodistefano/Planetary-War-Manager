@@ -1,29 +1,121 @@
-<div class="tech-modal-backdrop" (click)="closeModal()">
-  <div class="tactical-modal-frame" (click)="$event.stopPropagation()">
+<div class="intel-modal-backdrop" (click)="closeModal()">
+  
+  <div class="intel-frame" 
+       (click)="$event.stopPropagation()"
+       (mousedown)="onDragStart($event)"
+       [style.transform]="'translate(' + transformX + 'px, ' + transformY + 'px)'">
     
-    <div class="modal-header">
-      <div class="title-block compact">
-        <p class="eyebrow">Cyber Surveillance</p>
-        <h2>INTELLIGENCE ROOM</h2>
+    <div class="intel-sidebar">
+      <div class="brand">
+        <span class="system-name">INTELLIGENCE</span>
+        <span class="version">CYBER_EYE V.2.4</span>
       </div>
-      <ion-icon name="close-outline" class="close-icon" (click)="closeModal()"></ion-icon>
+      
+      <nav>
+        <div class="nav-item" [class.active]="activeTab === 'espionage'" (click)="activeTab = 'espionage'">
+          <ion-icon name="eye-outline"></ion-icon><span>ESPIONAGGIO</span>
+        </div>
+        <div class="nav-item" [class.active]="activeTab === 'counter'" (click)="activeTab = 'counter'">
+          <ion-icon name="shield-lock-outline"></ion-icon><span>DIFESA</span>
+        </div>
+        <div class="nav-item" [class.active]="activeTab === 'maintenance'" (click)="activeTab = 'maintenance'">
+          <ion-icon name="cash-outline"></ion-icon><span>OPERATIVI</span>
+        </div>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <button class="exit-btn" (click)="closeModal()">[ CHIUDI ]</button>
+      </div>
     </div>
 
-    <div class="modal-content scrollable-y">
-      <div class="sensor-grid">
-        <div class="sensor-row"><span>RADAR:</span> <span class="sensor-val">SCANNING...</span></div>
-        <div class="sensor-row"><span>MINACCE:</span> <span class="sensor-val" style="color: #ff7b72;">2 RILEVATE</span></div>
-      </div>
-      
-      <div class="hud-separator"></div>
-      
-      <div class="intel-alert-card">
-        <div class="alert-info">
-          <span class="item-name">SPOSTAMENTO TRUPPE NEMICHE</span>
-          <span class="item-tier">SETTORE NORD-EST</span>
-        </div>
+    <div class="intel-main scrollable-y">
+      <div class="content-container">
+
+        <ng-container *ngIf="activeTab === 'espionage'">
+          <p class="track-label">Operazioni Offensive</p>
+          <div class="action-grid">
+            
+            <div class="build-card no-hover">
+              <div class="build-info">
+                <span class="item-name">SABOTAGGIO ESTRATTORI</span>
+                <span class="item-tier danger">ALTO RISCHIO</span>
+              </div>
+              <p class="description">Danneggia la produzione di risorse del nemico per un periodo di 6 ore.</p>
+              <div class="card-footer">
+                <button class="primary-glow slim">ASSEGNA AGENTE</button>
+              </div>
+            </div>
+
+            <div class="build-card no-hover">
+              <div class="build-info">
+                <span class="item-name">RACCOLTA INFORMAZIONI</span>
+                <span class="item-tier success">BASSO RISCHIO</span>
+              </div>
+              <p class="description">Rileva le truppe stazionate e le strutture nei settori confinanti.</p>
+              <div class="card-footer">
+                <button class="primary-glow slim">ASSEGNA AGENTE</button>
+              </div>
+            </div>
+
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="activeTab === 'counter'">
+          <p class="track-label">Protezione Territoriale</p>
+          <div class="sensor-grid">
+            <div class="sensor-row">
+              <span>CRIPTAZIONE COMUNICAZIONI:</span>
+              <span class="sensor-val" style="color: var(--success-green)">ATTIVA</span>
+            </div>
+            <div class="sensor-row">
+              <span>SCANNER ANTI-SABOTAGGIO:</span>
+              <span class="sensor-val" style="color: var(--gold-accent)">LIVELLO 2</span>
+            </div>
+          </div>
+          <div class="hud-separator"></div>
+          <button class="primary-glow">INCREMENTA CONTROSPIONAGGIO (💵 2,500)</button>
+        </ng-container>
+
+        <ng-container *ngIf="activeTab === 'maintenance'">
+          <p class="track-label">Gestione Personale e Salari</p>
+          
+          <div class="spy-card" *ngFor="let spy of spies" [class.recovering]="spy.isRecovering">
+            <div class="spy-header">
+              <span class="spy-name">{{ spy.name }}</span>
+              <span class="spy-status">{{ spy.status }}</span>
+            </div>
+            
+            <div class="risk-bar-container" *ngIf="!spy.isRecovering">
+              <div class="risk-label">
+                <span>Rischio Abbandono</span>
+                <span class="risk-pct" [style.color]="getDesertionRisk(spy.daysUnpaid) > 40 ? 'var(--danger-red)' : 'var(--success-green)'">
+                  {{ getDesertionRisk(spy.daysUnpaid) }}%
+                </span>
+              </div>
+              <div class="risk-bar">
+                <div class="risk-fill" [style.width.%]="getDesertionRisk(spy.daysUnpaid)"></div>
+              </div>
+            </div>
+
+            <div class="recovery-msg" *ngIf="spy.isRecovering">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+              Agente rimosso per mancato pagamento. Countdown rientro: 01:54:20
+            </div>
+          </div>
+
+          <div class="hud-separator"></div>
+          
+          <div class="maintenance-footer">
+            <div class="cost-summary">
+              <span class="label">COSTO TOTALE GIORNALIERO:</span>
+              <span class="value">💵 {{ spies.length * dailyCostPerSpy | number }}</span>
+            </div>
+            <button class="primary-glow full-width">SALDA TUTTI GLI ARRETRATI</button>
+          </div>
+        </ng-container>
+
       </div>
     </div>
-    
+
   </div>
 </div>

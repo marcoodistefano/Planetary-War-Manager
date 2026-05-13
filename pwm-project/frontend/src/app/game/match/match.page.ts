@@ -6,10 +6,10 @@ import { Router } from '@angular/router';
 
 // Componenti
 import { TacticalTerminalComponent } from './components/tactical-terminal/tactical-terminal.component';
-import { AcademyModalComponent } from '../components/academy-modal/academy-modal.component';
-import { ArmyModalComponent } from '../components/army-modal/army-modal.component';
+import { DiplomacyModalComponent } from '../components/diplomacy-modal/diplomacy-modal.component';
 import { IntelligenceModalComponent } from '../components/intelligence-modal/intelligence-modal.component';
 import { InGameChatComponent } from '../components/in-game-chat/in-game-chat.component';
+import { TechTreeComponent } from '../components/tech-tree/tech-tree.component';
 
 // Librerie esterne caricate via CDN o definite globalmente
 declare var maplibregl: any;
@@ -27,10 +27,10 @@ declare var THREE: any;
     CommonModule, 
     FormsModule, 
     TacticalTerminalComponent,
-    AcademyModalComponent,
-    ArmyModalComponent,
+    DiplomacyModalComponent,
     IntelligenceModalComponent,
-    InGameChatComponent
+    InGameChatComponent,
+    TechTreeComponent
   ]
 })
 export class MatchPage implements OnInit, AfterViewInit {
@@ -49,8 +49,8 @@ export class MatchPage implements OnInit, AfterViewInit {
   
   // Gestione modali sovrapposte
   isBuildPanelOpen = false;
-  isAcademyModalOpen = false; 
-  isArmyModalOpen = false;
+  isTechModalOpen = false; 
+  isDiplomacyModalOpen = false;
   isIntelligenceModalOpen = false;
   isChatOpen = false;
 
@@ -116,24 +116,29 @@ export class MatchPage implements OnInit, AfterViewInit {
     this.isChatOpen = !this.isChatOpen;
   }
 
+  toggleTechModal() {
+    this.isTechModalOpen = !this.isTechModalOpen;
+    if (this.isTechModalOpen) {
+      this.isBuildPanelOpen = false;
+      this.isDiplomacyModalOpen = false;
+      this.isIntelligenceModalOpen = false;
+    }
+  }
+  
+  // Assicurati che gli altri toggle chiudano isTechModalOpen
   toggleBuildPanel() {
     this.isBuildPanelOpen = !this.isBuildPanelOpen;
-    if (this.isBuildPanelOpen) { this.isAcademyModalOpen = false; this.isArmyModalOpen = false; this.isIntelligenceModalOpen = false; }
+    if (this.isBuildPanelOpen) { this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; this.isIntelligenceModalOpen = false; }
   }
 
-  toggleAcademyModal() {
-    this.isAcademyModalOpen = !this.isAcademyModalOpen;
-    if (this.isAcademyModalOpen) { this.isBuildPanelOpen = false; this.isArmyModalOpen = false; this.isIntelligenceModalOpen = false; }
-  }
-
-  toggleArmyModal() {
-    this.isArmyModalOpen = !this.isArmyModalOpen;
-    if (this.isArmyModalOpen) { this.isBuildPanelOpen = false; this.isAcademyModalOpen = false; this.isIntelligenceModalOpen = false; }
+  toggleDiplomacyModal() {
+    this.isDiplomacyModalOpen = !this.isDiplomacyModalOpen;
+    if (this.isDiplomacyModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isIntelligenceModalOpen = false; }
   }
 
   toggleIntelligenceModal() {
     this.isIntelligenceModalOpen = !this.isIntelligenceModalOpen;
-    if (this.isIntelligenceModalOpen) { this.isBuildPanelOpen = false; this.isAcademyModalOpen = false; this.isArmyModalOpen = false; }
+    if (this.isIntelligenceModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; }
   }
 
   toggleMapSettings() { this.isMapSettingsOpen = !this.isMapSettingsOpen; }

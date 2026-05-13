@@ -1,4 +1,4 @@
-/* Variabili sincronizzate con il Match Page */
+/* Variabili sincronizzate con il Tech Tree Page */
 :host {
   --primary-blue: #86d7ff;
   --primary-glow: rgba(134, 215, 255, 0.3);
@@ -8,10 +8,12 @@
   --panel-blur: blur(20px);
   --text-muted: #a0a0b0;
   --text-accent: #b6cee9;
+  --success-green: #a3e635;
+  --gold-accent: #fde047;
 }
 
 /* Sfondo della modale a tutto schermo */
-.tech-modal-backdrop {
+.diplomacy-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 10000;
@@ -23,8 +25,8 @@
   font-family: 'Inter', sans-serif;
 }
 
-/* 1. FRAME PRINCIPALE */
-.tech-frame {
+/* 1. FRAME PRINCIPALE - STESSE DIMENSIONI DEL TECH-TREE */
+.diplomacy-frame {
   position: relative;
   width: 95vw;
   max-width: 1300px;
@@ -38,7 +40,7 @@
   overflow: hidden;
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(134, 215, 255, 0.05);
 
-  /* Scanlines Overlay */
+  /* Scanlines Overlay - Come Tech Tree */
   &::before {
     content: "";
     position: absolute;
@@ -52,8 +54,8 @@
   }
 }
 
-/* 2. SIDEBAR DI NAVIGAZIONE */
-.tech-sidebar {
+/* 2. SIDEBAR DI NAVIGAZIONE - STESSO STILE DEL TECH-TREE */
+.diplomacy-sidebar {
   width: 240px;
   background: rgba(0, 0, 0, 0.4);
   border-right: 1px solid var(--glass-border);
@@ -63,6 +65,7 @@
   position: relative;
   z-index: 10;
   user-select: none;
+  cursor: grab; /* Per trascinamento */
 
   .brand {
     padding: 0 25px 30px;
@@ -129,17 +132,15 @@
   }
 }
 
-/* 3. AREA CENTRALE (GRIGLIA E NODI) */
-.tech-main {
+/* 3. AREA CENTRALE - STESSO PATTERN RADAR DEL TECH-TREE */
+.diplomacy-main {
   flex: 1;
   padding: 40px;
-  overflow-x: auto;
   overflow-y: auto;
   position: relative;
   z-index: 10;
-  user-select: none;
   
-  /* Griglia di sfondo radar */
+  /* Griglia di sfondo radar - Come Tech Tree */
   background-image: radial-gradient(rgba(134, 215, 255, 0.15) 1px, transparent 1px);
   background-size: 30px 30px;
 
@@ -150,46 +151,57 @@
 .tree-container {
   display: flex;
   flex-direction: column;
-  gap: 60px;
   min-width: max-content;
 }
 
-.track-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.65rem;
-  color: var(--primary-blue);
-  font-weight: 800;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  opacity: 0.8;
-  margin-bottom: 10px;
-  border-bottom: 1px dashed rgba(134, 215, 255, 0.2);
-  padding-bottom: 5px;
-  display: inline-block;
+/* 4. ELEMENTI SPECIFICI DIPLOMAZIA (ADATTATI AL NUOVO LAYOUT) */
+.alliance-info-header {
+  display: flex; gap: 15px; align-items: center; padding: 10px 0;
+  margin-top: 10px;
+  .alliance-emblem {
+    font-size: 2.5rem; background: rgba(0, 0, 0, 0.3);
+    padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border);
+  }
+  .alliance-meta { display: flex; flex-direction: column; }
+  .alliance-name { display: block; font-weight: 800; color: #fff; font-size: 1.2rem; margin-bottom: 4px;}
+  .alliance-level { color: var(--primary-blue); font-size: 0.75rem; font-family: 'JetBrains Mono'; font-weight: bold; }
 }
 
-.nodes-row { display: flex; align-items: center; }
-.tech-node-wrapper { display: flex; align-items: center; }
+.section-label {
+  font-size: 0.65rem; color: var(--primary-blue); font-weight: 800;
+  margin: 15px 0 10px; letter-spacing: 1px;
+  opacity: 0.8;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+}
 
-/* Linee Connettori */
-.connector-line {
-  width: 50px;
-  height: 2px;
-  background: rgba(134, 215, 255, 0.3);
-  position: relative;
+.hud-separator { height: 1px; background: linear-gradient(90deg, transparent, #86d7ff, transparent); opacity: 0.2; margin: 20px 0; }
+
+/* Status Dot e Testi Militari */
+.status-dot-mini {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: #555; margin-right: 6px;
+  &.online { background: var(--success-green); box-shadow: 0 0 5px var(--success-green); }
+}
+
+.online-text { color: #fff; }
+
+.sensor-grid {
+  display: flex; flex-direction: column; gap: 8px;
+  background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(134, 215, 255, 0.1);
+  padding: 12px; border-radius: 6px;
   
-  &::after {
-    content: '';
-    position: absolute; right: 0; top: -4px;
-    border-left: 6px solid rgba(134, 215, 255, 0.4);
-    border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  .sensor-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;
+    span:first-child { color: #a0a0b0; font-weight: bold; }
+    .sensor-val { color: var(--primary-blue); font-weight: 800; }
   }
 }
 
-/* Stile Carte Tecnologiche */
-.tech-node {
-  width: 240px;
-  min-height: 90px;
+/* Stile Carte Trattati (Ereditato da build-card ma adattato) */
+.build-card {
+  width: 280px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(134, 215, 255, 0.15);
   border-radius: 8px;
@@ -199,24 +211,28 @@
   transition: 0.2s;
   display: flex;
   flex-direction: column;
+  margin-bottom: 10px;
 
-  &:hover {
+  &.no-hover { cursor: default; }
+  &.no-hover:hover { background: rgba(255, 255, 255, 0.03); border-color: rgba(134, 215, 255, 0.15); box-shadow: none; transform: none; }
+
+  &:hover:not(.no-hover) {
     background: rgba(134, 215, 255, 0.1);
     border-color: var(--primary-blue);
     box-shadow: 0 0 15px var(--primary-glow);
     transform: translateY(-3px);
   }
 
-  .node-header {
+  .build-info {
     display: flex; justify-content: space-between; align-items: flex-start;
     margin-bottom: 12px;
     
-    .node-name { font-size: 0.8rem; color: #fff; font-weight: 800; line-height: 1.2; width: 70%; }
-    .node-tier { font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; font-weight: 900; color: var(--primary-blue); }
+    .item-name { font-size: 0.8rem; color: #fff; font-weight: 800; line-height: 1.2; width: 70%; }
+    .item-tier { font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; font-weight: 900; color: var(--primary-blue); text-transform: uppercase;}
   }
 
-  /* Badge Costi */
-  .node-costs {
+  /* Badge Costi/Date */
+  .build-cost {
     margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px;
 
     .cost-unit {
@@ -230,57 +246,53 @@
       display: flex; align-items: center; gap: 4px;
     }
   }
+}
 
-  /* Miniature Unità Sbloccate */
-  .unlocked-units {
-    position: absolute; bottom: -12px; right: 10px;
-    display: flex; gap: 4px;
-    
-    .unit-dot {
-      width: 24px; height: 24px;
-      background: #050a14;
-      border: 1px solid var(--primary-blue);
-      border-radius: 50%;
-      display: grid; place-items: center;
-      font-size: 0.7rem; color: var(--primary-blue);
-      box-shadow: 0 0 10px rgba(0,0,0,0.8);
-    }
+/* Stile per i titoli delle sezioni nel main (simile a Tech Tree track-label) */
+.track-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--primary-blue);
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-bottom: 15px;
+  margin-top: 10px;
+  border-bottom: 1px dashed rgba(134, 215, 255, 0.2);
+  padding-bottom: 5px;
+  display: inline-block;
+}
+
+/* Placeholder Messaggi */
+.status-msg { font-size: 0.75rem; color: var(--text-muted); font-style: italic;}
+
+/* Area Ricerca */
+.search-bar-container {
+  max-width: 300px; margin-bottom: 15px;
+  
+  .glass-searchbar {
+    --background: rgba(0,0,0,0.4); --color: #fff; --placeholder-color: rgba(255,255,255,0.5);
+    --icon-color: var(--primary-blue); --border-radius: 8px; border: 1px solid rgba(134, 215, 255, 0.2);
+    padding: 0;
   }
 }
 
-.locked { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
+/* Bottoni - Usiamo quelli globali primary-glow ma adattati */
+.primary-glow {
+  width: 100%; padding: 12px; background: rgba(134, 215, 255, 0.1);
+  border: 1px solid var(--primary-blue); color: #fff; border-radius: 6px;
+  font-weight: 800; letter-spacing: 1px; cursor: pointer; transition: 0.3s;
+  font-family: 'Inter', sans-serif; text-transform: uppercase; font-size: 0.75rem;
 
-/* 4. DETTAGLI POPUP */
-.node-details {
-  position: absolute;
-  bottom: 30px;
-  right: 30px;
-  width: 320px;
-  background: var(--glass-bg);
-  border: 1px solid var(--primary-blue);
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 15px 40px rgba(0,0,0,0.8), inset 0 0 15px rgba(134,215,255,0.1);
-  z-index: 20;
-  backdrop-filter: var(--panel-blur);
+  &:hover:not(:disabled) { background: var(--primary-blue); color: #000; box-shadow: 0 0 15px var(--primary-glow); }
+  &:disabled { opacity: 0.3; border-color: gray; cursor: not-allowed; }
 
-  .details-header h2 { font-size: 1rem; color: #fff; margin: 0 0 5px 0; text-transform: uppercase; }
-  .details-header p { font-size: 0.6rem; color: var(--primary-blue); margin: 0 0 15px 0; font-family: 'JetBrains Mono', monospace; }
-  
-  .requirement-item {
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; color: #fff;
-    margin-bottom: 15px; border-bottom: 1px dashed rgba(134, 215, 255, 0.2);
-    padding-bottom: 8px;
-    
-    label { color: var(--text-muted); font-size: 0.65rem; }
-  }
-  
-  .research-btn {
-    width: 100%; padding: 12px; background: rgba(134, 215, 255, 0.1);
-    border: 1px solid var(--primary-blue); color: #fff; border-radius: 6px;
-    font-weight: 800; letter-spacing: 1px; cursor: pointer; transition: 0.3s;
-    &:hover:not(:disabled) { background: var(--primary-blue); color: #000; box-shadow: 0 0 15px var(--primary-glow); }
-    &:disabled { opacity: 0.3; border-color: gray; cursor: not-allowed; }
-  }
+  &.slim { padding: 8px 12px; width: auto; font-size: 0.7rem;}
+}
+
+.ghost-button.mini {
+  background: transparent; border: 1px solid rgba(255, 123, 114, 0.3); color: var(--danger-red);
+  font-size: 0.7rem; padding: 7px 12px; border-radius: 6px; font-weight: 800;
+  &:hover { background: rgba(255, 123, 114, 0.1); border-color: var(--danger-red);}
 }

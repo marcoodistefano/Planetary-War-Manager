@@ -1,0 +1,119 @@
+<div class="diplomacy-modal-backdrop" (click)="closeModal()">
+  
+  <div class="diplomacy-frame" 
+       (click)="$event.stopPropagation()"
+       (mousedown)="onDragStart($event)"
+       [style.transform]="'translate(' + transformX + 'px, ' + transformY + 'px)'">
+    
+    <div class="diplomacy-sidebar">
+      
+      <div class="brand">
+        <span class="system-name">DIPLOMACY</span>
+        <span class="version">DIPLOMACY_OS V.1.0</span>
+      </div>
+      
+      <nav>
+        <div class="nav-item" [class.active]="activeTab === 'status'" (click)="activeTab = 'status'">
+          <ion-icon name="people-outline"></ion-icon><span>ALLEANZA</span>
+        </div>
+        <div class="nav-item" [class.active]="activeTab === 'treaties'" (click)="activeTab = 'treaties'">
+          <ion-icon name="shield-half-outline"></ion-icon><span>TRATTATI</span>
+        </div>
+        <div class="nav-item" [class.active]="activeTab === 'search'" (click)="activeTab = 'search'">
+          <ion-icon name="search-outline"></ion-icon><span>CERCA</span>
+        </div>
+        <div class="nav-item" [class.active]="activeTab === 'requests'" (click)="activeTab = 'requests'">
+          <ion-icon name="mail-unread-outline"></ion-icon><span>RICHIESTE</span>
+        </div>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <button class="exit-btn" (click)="closeModal()">[ CHIUDI ]</button>
+      </div>
+    </div>
+
+    <div class="diplomacy-main scrollable-y">
+         
+      <div class="tree-container">
+        
+        <ng-container *ngIf="activeTab === 'status'">
+          <div class="alliance-info-header">
+            <div class="alliance-emblem">🛡️</div>
+            <div class="alliance-meta">
+              <span class="alliance-name">{{ myAlliance.name }} [{{ myAlliance.tag }}]</span>
+              <span class="alliance-level">LIVELLO {{ myAlliance.level }}</span>
+            </div>
+          </div>
+
+          <div class="hud-separator"></div>
+
+          <p class="section-label">MEMBRI ONLINE</p>
+          <div class="sensor-grid">
+            <div class="sensor-row" *ngFor="let member of myAlliance.members">
+              <span [class.online-text]="member.status === 'online'">
+                <span class="status-dot-mini" [class.online]="member.status === 'online'"></span>
+                {{ member.name }}
+              </span>
+              <span class="sensor-val">{{ member.rank }}</span>
+            </div>
+          </div>
+          
+          <div class="hud-separator"></div>
+          
+          <p class="section-label">MEMBRI ATTIVI DI RECENTE</p>
+          <div class="build-card no-hover" style="border-left: 2px solid var(--gold-accent)">
+            <div class="build-info">
+              <span class="item-name">Ufficiale_Bravo</span>
+              <span class="item-tier">Ufficiale</span>
+            </div>
+            <div class="build-cost">
+              <span class="cost-unit">⏳ ULTIMA ATTIVITÀ: 2h fa</span>
+            </div>
+          </div>
+          
+          <div style="margin-top: 15px;">
+            <button class="primary-glow full-width">COMUNICAZIONE DI MASSA</button>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="activeTab === 'treaties'">
+          <p class="track-label">Patti Militari e Diplomatici</p>
+          <div class="build-card" *ngFor="let treaty of myAlliance.treaties">
+            <div class="build-info">
+              <span class="item-name">{{ treaty.partner }}</span>
+              <span class="item-tier" style="color: var(--gold-accent)">{{ treaty.type }}</span>
+            </div>
+            <div class="build-cost">
+              <span class="cost-unit">⏳ SCADENZA: {{ treaty.duration }}</span>
+            </div>
+          </div>
+          <p class="status-msg" style="margin-top: 20px;">Utilizza lo strumento 'Cerca' per contattare altri comandi e avviare protocolli diplomatici.</p>
+        </ng-container>
+
+        <ng-container *ngIf="activeTab === 'search'">
+          <p class="track-label">Cyber Surveillance - Database Fazioni</p>
+          <div class="search-bar-container">
+            <ion-searchbar class="glass-searchbar" placeholder="Cerca Tag o Nome Alleanza"></ion-searchbar>
+          </div>
+          <p class="status-msg">Inserisci le coordinate o il nome del comando alleato per inviare un protocollo di unione.</p>
+        </ng-container>
+
+        <ng-container *ngIf="activeTab === 'requests'">
+          <p class="track-label">Protocolli Diplomatici in Attesa</p>
+          <div class="build-card">
+            <div class="build-info">
+              <span class="item-name">Sven</span>
+              <span class="item-tier">Trattato di Non-Aggressione</span>
+            </div>
+            <div class="action-row" style="margin-top: 10px; display: flex; gap: 8px;">
+              <button class="primary-glow slim">ACCETTA</button>
+              <button class="ghost-button mini">RIFIUTA</button>
+            </div>
+          </div>
+        </ng-container>
+
+      </div>
+    </div>
+
+  </div>
+</div>
