@@ -42,6 +42,7 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - ./shared/assets:/app/src/assets
     networks:
       - pwm-net
 

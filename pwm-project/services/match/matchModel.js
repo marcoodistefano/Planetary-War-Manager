@@ -127,7 +127,7 @@ const generateMatchStructure = async (gameMode) => {
       struct: null,
     };
   }
-},
+}
 
   
   const join_Match = async (playerId, id_partita_hash) => {

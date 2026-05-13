@@ -76,14 +76,13 @@ ion-content {
   justify-content: center;
   align-items: stretch; 
   
-  /* AUMENTATO: Maggiore distanza tra il centro e i pannelli laterali */
-  gap: clamp(140px, 20vw, 600px); 
+  /* NUOVO: Gap proporzionale al motore 16:9 (Regola il 20 per la distanza) */
+  --gap-scale: 45;
+  gap: max(calc(var(--gap-scale) * 1vh), calc(var(--gap-scale) * 0.5625vw));
   
   flex: 1; 
   min-height: 0; 
-  
-  /* AUMENTATO: Spazio massimo più largo per accogliere il gap */
-  max-width: 1600px; 
+  max-width: 1800px; /* Aumentato leggermente per i monitor ultrawide */
   
   margin: 0 auto;
   padding: 1vh 2vw;
@@ -210,10 +209,18 @@ ion-content {
     
     .primary-button, .ghost-button { 
       width: auto; 
-      padding: 0 24px; 
-      min-height: 40px; 
+      
+      /* NUOVO: Dimensioni proporzionali (16:9) per i bottoni */
+      --btn-h-scale: 4.5;
+      --btn-px-scale: 2.5;
+      
+      min-height: max(calc(var(--btn-h-scale) * 1vh), calc(var(--btn-h-scale) * 0.5625vw));
+      padding: 0 max(calc(var(--btn-px-scale) * 1vh), calc(var(--btn-px-scale) * 0.5625vw));
+      
+      /* Font size dinamico ma con limiti rigidi per la leggibilità */
+      font-size: clamp(0.65rem, max(calc(0.08 * 1vh), calc(0.08 * 0.5625vw)), 0.9rem);
+      
       border-radius: 8px;
-      font-size: 0.75rem;
       font-weight: 700;
       letter-spacing: 0.05em;
       text-transform: uppercase;
@@ -256,14 +263,25 @@ ion-content {
    5. PANNELLI LATERALI & STRUTTURE CONTENITORI
    ========================================================================== */
 .left-column, .right-column {
-  flex: 0 0 290px; 
+  /* =========================================================
+     MOTORE DI TRACCIAMENTO SCALATURA PANNELLI (16:9)
+     Regola questi valori per calibrare le dimensioni base
+     ========================================================= */
+  --panel-w-scale: 30; /* Larghezza */
+  --panel-h-scale: 75; /* Altezza */
+
+  /* Larghezza Dinamica con limiti di sicurezza */
+  --dynamic-width: max(calc(var(--panel-w-scale) * 1vh), calc(var(--panel-w-scale) * 0.5625vw));
+  flex: 0 0 clamp(260px, var(--dynamic-width), 400px); 
+  
+  /* Altezza Dinamica con limiti di sicurezza */
+  --dynamic-height: max(calc(var(--panel-h-scale) * 1vh), calc(var(--panel-h-scale) * 0.5625vw));
+  height: clamp(60vh, var(--dynamic-height), 85vh);
+
   align-self: center; 
   display: flex;
   flex-direction: column;
   gap: 0; 
-  
-  /* MODIFICA: Altezza fissa invece di auto per forzare lo scroll interno */
-  height: 72vh; 
 }
 
 .panel {
@@ -293,9 +311,17 @@ ion-content {
 .inner-panel {
   background: rgba(1, 36, 46, 0.15) !important;
   border: 1px solid rgba(95, 208, 255, 0.2) !important;
-  padding: 12px;
+  
+  /* NUOVO: Padding proporzionale al motore 16:9 */
+  --pad-scale: 1.2;
+  padding: max(calc(var(--pad-scale) * 1vh), calc(var(--pad-scale) * 0.5625vw));
+  
   border-radius: 12px;
-  margin: 10px; 
+  
+  /* NUOVO: Margine dinamico */
+  --margin-scale: 1;
+  margin: max(calc(var(--margin-scale) * 1vh), calc(var(--margin-scale) * 0.5625vw)); 
+  
   box-shadow: none !important; 
   
   display: flex;
