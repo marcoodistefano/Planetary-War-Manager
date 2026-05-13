@@ -1,3 +1,29 @@
-<p>
-  intelligence-modal works!
-</p>
+<div class="tech-modal-backdrop" (click)="closeModal()">
+  <div class="tactical-modal-frame" (click)="$event.stopPropagation()">
+    
+    <div class="modal-header">
+      <div class="title-block compact">
+        <p class="eyebrow">Cyber Surveillance</p>
+        <h2>INTELLIGENCE ROOM</h2>
+      </div>
+      <ion-icon name="close-outline" class="close-icon" (click)="closeModal()"></ion-icon>
+    </div>
+
+    <div class="modal-content scrollable-y">
+      <div class="sensor-grid">
+        <div class="sensor-row"><span>RADAR:</span> <span class="sensor-val">SCANNING...</span></div>
+        <div class="sensor-row"><span>MINACCE:</span> <span class="sensor-val" style="color: #ff7b72;">2 RILEVATE</span></div>
+      </div>
+      
+      <div class="hud-separator"></div>
+      
+      <div class="intel-alert-card">
+        <div class="alert-info">
+          <span class="item-name">SPOSTAMENTO TRUPPE NEMICHE</span>
+          <span class="item-tier">SETTORE NORD-EST</span>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+</div>

@@ -1,0 +1,60 @@
+/* Sfondo scuro e blur */
+.tech-modal-backdrop {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);
+}
+
+/* Finestra Modale Olografica */
+.tactical-modal-frame {
+  width: 90vw; max-width: 400px;
+  background: rgba(7, 15, 28, 0.85);
+  border: 1px solid rgba(134, 215, 255, 0.25);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(134, 215, 255, 0.05);
+  backdrop-filter: blur(20px);
+  animation: popupFade 0.2s ease-out;
+
+  .modal-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 15px; border-bottom: 1px solid rgba(134, 215, 255, 0.2); padding-bottom: 10px;
+    
+    .title-block { margin: 0; }
+    .eyebrow { color: #86d7ff; font-size: 0.55rem; text-transform: uppercase; font-weight: 800; margin: 0 0 4px; }
+    h2 { font-size: 1rem; color: #fff; margin: 0; font-weight: 700; }
+  }
+
+  .close-icon {
+    font-size: 1.5rem; color: #86d7ff; cursor: pointer; transition: 0.2s;
+    &:hover { color: #ff7b72; transform: scale(1.1); }
+  }
+
+  /* Elementi Interni */
+  .sensor-grid {
+    display: flex; flex-direction: column; gap: 8px;
+    background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(134, 215, 255, 0.1);
+    padding: 12px; border-radius: 6px;
+    
+    .sensor-row {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;
+      span:first-child { color: #a0a0b0; font-weight: bold; }
+      .sensor-val { color: #86d7ff; font-weight: 800; }
+    }
+  }
+
+  .hud-separator { height: 1px; background: linear-gradient(90deg, transparent, #86d7ff, transparent); opacity: 0.3; margin: 15px 0; }
+  
+  .intel-alert-card {
+    background: rgba(255, 123, 114, 0.05); border-left: 2px solid #ff7b72;
+    padding: 10px; border-radius: 4px;
+    .item-name { font-size: 0.75rem; color: #fff; font-weight: bold; display: block;}
+    .item-tier { font-size: 0.6rem; color: #ff7b72; font-family: monospace;}
+  }
+}
+
+@keyframes popupFade {
+  from { opacity: 0; transform: translateY(-15px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}

@@ -1,7 +1,6 @@
 <ion-content [fullscreen]="true" class="transparent-bg" [scrollY]="false">
   
   <div class="hud-panel top-navbar">
-
     <div class="resource-bar">
       <div *ngFor="let res of resourceConfig" 
            class="res-item" 
@@ -42,19 +41,29 @@
 
   <div class="hud-stack-left">
     
+    <div class="tactical-actions-row secondary-actions">
+      <button class="nav-action-btn primary-glow" [class.active]="isArmyModalOpen" (click)="toggleArmyModal()">
+        <ion-icon name="shield-half-outline"></ion-icon>
+        <span>ESERCITO</span>
+      </button>
+      <button class="nav-action-btn primary-glow" [class.active]="isIntelligenceModalOpen" (click)="toggleIntelligenceModal()">
+        <ion-icon name="eye-outline"></ion-icon>
+        <span>INTELLIGENCE</span>
+      </button>
+    </div>
+
     <div class="tactical-actions-row">
       <button class="nav-action-btn primary-glow" [class.active]="isBuildPanelOpen" (click)="toggleBuildPanel()">
         <ion-icon name="construct-outline"></ion-icon>
         <span>COSTRUZIONI</span>
       </button>
-      <button class="nav-action-btn primary-glow" [class.active]="isTechModalOpen" (click)="openTechTree()">
+      <button class="nav-action-btn primary-glow" [class.active]="isAcademyModalOpen" (click)="toggleAcademyModal()">
         <ion-icon name="flask-outline"></ion-icon>
-        <span>RICERCA</span>
+        <span>ACCADEMIA</span>
       </button>
     </div>
 
     <div class="hud-panel combined-control">
-      
       <div class="panel-header" (click)="toggleMapSettings()">
         <div class="title-block compact">
           <p class="eyebrow">Visual Engine</p>
@@ -94,7 +103,6 @@
           </div>
         </div>
       </div>
-      
     </div>
   </div>
 
@@ -132,16 +140,12 @@
     </div>
   </div>
 
-  <app-tactical-terminal 
-    *ngIf="isProfileModalOpen" 
-    (close)="setOpenProfile(false)">
-  </app-tactical-terminal>
+  <app-tactical-terminal *ngIf="isProfileModalOpen" (close)="setOpenProfile(false)"></app-tactical-terminal>
+  
+  <app-academy-modal *ngIf="isAcademyModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isAcademyModalOpen = false"></app-academy-modal>
 
-  <app-tech-tree
-    *ngIf="isTechModalOpen"
-    [gameRules]="gameRules"
-    [playerResources]="playerResources"
-    (close)="isTechModalOpen = false">
-  </app-tech-tree>
+  <app-army-modal *ngIf="isArmyModalOpen" (close)="isArmyModalOpen = false"></app-army-modal>
+  
+  <app-intelligence-modal *ngIf="isIntelligenceModalOpen" (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
 
 </ion-content>

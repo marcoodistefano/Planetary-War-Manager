@@ -3,8 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { Router } from '@angular/router';
+
+// Componenti
 import { TacticalTerminalComponent } from './components/tactical-terminal/tactical-terminal.component';
-import { TechTreeComponent } from './components/tech-tree/tech-tree.component';
+import { AcademyModalComponent } from '../components/academy-modal/academy-modal.component';
+import { ArmyModalComponent } from '../components/army-modal/army-modal.component';
+import { IntelligenceModalComponent } from '../components/intelligence-modal/intelligence-modal.component';
 
 // Librerie esterne caricate via CDN o definite globalmente
 declare var maplibregl: any;
@@ -22,7 +26,9 @@ declare var THREE: any;
     CommonModule, 
     FormsModule, 
     TacticalTerminalComponent,
-    TechTreeComponent
+    AcademyModalComponent,
+    ArmyModalComponent,
+    IntelligenceModalComponent
   ]
 })
 export class MatchPage implements OnInit, AfterViewInit {
@@ -37,46 +43,34 @@ export class MatchPage implements OnInit, AfterViewInit {
 
   // --- 2. STATO DELL'INTERFACCIA (UI) ---
   isProfileModalOpen = false;
-  isBuildPanelOpen = false;
-  isTechModalOpen = false; 
   isMapSettingsOpen = false;
+  
+  // Gestione modali sovrapposte
+  isBuildPanelOpen = false;
+  isAcademyModalOpen = false; 
+  isArmyModalOpen = false;
+  isIntelligenceModalOpen = false;
+
   activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
-  activeTab: 'profile' | 'settings' = 'profile';
 
   // --- 3. DATI DI GIOCO E REGOLE ---
   gameRules: any = null;
 
   playerResources: any = {
-    denaro: 100000,
-    legno: 5000,
-    piombo: 2500,
-    acciaio: 3000,
-    mattoni: 4000,
-    petrolio: 1500,
-    gas_naturale: 1200,
-    uranio: 100,
-    oro: 50 
+    denaro: 100000, legno: 5000, piombo: 2500, acciaio: 3000, 
+    mattoni: 4000, petrolio: 1500, gas_naturale: 1200, uranio: 100, oro: 50 
   };
 
   userProfile = {
     username: 'Comandante_Alpha',
     rank: 'Generale di Brigata',
-    experience: 85,
-    matchesWon: 24,
-    matchesLost: 5
+    experience: 85, matchesWon: 24, matchesLost: 5
   };
 
   playerTroops: any = {
-    "Fante": 150,
-    "Veicolo Leggero": 20,
-    "Fanteria Speciale": 10,
-    "Carro Armato": 5,
-    "Caccia": 2,
-    "Missile Balistico": 1
+    "Fante": 150, "Veicolo Leggero": 20, "Fanteria Speciale": 10,
+    "Carro Armato": 5, "Caccia": 2, "Missile Balistico": 1
   };
-
-  audioSettings = { music: 75, sfx: 90 };
-  uiSettings = { showAdvancedLabels: true };
 
   // --- 4. CONFIGURAZIONI STATICHE ---
   resourceConfig = [
@@ -93,120 +87,76 @@ export class MatchPage implements OnInit, AfterViewInit {
   ];
 
   modelDB: any = {
-    land: [
-        { label: 'Soldato', path: 'land_troops/soldier.glb' },
-        { label: 'LMV', path: 'land_troops/lmv.glb' },
-        { label: 'Speciale', path: 'land_troops/special.glb' },
-        { label: 'APC', path: 'land_troops/apc.glb' },
-        { label: 'Artiglieria Semovente', path: 'land_troops/artiglieria_semovente.glb' },
-        { label: 'Carro Armato', path: 'land_troops/tank.glb' },
-        { label: 'SAM (Contraerea)', path: 'land_troops/SAM.glb' },
-        { label: 'Missile da Crociera', path: 'land_troops/missile_crociera.glb' },
-        { label: 'Missile Balistico 1', path: 'land_troops/missile_balis.glb' },
-        { label: 'Missile Balistico 2', path: 'land_troops/missile_balistico.glb' },
-        { label: 'ICBM', path: 'land_troops/icbm.glb' }
-    ],
-    sea: [
-        { label: 'Cacciatorpediniere', path: 'sea_troops/cacciatorpediniere.glb' },
-        { label: 'Corvetta', path: 'sea_troops/corvetta.glb' },
-        { label: 'Fregata', path: 'sea_troops/fregata.glb' },
-        { label: 'Nave Cargo', path: 'sea_troops/nave_cargo.glb' },
-        { label: 'Portaerei', path: 'sea_troops/porta_aerei.glb' },
-        { label: 'Sottomarino', path: 'sea_troops/sottomarino.glb' }
-    ],
-    air: [
-        { label: 'Aereo Cargo', path: 'air_troops/aereo_cargo.glb' },
-        { label: 'Bombardiere Stealth', path: 'air_troops/bombardiere_stealth.glb' },
-        { label: 'Bombardiere', path: 'air_troops/bombardiere.glb' },
-        { label: 'Caccia', path: 'air_troops/caccia.glb' },
-        { label: 'Drone', path: 'air_troops/drone.glb' },
-        { label: 'Elicottero', path: 'air_troops/elicottero.glb' }
-    ]
+    land: [ { label: 'Soldato', path: 'land_troops/soldier.glb' } ],
+    sea: [ { label: 'Cacciatorpediniere', path: 'sea_troops/cacciatorpediniere.glb' } ],
+    air: [ { label: 'Aereo Cargo', path: 'air_troops/aereo_cargo.glb' } ]
   };
 
   constructor(private router: Router, private cdr: ChangeDetectorRef) { }
 
-  // --- 5. CICLO DI VITA ANGULAR ---
-
   ngOnInit() {
     this.loadGameRules();
-    // Inizializzazione Socket per Sensor Feed
-    this.sensorSocket = io('http://localhost:3030', {
-        auth: { token: "IL_TUO_JWT_TOKEN" }
-    });
+    this.sensorSocket = io('http://localhost:3030', { auth: { token: "IL_TUO_JWT_TOKEN" } });
     this.sensorSocket.on('point_data', (data: any) => this.handlePointData(data));
   }
 
   ngAfterViewInit() {
     setTimeout(() => {
       this.initMap();
-      this.updateModelSelect();
       setTimeout(() => { if (this.map) this.map.resize(); }, 300);
     }, 150);
   }
 
-  // --- 6. AZIONI HUD E CONTROLLI UI ---
+  // --- AZIONI HUD E CONTROLLI UI ---
 
   toggleBuildPanel() {
     this.isBuildPanelOpen = !this.isBuildPanelOpen;
-    if (this.isBuildPanelOpen) this.isTechModalOpen = false;
+    if (this.isBuildPanelOpen) { this.isAcademyModalOpen = false; this.isArmyModalOpen = false; this.isIntelligenceModalOpen = false; }
   }
 
-  toggleMapSettings() {
-    this.isMapSettingsOpen = !this.isMapSettingsOpen;
+  toggleAcademyModal() {
+    this.isAcademyModalOpen = !this.isAcademyModalOpen;
+    if (this.isAcademyModalOpen) { this.isBuildPanelOpen = false; this.isArmyModalOpen = false; this.isIntelligenceModalOpen = false; }
   }
 
-  openTechTree() {
-    console.log("Accesso all'Accademia: Caricamento Albero Tecnologico...");
-    this.isTechModalOpen = !this.isTechModalOpen;
-    if (this.isTechModalOpen) this.isBuildPanelOpen = false;
+  toggleArmyModal() {
+    this.isArmyModalOpen = !this.isArmyModalOpen;
+    if (this.isArmyModalOpen) { this.isBuildPanelOpen = false; this.isAcademyModalOpen = false; this.isIntelligenceModalOpen = false; }
   }
 
-  setBuildCategory(cat: 'risorse' | 'armamenti') {
-    this.activeBuildCategory = cat;
+  toggleIntelligenceModal() {
+    this.isIntelligenceModalOpen = !this.isIntelligenceModalOpen;
+    if (this.isIntelligenceModalOpen) { this.isBuildPanelOpen = false; this.isAcademyModalOpen = false; this.isArmyModalOpen = false; }
   }
 
-  setOpenProfile(isOpen: boolean) {
-    this.isProfileModalOpen = isOpen;
-  }
+  toggleMapSettings() { this.isMapSettingsOpen = !this.isMapSettingsOpen; }
+  setBuildCategory(cat: 'risorse' | 'armamenti') { this.activeBuildCategory = cat; }
+  setOpenProfile(isOpen: boolean) { this.isProfileModalOpen = isOpen; }
 
-  // --- 7. LOGICA DELLE REGOLE (CDB) ---
+  // --- LOGICA DELLE REGOLE (CDB) ---
 
   async loadGameRules() {
     try {
         const response = await fetch('/assets/game_rules.json'); 
         if (response.ok) {
             this.gameRules = await response.json();
-            
-            // Forza Angular ad aggiornare l'interfaccia ora che i dati ci sono!
             this.cdr.detectChanges(); 
-            
-            console.log("Regole caricate con successo:", this.gameRules);
-        } else {
-            console.error("File CDB non trovato. Status:", response.status);
         }
-    } catch (err) {
-        console.error("Errore Intelligence: Regole non caricate", err);
-    }
+    } catch (err) { console.error("Errore Intelligence: Regole non caricate", err); }
   }
 
   getFilteredBuildItems() {
     if (!this.gameRules || !this.gameRules.sheets) return [];
-
     if (this.activeBuildCategory === 'risorse') {
-      // Estrae TUTTI gli estrattori dal CDB
       return this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
     } else {
-      // Estrae TUTTE le strutture Militari/Difesa/Logistica dal CDB
       return this.gameRules.sheets.find((s: any) => s.name === 'Strutture')?.lines || [];
     }
   }
 
-  startConstruction(item: any) {
-    console.log("Inizio costruzione di:", item.name || item.nome);
-  }
+  startConstruction(item: any) { console.log("Inizio costruzione di:", item.name || item.nome); }
 
-  // --- 8. LOGICA MAPPA E SENSORI ---
+  // --- LOGICA MAPPA E SENSORI ---
 
   initMap() {
     this.map = new maplibregl.Map({
@@ -228,7 +178,6 @@ export class MatchPage implements OnInit, AfterViewInit {
     });
 
     this.map.on('load', () => {
-        // Aggiunta sorgenti terreno e curve di livello
         this.map.addSource('terrain-source', { type: 'raster-dem', url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${this.MAPTILER_KEY}`, tileSize: 256 });
         this.map.setTerrain({ source: 'terrain-source', exaggeration: 1.2 });
         this.map.addSource('contours', { type: 'vector', url: `https://api.maptiler.com/tiles/contours-v2/tiles.json?key=${this.MAPTILER_KEY}` });
@@ -241,7 +190,6 @@ export class MatchPage implements OnInit, AfterViewInit {
 
         this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3.5);
         this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
-        this.setupThreeJSLayer();
     });
 
     this.map.on('mousemove', (e: any) => this.handleMapMouseMove(e));
@@ -293,55 +241,9 @@ export class MatchPage implements OnInit, AfterViewInit {
   }
 
   handlePointData(data: any) {
-    if (!this.gameRules || !this.gameRules.sheets) return;
     const alt = Math.floor(data.altitude);
     const outAlt = document.getElementById('out-alt');
     if(outAlt) outAlt.innerText = `${alt} M`;
-
-    const terreniSheet = this.gameRules.sheets.find((s: any) => s.name === "Terreni")?.lines;
-    if (!terreniSheet) return;
-
-    let terrainInfo = null;
-    if ((data.biomeId === 17 || data.biomeId === 0 || data.biomeId === 255) && alt < 0) {
-        terrainInfo = terreniSheet.find((t: any) => t.id_terreno === 'ocean_deep');
-    } else if (data.biomeId >= 1 && data.biomeId <= 17) {
-        terrainInfo = terreniSheet[data.biomeId - 1];
-    }
-
-    const outType = document.getElementById('out-type');
-    const outResCom = document.getElementById('out-res-com');
-    const outResRare = document.getElementById('out-res-rare');
-    
-    if (terrainInfo && outType && outResCom && outResRare) {
-        outType.innerText = terrainInfo.nome.toUpperCase();
-        const tid = terrainInfo.id_terreno;
-        // Colorazione dinamica basata sul bioma
-        if (tid === 'urban') outType.style.color = "#f87171";
-        else if (tid.includes('forest')) outType.style.color = "#34d399";
-        else if (tid === 'ocean_deep') outType.style.color = "#60a5fa";
-        else if (tid === 'snow_ice') outType.style.color = "#ffffff";
-        else outType.style.color = "#fde047";
-
-        outResCom.innerText = terrainInfo.risorsa_comune ? terrainInfo.risorsa_comune.replace('_', ' ').toUpperCase() : "NESSUNA";
-        outResRare.innerText = terrainInfo.risorsa_rara ? terrainInfo.risorsa_rara.replace('_', ' ').toUpperCase() : "NESSUNA";
-    }
-  }
-
-  // --- 9. HELPERS E METODI PRIVATI ---
-
-  updateModelSelect() {
-    const domainSelect = document.getElementById('spawn-domain') as HTMLSelectElement;
-    const modelSelect = document.getElementById('spawn-model') as HTMLSelectElement;
-    if(!domainSelect || !modelSelect) return;
-    
-    const domain = domainSelect.value;
-    modelSelect.innerHTML = '';
-    this.modelDB[domain].forEach((model: any) => {
-        const opt = document.createElement('option');
-        opt.value = model.path;
-        opt.innerText = model.label;
-        modelSelect.appendChild(opt);
-    });
   }
 
   loadTopoJsonLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
@@ -362,10 +264,6 @@ export class MatchPage implements OnInit, AfterViewInit {
     });
   }
 
-  setupThreeJSLayer() {
-      // Logica Three.js per unità 3D
-  }
-
   changeBasemap(event: any) {
     const selected = event.target.value;
     ['esri-sat', 'maptiler-hybrid', 'carto-light'].forEach(id => {
@@ -377,15 +275,12 @@ export class MatchPage implements OnInit, AfterViewInit {
     if (type === 'contours') {
         const ids = ['contour-lines'];
         const vis = this.map.getLayoutProperty(ids[0], 'visibility');
-        const nextVis = (vis === 'visible' ? 'none' : 'visible');
-        ids.forEach(id => this.map.setLayoutProperty(id, 'visibility', nextVis));
+        this.map.setLayoutProperty(ids[0], 'visibility', vis === 'visible' ? 'none' : 'visible');
     }
   }
 
   switchGlobe() {
     this.isGlobe = !this.isGlobe;
     this.map.setProjection({ type: this.isGlobe ? 'globe' : 'mercator' });
-    const btn = document.getElementById('toggle-btn');
-    if(btn) btn.innerText = this.isGlobe ? "SWITCH TO 2D MAP" : "SWITCH TO 3D GLOBE";
   }
 }
