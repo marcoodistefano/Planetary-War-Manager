@@ -25,6 +25,9 @@
         <div class="nav-item" [class.active]="activeBranch === 'logistics'" (click)="setBranch('logistics')">
           <ion-icon name="construct-outline"></ion-icon><span>INFRASTRUTTURE</span>
         </div>
+        <div class="nav-item" [class.active]="activeBranch === 'tutti'" (click)="setBranch('tutti')">
+          <ion-icon name="list-outline"></ion-icon><span>TUTTI</span>
+        </div>
       </nav>
       
       <div class="sidebar-footer">

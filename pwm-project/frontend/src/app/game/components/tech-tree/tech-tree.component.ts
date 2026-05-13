@@ -162,6 +162,56 @@ export class TechTreeComponent implements OnInit {
       });
     }
 
+    if (this.activeBranch === 'tutti') {
+
+      const steps = this.gameRules.sheets.find((s: any) => s.name === 'Strutture').lines
+                    .filter((l: any) => l.id_struttura.includes('fortezza'))
+                    .sort((a: any, b: any) => a.tier - b.tier);
+      tracks.push({ name: 'CENTRO DI COMANDO', steps });
+
+      const allExtractors = this.gameRules.sheets.find((s: any) => s.name === 'Estrattori').lines;
+      const resourceTypes = ['legno', 'piombo', 'mattoni', 'acciaio', 'petrolio', 'gas_naturale'];
+      
+      resourceTypes.forEach(res => {
+        const steps = allExtractors.filter((ex: any) => ex.risorsa_estratta === res).sort((a: any, b: any) => a.tier - b.tier);
+        if(steps.length > 0) tracks.push({ name: 'INDUSTRIA: ' + res.toUpperCase(), steps });
+      });
+
+      const allStr = this.gameRules.sheets.find((s: any) => s.name === 'Strutture').lines;
+      
+      tracks.push({ 
+        name: 'FORZE TERRESTRI', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('caserma')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+      
+      tracks.push({ 
+        name: 'OPERAZIONI NAVALI', 
+        // Usando startsWith, 'aeroporto' viene ignorato!
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('porto')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+      
+      tracks.push({ 
+        name: 'SUPREMAZIA AEROSPAZIALE', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('aeroporto')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+
+      // Filtriamo per ferrovie, strade o centri logistici
+      tracks.push({ 
+        name: 'RETE DI TRASPORTO STRADALE', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('strada')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+      
+      tracks.push({ 
+        name: 'RETE FERROVIARIA', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('ferrovia')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+
+      tracks.push({ 
+        name: 'HANGAR', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('hangar')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+    }
+
     return tracks;
   }
 
