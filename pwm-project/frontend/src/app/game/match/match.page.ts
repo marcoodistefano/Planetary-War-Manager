@@ -9,6 +9,7 @@ import { TacticalTerminalComponent } from './components/tactical-terminal/tactic
 import { AcademyModalComponent } from '../components/academy-modal/academy-modal.component';
 import { ArmyModalComponent } from '../components/army-modal/army-modal.component';
 import { IntelligenceModalComponent } from '../components/intelligence-modal/intelligence-modal.component';
+import { InGameChatComponent } from '../components/in-game-chat/in-game-chat.component';
 
 // Librerie esterne caricate via CDN o definite globalmente
 declare var maplibregl: any;
@@ -28,7 +29,8 @@ declare var THREE: any;
     TacticalTerminalComponent,
     AcademyModalComponent,
     ArmyModalComponent,
-    IntelligenceModalComponent
+    IntelligenceModalComponent,
+    InGameChatComponent
   ]
 })
 export class MatchPage implements OnInit, AfterViewInit {
@@ -50,6 +52,7 @@ export class MatchPage implements OnInit, AfterViewInit {
   isAcademyModalOpen = false; 
   isArmyModalOpen = false;
   isIntelligenceModalOpen = false;
+  isChatOpen = false;
 
   activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
 
@@ -108,6 +111,10 @@ export class MatchPage implements OnInit, AfterViewInit {
   }
 
   // --- AZIONI HUD E CONTROLLI UI ---
+
+  toggleChat() {
+    this.isChatOpen = !this.isChatOpen;
+  }
 
   toggleBuildPanel() {
     this.isBuildPanelOpen = !this.isBuildPanelOpen;

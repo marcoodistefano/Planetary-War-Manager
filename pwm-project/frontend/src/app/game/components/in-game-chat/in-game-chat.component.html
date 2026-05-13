@@ -1,0 +1,59 @@
+<div class="chat-tactical-frame" (click)="$event.stopPropagation()">
+  
+  <div class="chat-header">
+    <div class="title-block compact">
+      <p class="eyebrow">Rete di Comunicazione</p>
+      <h2>COMMS LINK</h2>
+    </div>
+    <ion-icon name="close-outline" class="close-icon" (click)="closeChat()"></ion-icon>
+  </div>
+
+  <div class="chat-messages scrollable-y" #chatScroll>
+    <div class="message-entry" 
+         *ngFor="let msg of messages" 
+         [class.private]="msg.isPrivate"
+         [class.system]="msg.sender === 'Sistema'">
+      
+      <span class="msg-time">[{{ msg.timestamp | date:'HH:mm' }}]</span>
+      
+      <span class="msg-sender" *ngIf="!msg.isPrivate" (click)="replyTo(msg.sender)">
+        {{ msg.sender }}:
+      </span>
+      
+      <span class="msg-sender private" *ngIf="msg.isPrivate && msg.sender !== currentUser" (click)="replyTo(msg.sender)">
+        [Da {{ msg.sender }}]:
+      </span>
+      
+      <span class="msg-sender private" *ngIf="msg.isPrivate && msg.sender === currentUser">
+        [A {{ msg.to }}]:
+      </span>
+
+      <span class="msg-text">{{ msg.text }}</span>
+    </div>
+  </div>
+  
+  <div class="hud-separator"></div>
+
+  <div class="chat-input-area">
+    <div class="glass-select-container slim">
+      <select class="tactical-select" [(ngModel)]="recipient">
+        <option value="ALL">🌐 GLOBALE</option>
+        <optgroup label="GIOCATORI">
+          <option *ngFor="let p of playersInMatch" [value]="p">👤 {{ p }}</option>
+        </optgroup>
+      </select>
+    </div>
+    
+    <div class="input-row">
+      <input type="text" 
+             class="tactical-input" 
+             [(ngModel)]="newMessage" 
+             (keyup.enter)="sendMessage()" 
+             placeholder="Trasmetti messaggio..." />
+      <button class="send-btn primary-glow" (click)="sendMessage()">
+        <ion-icon name="send"></ion-icon>
+      </button>
+    </div>
+  </div>
+
+</div>
