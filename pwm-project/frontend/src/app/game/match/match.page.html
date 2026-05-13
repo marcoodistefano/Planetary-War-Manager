@@ -1,16 +1,6 @@
 <ion-content [fullscreen]="true" class="transparent-bg" [scrollY]="false">
   
   <div class="hud-panel top-navbar">
-    <div class="nav-group-left">
-      <button class="nav-action-btn mini" [class.active]="isBuildPanelOpen" (click)="toggleBuildPanel()">
-        <ion-icon name="construct-outline"></ion-icon>
-        <span>COSTRUZIONI</span>
-      </button>
-      <button class="nav-action-btn mini" [class.active]="isTechModalOpen" (click)="openTechTree()">
-        <ion-icon name="flask-outline"></ion-icon>
-        <span>RICERCA</span>
-      </button>
-    </div>
 
     <div class="resource-bar">
       <div *ngFor="let res of resourceConfig" 
@@ -51,6 +41,18 @@
   <div id="map-container"></div>
 
   <div class="hud-stack-left">
+    
+    <div class="tactical-actions-row">
+      <button class="nav-action-btn primary-glow" [class.active]="isBuildPanelOpen" (click)="toggleBuildPanel()">
+        <ion-icon name="construct-outline"></ion-icon>
+        <span>COSTRUZIONI</span>
+      </button>
+      <button class="nav-action-btn primary-glow" [class.active]="isTechModalOpen" (click)="openTechTree()">
+        <ion-icon name="flask-outline"></ion-icon>
+        <span>RICERCA</span>
+      </button>
+    </div>
+
     <div class="hud-panel combined-control">
       
       <div class="panel-header" (click)="toggleMapSettings()">

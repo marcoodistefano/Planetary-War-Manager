@@ -48,20 +48,34 @@
 }
 
 /* ==========================================================================
-   3. TOP NAVBAR (60px - COMPACT HUD)
+   3. TOP NAVBAR (ALTEZZA OLOGRAFICA, LARGHEZZA FLUIDA)
    ========================================================================== */
 .top-navbar {
   position: absolute;
-  top: 15px; left: 50%;
+  
+  /* Margine superiore proporzionato al motore 16:9 */
+  --nav-top-scale: 2;
+  top: max(calc(var(--nav-top-scale) * 1vh), calc(var(--nav-top-scale) * 0.5625vw));
+  
+  left: 50%;
   transform: translateX(-50%);
-  width: 96%;
-  height: 60px;
+  
+  /* CRITICO: La larghezza torna ad essere percentuale per far respirare il testo */
+  width: 98%; 
+  max-width: 1800px; 
+  
+  /* L'altezza continua a scalare in proporzione, dando l'effetto olografico */
+  --nav-h-scale: 6.5;
+  height: clamp(55px, max(calc(var(--nav-h-scale) * 1vh), calc(var(--nav-h-scale) * 0.5625vw)), 80px);
+  
   z-index: 1000;
   
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  
+  --nav-px-scale: 2;
+  padding: 0 clamp(10px, max(calc(var(--nav-px-scale) * 1vh), calc(var(--nav-px-scale) * 0.5625vw)), 20px);
   
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -76,8 +90,30 @@
     height: 100%;
   }
 
-  .nav-group-left { gap: 10px; }
-  .resource-bar { flex: 1; justify-content: center; gap: 8px; }
+  /* CRITICO: Impedisce che Costruzioni/Ricerca e il Profilo vengano spinti fuori o schiacciati */
+  .nav-group-left, .profile-section {
+    flex-shrink: 0;
+  }
+
+  .nav-group-left { 
+    gap: 15px; 
+  }
+  
+  /* CRITICO: Gestisce le risorse in eccesso limitandole allo spazio disponibile */
+  .resource-bar { 
+    flex: 1 1 auto; 
+    min-width: 0; 
+    justify-content: flex-start; /* MODIFICATO: Allinea le risorse a sinistra */
+    gap: 12px; /* Leggermente aumentato per farle respirare */
+    
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none; 
+    
+    &::-webkit-scrollbar {
+      display: none; 
+    }
+  }
 }
 
 /* --- RISORSE --- */
@@ -170,6 +206,25 @@
 
 .hud-stack-left { left: 20px; width: 320px; }
 .hud-stack-right { right: 20px; width: 280px; }
+
+.tactical-actions-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 15px; /* Crea distanza tra i bottoni e il pannello Map Settings sottostante */
+  pointer-events: auto; /* Permette il click */
+
+  button {
+    flex: 1; /* I pulsanti si dividono equamente lo spazio */
+    margin-top: 0; /* Sovrascrive il margine di default della classe primary-glow */
+    padding: 14px 5px; /* Più spessi e facili da cliccare */
+    font-size: 0.75rem;
+    
+    /* Effetto per farli sembrare veri tasti del cruscotto */
+    background: rgba(7, 15, 28, 0.85);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+  }
+}
 
 
 /* --- 5.1 STILI SPECIFICI VISUAL ENGINE & SENSORI (Aggiunti per coerenza) --- */
