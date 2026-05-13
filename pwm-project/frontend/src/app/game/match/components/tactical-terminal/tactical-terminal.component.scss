@@ -20,17 +20,16 @@
   /* Effects */
   --glass-blur: blur(25px) saturate(150%);
   --panel-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
-  position: absolute; /* o fixed */
   top: 0;
-  left: 0;
   width: 100%;
   height: 100%;
-  z-index: 9999; /* DEVE essere più alto della top-navbar (1000) e della mappa */
+  z-index: 50; /* DEVE essere più alto della top-navbar (1000) e della mappa */
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.5); /* Sfondo scuro semi-trasparente */
   backdrop-filter: blur(5px);
+  pointer-events: auto;
 }
 
 /* 1. MAIN FRAME & LAYOUT

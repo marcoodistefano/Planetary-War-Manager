@@ -1,6 +1,8 @@
 <ion-content [fullscreen]="true" class="transparent-bg" [scrollY]="false">
   
   <div class="hud-panel top-navbar">
+    <div class="nav-group-left"></div>
+
     <div class="resource-bar">
       <div *ngFor="let res of resourceConfig" 
            class="res-item" 
@@ -41,6 +43,36 @@
 
   <div class="hud-stack-left">
     
+    <div class="hud-panel build-panel" *ngIf="isBuildPanelOpen" style="margin-bottom: 12px;">
+      <div class="title-block compact">
+        <p class="eyebrow">Ingegneria di Campo</p>
+        <h2>COSTRUZIONE</h2>
+      </div>
+
+      <div class="category-toggle">
+        <button [class.active]="activeBuildCategory === 'risorse'" (click)="setBuildCategory('risorse')">RISORSE</button>
+        <button [class.active]="activeBuildCategory === 'armamenti'" (click)="setBuildCategory('armamenti')">ARMAMENTI</button>
+      </div>
+
+      <div class="hud-separator"></div>
+
+      <div class="build-grid scrollable-y">
+        <div *ngFor="let item of getFilteredBuildItems()" class="build-card" (click)="startConstruction(item)">
+          <div class="build-info">
+            <span class="item-name">{{ item.name || item.nome }}</span>
+            <span class="item-tier">TIER {{ item.tier }}</span>
+          </div>
+          <div class="build-cost">
+            <span class="cost-unit" *ngIf="item.costo_denaro > 0">💵 {{ item.costo_denaro | number }}</span>
+            <span class="cost-unit" *ngIf="item.costo_legno > 0">🪵 {{ item.costo_legno | number }}</span>
+            <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio | number }}</span>
+            <span class="cost-unit" *ngIf="item.costo_petrolio > 0">🛢️ {{ item.costo_petrolio | number }}</span>
+            <span class="cost-unit" *ngIf="item.costo_piombo > 0 || item.costo_piombio > 0">🔘 {{ (item.costo_piombo || item.costo_piombio) | number }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="tactical-actions-row secondary-actions">
       <button class="nav-action-btn primary-glow" [class.active]="isDiplomacyModalOpen" (click)="toggleDiplomacyModal()">
         <ion-icon name="shield-half-outline"></ion-icon>
@@ -71,90 +103,29 @@
         </div>
         <ion-icon [name]="isMapSettingsOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
       </div>
-
-      <div class="panel-content" *ngIf="isMapSettingsOpen">
-        <div class="hud-sub-section">
-          <div class="glass-select-container">
-            <select id="basemap-select" class="tactical-select" (change)="changeBasemap($event)">
-              <option value="esri-sat">🛰️ ESRI SATELLITE</option>
-              <option value="maptiler-hybrid">🌍 MAPTILER HYBRID</option>
-              <option value="carto-light">🛡️ CARTO STEALTH</option>
-            </select>
-          </div>
-
-          <div class="action-dock mini-grid">
-            <button class="ghost-button mini" (click)="toggleLayer('contours')">CONTOURS</button>
-            <button class="ghost-button mini" (click)="switchGlobe()">3D GLOBE</button>
-          </div>
-        </div>
-
-        <div class="hud-separator"></div>
-
-        <div class="hud-sub-section">
-          <div class="title-block compact">
-            <p class="eyebrow">Intelligence</p>
-            <h2>SENSOR FEED</h2>
-          </div>
-          <div class="sensor-grid">
-            <div class="sensor-row"><span>TER:</span><span class="sensor-val">{{ currentHoveredName || '--' }}</span></div>
-            <div class="sensor-row"><span>POS:</span> <span id="out-coords" class="sensor-val">--</span></div>
-            <div class="sensor-row"><span>ALT:</span> <span id="out-alt" class="sensor-val">--</span></div>
-            <div class="sensor-row"><span>COM:</span> <span id="out-res-com" class="sensor-val res-glow">--</span></div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
   <div class="hud-stack-right">
-    
-    <div class="hud-panel build-panel" *ngIf="isBuildPanelOpen" style="margin-bottom: 15px;">
-      <div class="title-block compact">
-        <p class="eyebrow">Ingegneria di Campo</p>
-        <h2>COSTRUZIONE</h2>
-      </div>
 
-      <div class="category-toggle">
-        <button [class.active]="activeBuildCategory === 'risorse'" (click)="setBuildCategory('risorse')">RISORSE</button>
-        <button [class.active]="activeBuildCategory === 'armamenti'" (click)="setBuildCategory('armamenti')">ARMAMENTI</button>
-      </div>
-
-      <div class="hud-separator"></div>
-
-      <div class="build-grid scrollable-y">
-        <div *ngFor="let item of getFilteredBuildItems()" class="build-card" (click)="startConstruction(item)">
-          <div class="build-info">
-            <span class="item-name">{{ item.name || item.nome }}</span>
-            <span class="item-tier">TIER {{ item.tier }}</span>
-          </div>
-          
-          <div class="build-cost">
-            <span class="cost-unit" *ngIf="item.costo_denaro > 0">💵 {{ item.costo_denaro | number }}</span>
-            <span class="cost-unit" *ngIf="item.costo_legno > 0">🪵 {{ item.costo_legno | number }}</span>
-            <span class="cost-unit" *ngIf="item.costo_mattoni > 0">🧱 {{ item.costo_mattoni | number }}</span>
-            <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio | number }}</span>
-            <span class="cost-unit" *ngIf="item.costo_petrolio > 0">🛢️ {{ item.costo_petrolio | number }}</span>
-            <span class="cost-unit" *ngIf="item.costo_piombo > 0 || item.costo_piombio > 0">🔘 {{ (item.costo_piombo || item.costo_piombio) | number }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <div class="hud-chat-panel" *ngIf="isChatOpen">
+    <app-in-game-chat (close)="toggleChat()"></app-in-game-chat>
+  </div>
 
     <div class="tactical-actions-row" style="margin-bottom: 0;">
-        <button class="nav-action-btn primary-glow" [class.active]="isChatOpen" (click)="toggleChat()">
-          <ion-icon name="chatbubbles-outline"></ion-icon>
-          <span>COMUNICAZIONI</span>
-        </button>
+      <button class="nav-action-btn primary-glow" [class.active]="isChatOpen" (click)="toggleChat()">
+        <ion-icon name="chatbubbles-outline"></ion-icon>
+        <span>COMUNICAZIONI</span>
+      </button>
     </div>
+  </div>
 
-  </div> <app-tactical-terminal *ngIf="isProfileModalOpen" (close)="setOpenProfile(false)"></app-tactical-terminal>
+  <app-tactical-terminal *ngIf="isProfileModalOpen" (close)="setOpenProfile(false)"></app-tactical-terminal>
   
   <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>
 
   <app-diplomacy-modal *ngIf="isDiplomacyModalOpen" (close)="isDiplomacyModalOpen = false"></app-diplomacy-modal>
   
   <app-intelligence-modal *ngIf="isIntelligenceModalOpen" (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
-
-  <app-in-game-chat *ngIf="isChatOpen" (close)="toggleChat()"></app-in-game-chat>
 
 </ion-content>

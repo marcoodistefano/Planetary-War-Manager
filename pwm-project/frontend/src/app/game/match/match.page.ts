@@ -77,14 +77,14 @@ export class MatchPage implements OnInit, AfterViewInit {
 
   // --- 4. CONFIGURAZIONI STATICHE ---
   resourceConfig = [
-    { id: 'denaro', icon: '💵', label: 'DEN' },
-    { id: 'legno', icon: '🪵', label: 'LEG' },
-    { id: 'piombo', icon: '🔘', label: 'PIO' },
-    { id: 'acciaio', icon: '🏗️', label: 'ACC' },
-    { id: 'mattoni', icon: '🧱', label: 'MAT' },
-    { id: 'petrolio', icon: '🛢️', label: 'PET' },
-    { id: 'gas_naturale', icon: '🔥', label: 'GAS' },
-    { id: 'uranio', icon: '☢️', label: 'URA' },
+    { id: 'denaro', icon: '💵', label: 'DENARO' },
+    { id: 'legno', icon: '🪵', label: 'LEGNO' },
+    { id: 'piombo', icon: '🔘', label: 'PIOMBO' },
+    { id: 'acciaio', icon: '🏗️', label: 'ACCIAIO' },
+    { id: 'mattoni', icon: '🧱', label: 'MATTONI' },
+    { id: 'petrolio', icon: '🛢️', label: 'PETROLIO' },
+    { id: 'gas_naturale', icon: '🔥', label: 'GAS NATURALE' },
+    { id: 'uranio', icon: '☢️', label: 'URANIO' },
     { id: 'truppe', icon: '👥', label: 'UNITÀ', isTrigger: true },
     { id: 'oro', icon: '🪙', label: 'ORO' }
   ];

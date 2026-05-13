@@ -18,10 +18,12 @@
   --text-muted: #a0a0b0;
   --text-accent: #b6cee9;
 
+  --unit: max(1vh, 0.5625vw);
+
   display: block;
   width: 100%;
   height: 100%;
-  font-family: 'Inter', 'JetBrains Mono', sans-serif;
+  font-family: 'Inter', sans-serif;
 }
 
 .transparent-bg { --background: #000 !important; }
@@ -54,8 +56,7 @@
   position: absolute;
   
   /* Margine superiore proporzionato al motore 16:9 */
-  --nav-top-scale: 2;
-  top: max(calc(var(--nav-top-scale) * 1vh), calc(var(--nav-top-scale) * 0.5625vw));
+  top: calc(2 * var(--unit));
   
   left: 50%;
   transform: translateX(-50%);
@@ -65,8 +66,8 @@
   max-width: 1800px; 
   
   /* L'altezza continua a scalare in proporzione, dando l'effetto olografico */
-  --nav-h-scale: 6.5;
-  height: clamp(55px, max(calc(var(--nav-h-scale) * 1vh), calc(var(--nav-h-scale) * 0.5625vw)), 80px);
+  height: calc(5 * var(--unit));
+  min-height: 60px;
   
   z-index: 1000;
   
@@ -75,7 +76,7 @@
   justify-content: space-between;
   
   --nav-px-scale: 2;
-  padding: 0 clamp(10px, max(calc(var(--nav-px-scale) * 1vh), calc(var(--nav-px-scale) * 0.5625vw)), 20px);
+  padding: 0 calc(2 * var(--unit));
   
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -101,18 +102,25 @@
   
   /* CRITICO: Gestisce le risorse in eccesso limitandole allo spazio disponibile */
   .resource-bar { 
-    flex: 1 1 auto; 
+    flex: 2; 
+    display: flex;
+    align-items: center;
     min-width: 0; 
-    justify-content: flex-start; /* MODIFICATO: Allinea le risorse a sinistra */
-    gap: 12px; /* Leggermente aumentato per farle respirare */
+    justify-content: center; /* MODIFICATO: Allinea le risorse a sinistra */
+    gap: calc(1.2 * var(--unit)); /* Leggermente aumentato per farle respirare */
     
-    overflow-x: auto;
-    overflow-y: visible;
+    overflow: visible; 
+    min-width: 0;
+
     scrollbar-width: none; 
     
     &::-webkit-scrollbar {
       display: none; 
     }
+  }
+  /* Allinea il profilo a destra */
+  .profile-section {
+    justify-content: flex-end;
   }
 }
 
@@ -121,14 +129,23 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
+  gap: calc(1 * var(--unit));
+  padding: calc(0.6 * var(--unit)) calc(1.5 * var(--unit));
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(134, 215, 255, 0.08);
-  border-radius: 6px;
+  border-radius: calc(0.8 * var(--unit));
 
-  .res-label { font-size: 0.5rem; color: var(--primary-blue); font-weight: 800; letter-spacing: 1px; }
-  .res-val { font-size: 0.9rem; color: #fff; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .res-data {
+    display: flex;
+    flex-direction: column; // Forza la disposizione verticale (Label sopra, Val sotto)
+    justify-content: center;
+    align-items: flex-start; // Allinea il testo a sinistra (accanto all'icona)
+    line-height: 1.1; // Riduce lo spazio tra le due righe di testo
+  }
+
+  .res-label { font-size: calc(0.75 * var(--unit));letter-spacing: 0.8px; color: var(--primary-blue); font-weight: 800}
+  .res-val { font-size: calc(1.25 * var(--unit)); color: #fff; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .res-icon { font-size: calc(1.6 * var(--unit)); }
 
   &.premium .res-val { color: var(--gold-accent); }
   &.trigger-item:hover .troops-dropdown { display: block; animation: popupFade 0.2s ease-out; }
@@ -138,24 +155,24 @@
 .troops-dropdown {
   display: none;
   position: absolute;
-  top: calc(100% + 12px);
+  top: 100%;
+  width: calc(22 * var(--unit)); 
+  padding: calc(1.2 * var(--unit));
   left: 50%;
   transform: translateX(-50%);
-  width: 220px;
   background: rgba(7, 15, 28, 0.95);
   border: 1px solid var(--primary-blue);
   backdrop-filter: blur(20px);
   border-radius: 8px;
-  padding: 12px;
   box-shadow: 0 15px 40px rgba(0,0,0,0.8);
-  z-index: 2000;
+  z-index: 9999;
 
   .dropdown-header {
-    font-size: 0.6rem; color: var(--primary-blue); font-weight: 900;
+    font-size: calc(0.8 * var(--unit)); color: var(--primary-blue); font-weight: 900;
     margin-bottom: 8px; border-bottom: 1px solid rgba(134, 215, 255, 0.2); padding-bottom: 4px;
   }
   .troop-entry {
-    display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 4px;
+    display: flex; justify-content: space-between; font-size: calc(1.2 * var(--unit)); margin-bottom: 4px;
     .t-key { color: var(--text-muted); }
     .t-val { color: #fff; font-weight: bold; }
   }
@@ -169,15 +186,17 @@
   align-items: center;
   gap: 12px;
   cursor: pointer;
+  gap: calc(1.5 * var(--unit));
 
   .profile-info {
     text-align: right;
-    .p-rank { font-size: 0.55rem; color: var(--primary-blue); font-weight: 900; display: block; margin-bottom: -2px; }
-    .p-name { font-size: 0.9rem; color: #fff; font-weight: 700; text-transform: uppercase; }
+    .p-rank { font-size: calc(0.8 * var(--unit));; color: var(--primary-blue); font-weight: 900; display: block; margin-bottom: -2px; }
+    .p-name { font-size: calc(1.2 * var(--unit)); color: #fff; font-weight: 700; text-transform: uppercase; }
   }
 
   .profile-avatar-circle {
-    width: 40px; height: 40px;
+    width: calc(4.5 * var(--unit)); 
+    height: calc(4.5 * var(--unit));
     border-radius: 50%;
     border: 2px solid var(--primary-blue);
     background: rgba(134, 215, 255, 0.15);
@@ -192,20 +211,40 @@
    5. HUD LATERALE E PANNELLI
    ========================================================================== */
 .hud-stack-left, .hud-stack-right {
-  position: absolute; bottom: 40px; z-index: 20; pointer-events: none;
+  position: absolute; bottom: calc(4 * var(--unit)); z-index: 20; pointer-events: none;
   .hud-panel {
     pointer-events: auto;
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
-    padding: 15px;
+    padding: calc(1.5 * var(--unit));
     backdrop-filter: var(--panel-blur);
     box-shadow: 0 10px 30px rgba(0,0,0,0.4);
   }
 }
 
-.hud-stack-left { left: 20px; width: 320px; }
-.hud-stack-right { right: 20px; width: 280px; }
+.hud-stack-right {
+  right: calc(2 * var(--unit));
+  width: clamp(260px, calc(28 * var(--unit)), 380px);
+  
+  /* AGGIUNGI QUESTE RIGHE PER L'ALLINEAMENTO VERTICALE */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* Allinea il contenuto partendo dal basso */
+}
+
+/* AGGIUNGI QUESTA REGOLA PER IL COMPONENTE CHAT */
+.hud-chat-panel {
+  display: block; 
+  pointer-events: auto; /* Permette di cliccare dentro la chat */
+  margin-bottom: 12px;  /* Crea lo spazio esatto tra chat e pulsante */
+  
+  /* Assicurati che non ci siano posizionamenti assoluti nel componente 
+     interno che lo portano via da questa posizione */
+}
+
+.hud-stack-left { left: calc(2 * var(--unit)); width: clamp(280px, calc(30 * var(--unit)), 400px);}
+.hud-stack-right { right: calc(2 * var(--unit)); width: clamp(260px, calc(28 * var(--unit)), 380px);}
 
 .tactical-actions-row {
   display: flex;
@@ -429,7 +468,7 @@
   }
 }
 
-.primary-glow { padding: 12px; border-radius: 8px; font-size: 0.7rem; width: 100%; margin-top: 10px; }
+.primary-glow { padding: calc(1.2 * var(--unit)); border-radius: 8px; font-size: calc(0.75 * var(--unit)); width: 100%; margin-top: 10px; }
 .nav-action-btn.mini, .ghost-button.mini { padding: 6px 12px; border-radius: 4px; font-size: 0.65rem; height: 34px; }
 .nav-action-btn.mini.active { background: var(--primary-blue); color: #050a14; box-shadow: 0 0 15px var(--primary-blue); }
 
