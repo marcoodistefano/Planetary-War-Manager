@@ -1,6 +1,7 @@
 const nodemailer = require("nodemailer");
 const aslan = require("./middleware/Aslan.js");
 const db = require("../shared/postgresClient.js");
+const { JsonWebTokenError } = require("jsonwebtoken");
 const HOST = process.env.HOST || "localhost:3001";
 const DOMAIN = process.env.DOMAIN || "PWM";
 const FRONTEND_URL = (process.env.FRONTEND_URL || `http://${HOST}`).replace(/\/$/, "");
@@ -215,14 +216,20 @@ const createAccessSession = async ({
   userId,
   ipAddress,
   cookieToken,
-  expireTime,
 }) => {
   const { rows } = await db.query(
-    "INSERT INTO accessi (user_id, ip_address, cookie_token, expire_time) VALUES ($1, $2, $3, $4) RETURNING id_access, login_time, expire_time",
-    [userId, ipAddress, cookieToken, expireTime],
+    "INSERT INTO accessi (user_id, ip_address, cookie_token) VALUES ($1, $2, $3) RETURNING id_access, login_time",
+    [userId, ipAddress, cookieToken],
   );
-
+  if(rows.length === 0) {
+    console.error("Errore durante la creazione della sessione di accesso: nessuna riga restituita");
+    return null;
+  }
   return rows[0];
+};
+
+const deleteAccessSessionByCookieToken = async (cookieToken) => {
+  await db.query("DELETE FROM accessi WHERE cookie_token = $1", [cookieToken]);
 };
 
 module.exports = {
@@ -231,5 +238,7 @@ module.exports = {
   recoverUsername,
   recoveryPassword,
   resetPassword,
+  resetPasswordToken,
   createAccessSession,
+  deleteAccessSessionByCookieToken,
 };

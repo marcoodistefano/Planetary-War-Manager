@@ -130,59 +130,59 @@ const generateMatchStructure = async (gameMode) => {
 }
 
   
-  const join_Match = async (playerId, id_partita_hash) => {
-    let res;
-    try {
-      console.log(`Il giocatore ${playerId} si sta unendo alla partita con hash ${id_partita_hash}...`);
-      let rows_select = await db.query(
-        "SELECT partite.struttura_partita FROM partite WHERE id_partita_hash = $1; AND partite.id_partita_hash = $1;",
-        [id_partita_hash],
-      );
-      let count = rows_select.length;
-      console.log(`Partite trovate con hash ${id_partita_hash}: ${count}`);
-      if(rows_select.length === 0) {
-        console.log(`Nessuna partita trovata con hash ${id_partita_hash}`);
-        res = {
-          status: "404",
-          message: "Partita non trovata.",
-        };
-      }
-      else{
-        rows = await db.query(
-          "INSERT INTO partecipazioni (id_partita_hash, id_user) VALUES ($1, $2);",
-          [id_partita_hash, playerId],
-        );
-        console.log(`Il giocatore ${playerId} si è unito alla partita con hash ${id_partita_hash} con successo.`);
-        console.log(`Struttura della partita con hash ${id_partita_hash}: ${rows_select[0].struttura_partita}`);
-        eru_start = Eru.check_start_match(rows_select[0].struttura_partita, count);
-        if(eru_start.status == 200) { //ad ogni ingresso di un giocatore, verifico se la partita è pronta per essere avviata, ERU tiene traccia delle tabelle di conversione, quindi spetta a lui stabilire se la partita è pronta per essere avviata o meno, e in caso affermativo, avviare la partita (cambiando lo stato della partita in corso e notificando i giocatori coinvolti)
-          //da implementare
-          rows = await db.query(
-            "UPDATE partite SET struttura_partita = $1 WHERE id_partita_hash = $2;",
-            [eru_start.struttura_partita, id_partita_hash],
-          );
-          console.log(`La partita con hash ${id_partita_hash} è pronta per essere avviata. Struttura aggiornata: ${eru_start.struttura_partita}`);
-          //START()
-          //NOTIFY_ALL()
-        }else{
-          console.log(`La partita con hash ${id_partita_hash} non è ancora pronta per essere avviata. Struttura attuale: ${eru_start.struttura_partita}`);
-        }
-        res = {
-          status: "200",
-          message: "Join alla partita avvenuto con successo.",
-          struttura_partita: eru_start.struttura_partita,
-        };
-      }
-    } catch (error) {
-      console.error(
-        "Errore durante il tentativo di join alla partita:",
-        error,
-      );
+const join_Match = async (playerId, id_partita_hash) => {
+  let res;
+  try {
+    console.log(`Il giocatore ${playerId} si sta unendo alla partita con hash ${id_partita_hash}...`);
+    let rows_select = await db.query(
+      "SELECT partite.struttura_partita FROM partite WHERE id_partita_hash = $1; AND partite.id_partita_hash = $1;",
+      [id_partita_hash],
+    );
+    let count = rows_select.length;
+    console.log(`Partite trovate con hash ${id_partita_hash}: ${count}`);
+    if(rows_select.length === 0) {
+      console.log(`Nessuna partita trovata con hash ${id_partita_hash}`);
       res = {
-        status: "500",
-        message:
-          "Errore interno del server durante il tentativo di join alla partita.",
+        status: "404",
+        message: "Partita non trovata.",
       };
     }
-    return res;
-  };
+    else{
+      rows = await db.query(
+        "INSERT INTO partecipazioni (id_partita_hash, id_user) VALUES ($1, $2);",
+        [id_partita_hash, playerId],
+      );
+      console.log(`Il giocatore ${playerId} si è unito alla partita con hash ${id_partita_hash} con successo.`);
+      console.log(`Struttura della partita con hash ${id_partita_hash}: ${rows_select[0].struttura_partita}`);
+      eru_start = Eru.check_start_match(rows_select[0].struttura_partita, count);
+      if(eru_start.status == 200) { //ad ogni ingresso di un giocatore, verifico se la partita è pronta per essere avviata, ERU tiene traccia delle tabelle di conversione, quindi spetta a lui stabilire se la partita è pronta per essere avviata o meno, e in caso affermativo, avviare la partita (cambiando lo stato della partita in corso e notificando i giocatori coinvolti)
+        //da implementare
+        rows = await db.query(
+          "UPDATE partite SET struttura_partita = $1 WHERE id_partita_hash = $2;",
+          [eru_start.struttura_partita, id_partita_hash],
+        );
+        console.log(`La partita con hash ${id_partita_hash} è pronta per essere avviata. Struttura aggiornata: ${eru_start.struttura_partita}`);
+        //START()
+        //NOTIFY_ALL()
+      }else{
+        console.log(`La partita con hash ${id_partita_hash} non è ancora pronta per essere avviata. Struttura attuale: ${eru_start.struttura_partita}`);
+      }
+      res = {
+        status: "200",
+        message: "Join alla partita avvenuto con successo.",
+        struttura_partita: eru_start.struttura_partita,
+      };
+    }
+  } catch (error) {
+    console.error(
+      "Errore durante il tentativo di join alla partita:",
+      error,
+    );
+    res = {
+      status: "500",
+      message:
+        "Errore interno del server durante il tentativo di join alla partita.",
+    };
+  }
+  return res;
+};

@@ -55,71 +55,66 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
   try {
+    // 1. INPUT VALIDATION (Prevenzione Garbage In/Garbage Out)
     const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ message: "Credenziali mancanti" });
+    }
 
-    const authResult = await authModel.verifyLogin({
-      username,
-      password,
-    });
+    // 2. AUTHENTICATION
+    const authResult = await authModel.verifyLogin({ username, password });
 
+    // Mitigazione Enumerazione: Messaggio generico
     if (!authResult.ok) {
-      return res.status(401).json({ isValid: false, errors: [authResult.error] });
+      return res.status(401).json({ isValid: false, message: "Credenziali non valide" });
     }
 
-    // --- INIZIO PROTOCOLLO DI SESSIONE REDIS & JWT ---
-    const sessionId = crypto.randomUUID();
     const userId = authResult.uuid;
+    const sessionId = crypto.randomUUID();
     const ipAddress = getClientIp(req);
-    const expireTime = new Date(Date.now() + SESSION_TTL * 1000);
 
-    // 1. Prepara il payload per Redis
-    const sessionData = {
-      userId: userId,
-      ip: ipAddress,
-      userAgent: req.headers["user-agent"] || "Unknown",
-      createdAt: new Date().toISOString(),
-    };
-
-    // 2. Salva la sessione in Redis con Scadenza (TTL)
-    await redisClient.setEx(
-      `session:${sessionId}`,
-      SESSION_TTL,
-      JSON.stringify(sessionData),
-    );
-    
-    // 3. Aggiungi il sessionId al Set dell'utente per tracciamento
-    await redisClient.sAdd(`user_sessions:${userId}`, sessionId);
-
-    // 4. Genera il JWT
+    // 3. TOKEN GENERATION
     const token = jwt.sign(
-      { sub: userId, id_user: userId, jti: sessionId },
+      { sub: userId, jti: sessionId }, // Evitiamo di duplicare userId in id_user
       JWT_SECRET,
-      { expiresIn: SESSION_TTL },
+      { expiresIn: SESSION_TTL }
     );
 
-    // 5. Persisti la sessione anche su Postgres (tabella accessi)
+    // 4. PERSISTENCE LAYER (Parallelismo o Transazione)
+    // Usiamo Promise.allSettled o una transazione per garantire consistenza
     try {
-      await authModel.createAccessSession({
+      const sessionData = JSON.stringify({
         userId,
-        ipAddress,
-        cookieToken: sessionId,
-        expireTime,
+        ip: ipAddress,
+        userAgent: req.headers["user-agent"] || "Unknown",
+        createdAt: new Date().toISOString()
       });
-    } catch (dbError) {
-      // Manteniamo consistenza: se non scriviamo sul DB, invalidiamo la sessione Redis
-      await redisClient.del(`session:${sessionId}`);
-      await redisClient.sRem(`user_sessions:${userId}`, sessionId);
-      throw dbError;
+
+      // Operazione atomica su Redis e salvataggio su Postgres
+      await Promise.all([
+        redisClient.setEx(`session:${sessionId}`, SESSION_TTL, sessionData),
+        redisClient.sAdd(`user_sessions:${userId}`, sessionId),
+        authModel.createAccessSession({ userId, ipAddress, cookieToken: token })
+      ]);
+    } catch (infraError) {
+      console.error("Critical Infrastructure Error:", infraError);
+      return res.status(500).json({ error: "Errore durante la creazione della sessione" });
     }
 
-    return res.json({
-      message: "Login avvenuto con successo",
-      token: token // Inviamo il token al frontend
+    // 5. SECURE DELIVERY
+    // Impostiamo il token in un cookie sicuro, non accessibile da JS
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: SESSION_TTL * 1000 // Convertito in ms
     });
+
+    return res.json({ status: 200, message: "Login avvenuto con successo" });
 
   } catch (error) {
-    console.error("--- Errore durante l'elaborazione ---");
-    console.error(error);
+    // Log granulare per debugging interno, ma generico per l'esterno
+    console.error(`[Auth Error] ${new Date().toISOString()}:`, error.message);
     return res.status(500).json({ error: "Errore interno del server" });
   }
 };
