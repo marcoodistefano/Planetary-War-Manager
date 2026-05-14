@@ -39,6 +39,11 @@ const Aslan = {
             token += charset[randomIndex];
         }
         return token;
+    },
+
+    normalizeRegion: (region) => {
+        if (!region) return null;
+        return region.trim().toLowerCase();
     }
 };
 

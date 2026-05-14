@@ -5,7 +5,8 @@
   "main": "app-route.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node app-route.js"
+    "start": "node app-route.js",
+    "test:gateway": "node scripts/test-gateway.js"
   },
   "dependencies": {
     "argon2": "^0.41.1",

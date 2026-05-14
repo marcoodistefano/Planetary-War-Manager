@@ -20,20 +20,27 @@ const getClientIp = (req) => {
 
 const register = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, reg } = req.body;
 
     const saved = await authModel.registerUser({
       username,
       email,
       password,
+      reg,
     });
-
+    if(saved.status === 400){
+      return res.status(400).json({
+        isValid: false,
+        errors: [saved.error],
+      });
+    }
     return res.json({
       message: "Registrazione ok",
       dato_x_sicuro: {
         username,
         email,
         password: saved.passwordHash,
+        reg: saved.reg,
       },
     });
   } catch (error) {

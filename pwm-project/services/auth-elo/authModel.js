@@ -30,13 +30,20 @@ const mapUniqueViolation = (error) => {
   return "Utente già esistente";
 };
 
-const registerUser = async ({ username, email, password }) => {
+const registerUser = async ({ username, email, password, reg }) => {
   const passwordHash = await aslan.hash_password(password);
-
+  const normalizeReg = aslan.normalizeRegion(reg);
+  if(reg === null){
+    console.log("Regione non fornita, non procedo.");
+    return{
+      status : 400,
+      error : "Regione non fornita"
+    }
+  }
   try {
     const { rows } = await db.query(
-      "INSERT INTO utenti (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id_user",
-      [username, email, passwordHash],
+      "INSERT INTO utenti (username, email, password_hash, reg) VALUES ($1, $2, $3, $4) RETURNING id_user",
+      [username, email, passwordHash, normalizeReg],
     );
     return { passwordHash, uuid: rows[0]?.id_user };
   } catch (error) {
