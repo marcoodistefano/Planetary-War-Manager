@@ -48,6 +48,63 @@
       </div>
     </form>
   </div>
+
+<ion-modal [isOpen]="isCountryModalOpen" (didDismiss)="closeCountryModal()" (ionModalDidPresent)="focusSearchbar()" class="tactical-modal">
+  <ng-template>
+    <div class="hologram-container">
+      <ion-header class="ion-no-border">
+        <ion-toolbar class="hud-toolbar">
+          <div class="header-glitch-wrapper">
+            <ion-title>NAV-DATA // REGION_SELECT</ion-title>
+            <div class="scanline"></div>
+          </div>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeCountryModal()" class="close-hud-btn">
+              <span class="btn-text">CHIUDI</span>
+              <div class="btn-frame"></div>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+        
+        <ion-toolbar class="hud-toolbar search-toolbar">
+          <ion-searchbar 
+            #countrySearchbar 
+            placeholder="INSERIRE COORDINATE..." 
+            (ionInput)="filterCountries($event)"
+            class="tactical-searchbar">
+          </ion-searchbar>
+        </ion-toolbar>
+      </ion-header>
+
+      <ion-content class="hud-content">
+        <div class="list-container">
+          <ion-list lines="none" class="tactical-list">
+            <ion-item *ngFor="let country of filteredCountries; let i = index" 
+                      (click)="selectCountry(country)" 
+                      button 
+                      class="tactical-item">
+              <div class="item-inner-wrapper">
+                <div class="flag-hex">
+                  <span class="flag-icon">{{ country.flag }}</span>
+                </div>
+                <ion-label>
+                  <h2 class="country-name">{{ country.name }}</h2>
+                  <p class="sector-code">SEC-{{ country.code }}-0{{ i % 9 }} // TACTICAL_ORIGIN</p>
+                </ion-label>
+                <div class="selection-bracket"></div>
+              </div>
+            </ion-item>
+
+            <div *ngIf="filteredCountries.length === 0" class="no-results">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+              <p>ERRORE: NESSUNA REGIONE TROVATA NEL DATABASE</p>
+            </div>
+          </ion-list>
+        </div>
+      </ion-content>
+    </div>
+  </ng-template>
+</ion-modal>
 </ion-content>
 
 <ion-footer class="ion-no-border">

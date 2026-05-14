@@ -344,3 +344,162 @@ ion-footer {
   }
   ion-button { height: 48px; margin-top: 5px; }
 }
+
+/* ==========================================================================
+   8. MODALE TATTICA (ESTETICA HUD)
+   ========================================================================== */
+
+.tactical-modal {
+  --width: clamp(320px, 45%, 500px);
+  --height: 60%; 
+  --border-radius: 16px; /* Aumentato per un arrotondamento ben visibile */
+  --background: transparent;
+
+  &::part(content) {
+    border: 1px solid rgba(88, 166, 255, 0.4);
+    border-radius: 16px; /* IMPORTANTE: Arrotonda anche il contenitore del vetro sfocato */
+    box-shadow: 0 0 30px rgba(0, 110, 255, 0.2);
+    background: rgba(6, 15, 25, 0.95);
+    backdrop-filter: blur(15px);
+  }
+}
+.hologram-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+
+  // Effetto Scanline (righe orizzontali)
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
+                linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+    background-size: 100% 4px, 3px 100%;
+    pointer-events: none;
+    z-index: 10;
+  }
+}
+
+.hud-toolbar {
+  --background: rgba(10, 25, 41, 0.9);
+  --color: #79c0ff;
+  border-bottom: 1px solid rgba(88, 166, 255, 0.2);
+  padding: 8px;
+
+  ion-title {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px rgba(121, 192, 255, 0.6);
+  }
+}
+
+.tactical-searchbar {
+  --background: rgba(0, 0, 0, 0.4);
+  --color: #f4f7fb;
+  --placeholder-color: rgba(121, 192, 255, 0.4);
+  --icon-color: #79c0ff;
+  --border-radius: 12px; /* Barra di ricerca più stondata */
+  padding: 0;
+  
+  &::part(searchbar-input-container) {
+    border: 1px solid rgba(88, 166, 255, 0.3);
+    border-radius: 12px; /* Applica l'arrotondamento al contenitore nativo */
+  }
+}
+
+.close-hud-btn {
+  --color: #ffb454;
+  font-weight: bold;
+  font-size: 0.7rem;
+  
+  .btn-frame {
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(255, 180, 84, 0.4);
+    border-radius: 8px; /* Smussa gli angoli del pulsante di chiusura */
+    pointer-events: none;
+  }
+}
+
+.tactical-item {
+  --background: transparent;
+  --padding-start: 8px;
+  --padding-end: 8px;
+  margin-bottom: 6px;
+  --background-hover: rgba(88, 166, 255, 0.1);
+
+  .item-inner-wrapper {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid rgba(88, 166, 255, 0.1);
+    border-radius: 10px; /* Riquadri delle nazioni stondati */
+    background: rgba(255, 255, 255, 0.02);
+    position: relative;
+    overflow: hidden; /* Evita che l'effetto hover "esca" dai bordi arrotondati */
+  }
+
+  .flag-hex {
+    width: 32px; /* Esagono della bandiera ridotto */
+    height: 32px;
+    background: rgba(88, 166, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    margin-right: 12px;
+    border: 1px solid rgba(88, 166, 255, 0.3);
+    
+    .flag-icon { font-size: 1.1rem; } /* Emoji bandiera ridotta */
+  }
+
+  .country-name {
+    color: #f4f7fb;
+    font-size: 0.9rem; /* Font più piccolo per adattarsi */
+    font-weight: bold;
+    margin: 0;
+  }
+
+  .sector-code {
+    color: #79c0ff;
+    font-size: 0.55rem;
+    margin: 2px 0 0;
+    opacity: 0.7;
+    letter-spacing: 1px;
+  }
+
+  // Bracket decorativo laterale (si vede al click/hover)
+  &:active .item-inner-wrapper {
+    border-left: 4px solid #79c0ff;
+    background: rgba(88, 166, 255, 0.15);
+  }
+}
+/* ==========================================================================
+   9. FIX SCROLL E SPAZIATURA CONTENUTO MODALE
+   ========================================================================== */
+
+.hud-content {
+  /* Ripristina lo scorrimento verticale bloccato dalla regola globale */
+  --overflow: auto !important; 
+  
+  &::part(scroll) {
+    /* Azzera il padding enorme ereditato dal main layout */
+    padding-top: 8px !important; 
+    padding-bottom: 16px !important;
+    
+    /* Assicura che la lista non venga schiacciata al centro */
+    align-items: stretch !important; 
+  }
+}
+
+.tactical-list {
+  background: transparent;
+  padding-top: 0;
+  margin-top: 0;
+}
