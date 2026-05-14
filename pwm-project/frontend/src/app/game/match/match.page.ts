@@ -89,6 +89,19 @@ export class MatchPage implements OnInit, AfterViewInit {
     { id: 'oro', icon: '🪙', label: 'ORO' }
   ];
 
+  // Aggiungi questo oggetto sotto playerResources
+  resourceProduction: any = {
+    denaro: 1250,
+    legno: 450,
+    piombo: 120,
+    acciaio: 300,
+    mattoni: 200,
+    petrolio: 80,
+    gas_naturale: 150,
+    uranio: 5,
+    oro: 0 // L'oro solitamente non ha produzione oraria
+  };
+
   modelDB: any = {
     land: [ { label: 'Soldato', path: 'land_troops/soldier.glb' } ],
     sea: [ { label: 'Cacciatorpediniere', path: 'sea_troops/cacciatorpediniere.glb' } ],

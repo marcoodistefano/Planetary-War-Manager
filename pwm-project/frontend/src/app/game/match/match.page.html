@@ -15,6 +15,7 @@
         <div class="res-data">
           <span class="res-label">{{ res.label }}</span>
           <span class="res-val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number }}</span>
+          <span class="res-prod" *ngIf="!res.isTrigger && resourceProduction[res.id] > 0"> +{{ resourceProduction[res.id] | number }}/h </span>
           <span class="res-val" *ngIf="res.isTrigger">STATUS</span>
         </div>
         

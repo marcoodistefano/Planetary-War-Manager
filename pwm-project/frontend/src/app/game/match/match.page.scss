@@ -145,6 +145,7 @@
 
   .res-label { font-size: calc(0.75 * var(--unit));letter-spacing: 0.8px; color: var(--primary-blue); font-weight: 800}
   .res-val { font-size: calc(1.25 * var(--unit)); color: #fff; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .res-prod { font-size: calc(0.85 * var(--unit)); color: var(--success-green); font-family: 'JetBrains Mono', monospace; font-weight: 600; margin-top: 1px; text-shadow: 0 0 5px rgba(163, 230, 53, 0.3); }
   .res-icon { font-size: calc(1.6 * var(--unit)); }
 
   &.premium .res-val { color: var(--gold-accent); }
