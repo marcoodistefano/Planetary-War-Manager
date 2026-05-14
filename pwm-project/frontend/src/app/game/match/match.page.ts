@@ -1,7 +1,7 @@
 import { Component, OnInit, AfterViewInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule } from '@ionic/angular';
+import { IonicModule, ModalController } from '@ionic/angular';
 import { Router } from '@angular/router';
 
 // Componenti
@@ -142,7 +142,11 @@ export class MatchPage implements OnInit, AfterViewInit {
     });
   }
 
-  constructor(private router: Router, private cdr: ChangeDetectorRef) { }
+  constructor(
+    private router: Router, 
+    private cdr: ChangeDetectorRef,
+    private modalCtrl: ModalController 
+  ) { }
 
   ngOnInit() {
     this.loadGameRules();
@@ -429,5 +433,19 @@ export class MatchPage implements OnInit, AfterViewInit {
   switchGlobe() {
     this.isGlobe = !this.isGlobe;
     this.map.setProjection({ type: this.isGlobe ? 'globe' : 'mercator' });
+  }
+
+  async ionViewWillLeave() {
+    try {
+      // Controlla se c'è una modale attualmente in cima allo stack visivo
+      const topModal = await this.modalCtrl.getTop();
+      
+      // Se esiste una modale aperta, forzane la chiusura
+      if (topModal) {
+        await this.modalCtrl.dismiss();
+      }
+    } catch (error) {
+      console.error('Errore durante la chiusura della modale:', error);
+    }
   }
 }

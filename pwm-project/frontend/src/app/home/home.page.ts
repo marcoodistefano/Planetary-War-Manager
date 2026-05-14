@@ -236,5 +236,19 @@ filterNewGames(event: any) {
   viewFinishedGames() {
     this.router.navigate(['/game-browser'], { queryParams: { tab: 'finished' } });
   }
+
+  async ionViewWillLeave() {
+    try {
+      // Controlla se c'è una modale attualmente in cima allo stack visivo
+      const topModal = await this.modalCtrl.getTop();
+      
+      // Se esiste una modale aperta, forzane la chiusura
+      if (topModal) {
+        await this.modalCtrl.dismiss();
+      }
+    } catch (error) {
+      console.error('Errore durante la chiusura della modale:', error);
+    }
+  }
 }
 

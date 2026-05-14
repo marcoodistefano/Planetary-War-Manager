@@ -129,16 +129,17 @@ ion-content {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 30px; 
+  --gap-scale: 3;
+  gap: max(calc(var(--gap-scale) * 1vh), calc(var(--gap-scale) * 0.5625vw));
   flex: 1; 
   min-height: 0; 
-  max-width: 1100px; 
+  max-width: 1800px; 
   margin: 0 auto;
   perspective: 1200px;
   z-index: 10;
 }
 
-.left-column, .right-column {
+.left-column, .right-column, .center-column {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   backface-visibility: hidden;
@@ -150,12 +151,25 @@ ion-content {
   justify-content: center; 
 }
 
-.left-column { flex: 0 0 290px; transform: rotateY(12deg) translateZ(0); transform-origin: right center; }
+.left-column, .right-column {
+  --panel-w-scale: 29;
+  --dynamic-width: max(calc(var(--panel-w-scale) * 1vh), calc(var(--panel-w-scale) * 0.5625vw));
+  flex: 0 0 clamp(260px, var(--dynamic-width), 400px);
+}
+
+.center-column { 
+  --panel-center-scale: 32;
+  --dynamic-width: max(calc(var(--panel-center-scale) * 1vh), calc(var(--panel-center-scale) * 0.5625vw));
+  flex: 0 0 clamp(280px, var(--dynamic-width), 450px);
+  
+  align-items: center; 
+  z-index: 10; 
+}
+
+.left-column { transform: rotateY(12deg) translateZ(0); transform-origin: right center; }
 .left-column:hover { transform: rotateY(6deg) translateZ(0); }
 
-.center-column { flex: 0 0 320px; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; } 
-
-.right-column { flex: 0 0 290px; transform: rotateY(-12deg) translateZ(0); transform-origin: left center; }
+.right-column { transform: rotateY(-12deg) translateZ(0); transform-origin: left center; }
 .right-column:hover { transform: rotateY(-6deg) translateZ(0); }
 
 /* ==========================================================================
@@ -178,9 +192,11 @@ ion-content {
 .inner-panel {
   background: rgba(1, 36, 46, 0.15) !important;
   border: 1px solid rgba(95, 208, 255, 0.2) !important;
-  padding: 12px;
+  --pad-scale: 1.2;
+  padding: max(calc(var(--pad-scale) * 1vh), calc(var(--pad-scale) * 0.5625vw));
   border-radius: 12px;
-  margin: 10px;
+  --margin-scale: 1;
+  margin: max(calc(var(--margin-scale) * 1vh), calc(var(--margin-scale) * 0.5625vw));
 }
 
 .transparent-element {

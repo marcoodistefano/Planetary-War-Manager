@@ -134,21 +134,35 @@ async changePassword() {
   
   
   async openSettings() {
-  const modal = await this.modalCtrl.create({
-    component: SettingsComponent,
-    cssClass: 'tactical-modal'
-  });
-  await modal.present();
+    const modal = await this.modalCtrl.create({
+      component: SettingsComponent,
+      cssClass: 'tactical-modal'
+    });
+    await modal.present();
 
-  const { data } = await modal.onDidDismiss();
-  if (data) {
-    console.log("Applicazione nuove impostazioni...", data);
-    
-    // QUI DIREMO AL SERVIZIO DI CAMBIARE LINGUA:
-    // this.translate.use(data.language);
-    
-    // E lo salveremo nel browser per ricordarlo al prossimo accesso:
-    // localStorage.setItem('sys_lang', data.language);
+    const { data } = await modal.onDidDismiss();
+    if (data) {
+      console.log("Applicazione nuove impostazioni...", data);
+      
+      // QUI DIREMO AL SERVIZIO DI CAMBIARE LINGUA:
+      // this.translate.use(data.language);
+      
+      // E lo salveremo nel browser per ricordarlo al prossimo accesso:
+      // localStorage.setItem('sys_lang', data.language);
+    }
+    }
+
+  async ionViewWillLeave() {
+    try {
+      // Controlla se c'è una modale attualmente in cima allo stack visivo
+      const topModal = await this.modalCtrl.getTop();
+      
+      // Se esiste una modale aperta, forzane la chiusura
+      if (topModal) {
+        await this.modalCtrl.dismiss();
+      }
+    } catch (error) {
+      console.error('Errore durante la chiusura della modale:', error);
+    }
   }
-}
 }
