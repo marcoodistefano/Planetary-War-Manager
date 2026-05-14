@@ -1,0 +1,132 @@
+/* Variabili sincronizzate con il resto del sistema */
+:host {
+  --primary-blue: #86d7ff;
+  --primary-glow: rgba(134, 215, 255, 0.3);
+  --danger-red: #ff7b72;
+  --success-green: #a3e635;
+  --gold-accent: #fde047;
+  --glass-bg: rgba(7, 15, 28, 0.85);
+  --glass-border: rgba(134, 215, 255, 0.25);
+  --panel-blur: blur(20px);
+  --text-muted: #a0a0b0;
+  --text-accent: #b6cee9;
+}
+
+/* Sfondo della modale a tutto schermo */
+.army-modal-backdrop {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);
+  font-family: 'Inter', sans-serif;
+}
+
+/* 1. FRAME PRINCIPALE - DIMENSIONI UNIFICATE */
+.army-frame {
+  position: relative; width: 95vw; max-width: 1300px; height: 85vh; max-height: 800px;
+  background: linear-gradient(135deg, var(--glass-bg) 0%, rgba(13, 25, 48, 0.95) 100%);
+  border: 1px solid var(--glass-border); backdrop-filter: var(--panel-blur);
+  border-radius: 18px; display: flex; overflow: hidden;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(134, 215, 255, 0.05);
+
+  /* Scanlines Overlay */
+  &::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+    background-size: 100% 3px, 3px 100%; pointer-events: none; opacity: 0.2; z-index: 2;
+  }
+}
+
+/* 2. SIDEBAR DI NAVIGAZIONE */
+.army-sidebar {
+  width: 240px; background: rgba(0, 0, 0, 0.4); border-right: 1px solid var(--glass-border);
+  padding: 40px 0 0 0; display: flex; flex-direction: column; position: relative; z-index: 10;
+  user-select: none; cursor: grab;
+
+  .brand {
+    padding: 0 25px 30px;
+    .system-name { display: block; font-weight: 800; color: var(--primary-blue); letter-spacing: 2px; text-shadow: 0 0 10px var(--primary-glow); margin-bottom: 4px; }
+    .version { font-size: 0.6rem; color: var(--text-muted); opacity: 0.6; font-family: 'JetBrains Mono', monospace; }
+  }
+
+  nav {
+    flex: 1;
+    .nav-item {
+      padding: 16px 25px; font-size: 0.75rem; font-weight: 600; cursor: pointer; color: var(--text-muted);
+      transition: 0.3s ease; border-left: 4px solid transparent; display: flex; align-items: center; gap: 12px; text-transform: uppercase;
+      ion-icon { font-size: 1.1rem; }
+      &:hover { color: #ffffff; background: rgba(134, 215, 255, 0.1); }
+      &.active { color: #ffffff; background: rgba(134, 215, 255, 0.15); border-left: 4px solid var(--primary-blue); text-shadow: 0 0 8px rgba(134, 215, 255, 0.6); }
+    }
+  }
+
+  .sidebar-footer {
+    padding: 20px; border-top: 1px solid var(--glass-border); background: rgba(0, 0, 0, 0.2);
+    .exit-btn {
+      width: 100%; background: rgba(255, 123, 114, 0.1); color: var(--danger-red); border: 1px solid rgba(255, 123, 114, 0.3);
+      padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-family: 'Inter', sans-serif; letter-spacing: 1px;
+      transition: 0.3s; display: flex; justify-content: center;
+      &:hover { background: var(--danger-red); color: white; box-shadow: 0 0 15px rgba(255, 123, 114, 0.5); }
+    }
+  }
+}
+
+/* 3. AREA CENTRALE E GRIGLIA RADAR */
+.army-main {
+  flex: 1; padding: 40px; overflow-y: auto; position: relative; z-index: 10;
+  background-image: radial-gradient(rgba(134, 215, 255, 0.15) 1px, transparent 1px); background-size: 30px 30px;
+  &::-webkit-scrollbar { height: 8px; width: 8px; }
+  &::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 4px; }
+}
+
+.content-container { display: flex; flex-direction: column; min-width: max-content; }
+
+/* 4. ELEMENTI SPECIFICI ARMY */
+.army-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
+
+.unit-card {
+  background: rgba(0, 0, 0, 0.3); border: 1px solid var(--glass-border); border-radius: 10px;
+  padding: 15px; display: flex; align-items: center; gap: 15px; transition: 0.3s;
+  &:hover { border-color: var(--primary-blue); background: rgba(134, 215, 255, 0.05); }
+  .unit-icon { font-size: 2rem; background: rgba(255,255,255,0.05); width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
+  .unit-name { display: block; color: #fff; font-weight: 800; font-size: 0.85rem; text-transform: uppercase; }
+  .unit-count { display: block; color: var(--primary-blue); font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: bold; }
+}
+
+/* Stile Carte Unificato */
+.build-card {
+  width: 100%; max-width: 450px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(134, 215, 255, 0.15);
+  border-radius: 8px; padding: 15px; position: relative; cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; margin-bottom: 15px;
+  
+  &.no-hover { cursor: default; }
+  &.no-hover:hover { background: rgba(255, 255, 255, 0.03); border-color: rgba(134, 215, 255, 0.15); box-shadow: none; transform: none; }
+  &:hover:not(.no-hover) { background: rgba(134, 215, 255, 0.1); border-color: var(--primary-blue); box-shadow: 0 0 15px var(--primary-glow); transform: translateY(-3px); }
+
+  .build-info {
+    display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;
+    .item-name { font-size: 0.85rem; color: #fff; font-weight: 800; line-height: 1.2; width: 70%; }
+    .item-tier { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; font-weight: 900; color: var(--primary-blue); text-transform: uppercase; }
+  }
+  
+  .unit-description { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 15px; line-height: 1.4; }
+}
+
+.recruitment-actions {
+  margin-top: auto; display: flex; justify-content: space-between; align-items: center;
+  .cost-row { display: flex; gap: 8px; }
+  .cost-unit { font-size: 0.65rem; font-family: 'JetBrains Mono', monospace; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(134, 215, 255, 0.15); padding: 4px 8px; border-radius: 4px; color: var(--text-accent); }
+}
+
+/* 5. TITOLI, BOTTONI E UTILITY CONDIVISE */
+.track-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--primary-blue); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; opacity: 0.8; margin-bottom: 15px; margin-top: 10px; border-bottom: 1px dashed rgba(134, 215, 255, 0.2); padding-bottom: 5px; display: inline-block; }
+.sensor-grid { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(134, 215, 255, 0.1); padding: 12px; border-radius: 6px; .sensor-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); span:first-child { color: #a0a0b0; font-weight: bold; } .sensor-val { color: var(--primary-blue); font-weight: 800; } } }
+.hud-separator { height: 1px; background: linear-gradient(90deg, transparent, #86d7ff, transparent); opacity: 0.2; margin: 20px 0; }
+.status-msg { font-size: 0.75rem; color: var(--text-muted); font-style: italic; }
+.danger-text { color: var(--danger-red) !important; }
+
+.primary-glow {
+  width: 100%; padding: 12px; background: rgba(134, 215, 255, 0.1); border: 1px solid var(--primary-blue); color: #fff; border-radius: 6px; font-weight: 800; letter-spacing: 1px; cursor: pointer; transition: 0.3s; font-family: 'Inter', sans-serif; text-transform: uppercase; font-size: 0.75rem;
+  &:hover:not(:disabled) { background: var(--primary-blue); color: #000; box-shadow: 0 0 15px var(--primary-glow); }
+  &:disabled { opacity: 0.3; border-color: gray; cursor: not-allowed; }
+  &.slim { padding: 8px 12px; width: auto; font-size: 0.7rem; }
+}

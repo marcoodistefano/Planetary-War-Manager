@@ -71,6 +71,17 @@
     </div>
 
     <div class="tactical-actions-row secondary-actions">
+      <button class="nav-action-btn primary-glow" [class.active]="isMarketModalOpen" (click)="toggleMarketModal()">
+        <ion-icon name="swap-horizontal-outline"></ion-icon>
+        <span>MARKET</span>
+      </button>
+      <button class="nav-action-btn primary-glow" [class.active]="isArmyModalOpen" (click)="toggleArmyModal()">
+        <ion-icon name="people-outline"></ion-icon>
+        <span>ARMATE</span>
+      </button>
+    </div>
+
+    <div class="tactical-actions-row secondary-actions">
       <button class="nav-action-btn primary-glow" [class.active]="isDiplomacyModalOpen" (click)="toggleDiplomacyModal()">
         <ion-icon name="shield-half-outline"></ion-icon>
         <span>DIPLOMAZIA</span>
@@ -151,5 +162,43 @@
   <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>
   <app-diplomacy-modal *ngIf="isDiplomacyModalOpen" (close)="isDiplomacyModalOpen = false"></app-diplomacy-modal>
   <app-intelligence-modal *ngIf="isIntelligenceModalOpen" (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
+  <app-market-modal *ngIf="isMarketModalOpen" [playerResources]="playerResources" (close)="toggleMarketModal()"></app-market-modal>
+  <app-army-modal *ngIf="isArmyModalOpen" [playerTroops]="playerTroops" (close)="isArmyModalOpen = false"> </app-army-modal>
+
+  <div class="radial-menu-container" 
+     *ngIf="isRadialMenuVisible" 
+     [style.left.px]="radialMenuX" 
+     [style.top.px]="radialMenuY">
+  
+  <div class="radial-menu-wrapper">
+    <div class="radial-center-trigger" (click)="handleRadialAction('ATTACCA')">
+      <ion-icon name="locate"></ion-icon>
+    </div>
+
+    <div class="radial-sector sector-top" (click)="handleRadialAction('INFO')">
+      <div class="sector-content">
+        <ion-icon name="information-circle"></ion-icon>
+      </div>
+    </div>
+
+    <div class="radial-sector sector-right" (click)="closeRadialMenu()">
+      <div class="sector-content">
+        <ion-icon name="close"></ion-icon>
+      </div>
+    </div>
+
+    <div class="radial-sector sector-bottom" (click)="handleRadialAction('DIPLOMAZIA')">
+      <div class="sector-content">
+        <ion-icon name="people"></ion-icon>
+      </div>
+    </div>
+
+    <div class="radial-sector sector-left active" (click)="handleRadialAction('COSTRUISCI')">
+      <div class="sector-content">
+        <ion-icon name="construct"></ion-icon>
+      </div>
+    </div>
+  </div>
+</div>
 
 </ion-content>

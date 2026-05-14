@@ -10,6 +10,8 @@ import { DiplomacyModalComponent } from '../components/diplomacy-modal/diplomacy
 import { IntelligenceModalComponent } from '../components/intelligence-modal/intelligence-modal.component';
 import { InGameChatComponent } from '../components/in-game-chat/in-game-chat.component';
 import { TechTreeComponent } from '../components/tech-tree/tech-tree.component';
+import { MarketModalComponent } from '../components/market-modal/market-modal.component';
+import { ArmyModalComponent } from '../components/army-modal/army-modal.component';
 
 // Librerie esterne caricate via CDN o definite globalmente
 declare var maplibregl: any;
@@ -30,7 +32,9 @@ declare var THREE: any;
     DiplomacyModalComponent,
     IntelligenceModalComponent,
     InGameChatComponent,
-    TechTreeComponent
+    TechTreeComponent,
+    MarketModalComponent,
+    ArmyModalComponent
   ]
 })
 export class MatchPage implements OnInit, AfterViewInit {
@@ -53,6 +57,8 @@ export class MatchPage implements OnInit, AfterViewInit {
   isDiplomacyModalOpen = false;
   isIntelligenceModalOpen = false;
   isChatOpen = false;
+  isMarketModalOpen = false;
+  isArmyModalOpen = false;
 
   activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
 
@@ -108,12 +114,46 @@ export class MatchPage implements OnInit, AfterViewInit {
     air: [ { label: 'Aereo Cargo', path: 'air_troops/aereo_cargo.glb' } ]
   };
 
+    // Aggiungi queste proprietà alla classe MatchPage
+  isRadialMenuVisible = false;
+  radialMenuX = 0;
+  radialMenuY = 0;
+
+// All'interno di ngOnInit o in una funzione di inizializzazione
+  initRadialListeners() {
+    const mapEl = document.getElementById('map-container');
+    
+    if (mapEl) {
+      mapEl.addEventListener('contextmenu', (e: MouseEvent) => {
+        e.preventDefault(); // Blocca il menu standard del browser
+        
+        this.radialMenuX = e.clientX;
+        this.radialMenuY = e.clientY;
+        this.isRadialMenuVisible = true;
+        
+        // Forza il refresh della UI se necessario
+        this.cdr.detectChanges(); 
+      });
+    }
+
+    // Chiude il menu se si clicca altrove con il tasto sinistro
+    window.addEventListener('click', () => {
+      if (this.isRadialMenuVisible) this.isRadialMenuVisible = false;
+    });
+  }
+
   constructor(private router: Router, private cdr: ChangeDetectorRef) { }
 
   ngOnInit() {
     this.loadGameRules();
     this.sensorSocket = io('http://localhost:3030', { auth: { token: "IL_TUO_JWT_TOKEN" } });
     this.sensorSocket.on('point_data', (data: any) => this.handlePointData(data));
+    window.addEventListener('click', () => {
+      if (this.isRadialMenuVisible) {
+        this.isRadialMenuVisible = false;
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   ngAfterViewInit() {
@@ -133,29 +173,53 @@ export class MatchPage implements OnInit, AfterViewInit {
     this.router.navigate(['/home']); // Assicurati che '/' sia il path della tua homepage
   }
 
+  toggleArmyModal() {
+    this.isArmyModalOpen = !this.isArmyModalOpen;
+    if (this.isArmyModalOpen) {
+      this.isBuildPanelOpen = false;
+      this.isTechModalOpen = false;
+      this.isDiplomacyModalOpen = false;
+      this.isIntelligenceModalOpen = false;
+      this.isMarketModalOpen = false;
+    }
+  }
+
+  toggleMarketModal() {
+    this.isMarketModalOpen = !this.isMarketModalOpen;
+    if (this.isMarketModalOpen) {
+      this.isBuildPanelOpen = false;
+      this.isTechModalOpen = false;
+      this.isDiplomacyModalOpen = false;
+      this.isIntelligenceModalOpen = false;
+      this.isArmyModalOpen = false;
+    }
+  }
+  
   toggleTechModal() {
     this.isTechModalOpen = !this.isTechModalOpen;
     if (this.isTechModalOpen) {
       this.isBuildPanelOpen = false;
       this.isDiplomacyModalOpen = false;
       this.isIntelligenceModalOpen = false;
+      this.isMarketModalOpen = false;
+      this.isArmyModalOpen = false;
     }
   }
   
   // Assicurati che gli altri toggle chiudano isTechModalOpen
   toggleBuildPanel() {
     this.isBuildPanelOpen = !this.isBuildPanelOpen;
-    if (this.isBuildPanelOpen) { this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; this.isIntelligenceModalOpen = false; }
+    if (this.isBuildPanelOpen) { this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; this.isIntelligenceModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false;}
   }
 
   toggleDiplomacyModal() {
     this.isDiplomacyModalOpen = !this.isDiplomacyModalOpen;
-    if (this.isDiplomacyModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isIntelligenceModalOpen = false; }
+    if (this.isDiplomacyModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isIntelligenceModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false;}
   }
 
   toggleIntelligenceModal() {
     this.isIntelligenceModalOpen = !this.isIntelligenceModalOpen;
-    if (this.isIntelligenceModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; }
+    if (this.isIntelligenceModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false;}
   }
 
   toggleMapSettings() { this.isMapSettingsOpen = !this.isMapSettingsOpen; }
@@ -206,6 +270,8 @@ export class MatchPage implements OnInit, AfterViewInit {
         center: [12.5, 41.9], zoom: 3.5, minZoom: 1.5, renderWorldCopies: true, projection: { type: 'mercator' }
     });
 
+    this.map.dragRotate.disable();
+
     this.map.on('load', () => {
         this.map.addSource('terrain-source', { type: 'raster-dem', url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${this.MAPTILER_KEY}`, tileSize: 256 });
         this.map.setTerrain({ source: 'terrain-source', exaggeration: 1.2 });
@@ -222,6 +288,58 @@ export class MatchPage implements OnInit, AfterViewInit {
     });
 
     this.map.on('mousemove', (e: any) => this.handleMapMouseMove(e));
+
+    this.map.on('contextmenu', (e: any) => {
+      // Impedisce il menu standard
+      e.originalEvent.preventDefault();
+      
+      // Coord dello schermo per posizionare il div HTML
+      this.radialMenuX = e.originalEvent.clientX;
+      this.radialMenuY = e.originalEvent.clientY;
+      
+      this.isRadialMenuVisible = true;
+      this.cdr.detectChanges();
+    });
+
+    this.map.on('dragstart', () => {
+      this.closeRadialOnInteraction();
+    });
+
+    // AGGIUNGI QUESTO: Chiude il menu quando inizia lo zoom
+    this.map.on('zoomstart', () => {
+      this.closeRadialOnInteraction();
+    });
+  }
+
+  private closeRadialOnInteraction() {
+    if (this.isRadialMenuVisible) {
+      this.isRadialMenuVisible = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  // Eseguita quando si preme un'azione nel menu radiale
+  handleRadialAction(action: string) {
+    console.log("Comando Tattico:", action);
+    
+    switch(action) {
+      case 'COSTRUISCI':
+        this.toggleBuildPanel();
+        break;
+      case 'INFO':
+        // Logica per mostrare dettagli territorio
+        break;
+      case 'ATTACCA':
+        // Logica combattimento
+        break;
+    }
+    
+    this.isRadialMenuVisible = false;
+  }
+
+  // Chiude il menu se si clicca altrove col tasto sinistro
+  closeRadialMenu() {
+    this.isRadialMenuVisible = false;
   }
 
   handleMapMouseMove(e: any) {

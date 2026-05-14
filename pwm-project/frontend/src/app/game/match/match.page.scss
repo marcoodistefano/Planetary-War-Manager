@@ -584,3 +584,106 @@ app-tactical-terminal {
   height: 80%;
   display: block;
 }
+/* --- RADIAL TACTICAL MENU --- */
+.radial-menu-container {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: auto;
+  transform: translate(-50%, -50%); 
+}
+
+.radial-menu-wrapper {
+  position: relative;
+  /* FORMULA 16:9: 18 * unit rende il menu più piccolo dei 240px originali e scalabile proporzionalmente */
+  width: calc(18 * var(--unit)); 
+  height: calc(18 * var(--unit));
+  border-radius: 50%;
+  filter: drop-shadow(0 0 15px rgba(0,0,0,0.5));
+  animation: radialScaleIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.radial-sector {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  clip-path: polygon(50% 50%, 100% 0%, 100% 100%); 
+  background: rgba(45, 55, 72, 0.6); 
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  cursor: pointer;
+
+  .sector-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    /* Spinge l'icona al centro usando la matematica 16:9 invece dei px fissi */
+    transform: translateX(calc(5.8 * var(--unit))); 
+    
+    ion-icon, svg {
+      font-size: calc(3.5 * var(--unit)); /* Icone scalabili */
+      color: white;
+      transform: rotate(var(--icon-rev-rot)); 
+    }
+  }
+
+  /* Rotazioni PERFETTE (Top, Right, Bottom, Left) */
+  &.sector-right { transform: rotate(0deg); --icon-rev-rot: 0deg; }
+  &.sector-bottom { transform: rotate(90deg); --icon-rev-rot: -90deg; }
+  &.sector-left { transform: rotate(180deg); --icon-rev-rot: -180deg; }
+  &.sector-top { transform: rotate(-90deg); --icon-rev-rot: 90deg; }
+
+  &.active {
+    background: rgba(234, 179, 8, 0.7); 
+    ion-icon, svg { color: white; }
+  }
+
+  &:hover {
+    background: rgba(134, 215, 255, 0.3);
+  }
+}
+
+.radial-center-trigger {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  
+  /* Dimensione pulsante centrale scalata in 16:9 */
+  width: calc(5.5 * var(--unit));
+  height: calc(5.5 * var(--unit));
+  
+  background: rgba(45, 55, 72, 0.8); 
+  backdrop-filter: blur(10px);
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.2s;
+
+  /* Applica le dimensioni anche all'SVG che abbiamo appena inserito */
+  ion-icon, svg { 
+    font-size: calc(2.8 * var(--unit)); 
+    color: white; 
+    opacity: 0.9;
+  }
+
+  /* Effetto Hover (colore Rosso come nel tuo screenshot) */
+  &:hover { 
+    background: var(--danger-red); 
+    border-color: #fff;
+    box-shadow: 0 0 15px var(--danger-red);
+  }
+}
+
+@keyframes radialScaleIn {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
+}

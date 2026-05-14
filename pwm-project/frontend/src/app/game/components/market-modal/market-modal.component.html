@@ -1,0 +1,89 @@
+<div class="market-modal-backdrop" (click)="closeModal()">
+  
+  <div class="market-frame" 
+       (click)="$event.stopPropagation()"
+       (mousedown)="onDragStart($event)"
+       [style.transform]="'translate(' + transformX + 'px, ' + transformY + 'px)'">
+    
+    <div class="market-sidebar">
+      <div class="brand">
+        <span class="system-name">MARKET</span>
+        <span class="version">COMMERCE_OS V.1.2</span>
+      </div>
+      
+      <nav>
+        <div class="nav-item" [class.active]="activeTab === 'trade'" (click)="activeTab = 'trade'">
+          <ion-icon name="swap-horizontal-outline"></ion-icon><span>SCAMBIO</span>
+        </div>
+        <div class="nav-item" [class.active]="activeTab === 'orders'" (click)="activeTab = 'orders'">
+          <ion-icon name="time-outline"></ion-icon><span>ORDINI</span>
+        </div>
+        <div class="nav-item" [class.active]="activeTab === 'storage'" (click)="activeTab = 'storage'">
+          <ion-icon name="cube-outline"></ion-icon><span>MAGAZZINO</span>
+        </div>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <button class="exit-btn" (click)="closeModal()">[ CHIUDI ]</button>
+      </div>
+    </div>
+
+    <div class="market-main scrollable-y">
+      <div class="market-container">
+        
+        <ng-container *ngIf="activeTab === 'trade'">
+          <div class="header-info">
+            <p class="track-label">Terminal Economico Globale</p>
+            <span class="wallet">SALDO DISPONIBILE: <span class="gold-text">💵 {{ playerResources['denaro'] | number }}</span></span>
+          </div>
+
+          <div class="resource-grid">
+            <div class="build-card" *ngFor="let res of marketItems">
+              <div class="build-info">
+                <span class="item-name">{{ res.icon }} {{ res.label }}</span>
+                <span class="item-tier">PREZZO UNIT: {{ res.price | number }}</span>
+              </div>
+              <div class="market-actions">
+                <div class="qty-selector">
+                  <button (click)="changeQty(res, -100)">-</button>
+                  <input type="number" [(ngModel)]="res.quantity" min="0">
+                  <button (click)="changeQty(res, 100)">+</button>
+                </div>
+                <div class="trade-buttons">
+                  <button class="primary-glow slim" (click)="buy(res)">ACQUISTA</button>
+                  <button class="ghost-button mini" (click)="sell(res)">VENDI</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="activeTab === 'orders'">
+          <p class="track-label">Protocolli di Carico in Transito</p>
+          <div class="sensor-grid">
+            <div class="sensor-row">
+              <span>CONVOGLIO_#441 (ACCIAIO)</span>
+              <span class="sensor-val gold-text">ARRIVO: 12m 30s</span>
+            </div>
+            <div class="sensor-row">
+              <span>CARGO_#12 (PETROLIO)</span>
+              <span class="sensor-val gold-text">ARRIVO: 45m 00s</span>
+            </div>
+          </div>
+          <p class="status-msg" style="margin-top: 20px;">Nessun altro ordine rilevato nei sensori radar a corto raggio.</p>
+        </ng-container>
+
+        <ng-container *ngIf="activeTab === 'storage'">
+          <p class="track-label">Rilevamento Scorte Silos</p>
+          <div class="sensor-grid">
+            <div class="sensor-row" *ngFor="let res of playerResources | keyvalue">
+              <span style="text-transform: uppercase;">{{ res.key }}</span>
+              <span class="sensor-val">{{ $any(res.value) | number }}</span>
+            </div>
+          </div>
+        </ng-container>
+
+      </div>
+    </div>
+  </div>
+</div>
