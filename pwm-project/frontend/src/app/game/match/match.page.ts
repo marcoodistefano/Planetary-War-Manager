@@ -1,7 +1,7 @@
 import { Component, OnInit, AfterViewInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule, ModalController, MenuController } from '@ionic/angular'; // <--- AGGIUNTO MenuController
 import { Router } from '@angular/router';
 
 // Componenti
@@ -46,6 +46,7 @@ export class MatchPage implements OnInit, AfterViewInit {
   hoveredState = { id: null as any, source: null as any };
   currentHoveredName = '';
   sensorSocket: any;
+  private touchTimer: any;
 
   // --- 2. STATO DELL'INTERFACCIA (UI) ---
   isProfileModalOpen = false;
@@ -145,7 +146,8 @@ export class MatchPage implements OnInit, AfterViewInit {
   constructor(
     private router: Router, 
     private cdr: ChangeDetectorRef,
-    private modalCtrl: ModalController 
+    private modalCtrl: ModalController,
+    private menuCtrl: MenuController
   ) { }
 
   ngOnInit() {
@@ -169,8 +171,13 @@ export class MatchPage implements OnInit, AfterViewInit {
 
   // --- AZIONI HUD E CONTROLLI UI ---
 
+  closeMobileMenu() {
+    this.menuCtrl.close('mobile-tactical-menu');
+  }
+
   toggleChat() {
     this.isChatOpen = !this.isChatOpen;
+    this.closeMobileMenu();
   }
 
   goToHome() {
@@ -186,6 +193,7 @@ export class MatchPage implements OnInit, AfterViewInit {
       this.isIntelligenceModalOpen = false;
       this.isMarketModalOpen = false;
     }
+    this.closeMobileMenu();
   }
 
   toggleMarketModal() {
@@ -197,6 +205,7 @@ export class MatchPage implements OnInit, AfterViewInit {
       this.isIntelligenceModalOpen = false;
       this.isArmyModalOpen = false;
     }
+    this.closeMobileMenu();
   }
   
   toggleTechModal() {
@@ -208,25 +217,29 @@ export class MatchPage implements OnInit, AfterViewInit {
       this.isMarketModalOpen = false;
       this.isArmyModalOpen = false;
     }
+    this.closeMobileMenu();
   }
   
   // Assicurati che gli altri toggle chiudano isTechModalOpen
   toggleBuildPanel() {
     this.isBuildPanelOpen = !this.isBuildPanelOpen;
     if (this.isBuildPanelOpen) { this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; this.isIntelligenceModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false;}
+    this.closeMobileMenu();
   }
 
   toggleDiplomacyModal() {
     this.isDiplomacyModalOpen = !this.isDiplomacyModalOpen;
     if (this.isDiplomacyModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isIntelligenceModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false;}
+    this.closeMobileMenu();
   }
 
   toggleIntelligenceModal() {
     this.isIntelligenceModalOpen = !this.isIntelligenceModalOpen;
     if (this.isIntelligenceModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false;}
+    this.closeMobileMenu();
   }
 
-  toggleMapSettings() { this.isMapSettingsOpen = !this.isMapSettingsOpen; }
+  toggleMapSettings() { this.isMapSettingsOpen = !this.isMapSettingsOpen; this.closeMobileMenu();}
   setBuildCategory(cat: 'risorse' | 'armamenti') { this.activeBuildCategory = cat; }
   setOpenProfile(isOpen: boolean) { this.isProfileModalOpen = isOpen; }
 
@@ -291,6 +304,43 @@ export class MatchPage implements OnInit, AfterViewInit {
         this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
     });
 
+    this.map.on('touchstart', (e: any) => {
+      // Avviamo un timer di 500ms (0.5 secondi)
+      this.touchTimer = setTimeout(() => {
+        // Se il timer arriva alla fine, attiviamo il menu radiale
+        // Usiamo le coordinate del punto toccato
+        this.radialMenuX = e.originalEvent.touches[0].clientX;
+        this.radialMenuY = e.originalEvent.touches[0].clientY;
+        
+        this.isRadialMenuVisible = true;
+        this.cdr.detectChanges();
+        
+        // Opzionale: un piccolo feedback di vibrazione se il dispositivo lo supporta
+        if (navigator.vibrate) navigator.vibrate(50);
+        
+      }, 500); // <--- Durata della pressione: 0.5 secondi
+    });
+
+    this.map.on('touchend', () => {
+      // Se l'utente alza il dito prima del secondo, annulliamo tutto
+      this.clearTouchTimer();
+    });
+
+    this.map.on('touchmove', () => {
+      // Se l'utente trascina la mappa, annulliamo il timer 
+      // (altrimenti il menu si aprirebbe durante lo scrolling)
+      this.clearTouchTimer();
+    });
+
+    // Mantieni anche il vecchio listener contextmenu per il Desktop
+    this.map.on('contextmenu', (e: any) => {
+      e.originalEvent.preventDefault();
+      this.radialMenuX = e.originalEvent.clientX;
+      this.radialMenuY = e.originalEvent.clientY;
+      this.isRadialMenuVisible = true;
+      this.cdr.detectChanges();
+    });
+
     this.map.on('mousemove', (e: any) => this.handleMapMouseMove(e));
 
     this.map.on('contextmenu', (e: any) => {
@@ -319,6 +369,13 @@ export class MatchPage implements OnInit, AfterViewInit {
     if (this.isRadialMenuVisible) {
       this.isRadialMenuVisible = false;
       this.cdr.detectChanges();
+    }
+  }
+
+  private clearTouchTimer() {
+    if (this.touchTimer) {
+      clearTimeout(this.touchTimer);
+      this.touchTimer = null;
     }
   }
 

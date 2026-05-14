@@ -1,10 +1,11 @@
 /* ==========================================================================
    PLANETARY WAR MANAGER - MATCH PAGE HUD (COMPLETE TACTICAL GLASS)
-   Restaurato: Include Scanlines, Pulsanti Tattici e Segmented Control
    ========================================================================== */
 
+/* ==========================================================================
+   1. VARIABILI GLOBALI E SETTAGGI BASE
+   ========================================================================== */
 :host {
-  /* --- 1. VARIABILI DI TEMA --- */
   --primary-blue: #86d7ff;
   --primary-glow: rgba(134, 215, 255, 0.3);
   --danger-red: #ff7b72;
@@ -26,9 +27,13 @@
   font-family: 'Inter', sans-serif;
 }
 
-.transparent-bg { --background: #000 !important; }
+.transparent-bg { 
+  --background: #000 !important; 
+}
 
-/* --- 2. MAPPA E OVERLAY HUD --- */
+/* ==========================================================================
+   2. MAPPA E OVERLAY SFONDO
+   ========================================================================== */
 #map-container {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -50,27 +55,18 @@
 }
 
 /* ==========================================================================
-   3. TOP NAVBAR (ALTEZZA OLOGRAFICA, LARGHEZZA FLUIDA)
+   3. TOP NAVBAR (DESKTOP) E RISORSE
    ========================================================================== */
 .top-navbar {
   position: absolute;
-  
-  /* Margine superiore proporzionato al motore 16:9 */
   top: calc(2 * var(--unit));
-  
   left: 50%;
   transform: translateX(-50%);
-  
-  /* CRITICO: La larghezza torna ad essere percentuale per far respirare il testo */
   width: 98%; 
   max-width: 1800px; 
-  
-  /* L'altezza continua a scalare in proporzione, dando l'effetto olografico */
   height: calc(5 * var(--unit));
   min-height: 60px;
-  
   z-index: 1000;
-  
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -91,7 +87,6 @@
     height: 100%;
   }
 
-  /* CRITICO: Impedisce che Costruzioni/Ricerca e il Profilo vengano spinti fuori o schiacciati */
   .nav-group-left, .profile-section {
     flex-shrink: 0;
   }
@@ -100,31 +95,24 @@
     gap: 15px; 
   }
   
-  /* CRITICO: Gestisce le risorse in eccesso limitandole allo spazio disponibile */
   .resource-bar { 
     flex: 2; 
     display: flex;
     align-items: center;
     min-width: 0; 
-    justify-content: center; /* MODIFICATO: Allinea le risorse a sinistra */
-    gap: calc(1.2 * var(--unit)); /* Leggermente aumentato per farle respirare */
-    
+    justify-content: center; 
+    gap: calc(1.2 * var(--unit)); 
     overflow: visible; 
-    min-width: 0;
-
-    scrollbar-width: none; 
     
-    &::-webkit-scrollbar {
-      display: none; 
-    }
+    scrollbar-width: none; 
+    &::-webkit-scrollbar { display: none; }
   }
-  /* Allinea il profilo a destra */
+
   .profile-section {
     justify-content: flex-end;
   }
 }
 
-/* --- RISORSE --- */
 .res-item {
   position: relative;
   display: flex;
@@ -137,13 +125,13 @@
 
   .res-data {
     display: flex;
-    flex-direction: column; // Forza la disposizione verticale (Label sopra, Val sotto)
+    flex-direction: column;
     justify-content: center;
-    align-items: flex-start; // Allinea il testo a sinistra (accanto all'icona)
-    line-height: 1.1; // Riduce lo spazio tra le due righe di testo
+    align-items: flex-start;
+    line-height: 1.1; 
   }
 
-  .res-label { font-size: calc(0.75 * var(--unit));letter-spacing: 0.8px; color: var(--primary-blue); font-weight: 800}
+  .res-label { font-size: calc(0.75 * var(--unit)); letter-spacing: 0.8px; color: var(--primary-blue); font-weight: 800; }
   .res-val { font-size: calc(1.25 * var(--unit)); color: #fff; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
   .res-prod { font-size: calc(0.85 * var(--unit)); color: var(--success-green); font-family: 'JetBrains Mono', monospace; font-weight: 600; margin-top: 1px; text-shadow: 0 0 5px rgba(163, 230, 53, 0.3); }
   .res-icon { font-size: calc(1.6 * var(--unit)); }
@@ -152,7 +140,6 @@
   &.trigger-item:hover .troops-dropdown { display: block; animation: popupFade 0.2s ease-out; }
 }
 
-/* --- DROPDOWN TRUPPE --- */
 .troops-dropdown {
   display: none;
   position: absolute;
@@ -180,18 +167,17 @@
 }
 
 /* ==========================================================================
-   4. SEZIONE PROFILO (AVATAR E TESTO)
+   4. PROFILO (DESKTOP BAR)
    ========================================================================== */
 .profile-trigger {
   display: flex;
   align-items: center;
-  gap: 12px;
-  cursor: pointer;
   gap: calc(1.5 * var(--unit));
+  cursor: pointer;
 
   .profile-info {
     text-align: right;
-    .p-rank { font-size: calc(0.8 * var(--unit));; color: var(--primary-blue); font-weight: 900; display: block; margin-bottom: -2px; }
+    .p-rank { font-size: calc(0.8 * var(--unit)); color: var(--primary-blue); font-weight: 900; display: block; margin-bottom: -2px; }
     .p-name { font-size: calc(1.2 * var(--unit)); color: #fff; font-weight: 700; text-transform: uppercase; }
   }
 
@@ -209,10 +195,14 @@
 }
 
 /* ==========================================================================
-   5. HUD LATERALE E PANNELLI
+   5. LAYOUT HUD LATERALE E PANNELLI FLUTTUANTI
    ========================================================================== */
 .hud-stack-left, .hud-stack-right {
-  position: absolute; bottom: calc(4 * var(--unit)); right: calc(2 * var(--unit)); z-index: 20; pointer-events: none;
+  position: absolute; 
+  bottom: calc(4 * var(--unit)); 
+  z-index: 20; 
+  pointer-events: none;
+  
   .hud-panel {
     pointer-events: auto;
     background: var(--glass-bg);
@@ -224,57 +214,50 @@
   }
 }
 
-.hud-stack-right {
-  right: calc(2 * var(--unit));
+.hud-stack-left { 
+  left: calc(2 * var(--unit)); 
+  width: clamp(280px, calc(30 * var(--unit)), 400px);
+}
+
+.hud-stack-right { 
+  right: calc(2 * var(--unit)); 
   width: clamp(260px, calc(28 * var(--unit)), 380px);
-  
-  /* AGGIUNGI QUESTE RIGHE PER L'ALLINEAMENTO VERTICALE */
   display: flex;
   flex-direction: column;
-  justify-content: flex-end; /* Allinea il contenuto partendo dal basso */
+  justify-content: flex-end; 
 }
 
-/* AGGIUNGI QUESTA REGOLA PER IL COMPONENTE CHAT */
 .hud-chat-panel {
   display: block; 
-  pointer-events: auto; /* Permette di cliccare dentro la chat */
-  margin-bottom: 12px;  /* Crea lo spazio esatto tra chat e pulsante */
-  
-  /* Assicurati che non ci siano posizionamenti assoluti nel componente 
-     interno che lo portano via da questa posizione */
+  pointer-events: auto; 
+  margin-bottom: 12px;  
 }
-
-.hud-stack-left { left: calc(2 * var(--unit)); width: clamp(280px, calc(30 * var(--unit)), 400px);}
-.hud-stack-right { right: calc(2 * var(--unit)); width: clamp(260px, calc(28 * var(--unit)), 380px);}
 
 .tactical-actions-row {
   display: flex;
   gap: 12px;
-  margin-bottom: 15px; /* Crea distanza tra i bottoni e il pannello Map Settings sottostante */
-  pointer-events: auto; /* Permette il click */
+  margin-bottom: 15px; 
+  pointer-events: auto; 
 
   button {
-    flex: 1; /* I pulsanti si dividono equamente lo spazio */
-    margin-top: 0; /* Sovrascrive il margine di default della classe primary-glow */
-    padding: 14px 5px; /* Più spessi e facili da cliccare */
+    flex: 1; 
+    margin-top: 0; 
+    padding: 14px 5px; 
     font-size: 0.75rem;
-    
-    /* Effetto per farli sembrare veri tasti del cruscotto */
     background: rgba(7, 15, 28, 0.85);
     backdrop-filter: blur(20px);
     box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
   }
 }
 
-
-/* --- 5.1 STILI SPECIFICI VISUAL ENGINE & SENSORI (Aggiunti per coerenza) --- */
-
+/* ==========================================================================
+   6. COMPONENTI INTERNI PANNELLI (Sensori, Select, Build Cards)
+   ========================================================================== */
 .glass-select-container {
   position: relative;
   width: 100%;
   margin-bottom: 12px;
 
-  /* Freccia custom per il dropdown */
   &::after {
     content: '▼';
     position: absolute;
@@ -294,7 +277,7 @@
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--glass-border);
   color: var(--text-accent);
-  padding: 10px 30px 10px 12px; /* Spazio a destra per la freccia custom */
+  padding: 10px 30px 10px 12px; 
   border-radius: 6px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem;
@@ -365,8 +348,6 @@
   }
 }
 
-
-/* --- SEGMENTED CONTROL (RISORSE / ARMAMENTI) --- */
 .category-toggle {
   display: flex;
   gap: 2px;
@@ -399,7 +380,6 @@
   }
 }
 
-/* Card Build */
 .build-card {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(134, 215, 255, 0.1);
@@ -418,16 +398,15 @@
   .build-info {
     display: flex; 
     justify-content: space-between;
-    margin-bottom: 8px; /* Spazio tra il nome e le risorse */
+    margin-bottom: 8px; 
     
     .item-name { font-size: 0.7rem; color: #fff; font-weight: 800; }
     .item-tier { font-size: 0.55rem; color: var(--primary-blue); font-weight: 900; }
   }
 
-  /* Badge per i Costi delle risorse */
   .build-cost {
     display: flex;
-    flex-wrap: wrap; /* Manda a capo le risorse se sono troppe */
+    flex-wrap: wrap; 
     gap: 6px;
 
     .cost-unit {
@@ -444,10 +423,10 @@
     }
   }
 }
-/* ==========================================================================
-   6. PULSANTI TATTICI (UNIFICATI)
-   ========================================================================== */
 
+/* ==========================================================================
+   7. BOTTONI GLOBALI E MODALI
+   ========================================================================== */
 .primary-glow, .nav-action-btn.mini, .ghost-button.mini {
   background: rgba(134, 215, 255, 0.05);
   border: 1px solid var(--glass-border);
@@ -475,7 +454,7 @@
 
 .pwm-logo-btn {
   background: var(--primary-blue);
-  color: #051120; /* Colore scuro per contrasto sul blu */
+  color: #051120; 
   border: none;
   font-family: 'JetBrains Mono', monospace;
   font-weight: 900;
@@ -496,16 +475,209 @@
     box-shadow: 0 0 25px var(--primary-blue);
     transform: scale(1.05);
   }
+  &:active { transform: scale(0.95); }
+}
 
-  &:active {
-    transform: scale(0.95);
-  }
+.modal-overlay-container {
+  position: fixed;   
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.7); 
+  backdrop-filter: blur(8px);    
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;     
+  pointer-events: auto; 
+}
+
+app-tactical-terminal {
+  width: 90%; max-width: 1000px; height: 80%; display: block;
 }
 
 /* ==========================================================================
-   7. UTILITY & ANIMAZIONI
+   8. MENU RADIALE TATTICO
    ========================================================================== */
+.radial-menu-container {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: auto;
+  transform: translate(-50%, -50%); 
+}
 
+.radial-menu-wrapper {
+  position: relative;
+  width: calc(18 * var(--unit)); 
+  height: calc(18 * var(--unit));
+  border-radius: 50%;
+  filter: drop-shadow(0 0 15px rgba(0,0,0,0.5));
+  animation: radialScaleIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.radial-sector {
+  position: absolute;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  clip-path: polygon(50% 50%, 100% 0%, 100% 100%); 
+  background: rgba(45, 55, 72, 0.6); 
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+  cursor: pointer;
+
+  .sector-content {
+    display: flex; align-items: center; justify-content: center;
+    transform: translateX(calc(5.8 * var(--unit))); 
+    
+    ion-icon, svg {
+      font-size: calc(3.5 * var(--unit)); 
+      color: white;
+      transform: rotate(var(--icon-rev-rot)); 
+    }
+  }
+
+  &.sector-right { transform: rotate(0deg); --icon-rev-rot: 0deg; }
+  &.sector-bottom { transform: rotate(90deg); --icon-rev-rot: -90deg; }
+  &.sector-left { transform: rotate(180deg); --icon-rev-rot: -180deg; }
+  &.sector-top { transform: rotate(-90deg); --icon-rev-rot: 90deg; }
+
+  &.active { background: rgba(234, 179, 8, 0.7); ion-icon, svg { color: white; } }
+  &:hover { background: rgba(134, 215, 255, 0.3); }
+}
+
+.radial-center-trigger {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(5.5 * var(--unit)); height: calc(5.5 * var(--unit));
+  background: rgba(45, 55, 72, 0.8); 
+  backdrop-filter: blur(10px);
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: 0.2s;
+
+  ion-icon, svg { font-size: calc(2.8 * var(--unit)); color: white; opacity: 0.9; }
+
+  &:hover { 
+    background: var(--danger-red); 
+    border-color: #fff;
+    box-shadow: 0 0 15px var(--danger-red);
+  }
+}
+
+@keyframes radialScaleIn {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ==========================================================================
+   9. SIDEBAR TATTICA MOBILE (VETRO E LEGGIBILITÀ)
+   ========================================================================== */
+/* ==========================================================================
+   9. SIDEBAR TATTICA MOBILE (75% WIDTH E NO BLUR)
+   ========================================================================== */
+ion-menu {
+  /* Sfondo semi-trasparente scuro, senza effetto blur per vedere la mappa nitida */
+  --background: rgba(7, 15, 28, 0.92) !important;
+  --width: 75vw; /* Esattamente il 75% della larghezza dello schermo */
+  border-right: 1px solid var(--glass-border);
+}
+
+.mobile-sidebar-content {
+  --background: transparent;
+  padding: 24px 10px; /* Leggermente ridotto per dare più larghezza centrale al titolo */
+
+  .sidebar-header {
+    margin-bottom: 20px;
+    
+    .title-block {
+      text-align: center;
+      
+      .eyebrow { font-size: 0.6rem; color: var(--primary-blue); letter-spacing: 2px; }
+      h2 { font-size: 1.15rem; color: #fff; text-shadow: 0 0 10px rgba(134, 215, 255, 0.4); margin-top: 4px; }
+    }
+  }
+
+  .profile-trigger {
+    display: flex;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--glass-border);
+    box-shadow: inset 0 0 15px rgba(134, 215, 255, 0.05);
+    padding: 14px;
+    border-radius: 12px;
+    
+    /* AGGIUNTO: Margine orizzontale di 20px per staccarlo dai bordi */
+    margin: 16px 20px 0 20px; 
+    
+    gap: 12px;
+    align-items: center;
+    
+    .profile-avatar-circle { width: 48px; height: 48px; font-size: 1.4rem; border: 2px solid var(--primary-blue); flex-shrink: 0; display: flex; align-items: center; justify-content: center;}
+    
+    .profile-info { 
+      text-align: left;
+      flex: 1;             /* Permette al div di occupare lo spazio ma di potersi restringere */
+      min-width: 0;        /* CRITICO: Serve a far funzionare il taglio del testo nei layout flexbox */
+      
+      .p-rank { 
+        font-size: 0.7rem; 
+        font-weight: 900; 
+        letter-spacing: 1px; 
+        color: var(--primary-blue); 
+        display: block; 
+        margin-bottom: 2px; 
+      }
+      
+      .p-name { 
+        font-size: 1.05rem; 
+        font-weight: 700; 
+        color: #fff; 
+        display: block; 
+        
+        /* Regole per tagliare il testo lungo con i tre puntini */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      } 
+    }
+  }
+
+  .sidebar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px; 
+    margin-top: 20px;
+    
+    /* AGGIUNTO: Padding orizzontale di 20px per stringere i bottoni verso il centro */
+    padding: 0 20px 30px 20px;
+
+    .nav-action-btn {
+      width: 100%;
+      justify-content: flex-start;
+      padding: 15px 16px; 
+      margin-top: 0;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(134, 215, 255, 0.15);
+      border-radius: 10px;
+      box-shadow: none; 
+      
+      ion-icon { margin-right: 14px; font-size: 1.4rem; color: var(--primary-blue); }
+      
+      span { font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #f4f7fb; letter-spacing: 1px; }
+
+      &:active, &.active {
+        background: rgba(134, 215, 255, 0.15);
+        border-color: var(--primary-blue);
+        box-shadow: 0 0 20px rgba(134, 215, 255, 0.2);
+        span { color: #fff; text-shadow: 0 0 8px rgba(134, 215, 255, 0.6); }
+      }
+    }
+  }
+}
+/* ==========================================================================
+   10. UTILITIES E ANIMAZIONI
+   ========================================================================== */
 .scrollable-y {
   max-height: 320px; overflow-y: auto;
   &::-webkit-scrollbar { width: 3px; }
@@ -523,38 +695,20 @@
   h2 { font-size: 0.8rem; color: #fff; margin: 0; font-weight: 700; }
 }
 
-@keyframes popupFade {
-  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-
 .panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  transition: opacity 0.3s ease;
-
-  &:hover {
-    opacity: 0.8;
-  }
-
-  /* Rimuove il margine inferiore dal titolo per centrarlo con la freccia */
-  .title-block {
-    margin-bottom: 0 !important;
-  }
-
-  ion-icon {
-    color: var(--primary-blue);
-    font-size: 1.4rem;
-    transition: transform 0.3s ease;
-  }
+  display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: opacity 0.3s ease;
+  &:hover { opacity: 0.8; }
+  .title-block { margin-bottom: 0 !important; }
+  ion-icon { color: var(--primary-blue); font-size: 1.4rem; transition: transform 0.3s ease; }
 }
 
 .panel-content {
-  margin-top: 15px;
-  animation: panelSlideDown 0.25s ease-out forwards;
-  transform-origin: top;
+  margin-top: 15px; animation: panelSlideDown 0.25s ease-out forwards; transform-origin: top;
+}
+
+@keyframes popupFade {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 @keyframes panelSlideDown {
@@ -562,128 +716,99 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.modal-overlay-container {
-  position: fixed;   /* Fondamentale: deve stare sopra tutto il resto */
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.7); /* Scurisce lo sfondo */
-  backdrop-filter: blur(8px);    /* Effetto vetro sfocato */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;     /* Deve essere più alto di .top-navbar (che ha 1000) */
-  pointer-events: auto; /* Permette di cliccare dentro la modale */
+/* ==========================================================================
+   11. RESPONSIVE ADAPTATIONS (Media Queries)
+   ========================================================================== */
+.mobile-only {
+  display: none !important;
 }
 
-/* Se il componente interno non ha dimensioni, forzale qui */
-app-tactical-terminal {
-  width: 90%;
-  max-width: 1000px;
-  height: 80%;
-  display: block;
-}
-/* --- RADIAL TACTICAL MENU --- */
-.radial-menu-container {
-  position: fixed;
-  z-index: 10000;
-  pointer-events: auto;
-  transform: translate(-50%, -50%); 
-}
-
-.radial-menu-wrapper {
-  position: relative;
-  /* FORMULA 16:9: 18 * unit rende il menu più piccolo dei 240px originali e scalabile proporzionalmente */
-  width: calc(18 * var(--unit)); 
-  height: calc(18 * var(--unit));
-  border-radius: 50%;
-  filter: drop-shadow(0 0 15px rgba(0,0,0,0.5));
-  animation: radialScaleIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.radial-sector {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  clip-path: polygon(50% 50%, 100% 0%, 100% 100%); 
-  background: rgba(45, 55, 72, 0.6); 
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  cursor: pointer;
-
-  .sector-content {
+@media (max-width: 992px) {
+  .desktop-only { display: none !important; }
+  .mobile-only { display: flex !important; }
+  
+ /* 1. Nuova Navbar Mobile (Pillola di vetro tattica) */
+  .mobile-top-navbar {
+    position: absolute;
+    top: 10px; 
+    left: 10px;
+    right: 10px;
+    height: 56px; /* Altezza fissa per inquadrare bene gli elementi */
+    z-index: 1000;
     display: flex;
     align-items: center;
-    justify-content: center;
+    padding: 0 8px;
     
-    /* Spinge l'icona al centro usando la matematica 16:9 invece dei px fissi */
-    transform: translateX(calc(5.8 * var(--unit))); 
+    /* AGGIUNTO: Sfondo Vetro Tattico */
+    background: rgba(7, 15, 28, 0.85);
+    border: 1px solid rgba(134, 215, 255, 0.3);
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     
-    ion-icon, svg {
-      font-size: calc(3.5 * var(--unit)); /* Icone scalabili */
-      color: white;
-      transform: rotate(var(--icon-rev-rot)); 
+    pointer-events: auto; /* Riattivato per intercettare i tocchi sulla barra */
+
+    .holographic-menu-btn {
+      --color: #86d7ff;
+      background: rgba(134, 215, 255, 0.1);
+      border: 1px solid rgba(134, 215, 255, 0.2);
+      border-radius: 8px;
+      width: 40px; height: 40px; 
+      box-shadow: none; /* Ombre rimosse perché c'è già il background della navbar */
+    }
+
+    .mobile-logo {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 900;
+      font-size: 1.4rem;
+      color: #86d7ff;
+      text-shadow: 0 0 10px rgba(134, 215, 255, 0.5);
+      letter-spacing: 2px;
+      margin: 0;
     }
   }
 
-  /* Rotazioni PERFETTE (Top, Right, Bottom, Left) */
-  &.sector-right { transform: rotate(0deg); --icon-rev-rot: 0deg; }
-  &.sector-bottom { transform: rotate(90deg); --icon-rev-rot: -90deg; }
-  &.sector-left { transform: rotate(180deg); --icon-rev-rot: -180deg; }
-  &.sector-top { transform: rotate(-90deg); --icon-rev-rot: 90deg; }
+  /* 2. Barra Risorse Verticale (Abbassata per fare spazio alla nuova Navbar) */
+  .vertical-resource-bar {
+    position: absolute;
+    top: 110px; /* Spostato più in basso rispetto ai 65px di prima */
+    right: 10px;
+    z-index: 1000;
+    pointer-events: auto;
+    display: flex !important;
+    flex-direction: column;
+    gap: 3px; 
+    max-height: calc(100vh - 90px); 
+    overflow-y: visible; 
+    padding-right: 0;
 
-  &.active {
-    background: rgba(234, 179, 8, 0.7); 
-    ion-icon, svg { color: white; }
+    .mini-res-item {
+      background: rgba(7, 15, 28, 0.85);
+      border: 1px solid rgba(134, 215, 255, 0.3); 
+      border-radius: 6px;
+      padding: 4px 2px; 
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      backdrop-filter: blur(10px);
+      min-width: 46px; 
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+
+      .icon { font-size: 1.1rem; margin-bottom: 1px; } 
+      .val { font-size: 0.65rem; color: #fff; font-family: 'JetBrains Mono', monospace; font-weight: 800; text-align: center; line-height: 1; margin-top: 2px; } 
+
+      &.premium {
+        border-color: rgba(253, 224, 71, 0.6);
+        .val { color: #fde047; text-shadow: 0 0 5px rgba(253, 224, 71, 0.3); }
+      }
+    }
   }
 
-  &:hover {
-    background: rgba(134, 215, 255, 0.3);
+  /* 3. Abbassato anche il contenitore sinistro di costruzioni/sensori */
+  .hud-stack-left {
+    top: 80px; 
+    bottom: auto;
   }
-}
-
-.radial-center-trigger {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  
-  /* Dimensione pulsante centrale scalata in 16:9 */
-  width: calc(5.5 * var(--unit));
-  height: calc(5.5 * var(--unit));
-  
-  background: rgba(45, 55, 72, 0.8); 
-  backdrop-filter: blur(10px);
-  border: 3px solid rgba(255, 255, 255, 0.15);
-  border-radius: 50%;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: 0.2s;
-
-  /* Applica le dimensioni anche all'SVG che abbiamo appena inserito */
-  ion-icon, svg { 
-    font-size: calc(2.8 * var(--unit)); 
-    color: white; 
-    opacity: 0.9;
-  }
-
-  /* Effetto Hover (colore Rosso come nel tuo screenshot) */
-  &:hover { 
-    background: var(--danger-red); 
-    border-color: #fff;
-    box-shadow: 0 0 15px var(--danger-red);
-  }
-}
-
-@keyframes radialScaleIn {
-  from { opacity: 0; transform: scale(0.5); }
-  to { opacity: 1; transform: scale(1); }
 }

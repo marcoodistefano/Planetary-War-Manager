@@ -1,204 +1,260 @@
-<ion-content [fullscreen]="true" class="transparent-bg" [scrollY]="false">
-  
-  <div class="hud-panel top-navbar">
-    <div class="nav-group-left">
-      <button class="pwm-logo-btn" (click)="goToHome()">PWM</button>
-    </div>
-
-    <div class="resource-bar">
-      <div *ngFor="let res of resourceConfig" 
-           class="res-item" 
-           [class.premium]="res.id === 'oro'" 
-           [class.trigger-item]="res.isTrigger">
-        
-        <span class="res-icon">{{ res.icon }}</span>
-        <div class="res-data">
-          <span class="res-label">{{ res.label }}</span>
-          <span class="res-val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number }}</span>
-          <span class="res-prod" *ngIf="!res.isTrigger && resourceProduction[res.id] > 0"> +{{ resourceProduction[res.id] | number }}/h </span>
-          <span class="res-val" *ngIf="res.isTrigger">STATUS</span>
-        </div>
-        
-        <div class="troops-dropdown" *ngIf="res.isTrigger">
-          <div class="dropdown-header">ARMATA DISPIEGATA</div>
-          <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
-            <span class="t-key">{{ troop.key }}</span>
-            <span class="t-val">{{ troop.value }}</span>
-          </div>
-        </div>
+<ion-menu side="start" menuId="mobile-tactical-menu" contentId="main-map-content" type="overlay">
+  <ion-content class="mobile-sidebar-content">
+    
+    <div class="sidebar-header">
+      <div class="title-block compact" style="margin-bottom: 20px;">
+        <p class="eyebrow">Strategic Command</p>
+        <h2>PLANETARY WAR<br>MANAGER</h2>
       </div>
-    </div>
-
-    <div class="profile-section">
-      <div class="profile-trigger" (click)="setOpenProfile(true)">
-        <div class="profile-info">
-          <span class="p-rank">GENERALE DI BRIGATA</span>
-          <span class="p-name">{{ userProfile.username }}</span>
-        </div>
+      
+      <div class="profile-trigger" (click)="setOpenProfile(true); closeMobileMenu()">
         <div class="profile-avatar-circle">
           <span class="user-symbol">👤</span>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="map-container"></div>
-
-  <div class="hud-stack-left">
-    
-    <div class="hud-panel build-panel" *ngIf="isBuildPanelOpen" style="margin-bottom: 12px;">
-      <div class="title-block compact">
-        <p class="eyebrow">Ingegneria di Campo</p>
-        <h2>COSTRUZIONE</h2>
-      </div>
-      <div class="category-toggle">
-        <button [class.active]="activeBuildCategory === 'risorse'" (click)="setBuildCategory('risorse')">RISORSE</button>
-        <button [class.active]="activeBuildCategory === 'armamenti'" (click)="setBuildCategory('armamenti')">ARMAMENTI</button>
-      </div>
-      <div class="hud-separator"></div>
-      <div class="build-grid scrollable-y">
-        <div *ngFor="let item of getFilteredBuildItems()" class="build-card" (click)="startConstruction(item)">
-          <div class="build-info">
-            <span class="item-name">{{ item.name || item.nome }}</span>
-            <span class="item-tier">TIER {{ item.tier }}</span>
-          </div>
-          <div class="build-cost">
-            <span class="cost-unit" *ngIf="item.costo_denaro > 0">💵 {{ item.costo_denaro | number }}</span>
-            <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio | number }}</span>
-          </div>
+        <div class="profile-info">
+          <span class="p-rank">GEN. BRIGATA</span>
+          <span class="p-name">{{ userProfile.username }}</span>
         </div>
       </div>
     </div>
+    
+    <div class="hud-separator"></div>
 
-    <div class="tactical-actions-row secondary-actions">
+    <div class="sidebar-actions">
       <button class="nav-action-btn primary-glow" [class.active]="isMarketModalOpen" (click)="toggleMarketModal()">
-        <ion-icon name="swap-horizontal-outline"></ion-icon>
-        <span>MARKET</span>
+        <ion-icon name="swap-horizontal-outline"></ion-icon> <span>MARKET GLOBALE</span>
       </button>
       <button class="nav-action-btn primary-glow" [class.active]="isArmyModalOpen" (click)="toggleArmyModal()">
-        <ion-icon name="people-outline"></ion-icon>
-        <span>ARMATE</span>
+        <ion-icon name="people-outline"></ion-icon> <span>GESTIONE ARMATE</span>
       </button>
-    </div>
-
-    <div class="tactical-actions-row secondary-actions">
       <button class="nav-action-btn primary-glow" [class.active]="isDiplomacyModalOpen" (click)="toggleDiplomacyModal()">
-        <ion-icon name="shield-half-outline"></ion-icon>
-        <span>DIPLOMAZIA</span>
+        <ion-icon name="shield-half-outline"></ion-icon> <span>DIPLOMAZIA</span>
       </button>
       <button class="nav-action-btn primary-glow" [class.active]="isIntelligenceModalOpen" (click)="toggleIntelligenceModal()">
-        <ion-icon name="eye-outline"></ion-icon>
-        <span>INTELLIGENCE</span>
+        <ion-icon name="eye-outline"></ion-icon> <span>INTELLIGENCE</span>
       </button>
-    </div>
-
-    <div class="tactical-actions-row">
       <button class="nav-action-btn primary-glow" [class.active]="isBuildPanelOpen" (click)="toggleBuildPanel()">
-        <ion-icon name="construct-outline"></ion-icon>
-        <span>COSTRUZIONI</span>
+        <ion-icon name="construct-outline"></ion-icon> <span>COSTRUZIONI</span>
       </button>
       <button class="nav-action-btn primary-glow" [class.active]="isTechModalOpen" (click)="toggleTechModal()">
-        <ion-icon name="flask-outline"></ion-icon>
-        <span>RICERCHE</span>
+        <ion-icon name="flask-outline"></ion-icon> <span>RICERCHE TECH</span>
+      </button>
+      <button class="nav-action-btn primary-glow" [class.active]="isChatOpen" (click)="toggleChat()">
+        <ion-icon name="chatbubbles-outline"></ion-icon> <span>COMUNICAZIONI</span>
+      </button>
+      <button class="nav-action-btn primary-glow" (click)="goToHome()">
+        <ion-icon name="home-outline"></ion-icon> <span>TORNA ALLA HOME</span>
       </button>
     </div>
 
-    <div class="hud-panel combined-control">
-      <div class="panel-header" (click)="toggleMapSettings()">
-        <div class="title-block compact">
-          <p class="eyebrow">Visual Engine</p>
-          <h2>MAP & SENSORS</h2>
-        </div>
-        <ion-icon [name]="isMapSettingsOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+  </ion-content>
+</ion-menu>
+
+<div class="ion-page" id="main-map-content">
+  <ion-content [fullscreen]="true" class="transparent-bg" [scrollY]="false">
+    
+    <div class="hud-panel top-navbar desktop-only">
+      
+      <div class="nav-group-left">
+        <button class="pwm-logo-btn" (click)="goToHome()">PWM</button>
       </div>
 
-      <div class="panel-content" *ngIf="isMapSettingsOpen">
-        <div class="hud-sub-section">
-          <div class="glass-select-container">
-            <select class="tactical-select" (change)="changeBasemap($event)">
-              <option value="esri-sat">🛰️ ESRI SATELLITE</option>
-              <option value="maptiler-hybrid">🌍 MAPTILER HYBRID</option>
-              <option value="carto-light">🛡️ CARTO STEALTH</option>
-            </select>
+      <div class="resource-bar">
+        <div *ngFor="let res of resourceConfig" 
+             class="res-item" 
+             [class.premium]="res.id === 'oro'" 
+             [class.trigger-item]="res.isTrigger">
+          
+          <span class="res-icon">{{ res.icon }}</span>
+          <div class="res-data">
+            <span class="res-label">{{ res.label }}</span>
+            <span class="res-val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number }}</span>
+            <span class="res-prod" *ngIf="!res.isTrigger && resourceProduction[res.id] > 0"> +{{ resourceProduction[res.id] | number }}/h </span>
+            <span class="res-val" *ngIf="res.isTrigger">STATUS</span>
           </div>
-          <div class="action-dock mini-grid">
-            <button class="ghost-button mini" (click)="toggleLayer('contours')">CONTOURS</button>
-            <button class="ghost-button mini" (click)="switchGlobe()">3D GLOBE</button>
+          
+          <div class="troops-dropdown" *ngIf="res.isTrigger">
+            <div class="dropdown-header">ARMATA DISPIEGATA</div>
+            <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
+              <span class="t-key">{{ troop.key }}</span>
+              <span class="t-val">{{ troop.value }}</span>
+            </div>
           </div>
         </div>
+      </div>
 
+      <div class="profile-section">
+        <div class="profile-trigger" (click)="setOpenProfile(true)">
+          <div class="profile-info">
+            <span class="p-rank">GENERALE DI BRIGATA</span>
+            <span class="p-name">{{ userProfile.username }}</span>
+          </div>
+          <div class="profile-avatar-circle">
+            <span class="user-symbol">👤</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-top-navbar mobile-only">
+      <ion-menu-button class="holographic-menu-btn"></ion-menu-button>
+      <div class="mobile-logo">PWM</div>
+    </div>
+
+    <div class="vertical-resource-bar mobile-only scrollable-y-hidden">
+      <div *ngFor="let res of resourceConfig" class="mini-res-item" [class.premium]="res.id === 'oro'">
+        <span class="icon">{{ res.icon }}</span>
+        <span class="val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number: '1.0-0' }}</span>
+        <span class="val" *ngIf="res.isTrigger">INFO</span>
+      </div>
+    </div>
+
+    <div class="vertical-resource-bar mobile-only scrollable-y-hidden">
+      <div *ngFor="let res of resourceConfig" class="mini-res-item" [class.premium]="res.id === 'oro'">
+        <span class="icon">{{ res.icon }}</span>
+        <span class="val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number: '1.0-0' }}</span>
+        <span class="val" *ngIf="res.isTrigger">INFO</span>
+      </div>
+    </div>
+
+    <div id="map-container"></div>
+
+    <div class="hud-stack-left">
+      
+      <div class="tactical-actions-row secondary-actions desktop-only">
+        <button class="nav-action-btn primary-glow" [class.active]="isMarketModalOpen" (click)="toggleMarketModal()">
+          <ion-icon name="swap-horizontal-outline"></ion-icon> <span>MARKET</span>
+        </button>
+        <button class="nav-action-btn primary-glow" [class.active]="isArmyModalOpen" (click)="toggleArmyModal()">
+          <ion-icon name="people-outline"></ion-icon> <span>ARMATE</span>
+        </button>
+      </div>
+
+      <div class="tactical-actions-row secondary-actions desktop-only">
+        <button class="nav-action-btn primary-glow" [class.active]="isDiplomacyModalOpen" (click)="toggleDiplomacyModal()">
+          <ion-icon name="shield-half-outline"></ion-icon> <span>DIPLOMAZIA</span>
+        </button>
+        <button class="nav-action-btn primary-glow" [class.active]="isIntelligenceModalOpen" (click)="toggleIntelligenceModal()">
+          <ion-icon name="eye-outline"></ion-icon> <span>INTELLIGENCE</span>
+        </button>
+      </div>
+
+      <div class="tactical-actions-row desktop-only">
+        <button class="nav-action-btn primary-glow" [class.active]="isBuildPanelOpen" (click)="toggleBuildPanel()">
+          <ion-icon name="construct-outline"></ion-icon> <span>COSTRUZIONI</span>
+        </button>
+        <button class="nav-action-btn primary-glow" [class.active]="isTechModalOpen" (click)="toggleTechModal()">
+          <ion-icon name="flask-outline"></ion-icon> <span>RICERCHE</span>
+        </button>
+      </div>
+
+      <div class="hud-panel build-panel" *ngIf="isBuildPanelOpen" style="margin-bottom: 12px;">
+        <div class="title-block compact">
+          <p class="eyebrow">Ingegneria di Campo</p>
+          <h2>COSTRUZIONE</h2>
+        </div>
+        <div class="category-toggle">
+          <button [class.active]="activeBuildCategory === 'risorse'" (click)="setBuildCategory('risorse')">RISORSE</button>
+          <button [class.active]="activeBuildCategory === 'armamenti'" (click)="setBuildCategory('armamenti')">ARMAMENTI</button>
+        </div>
         <div class="hud-separator"></div>
-
-        <div class="hud-sub-section">
-          <div class="title-block compact">
-            <p class="eyebrow">Intelligence</p>
-            <h2>SENSOR FEED</h2>
-          </div>
-          <div class="sensor-grid">
-            <div class="sensor-row"><span>TER:</span><span class="sensor-val">{{ currentHoveredName || '--' }}</span></div>
-            <div class="sensor-row"><span>POS:</span><span id="out-coords" class="sensor-val">--</span></div>
-            <div class="sensor-row"><span>ALT:</span><span id="out-alt" class="sensor-val">--</span></div>
-            <div class="sensor-row"><span>COM:</span><span id="out-res-com" class="sensor-val res-glow">--</span></div>
+        <div class="build-grid scrollable-y">
+          <div *ngFor="let item of getFilteredBuildItems()" class="build-card" (click)="startConstruction(item)">
+            <div class="build-info">
+              <span class="item-name">{{ item.name || item.nome }}</span>
+              <span class="item-tier">TIER {{ item.tier }}</span>
+            </div>
+            <div class="build-cost">
+              <span class="cost-unit" *ngIf="item.costo_denaro > 0">💵 {{ item.costo_denaro | number }}</span>
+              <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio | number }}</span>
+            </div>
           </div>
         </div>
+      </div>
+
+      <div class="hud-panel combined-control desktop-only">
+        <div class="panel-header" (click)="toggleMapSettings()">
+          <div class="title-block compact">
+            <p class="eyebrow">Visual Engine</p>
+            <h2>MAP & SENSORS</h2>
+          </div>
+          <ion-icon [name]="isMapSettingsOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+        </div>
+
+        <div class="panel-content" *ngIf="isMapSettingsOpen">
+          <div class="hud-sub-section">
+            <div class="glass-select-container">
+              <select class="tactical-select" (change)="changeBasemap($event)">
+                <option value="esri-sat">🛰️ ESRI SATELLITE</option>
+                <option value="maptiler-hybrid">🌍 MAPTILER HYBRID</option>
+                <option value="carto-light">🛡️ CARTO STEALTH</option>
+              </select>
+            </div>
+            <div class="action-dock mini-grid">
+              <button class="ghost-button mini" (click)="toggleLayer('contours')">CONTOURS</button>
+              <button class="ghost-button mini" (click)="switchGlobe()">3D GLOBE</button>
+            </div>
+          </div>
+
+          <div class="hud-separator"></div>
+
+          <div class="hud-sub-section">
+            <div class="title-block compact">
+              <p class="eyebrow">Intelligence</p>
+              <h2>SENSOR FEED</h2>
+            </div>
+            <div class="sensor-grid">
+              <div class="sensor-row"><span>TER:</span><span class="sensor-val">{{ currentHoveredName || '--' }}</span></div>
+              <div class="sensor-row"><span>POS:</span><span id="out-coords" class="sensor-val">--</span></div>
+              <div class="sensor-row"><span>ALT:</span><span id="out-alt" class="sensor-val">--</span></div>
+              <div class="sensor-row"><span>COM:</span><span id="out-res-com" class="sensor-val res-glow">--</span></div>
+            </div>
+          </div>
+        </div> 
       </div> 
     </div> 
-  </div> <div class="hud-stack-right">
-    <div class="hud-chat-panel" *ngIf="isChatOpen">
-      <app-in-game-chat (close)="toggleChat()"></app-in-game-chat>
-    </div>
-    <div class="tactical-actions-row">
-      <button class="nav-action-btn primary-glow" [class.active]="isChatOpen" (click)="toggleChat()">
-        <ion-icon name="chatbubbles-outline"></ion-icon>
-        <span>COMUNICAZIONI</span>
-      </button>
-    </div>
-  </div>
 
-  <div class="modal-overlay-container" *ngIf="isProfileModalOpen">
-    <app-profile-modal (close)="setOpenProfile(false)"></app-profile-modal>
-  </div>
-  
-  <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>
-  <app-diplomacy-modal *ngIf="isDiplomacyModalOpen" (close)="isDiplomacyModalOpen = false"></app-diplomacy-modal>
-  <app-intelligence-modal *ngIf="isIntelligenceModalOpen" (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
-  <app-market-modal *ngIf="isMarketModalOpen" [playerResources]="playerResources" (close)="toggleMarketModal()"></app-market-modal>
-  <app-army-modal *ngIf="isArmyModalOpen" [playerTroops]="playerTroops" (close)="isArmyModalOpen = false"> </app-army-modal>
-
-  <div class="radial-menu-container" 
-     *ngIf="isRadialMenuVisible" 
-     [style.left.px]="radialMenuX" 
-     [style.top.px]="radialMenuY">
-  
-  <div class="radial-menu-wrapper">
-    <div class="radial-center-trigger" (click)="handleRadialAction('ATTACCA')">
-      <ion-icon name="locate"></ion-icon>
-    </div>
-
-    <div class="radial-sector sector-top" (click)="handleRadialAction('INFO')">
-      <div class="sector-content">
-        <ion-icon name="information-circle"></ion-icon>
+    <div class="hud-stack-right">
+      <div class="hud-chat-panel" *ngIf="isChatOpen">
+        <app-in-game-chat (close)="toggleChat()"></app-in-game-chat>
+      </div>
+      <div class="tactical-actions-row desktop-only">
+        <button class="nav-action-btn primary-glow" [class.active]="isChatOpen" (click)="toggleChat()">
+          <ion-icon name="chatbubbles-outline"></ion-icon>
+          <span>COMUNICAZIONI</span>
+        </button>
       </div>
     </div>
 
-    <div class="radial-sector sector-right" (click)="closeRadialMenu()">
-      <div class="sector-content">
-        <ion-icon name="close"></ion-icon>
+    <div class="modal-overlay-container" *ngIf="isProfileModalOpen">
+      <app-profile-modal (close)="setOpenProfile(false)"></app-profile-modal>
+    </div>
+    
+    <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>
+    <app-diplomacy-modal *ngIf="isDiplomacyModalOpen" (close)="isDiplomacyModalOpen = false"></app-diplomacy-modal>
+    <app-intelligence-modal *ngIf="isIntelligenceModalOpen" (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
+    <app-market-modal *ngIf="isMarketModalOpen" [playerResources]="playerResources" (close)="toggleMarketModal()"></app-market-modal>
+    <app-army-modal *ngIf="isArmyModalOpen" [playerTroops]="playerTroops" (close)="isArmyModalOpen = false"> </app-army-modal>
+
+    <div class="radial-menu-container" *ngIf="isRadialMenuVisible" [style.left.px]="radialMenuX" [style.top.px]="radialMenuY">
+      <div class="radial-menu-wrapper">
+        <div class="radial-center-trigger" (click)="handleRadialAction('ATTACCA')">
+          <ion-icon name="locate"></ion-icon>
+        </div>
+        <div class="radial-sector sector-top" (click)="handleRadialAction('INFO')">
+          <div class="sector-content"><ion-icon name="information-circle"></ion-icon></div>
+        </div>
+        <div class="radial-sector sector-right" (click)="closeRadialMenu()">
+          <div class="sector-content"><ion-icon name="close"></ion-icon></div>
+        </div>
+        <div class="radial-sector sector-bottom" (click)="handleRadialAction('DIPLOMAZIA')">
+          <div class="sector-content"><ion-icon name="people"></ion-icon></div>
+        </div>
+        <div class="radial-sector sector-left active" (click)="handleRadialAction('COSTRUISCI')">
+          <div class="sector-content"><ion-icon name="construct"></ion-icon></div>
+        </div>
       </div>
     </div>
 
-    <div class="radial-sector sector-bottom" (click)="handleRadialAction('DIPLOMAZIA')">
-      <div class="sector-content">
-        <ion-icon name="people"></ion-icon>
-      </div>
-    </div>
-
-    <div class="radial-sector sector-left active" (click)="handleRadialAction('COSTRUISCI')">
-      <div class="sector-content">
-        <ion-icon name="construct"></ion-icon>
-      </div>
-    </div>
-  </div>
+  </ion-content>
 </div>
-
-</ion-content>
