@@ -1,24 +1,21 @@
 :host {
-  /* Posizionato a destra dell'HUD sinistro (che è largo 320px + 20px di margine) */
-  position: absolute;
-  right: 360px; 
-  left: auto;
-  bottom: 40px;
+  display: block;
   z-index: 50; 
   pointer-events: auto;
 }
 
 .chat-tactical-frame {
-  width: 380px; 
+  width: 100%; 
+  max-width: 380px;
   height: 450px;
   display: flex;
   flex-direction: column;
 
-  background: rgba(7, 15, 28, 0.85);
-  border: 1px solid rgba(134, 215, 255, 0.25);
-  border-radius: 12px;
-  padding: 15px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(134, 215, 255, 0.05);
+  background: rgba(7, 15, 28, 0.95); // Reso leggermente più opaco per leggere meglio
+  border: 1px solid rgba(134, 215, 255, 0.3);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(134, 215, 255, 0.1);
   backdrop-filter: blur(20px);
   animation: slideUp 0.3s ease-out;
 
@@ -26,7 +23,6 @@
     display: flex; justify-content: space-between; align-items: flex-start;
     border-bottom: 1px solid rgba(134, 215, 255, 0.2); padding-bottom: 10px; margin-bottom: 10px;
     
-    .title-block { margin: 0; }
     .eyebrow { color: #86d7ff; font-size: 0.55rem; text-transform: uppercase; font-weight: 800; margin: 0 0 4px; }
     h2 { font-size: 0.9rem; color: #fff; margin: 0; font-weight: 700; }
     
@@ -44,37 +40,31 @@
     gap: 6px;
     padding-right: 5px;
 
-    /* Scrollbar */
     &::-webkit-scrollbar { width: 4px; }
-    &::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
     &::-webkit-scrollbar-thumb { background: #86d7ff; border-radius: 2px; }
 
     .message-entry {
       font-size: 0.75rem;
       font-family: 'JetBrains Mono', monospace;
       line-height: 1.4;
-      background: rgba(255, 255, 255, 0.02);
-      padding: 6px 8px;
-      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 8px 10px;
+      border-radius: 8px;
       border-left: 2px solid rgba(134, 215, 255, 0.3);
 
-      .msg-time { color: #6b7280; margin-right: 4px; font-size: 0.65rem; }
-      
-      .msg-sender { 
-        color: #86d7ff; font-weight: 800; margin-right: 4px; cursor: pointer;
-        &:hover { text-decoration: underline; }
-      }
-      
-      .msg-text { color: #e5e7eb; }
+      .msg-time { color: #86d7ff; opacity: 0.5; margin-right: 4px; font-size: 0.65rem; }
+      .msg-sender { color: #86d7ff; font-weight: 800; margin-right: 4px; cursor: pointer; }
+      .msg-text { color: #ffffff; } // Forza testo bianco per i messaggi
 
       &.private {
-        background: rgba(253, 224, 71, 0.05); /* Sfondo dorato per i PM */
+        background: rgba(253, 224, 71, 0.08);
         border-left-color: #fde047;
         .msg-sender.private { color: #fde047; }
         .msg-text { color: #fef08a; }
       }
 
       &.system {
+        background: rgba(163, 230, 53, 0.05);
         border-left-color: #a3e635;
         .msg-sender { color: #a3e635; }
         .msg-text { color: #d9f99d; font-style: italic; }
@@ -85,22 +75,74 @@
   .hud-separator { height: 1px; background: linear-gradient(90deg, transparent, #86d7ff, transparent); opacity: 0.3; margin: 10px 0; }
 
   .chat-input-area {
-    display: flex; flex-direction: column; gap: 8px;
+    display: flex; flex-direction: column; gap: 10px;
 
-    .slim select { padding: 6px 24px 6px 8px; font-size: 0.7rem; }
+    .glass-select-container {
+      position: relative;
+      width: 100%;
+
+      &::after {
+        content: '▼';
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #86d7ff;
+        font-size: 0.6rem;
+        pointer-events: none;
+      }
+
+      .tactical-select {
+        appearance: none;
+        width: 100%;
+        background: #0d1625; // Sfondo solido molto scuro per evitare trasparenze sballate
+        border: 1px solid rgba(134, 215, 255, 0.4);
+        border-radius: 8px;
+        color: #ffffff !important; // Forza testo bianco
+        padding: 10px 30px 10px 12px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        font-weight: 700;
+        outline: none;
+        cursor: pointer;
+        transition: 0.3s;
+
+        /* Fix critico per le opzioni del menu a tendina */
+        option, optgroup {
+          background-color: #0d1625 !important;
+          color: #ffffff !important;
+          padding: 10px;
+        }
+
+        &:focus {
+          border-color: #86d7ff;
+          box-shadow: 0 0 12px rgba(134, 215, 255, 0.4);
+        }
+      }
+    }
 
     .input-row {
       display: flex; gap: 8px;
       
       .tactical-input {
-        flex: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(134, 215, 255, 0.25);
-        border-radius: 6px; padding: 8px 10px; color: #fff; font-family: 'Inter', sans-serif; font-size: 0.75rem;
-        outline: none; transition: 0.3s;
+        flex: 1; 
+        background: rgba(0, 0, 0, 0.5); 
+        border: 1px solid rgba(134, 215, 255, 0.3);
+        border-radius: 8px;
+        padding: 10px 12px; 
+        color: #ffffff; 
+        font-family: 'Inter', sans-serif; 
+        font-size: 0.8rem;
+        outline: none; 
+        transition: 0.3s;
+
+        &::placeholder { color: rgba(255, 255, 255, 0.3); }
         &:focus { border-color: #86d7ff; box-shadow: 0 0 10px rgba(134, 215, 255, 0.2); }
       }
 
       .send-btn { 
-        margin: 0; padding: 0 15px; width: auto; font-size: 1rem; border-radius: 6px; 
+        margin: 0; padding: 0 18px; width: auto; font-size: 1.1rem; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
       }
     }
   }

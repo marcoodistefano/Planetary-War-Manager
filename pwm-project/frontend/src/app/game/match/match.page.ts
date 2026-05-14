@@ -5,7 +5,7 @@ import { IonicModule } from '@ionic/angular';
 import { Router } from '@angular/router';
 
 // Componenti
-import { TacticalTerminalComponent } from './components/tactical-terminal/tactical-terminal.component';
+import { ProfileModalComponent } from '../components/profile-modal/profile-modal.component';
 import { DiplomacyModalComponent } from '../components/diplomacy-modal/diplomacy-modal.component';
 import { IntelligenceModalComponent } from '../components/intelligence-modal/intelligence-modal.component';
 import { InGameChatComponent } from '../components/in-game-chat/in-game-chat.component';
@@ -26,7 +26,7 @@ declare var THREE: any;
     IonicModule, 
     CommonModule, 
     FormsModule, 
-    TacticalTerminalComponent,
+    ProfileModalComponent,
     DiplomacyModalComponent,
     IntelligenceModalComponent,
     InGameChatComponent,
@@ -114,6 +114,10 @@ export class MatchPage implements OnInit, AfterViewInit {
 
   toggleChat() {
     this.isChatOpen = !this.isChatOpen;
+  }
+
+  goToHome() {
+    this.router.navigate(['/home']); // Assicurati che '/' sia il path della tua homepage
   }
 
   toggleTechModal() {

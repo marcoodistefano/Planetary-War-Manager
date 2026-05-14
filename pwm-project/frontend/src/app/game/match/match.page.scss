@@ -211,7 +211,7 @@
    5. HUD LATERALE E PANNELLI
    ========================================================================== */
 .hud-stack-left, .hud-stack-right {
-  position: absolute; bottom: calc(4 * var(--unit)); z-index: 20; pointer-events: none;
+  position: absolute; bottom: calc(4 * var(--unit)); right: calc(2 * var(--unit)); z-index: 20; pointer-events: none;
   .hud-panel {
     pointer-events: auto;
     background: var(--glass-bg);
@@ -472,6 +472,35 @@
 .nav-action-btn.mini, .ghost-button.mini { padding: 6px 12px; border-radius: 4px; font-size: 0.65rem; height: 34px; }
 .nav-action-btn.mini.active { background: var(--primary-blue); color: #050a14; box-shadow: 0 0 15px var(--primary-blue); }
 
+.pwm-logo-btn {
+  background: var(--primary-blue);
+  color: #051120; /* Colore scuro per contrasto sul blu */
+  border: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 900;
+  font-size: calc(1.4 * var(--unit));
+  padding: 0 calc(1.5 * var(--unit));
+  height: calc(3.5 * var(--unit));
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 0 15px var(--primary-glow);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 1px;
+
+  &:hover {
+    background: #fff;
+    box-shadow: 0 0 25px var(--primary-blue);
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
 /* ==========================================================================
    7. UTILITY & ANIMAZIONI
    ========================================================================== */
@@ -530,4 +559,27 @@
 @keyframes panelSlideDown {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-overlay-container {
+  position: fixed;   /* Fondamentale: deve stare sopra tutto il resto */
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7); /* Scurisce lo sfondo */
+  backdrop-filter: blur(8px);    /* Effetto vetro sfocato */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;     /* Deve essere più alto di .top-navbar (che ha 1000) */
+  pointer-events: auto; /* Permette di cliccare dentro la modale */
+}
+
+/* Se il componente interno non ha dimensioni, forzale qui */
+app-tactical-terminal {
+  width: 90%;
+  max-width: 1000px;
+  height: 80%;
+  display: block;
 }

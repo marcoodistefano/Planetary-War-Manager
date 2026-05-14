@@ -1,0 +1,111 @@
+<div class="profile-modal-backdrop" (click)="closeTerminal()">
+  
+  <div class="profile-frame" 
+       (click)="$event.stopPropagation()"
+       (mousedown)="onDragStart($event)"
+       [style.transform]="'translate(' + transformX + 'px, ' + transformY + 'px)'">
+    
+    <div class="profile-sidebar">
+      <div class="brand">
+        <span class="system-name">HQ_OS</span>
+        <span class="version">CYBER_EYE V.4.2</span>
+      </div>
+      
+      <nav>
+        <div class="nav-item" [class.active]="activeTab === 'profile'" (click)="setTab('profile')">
+          <ion-icon name="person-outline"></ion-icon><span>PROFILO</span>
+        </div>
+        <div class="nav-item" [class.active]="activeTab === 'settings'" (click)="setTab('settings')">
+          <ion-icon name="settings-outline"></ion-icon><span>SISTEMA</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="exit-btn" (click)="closeTerminal()">[ CHIUDI TERMINALE ]</button>
+      </div>
+    </div>
+
+    <div class="profile-main scrollable-y">
+      <div class="content-container">
+
+        <ng-container *ngIf="activeTab === 'profile'">
+          <div class="profile-header">
+            <div class="avatar-wrapper">
+              <div class="avatar-monitor">
+                <span class="user-icon">👤</span>
+              </div>
+              <div class="rank-tag">{{ profile?.rank }}</div>
+            </div>
+
+            <div class="user-info">
+              <div class="id-tag">OPERATORE ATTIVO</div>
+              <h2 class="username">{{ profile?.username }}</h2>
+              
+              <div class="xp-module">
+                <div class="xp-info">
+                  <span class="label">LIVELLO DI COMANDO</span>
+                  <span class="value">{{ profile?.experience }}%</span>
+                </div>
+                <div class="xp-track">
+                  <div class="xp-bar" [style.width.%]="profile?.experience"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-divider">
+            <span class="divider-text">DATI PRESTAZIONALI</span>
+          </div>
+
+          <div class="stats-row">
+            <div class="stat-item">
+              <span class="s-label">VITTORIE</span>
+              <span class="s-value success">{{ profile?.matchesWon }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="s-label">SCONFITTE</span>
+              <span class="s-value danger">{{ profile?.matchesLost }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="s-label">RAPPORTO K/D</span>
+              <span class="s-value info">4.8</span>
+            </div>
+          </div>
+
+          <div class="footer-actions">
+            <button class="ghost-btn" (click)="navigateToFullProfile()">
+              <ion-icon name="analytics-outline"></ion-icon>
+              ANALISI DETTAGLIATA
+            </button>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="activeTab === 'settings'">
+          <div class="section-divider">
+            <span class="divider-text">CONFIGURAZIONE AUDIO</span>
+          </div>
+          
+          <div class="settings-stack">
+            <div class="control-row">
+              <div class="c-label">MUSICA DI SOTTOFONDO</div>
+              <div class="c-input">
+                <input type="range" [(ngModel)]="audioSettings.music" class="tactical-slider">
+                <span class="c-val">{{ audioSettings.music }}%</span>
+              </div>
+            </div>
+
+            <div class="control-row">
+              <div class="c-label">EFFETTI SONORI (SFX)</div>
+              <div class="c-input">
+                <input type="range" [(ngModel)]="audioSettings.sfx" class="tactical-slider">
+                <span class="c-val">{{ audioSettings.sfx }}%</span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+      </div>
+    </div>
+
+  </div>
+</div>
