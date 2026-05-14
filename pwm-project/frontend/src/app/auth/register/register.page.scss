@@ -416,12 +416,10 @@ ion-footer {
   --color: #ffb454;
   font-weight: bold;
   font-size: 0.7rem;
-  
+
   .btn-frame {
     position: absolute;
     inset: 0;
-    border: 1px solid rgba(255, 180, 84, 0.4);
-    border-radius: 8px; /* Smussa gli angoli del pulsante di chiusura */
     pointer-events: none;
   }
 }
