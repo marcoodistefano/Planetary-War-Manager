@@ -11,7 +11,7 @@ const controller = require("./app-controller.js");
 // Ho separato i servizi HTTP da quelli WebSocket per massima chiarezza
 const SERVICE_TARGETS = {
   auth: process.env.AUTH_SERVICE_URL || "http://auth-service:3000",
-  // Aggiungiamo i target per i nuovi servizi WebSocket
+  match: process.env.MATCH_SERVICE_URL || "http://match-service:3004", // <--- AGGIUNTO IL PIN
   chat: process.env.CHAT_SERVICE_URL || "http://chat-service:3001",
   movement: process.env.MOVEMENT_SERVICE_URL || "http://movement-service:3002",
   combat: process.env.COMBAT_SERVICE_URL || "http://combat-service:3003",
@@ -255,12 +255,18 @@ const forwardToService = async (req, res) => {
     }
   }
 
+  // ---> PATCH DI SICUREZZA: INIEZIONE IDENTITÀ (TRUSTED HEADERS) <---
+  if (req.user) {
+    // Trasmettiamo l'identità ai microservizi a valle tramite header custom
+    cleanHeaders["x-user-id"] = req.user.uuid;
+    cleanHeaders["x-session-id"] = req.user.sessionId;
+  }
+
   const hasBody = req.safeRequest.body && Object.keys(req.safeRequest.body).length > 0;
   if (hasBody) {
     cleanHeaders["content-type"] = "application/json";
   }
 
-  // Esecuzione chiamata
   try {
     const fetchOptions = {
       method: req.method,

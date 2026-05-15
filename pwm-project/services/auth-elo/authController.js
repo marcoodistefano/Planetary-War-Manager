@@ -20,13 +20,13 @@ const getClientIp = (req) => {
 
 const register = async (req, res) => {
   try {
-    const { username, email, password, reg } = req.body;
+    const { username, email, password, region } = req.body;
 
     const saved = await authModel.registerUser({
       username,
       email,
       password,
-      reg,
+      region,
     });
     if(saved.status === 400){
       return res.status(400).json({

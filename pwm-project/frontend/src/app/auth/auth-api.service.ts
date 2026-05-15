@@ -12,6 +12,7 @@ export interface RegisterPayload {
   username: string;
   email: string;
   password: string;
+  region : string;
 }
 
 export interface RecoveryPasswordPayload {

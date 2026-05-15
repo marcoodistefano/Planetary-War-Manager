@@ -19,7 +19,7 @@
       <div class="field-container clickable-field" (click)="openCountryModal()">
         <ion-label class="custom-label">REGIONE UTENTE</ion-label>
         <div class="selected-value">
-          <span *ngIf="selectedCountry">{{ selectedCountry.flag }} {{ selectedCountry.name }}</span>
+          <span *ngIf="selectedCountry" >{{ selectedCountry.flag }} {{ selectedCountry.name }}</span>
           <span *ngIf="!selectedCountry" class="placeholder-text">Seleziona Regione</span>
           <ion-icon name="chevron-down-outline"></ion-icon>
         </div>

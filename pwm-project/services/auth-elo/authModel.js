@@ -33,6 +33,7 @@ const mapUniqueViolation = (error) => {
 const registerUser = async ({ username, email, password, reg }) => {
   const passwordHash = await aslan.hash_password(password);
   const normalizeReg = aslan.normalizeRegion(reg);
+  console.log(`Registrazione utente: username="${username}", email="${email}", regione="${reg}" (normalizzata: "${normalizeReg}")`);
   if(reg === null){
     console.log("Regione non fornita, non procedo.");
     return{

@@ -149,11 +149,11 @@ export class RegisterPage implements OnInit, AfterViewInit {
       return;
     }
 
-    const { username, email, password } = this.RegisterForm.value;
+    const { username, email, password, region } = this.RegisterForm.value;
     this.errorMessage = '';
     this.isSubmitting = true;
     this.authApi
-      .register({ username, email, password })
+      .register({ username, email, password, region })
       .pipe(finalize(() => {
         this.isSubmitting = false;
       }))

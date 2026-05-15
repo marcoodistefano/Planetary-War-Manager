@@ -1,188 +1,136 @@
 const aslan = require("./middleware/Aslan.js");
 const db = require("../shared/postgresClient.js");
-const redis = require("../shared/redisClient.js");
-const Eru = require("./midleware/Eru.js");
+const redis = require("../shared/redisClient.js"); // Client Redis collegato
+const Eru = require("./middleware/Eru.js");
 
-const mapUniqueViolation = (error) => {
-  if (!error || error.code !== "23505") return null;
-
-  const constraint = String(error.constraint || "").toLowerCase();
-  const detail = String(error.detail || "");
-
-  if (constraint.includes("username") || detail.includes("(username)")) {
-    return "Username già in uso";
-  }
-  if (constraint.includes("email") || detail.includes("(email)")) {
-    return "Email già in uso";
-  }
-  return "Utente già esistente";
-};
-
+// ============================================================================
+// 1. CREAZIONE PARTITA (Postgres + Istanza Redis)
+// ============================================================================
 const createMatch = async ({ playerId, gameMode }) => {
   try {
-    //verifico che il giocatore non abbia già una partita in corso come host
-    console.log(`Verifica partite in corso per il giocatore ${playerId}...`);
-    let rows = await db.query(
-      "SELECT count(id_partita) FROM partite, utenti WHERE (utenti.id_user = $1 AND partite.id_host = $1) AND SUBSTRING(partite.struttura_partita FROM 1 FOR 2) = B'10';",
-      [playerId],
+    // A. Controllo Pre-Flight (Check partite attive dell'host)
+    const activeMatches = await db.query(
+      `SELECT count(p.id_partita) FROM partite p 
+       WHERE p.id_host = $1 AND substring(p.struttura_partita::text from 1 for 2) IN ('00', '01');`,
+      [playerId]
     );
-    if (rows[0].count > 0) {
-      console.log("Il giocatore è già host di una partita in corso");
-      return {
-        status: "400",
-        message:
-          "Il giocatore ha già creato una partita in corso e questa è ancora in corso.",
-      };
-    } else {
-      console.log(`Creazione della partita per il giocatore ${playerId}...`);
-      const id_partita_hash = await aslan.generateSecureToken(256); //ASLAN NON é ANCORA NELLA CARTELLA
-      const id_partita_visualizzato = await aslan.generateSecureToken(10);
-      const struttura_partita = await generateMatchStructure(gameMode); //torna: stato, messaggio e content (stringa di 56 bit)
-      if (
-        struttura_partita.status == "200" &&
-        struttura_partita.struct != null
-      ) {
-        //ISTANZA REDIS
-        rows = await db.query(
-          "INSERT INTO partite (id_partita_hash, id_partita_visualizzato, id_host, struttura_partita, has_elo) VALUES ($1, $2, $3, $4, $5);",
-          [
-            id_partita_hash,
-            id_partita_visualizzato,
-            playerId,
-            struttura_partita.struct,
-            gameMode.hasElo,
-          ],
-        );
-        return struttura_partita;
-      } else {
-        console.log(
-          "Errore durante la generazione della struttura della partita:",
-          struttura_partita.message,
-        );
-        return {
-          status: struttura_partita.status,
-          message: struttura_partita.message,
-        };
-      }
+
+    if (parseInt(activeMatches[0].count) > 0) {
+      return { status: "400", message: "Hai già una partita attiva come host." };
     }
+
+    // B. Generazione Frame a 56-Bit via Eru
+    gameMode.stato = "In attesa"; 
+    const eruRes = Eru.procedure_create_match({ body: gameMode });
+    if (eruRes.binary_match.length !== 56) throw new Error("Errore critico di clock nel Multiplexer Eru.");
+
+    // C. Generazione Identificativi
+    const id_partita_hash = await aslan.generateSecureToken(256);
+    const id_partita_visualizzato = await aslan.generateSecureToken(10);
+
+    // D. Transazione SQL (Persistenza)
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `INSERT INTO partite (id_partita_hash, id_partita_visualizzato, id_host, struttura_partita, has_elo) 
+         VALUES ($1, $2, $3, $4::bit(56), $5);`,
+        [id_partita_hash, id_partita_visualizzato, playerId, eruRes.binary_match, gameMode.hasElo || false]
+      );
+
+      await client.query(
+        `INSERT INTO partecipazioni (id_partita_hash, id_user) VALUES ($1, $2);`,
+        [id_partita_hash, playerId]
+      );
+
+      await client.query('COMMIT');
+
+      // E. ISTANZIAZIONE REDIS (Iniezione in Memoria Volatile)
+      // La partita viene caricata in Redis con un TTL (Time-To-Live) di 24 ore
+      // per evitare "Memory Leak" di partite mai concluse.
+      const redisKey = `match:${id_partita_hash}:status`;
+      await redis.set(redisKey, eruRes.binary_match);
+      await redis.expire(redisKey, 86400); 
+
+      console.log(`[SYS_OK] Partita istanziata su Postgres e caricata in cache Redis: ${id_partita_hash}`);
+      
+      return { status: "200", message: "Partita creata e istanziata correttamente.", matchId: id_partita_hash };
+
+    } catch (dbError) {
+      await client.query('ROLLBACK');
+      throw dbError;
+    } finally {
+      client.release();
+    }
+
   } catch (error) {
-    console.error("Errore durante la verifica delle partite in corso:", error);
-    return {
-      status: "500",
-      message:
-        "Errore interno del server durante la verifica delle partite in corso.",
-    };
+    console.error("[SYS_ERR] Errore durante createMatch:", error);
+    return { status: "500", message: "Errore interno durante la creazione e istanziazione della partita." };
   }
 };
 
-const generateMatchStructure = async (gameMode) => {
-  if (gameMode.STATO !== "IN_ATTESA") gameMode.STATO = "IN_ATTESA"; //Forzo lo stato in attesa, visto che la partita è appena stata creata
-  try {
-    let res = Eru.procedure_create_match(gameMode);
-    let match = res.match;
-    console.log(`Struttura della partita generata: ${JSON.stringify(match)}`);
-    let binary_match = res.binary_match;
-    console.log(`Struttura della partita in formato binario: ${binary_match}`);
-    if (binary_match.length !== 56) {
-      console.error(
-        `La struttura della partita in formato binario non è di 56 bit: ${binary_match}`,
-      );
-      return {
-        status: "500",
-        message:
-          "Errore interno del server: la struttura della partita in formato binario non è di 56 bit.",
-        struct: null,
-      };
-    } else {
-      console.log(
-        `La struttura della partita in formato binario è correttamente di 56 bit.`,
-      );
-      let joined = await join_Match(gameMode.id_host, id_partita_hash);
-      if(joined.status !== "200") {
-        console.error(
-          `Errore durante il join alla partita appena creata: ${joined.message}`,
-        );
-        return {
-          status: "500",
-          message:
-            "Errore interno del server: impossibile unirsi alla partita appena creata.",
-        };
-      }else{
-        console.log(`Join alla partita ${id_partita_hash} appena creata avvenuto con successo: ${joined.message}`);
-      }
-      return {
-        status: "200",
-        message: "Struttura della partita generata con successo.",
-      };
-    }
-  } catch (error) {
-    console.error(
-      "Errore durante la generazione della struttura della partita:",
-      error,
-    );
-    return {
-      status: "500",
-      message:
-        "Errore interno del server durante la generazione della struttura della partita.",
-      struct: null,
-    };
-  }
-}
-
-  
+// ============================================================================
+// 2. JOIN ALLA PARTITA E AGGIORNAMENTO CACHE
+// ============================================================================
 const join_Match = async (playerId, id_partita_hash) => {
-  let res;
   try {
-    console.log(`Il giocatore ${playerId} si sta unendo alla partita con hash ${id_partita_hash}...`);
-    let rows_select = await db.query(
-      "SELECT partite.struttura_partita FROM partite WHERE id_partita_hash = $1; AND partite.id_partita_hash = $1;",
-      [id_partita_hash],
-    );
-    let count = rows_select.length;
-    console.log(`Partite trovate con hash ${id_partita_hash}: ${count}`);
-    if(rows_select.length === 0) {
-      console.log(`Nessuna partita trovata con hash ${id_partita_hash}`);
-      res = {
-        status: "404",
-        message: "Partita non trovata.",
-      };
-    }
-    else{
-      rows = await db.query(
-        "INSERT INTO partecipazioni (id_partita_hash, id_user) VALUES ($1, $2);",
-        [id_partita_hash, playerId],
+    const client = await db.getClient();
+    const redisKey = `match:${id_partita_hash}:status`;
+
+    try {
+      await client.query('BEGIN');
+
+      // 1. Lock riga database
+      const matchQuery = await client.query(
+        `SELECT struttura_partita::text AS struct FROM partite WHERE id_partita_hash = $1 FOR UPDATE;`, 
+        [id_partita_hash]
       );
-      console.log(`Il giocatore ${playerId} si è unito alla partita con hash ${id_partita_hash} con successo.`);
-      console.log(`Struttura della partita con hash ${id_partita_hash}: ${rows_select[0].struttura_partita}`);
-      eru_start = Eru.check_start_match(rows_select[0].struttura_partita, count);
-      if(eru_start.status == 200) { //ad ogni ingresso di un giocatore, verifico se la partita è pronta per essere avviata, ERU tiene traccia delle tabelle di conversione, quindi spetta a lui stabilire se la partita è pronta per essere avviata o meno, e in caso affermativo, avviare la partita (cambiando lo stato della partita in corso e notificando i giocatori coinvolti)
-        //da implementare
-        rows = await db.query(
-          "UPDATE partite SET struttura_partita = $1 WHERE id_partita_hash = $2;",
-          [eru_start.struttura_partita, id_partita_hash],
+
+      if (matchQuery.rows.length === 0) throw { customStatus: "404", message: "Partita non trovata." };
+      const currentStruct = matchQuery.rows[0].struct;
+
+      // 2. Verifica se utente già presente
+      const checkUser = await client.query(
+        `SELECT 1 FROM partecipazioni WHERE id_partita_hash = $1 AND id_user = $2`,
+        [id_partita_hash, playerId]
+      );
+      if (checkUser.rows.length > 0) throw { customStatus: "400", message: "Sei già in questa partita." };
+
+      // 3. Inserimento e conteggio
+      await client.query(`INSERT INTO partecipazioni (id_partita_hash, id_user) VALUES ($1, $2);`, [id_partita_hash, playerId]);
+      const countRes = await client.query(`SELECT count(*) FROM partecipazioni WHERE id_partita_hash = $1;`, [id_partita_hash]);
+      const playerCount = parseInt(countRes.rows[0].count);
+
+      // 4. Check Avvio con Eru
+      const eru_start = Eru.check_start_match(currentStruct, playerCount);
+
+      if (eru_start.status === 200) {
+        // A. Aggiornamento Postgres (Stato -> IN_CORSO)
+        await client.query(
+          `UPDATE partite SET struttura_partita = $1::bit(56) WHERE id_partita_hash = $2;`,
+          [eru_start.struttura_partita, id_partita_hash]
         );
-        console.log(`La partita con hash ${id_partita_hash} è pronta per essere avviata. Struttura aggiornata: ${eru_start.struttura_partita}`);
-        //START()
-        //NOTIFY_ALL()
-      }else{
-        console.log(`La partita con hash ${id_partita_hash} non è ancora pronta per essere avviata. Struttura attuale: ${eru_start.struttura_partita}`);
+
+        // B. Sincronizzazione Redis
+        // Sovrascriviamo il frame in cache con il nuovo stato "IN_CORSO"
+        await redis.set(redisKey, eru_start.struttura_partita);
+        
+        console.log(`[SYS_EVENT] Match ${id_partita_hash} AVVIATO. Cache Redis aggiornata.`);
       }
-      res = {
-        status: "200",
-        message: "Join alla partita avvenuto con successo.",
-        struttura_partita: eru_start.struttura_partita,
-      };
+
+      await client.query('COMMIT');
+      return { status: "200", message: "Join completato.", structure: eru_start.struttura_partita };
+
+    } catch (innerError) {
+      await client.query('ROLLBACK');
+      if (innerError.customStatus) return { status: innerError.customStatus, message: innerError.message };
+      throw innerError;
+    } finally {
+      client.release();
     }
   } catch (error) {
-    console.error(
-      "Errore durante il tentativo di join alla partita:",
-      error,
-    );
-    res = {
-      status: "500",
-      message:
-        "Errore interno del server durante il tentativo di join alla partita.",
-    };
+    console.error("[SYS_ERR] Errore durante join_Match:", error);
+    return { status: "500", message: "Errore durante il join alla partita." };
   }
-  return res;
 };
