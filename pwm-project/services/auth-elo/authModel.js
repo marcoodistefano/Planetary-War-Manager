@@ -30,11 +30,11 @@ const mapUniqueViolation = (error) => {
   return "Utente già esistente";
 };
 
-const registerUser = async ({ username, email, password, reg }) => {
+const registerUser = async ({ username, email, password, region }) => {
   const passwordHash = await aslan.hash_password(password);
-  const normalizeReg = aslan.normalizeRegion(reg);
-  console.log(`Registrazione utente: username="${username}", email="${email}", regione="${reg}" (normalizzata: "${normalizeReg}")`);
-  if(reg === null){
+  const normalizeReg = aslan.normalizeRegion(region);
+  console.log(`Registrazione utente: username="${username}", email="${email}", regione="${region}" (normalizzata: "${normalizeReg}")`);
+  if(region === null){
     console.log("Regione non fornita, non procedo.");
     return{
       status : 400,
