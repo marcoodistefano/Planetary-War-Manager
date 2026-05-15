@@ -137,7 +137,7 @@ export class RegisterPage implements OnInit, AfterViewInit {
 
   selectCountry(country: any) {
     this.selectedCountry = country; 
-    this.RegisterForm.patchValue({ region: country.code }); 
+    this.RegisterForm.patchValue({ region: country.name }); 
     this.closeCountryModal(); 
   }
 
