@@ -221,10 +221,33 @@ const recoveryPasswordToken = async (req, res) => {
   }
 };
 
+const home = async (req, res) => {
+  try {
+    token = req.cookies.auth_token;
+    if (!token) { //il token è verificato nel gateway, qui è solo per testare se arriva correttamente
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+    U_ID = JSON.parse(await redisClient.get(`session:${token}`)).userId;
+    console.log("U_ID:", U_ID);
+    res = await authModel.buildHome(U_ID);
+    if(res.status !== 200){
+      return res.status(res.status).json({
+        isValid: false,
+        errors: [res.message],
+      });
+    }
+    return res    
+  }catch(error){
+    console.log("errore");
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
+
 module.exports = {
   register,
   login,
   recoveryUsername,
   recoveryPassword,
-  recoveryPasswordToken
+  recoveryPasswordToken,
+  home,
 };

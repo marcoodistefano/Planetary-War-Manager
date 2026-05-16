@@ -1,18 +1,29 @@
 const nodemailer = require("nodemailer");
 const aslan = require("./middleware/Aslan.js");
+const Eru = require("./middleware/Eru_recostructor.js");
 const db = require("../shared/postgresClient.js");
 const { JsonWebTokenError } = require("jsonwebtoken");
 const HOST = process.env.HOST || "localhost:3001";
 const DOMAIN = process.env.DOMAIN || "PWM";
-const FRONTEND_URL = (process.env.FRONTEND_URL || `http://${HOST}`).replace(/\/$/, "");
-const SMTP_HOST = process.env.SMTP_HOST || process.env.MAIL_HOST || "smtp.ethereal.email";
+const FRONTEND_URL = (process.env.FRONTEND_URL || `http://${HOST}`).replace(
+  /\/$/,
+  "",
+);
+const SMTP_HOST =
+  process.env.SMTP_HOST || process.env.MAIL_HOST || "smtp.ethereal.email";
 const SMTP_PORT = Number(process.env.SMTP_PORT || process.env.MAIL_PORT || 587);
 const SMTP_SECURE =
-  process.env.SMTP_SECURE === "true" || SMTP_PORT === 465 || process.env.MAIL_SECURE === "true";
+  process.env.SMTP_SECURE === "true" ||
+  SMTP_PORT === 465 ||
+  process.env.MAIL_SECURE === "true";
 const SMTP_TLS_REJECT_UNAUTHORIZED =
   process.env.SMTP_TLS_REJECT_UNAUTHORIZED === "true";
-const SMTP_USER = process.env.SMTP_USER || process.env.MAIL_USER || "benny.waelchi78@ethereal.email";
-const SMTP_PASS = process.env.SMTP_PASS || process.env.MAIL_PASS || "gutRxGp5JfjD9C9cbf";
+const SMTP_USER =
+  process.env.SMTP_USER ||
+  process.env.MAIL_USER ||
+  "benny.waelchi78@ethereal.email";
+const SMTP_PASS =
+  process.env.SMTP_PASS || process.env.MAIL_PASS || "gutRxGp5JfjD9C9cbf";
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || `noreply@${DOMAIN}`;
 
 const mapUniqueViolation = (error) => {
@@ -33,13 +44,15 @@ const mapUniqueViolation = (error) => {
 const registerUser = async ({ username, email, password, region }) => {
   const passwordHash = await aslan.hash_password(password);
   const normalizeReg = aslan.normalizeRegion(region);
-  console.log(`Registrazione utente: username="${username}", email="${email}", regione="${region}" (normalizzata: "${normalizeReg}")`);
-  if(region === null){
+  console.log(
+    `Registrazione utente: username="${username}", email="${email}", regione="${region}" (normalizzata: "${normalizeReg}")`,
+  );
+  if (region === null) {
     console.log("Regione non fornita, non procedo.");
-    return{
-      status : 400,
-      error : "Regione non fornita"
-    }
+    return {
+      status: 400,
+      error: "Regione non fornita",
+    };
   }
   try {
     const { rows } = await db.query(
@@ -126,7 +139,9 @@ const recoveryPassword = async ({ email }) => {
   }
 
   if (!SMTP_USER || !SMTP_PASS) {
-    console.error("Configurazione SMTP incompleta: controlla SMTP_USER e SMTP_PASS");
+    console.error(
+      "Configurazione SMTP incompleta: controlla SMTP_USER e SMTP_PASS",
+    );
     return { status: 500, message: "Configurazione email non completata" };
   }
 
@@ -195,7 +210,7 @@ const resetPassword = async ({ username, email, newPassword }) => {
 const resetPasswordToken = async ({ username, email, newPassword, token }) => {
   const { rows } = await db.query(
     "SELECT token FROM password_recovery_tokens WHERE token = $1 LIMIT 1",
-    [token]
+    [token],
   );
   if (rows.length === 0) {
     return { status: 404, error: "Token non trovato" };
@@ -209,28 +224,30 @@ const resetPasswordToken = async ({ username, email, newPassword, token }) => {
   if (!updated) {
     return { status: 400, error: "Utente o email non validi" };
   }
-  try {   
-    await db.query(
-      "DELETE FROM password_recovery_tokens WHERE token = $1", [token]);
-      console.log(`Token "${token}" eliminato dopo l'uso.`);
+  try {
+    await db.query("DELETE FROM password_recovery_tokens WHERE token = $1", [
+      token,
+    ]);
+    console.log(`Token "${token}" eliminato dopo l'uso.`);
   } catch (error) {
-    console.error("Errore durante la cancellazione del token di recupero password:", error);
+    console.error(
+      "Errore durante la cancellazione del token di recupero password:",
+      error,
+    );
     return { status: 500, error: "Errore interno del server" };
   }
-  return { status : 200, message: "Password reimpostata con successo"};
-}
+  return { status: 200, message: "Password reimpostata con successo" };
+};
 
-const createAccessSession = async ({
-  userId,
-  ipAddress,
-  cookieToken,
-}) => {
+const createAccessSession = async ({ userId, ipAddress, cookieToken }) => {
   const { rows } = await db.query(
     "INSERT INTO accessi (user_id, ip_address, cookie_token) VALUES ($1, $2, $3) RETURNING id_access, login_time",
     [userId, ipAddress, cookieToken],
   );
-  if(rows.length === 0) {
-    console.error("Errore durante la creazione della sessione di accesso: nessuna riga restituita");
+  if (rows.length === 0) {
+    console.error(
+      "Errore durante la creazione della sessione di accesso: nessuna riga restituita",
+    );
     return null;
   }
   return rows[0];
@@ -239,7 +256,136 @@ const createAccessSession = async ({
 const deleteAccessSessionByCookieToken = async (cookieToken) => {
   await db.query("DELETE FROM accessi WHERE cookie_token = $1", [cookieToken]);
 };
+const buildMatchMap = (rows) => {
+  if (!Array.isArray(rows)) return {};
+  return rows.reduce((acc, row, index) => {
+    const decodedMatch = Eru.procedure_recreate_field(row.struttura_partita);
+    acc[`match${index + 1}`] = {
+      ...row,
+      struttura_partita: decodedMatch,
+    };
+    return acc;
+  }, {});
+};
 
+const buildHome = async (U_ID) => {
+  try {
+    const cachedData = await fetchFromRedis(U_ID);
+    if (cachedData) {
+      console.log("Dati della home page recuperati da Redis per U_ID:", U_ID);
+      return {
+        status: 200,
+        message: "Benvenuto nella home page protetta!",
+        data: cachedData,
+      };
+    }
+    //SI TENTA A PRIORI DI RECUPERARE LE INFO DA REDIS, SE NON CI SONO SI VA A DB E SI POPOLA REDIS PER LE PROSSIME VOLTE.
+    //REDIS, AD OGNI MODO, IMPLEMENTA UNA CASH: SE L'UTENTE NON EFFETTUA RICHIESTE PER UN PO' DI TEMPO, LE INFO SI ELIMINANO E SI VA A DB.
+    // 1. LEADERBOARD REGIONALE
+    else {
+      const leaderboard_regionale = await db.query(
+        `SELECT username, reg, elo_rating
+      FROM utenti
+      WHERE reg = (SELECT reg FROM utenti WHERE id_user = $1)
+      ORDER BY elo_rating DESC
+      LIMIT 10;`,
+        [U_ID],
+      );
+
+      // 2. LEADERBOARD GLOBALE
+      const leaderboard_globale = await db.query(
+        `SELECT username, reg, elo_rating
+      FROM utenti
+      ORDER BY elo_rating DESC
+      LIMIT 10;`,
+      );
+
+      // 3. POSIZIONE UTENTE (Risolto Syntax Error)
+      const user_position = await db.query(
+        `SELECT (COUNT(id_user) + 1) AS user_rank
+      FROM utenti
+      WHERE elo_rating > (
+          SELECT elo_rating 
+          FROM utenti 
+          WHERE id_user = $1
+      );`,
+        [U_ID],
+      );
+      const match_attivi = await db.query(
+        `SELECT 
+          m.nome_match, 
+          m.struttura_partita, 
+          m.data_creazione, 
+          m.id_host,
+          (SELECT count(id_user) FROM partecipanti p2 WHERE p2.id_match = m.id_match) AS numero_partecipanti
+      FROM partecipanti p
+      INNER JOIN partite m ON p.id_match = m.id_match
+      WHERE p.id_user = $1 
+        AND substring(m.struttura_partita from 1 for 2) IN (B'00', B'01')
+      ORDER BY p.data_join DESC`,
+        [U_ID],
+      );
+      //QUESTA QUERY SI FA A REDIS: è lui che tiene traccia immediata dei match creati.
+      const last_created_match = await db.query(
+        `SELECT 
+          m.nome_match, 
+          m.struttura_partita, 
+          m.data_creazione, 
+          m.id_host,
+          (SELECT count(id_user) FROM partecipanti p2 WHERE p2.id_match = m.id_match) AS numero_partecipanti
+      FROM partecipanti p
+      INNER JOIN partite m ON p.id_match = m.id_match
+      WHERE p.id_user = $1 
+        AND substring(m.struttura_partita from 1 for 2) IN (B'00', B'01')
+      ORDER BY m.data_creazione DESC 
+      LIMIT 10;`,
+        [U_ID],
+      );
+      const friends_information = await db.query(
+        `SELECT 
+          u.username, 
+          u.reg, 
+          u.elo_rating, 
+          u.avatar_id, 
+          u.codice_amico
+      FROM amici a
+      INNER JOIN utenti u ON a.id_amico = u.id_user
+      WHERE a.id_user = $1;`,
+        [U_ID],
+      );
+      const decompress_match_attivi = buildMatchMap(match_attivi.rows);
+      const decompress_match_unito = buildMatchMap(last_created_match.rows);
+      const Information = {
+        leaderboard_regionale: leaderboard_regionale.rows,
+        leaderboard_globale: leaderboard_globale.rows,
+        user_position: user_position.rows[0]?.user_rank,
+        match_attivi: decompress_match_attivi,
+        last_created_match: decompress_match_unito,
+        friends_information: friends_information.rows,
+      };
+      console.log("Informazioni per la home page:", Information);
+      const redis_response = await fetchToRedis(U_ID, Information);//VANNO FETCHATE SOLO LE INFO RELATIVE ALL'UTENTE. REDIS MEMORIZZA GIA' LE INFO DELLE PARTITE ATTIVE E DI QUELLE APPENA CREATE (SI DEVE MODIFICARE LA QUERY CHE LE RECUPERA, IN MODO CHE SIANO SOLO QUELLE RELATIVE ALL'UTENTE)
+      return { status: 200, message: "Benvenuto nella home page protetta!" };
+    }
+  } catch (error) {
+    console.log("errore");
+    return { status: 500, error: "Errore interno del server" };
+  }
+};
+const fetchToRedis = async (U_ID, Information) => {
+  const redis_response = await redisClient.setEx(
+    `home_info:${U_ID}`,
+    3600,
+    JSON.stringify(Information),
+  );
+  console.log("Dati della home page salvati in Redis per U_ID:", U_ID, "Risposta Redis:", redis_response);
+  return redis_response;
+};
+const fetchFromRedis = async (U_ID) => {
+  const data = await redisClient.get(`home_info:${U_ID}`);
+  console.log("Dati della home page recuperati da Redis per U_ID:", U_ID, "Dati:", data);
+  return data ? JSON.parse(data) : null;
+};
 module.exports = {
   registerUser,
   verifyLogin,
@@ -249,4 +395,5 @@ module.exports = {
   resetPasswordToken,
   createAccessSession,
   deleteAccessSessionByCookieToken,
+  buildHome,
 };

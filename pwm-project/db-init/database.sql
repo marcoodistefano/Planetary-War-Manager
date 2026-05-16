@@ -165,6 +165,8 @@ CREATE TABLE IF NOT EXISTS partecipanti_partite (
     CONSTRAINT fk_user_partecipante FOREIGN KEY (user_id) REFERENCES utenti(id_user) ON DELETE CASCADE,
     CONSTRAINT fk_partita_partecipante FOREIGN KEY (partita_id) REFERENCES partite(id_partita) ON DELETE CASCADE
 );
+--MANCA UN CAMPO PER QUANDO L'UTENTE SI è UNITO!
+
 -- 5. MOSSE 
 CREATE TABLE IF NOT EXISTS mosse (
     id_mossa UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
