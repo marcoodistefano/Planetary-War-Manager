@@ -170,3 +170,47 @@ ion-modal.tactical-modal {
     --color-checked: #58a6ff;
   }
 }
+/* ==========================================================================
+   GLOBAL RESPONSIVE DESIGN & ULTRAWIDE COMPATIBILITY (21:9, SMALL DISPLAYS)
+   ========================================================================== */
+@media (min-width: 1920px) {
+  html, body { font-size: 18px; }
+  .modal-overlay-container, .army-frame, .tech-frame, .market-frame, .intel-frame, .diplomacy-frame, .profile-frame {
+    max-width: 1400px !important;
+  }
+}
+
+@media (min-aspect-ratio: 21/9) {
+  /* Fix per display Ultra-wide (21:9 o 32:9) */
+  .match-page-container, .home-container, .profile-container {
+    max-width: 2000px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 400px) {
+  /* Fix per telefoni molto stretti (es. vecchi iPhone) */
+  html, body { font-size: 12px; }
+}
+
+@media (max-height: 600px) {
+  /* Fix per display bassi in modalità landscape */
+  .modal-overlay-container { align-items: flex-start; }
+  .army-frame, .tech-frame, .market-frame, .intel-frame, .diplomacy-frame, .profile-frame {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+  }
+}
+
+/* Fix globali anti-overflow orizzontale */
+html, body {
+  overflow-x: hidden;
+  width: 100vw;
+  max-width: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
