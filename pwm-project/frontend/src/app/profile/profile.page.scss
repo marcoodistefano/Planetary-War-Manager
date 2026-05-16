@@ -122,6 +122,48 @@ ion-content {
   }
 }
 
+/* PULSANTE BACK DESKTOP */
+.desktop-back-btn {
+  position: absolute;
+  top: 20px;
+  left: 30px;
+  z-index: 1000;
+
+  .tactical-back-button {
+    display: flex;
+    align-items: center;
+    background: rgba(9, 16, 30, 0.4);
+    border: 1px solid rgba(95, 208, 255, 0.2);
+    color: #86d7ff;
+    padding: 8px 18px 8px 12px;
+    border-radius: 6px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.8rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+
+    ion-icon {
+      font-size: 1.2rem;
+      margin-right: 6px;
+      transition: transform 0.3s ease;
+    }
+
+    &:hover {
+      background: rgba(88, 166, 255, 0.15);
+      border-color: #86d7ff;
+      color: #fff;
+      box-shadow: 0 0 15px rgba(134, 215, 255, 0.3), inset 0 0 10px rgba(134, 215, 255, 0.1);
+      
+      ion-icon {
+        transform: translateX(-3px);
+      }
+    }
+  }
+}
+
 /* ==========================================================================
    2. LAYOUT CENTRATO (Visuale 3D)
    ========================================================================== */
@@ -392,22 +434,91 @@ ion-content {
 .status-text { color: #3fb950; font-weight: bold; }
 .divider { color: rgba(255,255,255,0.3); margin: 0 8px; }
 
+
 /* ==========================================================================
-   8. RESPONSIVE LOGIC (Mobile/Tablet < 1100px)
+   8. RESPONSIVE DESIGN (TABLET & MOBILE)
    ========================================================================== */
-@media (max-width: 1100px) {
+
+/* TABLET (768px - 1100px) */
+@media (min-width: 768px) and (max-width: 1100px) {
+  .desktop-back-btn { display: none; }
   .home-page {
-    height: auto; min-height: 100vh; overflow: visible; display: flex; flex-direction: column;
-    padding-top: 75px !important; /* Spazio per l'header fisso */
+    height: auto; min-height: 100vh; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column;
+    padding-top: 80px !important; 
   }
   
-  .mobile-header { display: flex !important;} /* Mostra l'header su mobile */
+  .mobile-header { 
+    display: flex !important; 
+    top: 15px; left: 15px; width: calc(100% - 30px); padding: 12px 25px;
+  } 
+  
+  .mobile-header .nav-title { font-size: 1.3rem; }
+  .mobile-header .back-link { font-size: 1.1rem; }
+  
+  .top-row {
+    flex-direction: row; flex-wrap: wrap; perspective: none !important; 
+    gap: 30px; padding: 20px; height: auto; justify-content: center;
+  }
+
+  .left-column, .right-column, .center-column {
+    transform: none !important; flex: none; overflow: visible;
+  }
+  
+  .left-column:hover, .right-column:hover { transform: none !important; }
+
+  /* Il Profilo torna in testa */
+  .center-column { order: 1; width: 100%; max-width: 800px; padding-bottom: 30px; margin-top: 0; }
+  
+  /* I due pannelli si affiancano grandissimi per iPad Pro */
+  .left-column { order: 2; width: calc(50% - 15px); max-width: 600px; }
+  .right-column { order: 3; width: calc(50% - 15px); max-width: 600px; }
+  
+  /* Ingrandiamo notevolmente la zona Profilo e Azioni */
+  .title-block {
+    .eyebrow { font-size: 0.9rem; }
+    h1 { font-size: 3rem; }
+  }
+  .avatar-core .avatar-frame { width: 180px; height: 180px; }
+  .avatar-core .elo-badge h2 { font-size: 2.2rem; }
+  .avatar-core .elo-badge p { font-size: 0.8rem; }
+  
+  .action-dock { max-width: 500px; margin: 30px auto 0; }
+  .primary-glow { font-size: 1rem !important; padding: 18px 20px !important; }
+  
+  /* Ingrandiamo i vecchi pannelli striminziti */
+  .panel-heading span { font-size: 1rem; }
+  .panel-heading small { font-size: 0.75rem; }
+  .data-value { font-size: 1rem; }
+  .field-container .custom-label { font-size: 0.75rem; }
+  .chart-container { height: 100px; }
+  .bar-label { font-size: 0.7rem; }
+  .radial-container .chart-wrap { width: 80px; height: 80px; }
+  .radial-container .text-wrap h3 { font-size: 1.4rem; }
+  .kd-container .kd-labels { font-size: 0.85rem; }
+  
+  .standard-btn, .logout-button { font-size: 0.9rem; padding: 15px; }
+
+  .hud-footer {
+    width: calc(100% - 32px) !important; margin: 40px auto 20px auto !important; padding: 12px 20px;
+    &-content { flex-direction: row; text-align: center; font-size: 0.75rem; justify-content: space-between; }
+  }
+}
+
+/* MOBILE (< 768px) */
+@media (max-width: 767px) {
+  .desktop-back-btn { display: none; }
+  .home-page {
+    height: auto; min-height: 100vh; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column;
+    padding-top: 75px !important; 
+  }
+  
+  .mobile-header { display: flex !important; } 
   
   .top-row {
     flex-direction: column; perspective: none !important; gap: 20px; padding: 10px; height: auto;
   }
 
-  .left-column, .right-column {
+  .left-column, .right-column, .center-column {
     transform: none !important; width: 100%; max-width: 500px; flex: none; overflow: visible;
   }
   
