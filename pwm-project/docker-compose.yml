@@ -46,14 +46,14 @@ services:
     networks:
       - pwm-net
 
-  # AUTH & ELO
-  auth-service:
-    build: ./services/auth-elo
-    working_dir: /app/services/auth-elo
+  # User service (gestione utenti, autenticazione, profili, ecc.)
+  user-service:
+    build: ./services/user-service
+    working_dir: /app/services/user-service
     ports:
       - "3000:3000"
     volumes:
-      - ./services/auth-elo:/app/services/auth-elo
+      - ./services/user-service:/app/services/user-service
       - ./services/shared:/app/services/shared
     depends_on:
       - db
@@ -75,13 +75,13 @@ services:
     volumes:
       - ./gateway:/app 
       - app_route_node_modules:/app/node_modules
-      - ./services/auth-elo:/app/services/auth-elo
+      - ./services/user-service:/app/services/user-service
       - ./services/match:/app/services/match
       - ./services/shared:/app/services/shared
     ports:
       - "4000:3001" # <--- Frontend -> app-route (porta interna 3001)
     depends_on:
-      - auth-service
+      - user-service
     environment:
       - REDIS_URL=redis://redis:6379 # <--- FONDAMENTALE per il Comm-Link
       - JWT_SECRET=${SECRET_KEY}
@@ -160,7 +160,7 @@ services:
       - ./shared/assets:/usr/share/nginx/html/assets:ro 
     depends_on:
       - app-route
-      - auth-service
+      - user-service
       - engine-move
       - engine-combat
       - engine-res

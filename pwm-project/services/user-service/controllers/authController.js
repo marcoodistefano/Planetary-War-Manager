@@ -1,5 +1,5 @@
-const authModel = require("./authModel.js");
-const redisClient = require("../shared/redisClient.js");
+const authModel = require("../models/authModel.js");
+const redisClient = require("../../shared/redisClient.js");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 
@@ -247,6 +247,26 @@ const home = async (req, res) => {
   }
 };
 
+const logout = async (req, res) => {
+  try {
+    // Rimuoviamo il cookie impostandolo con una data di scadenza passata o usando clearCookie
+    res.clearCookie('auth_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      path: '/'
+    });
+    
+    // Volendo potremmo invalidare la sessione su Redis/Postgres se abbiamo i dati a disposizione, 
+    // ma per rispondere alla richiesta base rimuoviamo intanto il cookie.
+    
+    return res.status(200).json({ message: "Logout effettuato con successo" });
+  } catch (error) {
+    console.error("Errore durante il logout:", error);
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -254,4 +274,5 @@ module.exports = {
   recoveryPassword,
   recoveryPasswordToken,
   home,
+  logout,
 };

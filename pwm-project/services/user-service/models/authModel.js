@@ -1,8 +1,8 @@
 const nodemailer = require("nodemailer");
-const aslan = require("./middleware/Aslan.js");
-const Eru = require("./middleware/Eru_recostructor.js");
-const db = require("../shared/postgresClient.js");
-const redisClient = require("../shared/redisClient.js");
+const aslan = require("../middleware/Aslan.js");
+const Eru = require("../middleware/Eru_recostructor.js");
+const db = require("../../shared/postgresClient.js");
+const redisClient = require("../../shared/redisClient.js");
 const { JsonWebTokenError } = require("jsonwebtoken");
 const HOST = process.env.HOST || "localhost:3001";
 const DOMAIN = process.env.DOMAIN || "PWM";

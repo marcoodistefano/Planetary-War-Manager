@@ -12,8 +12,10 @@ const PASSWORD_RESET_TOKEN_PATTERN = /^\/auth\/login\/recovery\/password\/([A-Za
 const MIN_PASSWORD_LENGTH = 12;
 
 const ROUTE_GROUPS = [
-    { pattern: /^\/auth(?:\/|$)/, target: "auth" },
-    { pattern: /^\/home(?:\/|$)/, target: "auth" },
+    { pattern: /^\/auth(?:\/|$)/, target: "user" },     // Gestito da user-service
+    { pattern: /^\/home(?:\/|$)/, target: "user" },     // Gestito da user-service
+    { pattern: /^\/elo(?:\/|$)/, target: "user" },      // NUOVO: Rotte per i calcoli ELO
+    { pattern: /^\/player(?:\/|$)/, target: "user" },   // NUOVO: Rotte per info profilo/statistiche
     { pattern: /^\/match(?:\/|$)/, target: "match" },
     { pattern: /^\/chat(?:\/|$)/, target: "chat" },
     { pattern: /^\/movement(?:\/|$)/, target: "movement" },

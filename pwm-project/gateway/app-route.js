@@ -10,7 +10,7 @@ const controller = require("./app-controller.js");
 // 1. CONFIGURAZIONE TARGET E PORTE
 // Ho separato i servizi HTTP da quelli WebSocket per massima chiarezza
 const SERVICE_TARGETS = {
-  auth: process.env.AUTH_SERVICE_URL || "http://auth-service:3000",
+  auth: process.env.AUTH_SERVICE_URL || "http://user-service:3000",
   match: process.env.MATCH_SERVICE_URL || "http://match-service:3004", // <--- AGGIUNTO IL PIN
   chat: process.env.CHAT_SERVICE_URL || "http://chat-service:3001",
   movement: process.env.MOVEMENT_SERVICE_URL || "http://movement-service:3002",
@@ -26,6 +26,7 @@ const PUBLIC_PATHS = [
   "/recovery-password",
   "/registration",
   "/auth/login",
+  "/auth/logout",
   "/auth/register",
   "/auth/login/recovery/password"
 ];

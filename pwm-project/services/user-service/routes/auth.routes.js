@@ -1,5 +1,5 @@
 const express = require("express");
-const authController = require("./authController.js");
+const authController = require("../controllers/authController.js");
 
 const router = express.Router();
 
@@ -8,6 +8,7 @@ router.post("/auth/login", authController.login);
 router.post("/auth/login/recovery/username", authController.recoveryUsername);
 router.post("/auth/login/recovery/password", authController.recoveryPassword);
 router.post("/auth/login/recovery/password/:token", authController.recoveryPasswordToken);
+router.post("/auth/logout", authController.logout);
 router.get("/home", authController.home);
 // router.get("/profile", authController.profile);
 // router.post("/profile/update", authController.updateProfile);

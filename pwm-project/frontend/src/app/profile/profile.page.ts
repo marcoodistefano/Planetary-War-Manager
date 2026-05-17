@@ -8,6 +8,7 @@ import { IconSelectorComponent } from './components/icon-selector/icon-selector.
 import { ChangeNameComponent } from './components/change-name/change-name.component';
 import { ChangePasswordComponent } from './components/change-password/change-password.component';
 import { SettingsComponent } from './components/settings/settings.component';
+import { AuthApiService } from '../auth/auth-api.service';
 
 @Component({
   selector: 'app-profile',
@@ -43,7 +44,8 @@ export class ProfilePage implements OnInit, AfterViewInit {
   constructor(
     private router: Router, 
     private titleService: Title,
-    private modalCtrl: ModalController
+    private modalCtrl: ModalController,
+    private authService: AuthApiService
   ) { }
 
   ngOnInit() {
@@ -128,7 +130,12 @@ async changePassword() {
   }
 
   editProfile() { console.log('Accesso al pannello configurazione protocolli...'); }
-  logout() { this.router.navigate(['/login']); }
+  logout() { 
+    this.authService.logout().subscribe({
+      next: () => this.router.navigate(['/login']),
+      error: () => this.router.navigate(['/login'])
+    });
+  }
   openMatchHistory() { console.log("Apertura Archivio: Recupero snapshot PostgreSQL per il Timelapse..."); }
   manageFriends() { console.log("Accesso alla Rete Diplomatica: Caricamento lista amici pending/accepted..."); }
   
