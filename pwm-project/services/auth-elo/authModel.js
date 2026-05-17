@@ -2,6 +2,7 @@ const nodemailer = require("nodemailer");
 const aslan = require("./middleware/Aslan.js");
 const Eru = require("./middleware/Eru_recostructor.js");
 const db = require("../shared/postgresClient.js");
+const redisClient = require("../shared/redisClient.js");
 const { JsonWebTokenError } = require("jsonwebtoken");
 const HOST = process.env.HOST || "localhost:3001";
 const DOMAIN = process.env.DOMAIN || "PWM";
@@ -283,6 +284,13 @@ const buildHome = async (U_ID) => {
     //REDIS, AD OGNI MODO, IMPLEMENTA UNA CASH: SE L'UTENTE NON EFFETTUA RICHIESTE PER UN PO' DI TEMPO, LE INFO SI ELIMINANO E SI VA A DB.
     // 1. LEADERBOARD REGIONALE
     else {
+
+      const user_profile_query = await db.query(
+        `SELECT username, reg, elo_rating, avatar_id FROM utenti WHERE id_user = $1`,
+        [U_ID]
+      );
+      const currentUser = user_profile_query.rows[0];
+
       const leaderboard_regionale = await db.query(
         `SELECT username, reg, elo_rating
       FROM utenti
@@ -312,35 +320,35 @@ const buildHome = async (U_ID) => {
         [U_ID],
       );
       const match_attivi = await db.query(
-        `SELECT 
-          m.nome_match, 
-          m.struttura_partita, 
-          m.data_creazione, 
-          m.id_host,
-          (SELECT count(id_user) FROM partecipanti p2 WHERE p2.id_match = m.id_match) AS numero_partecipanti
-      FROM partecipanti p
-      INNER JOIN partite m ON p.id_match = m.id_match
-      WHERE p.id_user = $1 
-        AND substring(m.struttura_partita from 1 for 2) IN (B'00', B'01')
-      ORDER BY p.data_join DESC`,
-        [U_ID],
-      );
+          `SELECT 
+            m.nome_partita AS nome_match, 
+            m.struttura_partita, 
+            m.created_at AS data_creazione, 
+            m.id_host,
+            (SELECT count(user_id) FROM partecipanti_partite p2 WHERE p2.partita_id = m.id_partita) AS numero_partecipanti
+        FROM partecipanti_partite p
+        INNER JOIN partite m ON p.partita_id = m.id_partita
+        WHERE p.user_id = $1 
+          AND substring(m.struttura_partita::text from 1 for 2) IN ('00', '01')
+        ORDER BY m.created_at DESC`,
+          [U_ID],
+        );
       //QUESTA QUERY SI FA A REDIS: è lui che tiene traccia immediata dei match creati.
       const last_created_match = await db.query(
-        `SELECT 
-          m.nome_match, 
-          m.struttura_partita, 
-          m.data_creazione, 
-          m.id_host,
-          (SELECT count(id_user) FROM partecipanti p2 WHERE p2.id_match = m.id_match) AS numero_partecipanti
-      FROM partecipanti p
-      INNER JOIN partite m ON p.id_match = m.id_match
-      WHERE p.id_user = $1 
-        AND substring(m.struttura_partita from 1 for 2) IN (B'00', B'01')
-      ORDER BY m.data_creazione DESC 
-      LIMIT 10;`,
-        [U_ID],
-      );
+          `SELECT 
+            m.nome_partita AS nome_match, 
+            m.struttura_partita, 
+            m.created_at AS data_creazione, 
+            m.id_host,
+            (SELECT count(user_id) FROM partecipanti_partite p2 WHERE p2.partita_id = m.id_partita) AS numero_partecipanti
+        FROM partecipanti_partite p
+        INNER JOIN partite m ON p.partita_id = m.id_partita
+        WHERE p.user_id = $1 
+          AND substring(m.struttura_partita::text from 1 for 2) IN ('00', '01')
+        ORDER BY m.created_at DESC 
+        LIMIT 10;`,
+          [U_ID],
+        );
       const friends_information = await db.query(
         `SELECT 
           u.username, 
@@ -356,6 +364,7 @@ const buildHome = async (U_ID) => {
       const decompress_match_attivi = buildMatchMap(match_attivi.rows);
       const decompress_match_unito = buildMatchMap(last_created_match.rows);
       const Information = {
+        user_profile: currentUser,
         leaderboard_regionale: leaderboard_regionale.rows,
         leaderboard_globale: leaderboard_globale.rows,
         user_position: user_position.rows[0]?.user_rank,
@@ -365,10 +374,10 @@ const buildHome = async (U_ID) => {
       };
       console.log("Informazioni per la home page:", Information);
       const redis_response = await fetchToRedis(U_ID, Information);//VANNO FETCHATE SOLO LE INFO RELATIVE ALL'UTENTE. REDIS MEMORIZZA GIA' LE INFO DELLE PARTITE ATTIVE E DI QUELLE APPENA CREATE (SI DEVE MODIFICARE LA QUERY CHE LE RECUPERA, IN MODO CHE SIANO SOLO QUELLE RELATIVE ALL'UTENTE)
-      return { status: 200, message: "Benvenuto nella home page protetta!" };
+      return { status: 200, message: "Benvenuto nella home page protetta!", data: Information};
     }
   } catch (error) {
-    console.log("errore");
+    console.error("Errore generato dentro buildHome:", error);
     return { status: 500, error: "Errore interno del server" };
   }
 };

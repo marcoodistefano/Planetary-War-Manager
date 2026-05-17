@@ -13,6 +13,7 @@ const MIN_PASSWORD_LENGTH = 12;
 
 const ROUTE_GROUPS = [
     { pattern: /^\/auth(?:\/|$)/, target: "auth" },
+    { pattern: /^\/home(?:\/|$)/, target: "auth" },
     { pattern: /^\/match(?:\/|$)/, target: "match" },
     { pattern: /^\/chat(?:\/|$)/, target: "chat" },
     { pattern: /^\/movement(?:\/|$)/, target: "movement" },

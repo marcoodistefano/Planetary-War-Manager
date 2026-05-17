@@ -114,6 +114,7 @@ const login = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'Strict',
+      path: '/',
       maxAge: SESSION_TTL * 1000 // Convertito in ms
     });
 
@@ -223,22 +224,25 @@ const recoveryPasswordToken = async (req, res) => {
 
 const home = async (req, res) => {
   try {
-    token = req.cookies.auth_token;
-    if (!token) { //il token è verificato nel gateway, qui è solo per testare se arriva correttamente
-      return res.status(401).json({ message: "Non autenticato" });
+    // 1. Leggiamo l'ID utente iniettato dal gateway (app-route)
+    const U_ID = req.headers['x-user-id'];
+    
+    if (!U_ID) {
+      return res.status(401).json({ message: "Non autenticato (identità mancante)" });
     }
-    U_ID = JSON.parse(await redisClient.get(`session:${token}`)).userId;
-    console.log("U_ID:", U_ID);
-    res = await authModel.buildHome(U_ID);
-    if(res.status !== 200){
-      return res.status(res.status).json({
-        isValid: false,
-        errors: [res.message],
-      });
+
+    // 2. Chiamata al model per costruire i dati della UI
+    const result = await authModel.buildHome(U_ID);
+    
+    if (result.status !== 200) {
+      return res.status(result.status).json({ isValid: false, errors: [result.message] });
     }
-    return res    
-  }catch(error){
-    console.log("errore");
+
+    // 3. Invia i dati reali al frontend
+    return res.status(200).json(result); 
+    
+  } catch (error) {
+    console.error("Errore controller home:", error);
     return res.status(500).json({ error: "Errore interno del server" });
   }
 };
