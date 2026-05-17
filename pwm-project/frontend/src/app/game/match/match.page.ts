@@ -162,6 +162,10 @@ export class MatchPage implements OnInit, AfterViewInit {
     });
   }
 
+  ionViewWillEnter() {
+    this.loadGameRules();
+  }
+
   ngAfterViewInit() {
     setTimeout(() => {
       this.initMap();

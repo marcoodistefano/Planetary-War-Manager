@@ -5,7 +5,7 @@
       <div class="drawer-header">
         <img src="assets/icon/favicon.svg" class="logo-mark" alt="PWM">
         <div class="avatar" routerLink="/profile">
-          <img [src]="'assets/profile_icons/id_1.jpeg'" alt="Profile">
+          <img [src]="currentPlayer.avatar" alt="Profile">
         </div>
       </div>
 
@@ -69,7 +69,7 @@
     
     <header class="mobile-header">
       <div class="mini-avatar" routerLink="/profile">
-        <img [src]="'assets/profile_icons/id_1.jpeg'" alt="Vai al Profilo">
+        <img [src]="currentPlayer.avatar" alt="Vai al Profilo">
       </div>
 
       <div class="header-title">PWM</div>
@@ -167,7 +167,7 @@
           <div class="profile-card">
             <p class="profile-label">Profilo</p>
             <div class="avatar transparent-element" routerLink="/profile" style="padding: 0; overflow: hidden;">
-              <img [src]="'assets/profile_icons/id_1.jpeg'" style="width: 100%; height: 100%; object-fit: cover;">
+              <img [src]="currentPlayer.avatar" alt="Profile" style="width: 100%; height: 100%; object-fit: cover;">
             </div>
             <h2 class="profile-name">{{ currentPlayer.name }}</h2>
             <small class="profile-level">Livello 24</small>

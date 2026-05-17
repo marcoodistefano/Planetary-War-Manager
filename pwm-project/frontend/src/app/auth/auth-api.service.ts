@@ -53,4 +53,14 @@ export class AuthApiService {
   logout(): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.baseUrl}/auth/logout`, {}, { withCredentials: true });
   }
+
+  getProfile() {
+    return this.http.get(`${this.baseUrl}/player/profile`, { 
+      withCredentials: true 
+    });
+  }
+
+  updateAvatar(avatarId: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.baseUrl}/player/profile/avatar`, { avatarId }, { withCredentials: true });
+  }
 }

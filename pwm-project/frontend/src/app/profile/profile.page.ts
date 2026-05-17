@@ -9,6 +9,9 @@ import { ChangeNameComponent } from './components/change-name/change-name.compon
 import { ChangePasswordComponent } from './components/change-password/change-password.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { AuthApiService } from '../auth/auth-api.service';
+import { UserStateService } from '../user-state.service';
+
+const AVATAR_ASSET_VERSION = '20260517';
 
 @Component({
   selector: 'app-profile',
@@ -27,30 +30,39 @@ export class ProfilePage implements OnInit, AfterViewInit {
   showFriendCode: boolean = false;
 
   user: any = {
-    // ... MANTIENI I TUOI DATI USER QUI ...
-    username: '',
-    avatar: 'assets/profile_icons/id_1.jpeg',
-    email: '',
-    reg: '',
+    username: 'Caricamento...',
+    avatar: this.avatarPath(1),
+    email: '...',
+    reg: '...',
     elo_rating: 0,
-    elo_history: [1100, 1250, 1200, 1380, 1450], 
+    elo_history: [0, 0, 0, 0, 0], 
     territori_conquistati: 0,
     capitali_distrutte: 0,
     truppe_eliminate: 0,
     truppe_perse: 0,
-    win_rate: 65 
+    win_rate: 0,
+    codice_amico: '...'
   };
 
   constructor(
     private router: Router, 
     private titleService: Title,
     private modalCtrl: ModalController,
-    private authService: AuthApiService
+    private authService: AuthApiService, // Il servizio che useremo per la chiamata
+    private userState: UserStateService
   ) { }
 
   ngOnInit() {
     this.titleService.setTitle('PWM | Profilo Comandante');
     this.loadUserData();
+  }
+
+  ionViewWillEnter() {
+    this.loadUserData();
+  }
+
+  private avatarPath(avatarId: number) {
+    return `assets/profile_icons/id_${avatarId}.jpeg?v=${AVATAR_ASSET_VERSION}`;
   }
 
   // === METODI PER IL PLAYBACK DEL VIDEO ===
@@ -73,21 +85,44 @@ export class ProfilePage implements OnInit, AfterViewInit {
   }
 
   loadUserData() {
-    this.user = {
-      id_user: '550e8400-e29b-41d4-a716-446655440000',
-      username: 'Generale_Inverno',
-      avatar: 'assets/profile_icons/id_1.jpeg',
-      email: 'gen@mail.com',
-      reg: 'Europa',
-      elo_rating: 1450,
-      elo_history: [1100, 1250, 1200, 1380, 1450],
-      codice_amico: 'AMICO-X8F9',
-      territori_conquistati: 142,
-      capitali_distrutte: 12,
-      truppe_eliminate: 15420,
-      truppe_perse: 8430,
-      win_rate: 65
-    };
+    // Chiamata al nuovo endpoint tramite il servizio
+    this.authService.getProfile().subscribe({
+      next: (response: any) => {
+        if (response && response.status === 200) {
+          const profile = response.data.profile;
+          const stats = response.data.combat_stats;
+
+          // Mappiamo i dati del backend (JSON) sulle variabili del frontend
+          this.user = {
+            username: profile.username,
+            email: profile.email,
+            reg: profile.reg,
+            elo_rating: profile.elo_rating,
+            codice_amico: profile.codice_amico,
+            
+            // Lavoriamo con ID numerico nel DB e formiamo il prefisso id_ qui
+            avatar: profile.avatar_id
+              ? this.avatarPath(profile.avatar_id)
+              : this.avatarPath(1),
+
+            // Mappatura delle statistiche
+            elo_history: stats.elo_history,
+            territori_conquistati: stats.territories,
+            capitali_distrutte: stats.capitals,
+            truppe_eliminate: stats.kills,
+            truppe_perse: stats.deaths,
+            win_rate: stats.win_rate
+          };
+        }
+      },
+      error: (err) => {
+        console.error("Errore nel recupero dei dati del profilo:", err);
+        // Opzionale: Reindirizzare al login se l'utente non è autorizzato (Token scaduto)
+        if (err.status === 401) {
+          this.router.navigate(['/login']);
+        }
+      }
+    });
   }
 
   async changeAvatar() {
@@ -99,8 +134,28 @@ export class ProfilePage implements OnInit, AfterViewInit {
 
   const { data } = await modal.onDidDismiss();
   if (data) {
-    console.log("Nuovo Avatar selezionato:", data);
-    this.user.avatar = data; 
+    console.log("Nuovo Avatar selezionato (path):", data);
+    
+    // Estraiamo l'ID dall'URL. Dall'URL 'assets/profile_icons/id_2.jpeg', vogliamo ottenere il numero '2'
+    const fileName = data.split('/').pop(); 
+    const idWithPrefix = fileName ? fileName.split('.')[0] : null; 
+    const avatarId = idWithPrefix ? parseInt(idWithPrefix.replace('id_', ''), 10) : null; // 2
+
+    if (avatarId && !isNaN(avatarId)) {
+      this.authService.updateAvatar(avatarId.toString()).subscribe({
+        next: (res) => {
+          console.log("Avatar aggiornato nel DB!");
+          // Aggiorna lo stato locale e notifica le altre pagine
+          this.user.avatar = this.avatarPath(avatarId);
+          this.userState.setAvatarId(avatarId);
+        },
+        error: (err) => {
+          console.error("Errore salvataggio avatar:", err);
+        }
+      });
+    } else {
+      console.warn("Impossibile determinare l'ID numerico dell'avatar.");
+    }
   }
 }
 

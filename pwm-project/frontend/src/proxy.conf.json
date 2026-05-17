@@ -4,6 +4,11 @@
     "secure": false,
     "changeOrigin": true
   },
+  "/player": {
+    "target": "http://app-route:3001",
+    "secure": false,
+    "changeOrigin": true
+  },
   "/api": {
     "target": "http://app-route:3001",
     "secure": false,

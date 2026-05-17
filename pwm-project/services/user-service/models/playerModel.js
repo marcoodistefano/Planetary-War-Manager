@@ -5,7 +5,7 @@ const Eru = require("../middleware/Eru_recostructor.js");
 const fetchToRedis = async (U_ID, Information) => {
   const redis_response = await redisClient.setEx(
     `home_info:${U_ID}`,
-    3600,
+    30, // Ridotto a 30s per i test; mettilo a quanto desideri. In questo modo si auto-rigenera
     JSON.stringify(Information),
   );
   console.log("Dati della home page salvati in Redis per U_ID:", U_ID, "Risposta Redis:", redis_response);
@@ -145,8 +145,85 @@ const buildHome = async (U_ID) => {
     console.error("Errore generato dentro buildHome:", error);
     return { status: 500, error: "Errore interno del server" };
   }
+};  
+  const getProfileData = async (U_ID) => {
+  try {
+    // 1. Dati base dell'utente
+    const userQuery = await db.query(
+      `SELECT username, email, reg, elo_rating, avatar_id, codice_amico 
+       FROM utenti WHERE id_user = $1`,
+      [U_ID]
+    );
+    const user = userQuery.rows[0];
+
+    if (!user) {
+      return { status: 404, error: "Utente non trovato" };
+    }
+
+    // 2. Simulazione statistiche belliche (In futuro le prenderai da una tabella 'statistiche_match')
+    // Ad esempio: Kills, Morti, Territori conquistati
+    const stats = {
+      win_rate: 65, 
+      kills: 15420,
+      deaths: 8430,
+      territories: 142,
+      capitals: 12,
+      elo_history: [1100, 1250, 1200, 1380, 1450] // Andamento ELO
+    };
+
+    return { 
+      status: 200, 
+      data: {
+        profile: user,
+        combat_stats: stats
+      }
+    };
+  } catch (error) {
+    console.error("Errore in getProfileData:", error);
+    return { status: 500, error: "Errore nel recupero del profilo" };
+  }
+
+};
+
+const getAvatar = async (U_ID) => {
+  try {
+    const q = await db.query(
+      `SELECT avatar_id FROM utenti WHERE id_user = $1 LIMIT 1`,
+      [U_ID]
+    );
+    const row = q.rows[0];
+    if (!row) return { status: 404, error: 'Utente non trovato' };
+    return { status: 200, data: { avatar_id: row.avatar_id } };
+  } catch (error) {
+    console.error('Errore in getAvatar:', error);
+    return { status: 500, error: "Errore durante il recupero dell'avatar" };
+  }
+};
+
+const updateAvatar = async (U_ID, avatarId) => {
+  try {
+    const result = await db.query(
+      `UPDATE utenti SET avatar_id = $1 WHERE id_user = $2 RETURNING avatar_id`,
+      [avatarId, U_ID]
+    );
+
+    if (result.rowCount === 0) {
+      return { status: 404, error: "Utente non trovato" };
+    }
+
+    // Invalidare la cache Redis della dashboard in modo che mostri il nuovo avatar
+    await redisClient.del(`home_info:${U_ID}`);
+    
+    return { status: 200, message: "Avatar aggiornato con successo", data: result.rows[0] };
+  } catch (error) {
+    console.error("Errore in updateAvatar:", error);
+    return { status: 500, error: "Errore durante l'aggiornamento dell'avatar" };
+  }
 };
 
 module.exports = {
   buildHome,
+  getProfileData,
+  getAvatar,
+  updateAvatar
 };

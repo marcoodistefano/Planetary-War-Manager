@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
@@ -8,6 +8,8 @@ import { ModalController } from '@ionic/angular';
 
 // Importazione del Service e del Modello
 import { HomeService } from './home'; 
+import { UserStateService } from '../user-state.service';
+import { Subscription } from 'rxjs';
 import { HomeData } from './home-data.model';
 
 import { SettingsComponent } from '../profile/components/settings/settings.component';
@@ -19,6 +21,8 @@ import { NewgamesComponent } from './components/newgames/newgames.component';
 import { ActivegamesComponent } from './components/activegames/activegames.component';
 import { LeaderboardComponent } from './components/leaderboard/leaderboard.component';
 
+const AVATAR_ASSET_VERSION = '20260517';
+
 @Component({
   selector: 'app-home',
   templateUrl: 'home.page.html',
@@ -26,12 +30,12 @@ import { LeaderboardComponent } from './components/leaderboard/leaderboard.compo
   standalone: true,
   imports: [IonicModule, CommonModule, FormsModule, RouterModule]
 })
-export class HomePage implements OnInit, AfterViewInit {
+export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
 
   // Stato iniziale dell'utente (sarà sovrascritto dal DB)
-  currentPlayer = { name: 'Caricamento...', region: '', rank: 0, score: 0 };
+  currentPlayer = { name: 'Caricamento...', region: '', rank: 0, score: 0, avatar: this.avatarPath(1) };
   
   activeGames: any[] = [];
   leaderboardFull: any[] = [];
@@ -42,16 +46,46 @@ export class HomePage implements OnInit, AfterViewInit {
   leaderboardView: 'global' | 'regional' = 'global';
   quickActions = ['Profilo', 'Notifiche', 'Impostazioni', 'Obiettivi', 'Amici'];
 
+  private avatarSub?: Subscription;
+
   constructor(
     private router: Router, 
     private titleService: Title,
     private modalCtrl: ModalController,
-    private homeService: HomeService // Iniezione del Service creato
+    private homeService: HomeService, // Iniezione del Service creato
+    private userState: UserStateService
   ) { }
+
+  private pollingInterval: any;
 
   ngOnInit() {
     this.titleService.setTitle('PWM | Homepage');
     this.loadDashboardData(); // Carica i dati dal backend all'avvio
+    
+    // Effettua un fetch ogni 2 minuti (120000 ms)
+    this.pollingInterval = setInterval(() => {
+      this.loadDashboardData();
+    }, 120000);
+
+    // Sottoscrizione per aggiornare l'avatar non appena viene cambiato
+    this.avatarSub = this.userState.avatarId$.subscribe((id) => {
+      if (id) this.currentPlayer.avatar = this.avatarPath(id);
+    });
+  }
+
+  ionViewWillEnter() {
+    this.loadDashboardData();
+  }
+
+  private avatarPath(avatarId: number) {
+    return `assets/profile_icons/id_${avatarId}.jpeg?v=${AVATAR_ASSET_VERSION}`;
+  }
+
+  ngOnDestroy() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+    }
+    if (this.avatarSub) this.avatarSub.unsubscribe();
   }
 
   /**
@@ -68,7 +102,8 @@ export class HomePage implements OnInit, AfterViewInit {
             name: info.user_profile.username,
             region: info.user_profile.reg,
             rank: info.user_position,
-            score: info.user_profile.elo_rating
+            score: info.user_profile.elo_rating,
+            avatar: info.user_profile.avatar_id ? this.avatarPath(info.user_profile.avatar_id) : this.avatarPath(1)
           };
         }
 
