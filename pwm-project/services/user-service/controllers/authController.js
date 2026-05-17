@@ -62,16 +62,13 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    // 1. INPUT VALIDATION (Prevenzione Garbage In/Garbage Out)
     const { username, password } = req.body;
     if (!username || !password) {
       return res.status(400).json({ message: "Credenziali mancanti" });
     }
 
-    // 2. AUTHENTICATION
     const authResult = await authModel.verifyLogin({ username, password });
 
-    // Mitigazione Enumerazione: Messaggio generico
     if (!authResult.ok) {
       return res.status(401).json({ isValid: false, message: "Credenziali non valide" });
     }
@@ -80,15 +77,12 @@ const login = async (req, res) => {
     const sessionId = crypto.randomUUID();
     const ipAddress = getClientIp(req);
 
-    // 3. TOKEN GENERATION
     const token = jwt.sign(
-      { sub: userId, jti: sessionId }, // Evitiamo di duplicare userId in id_user
+      { sub: userId, jti: sessionId }, 
       JWT_SECRET,
       { expiresIn: SESSION_TTL }
     );
 
-    // 4. PERSISTENCE LAYER (Parallelismo o Transazione)
-    // Usiamo Promise.allSettled o una transazione per garantire consistenza
     try {
       const sessionData = JSON.stringify({
         userId,
@@ -97,7 +91,6 @@ const login = async (req, res) => {
         createdAt: new Date().toISOString()
       });
 
-      // Operazione atomica su Redis e salvataggio su Postgres
       await Promise.all([
         redisClient.setEx(`session:${sessionId}`, SESSION_TTL, sessionData),
         redisClient.sAdd(`user_sessions:${userId}`, sessionId),
@@ -108,20 +101,17 @@ const login = async (req, res) => {
       return res.status(500).json({ error: "Errore durante la creazione della sessione" });
     }
 
-    // 5. SECURE DELIVERY
-    // Impostiamo il token in un cookie sicuro, non accessibile da JS
     res.cookie('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'Strict',
       path: '/',
-      maxAge: SESSION_TTL * 1000 // Convertito in ms
+      maxAge: SESSION_TTL * 1000 
     });
 
     return res.json({ status: 200, message: "Login avvenuto con successo" });
 
   } catch (error) {
-    // Log granulare per debugging interno, ma generico per l'esterno
     console.error(`[Auth Error] ${new Date().toISOString()}:`, error.message);
     return res.status(500).json({ error: "Errore interno del server" });
   }
@@ -130,55 +120,33 @@ const login = async (req, res) => {
 const recoveryUsername = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    const recovery = await authModel.recoverUsername({
-      email,
-      password,
-    });
+    const recovery = await authModel.recoverUsername({ email, password });
 
     if (!recovery.ok) {
-      return res.status(400).json({
-        isValid: false,
-        errors: [recovery.error],
-      });
+      return res.status(400).json({ isValid: false, errors: [recovery.error] });
     }
 
     return res.json({
       message: "Username recuperato con successo",
-      dato_x_sicuro: {
-        email,
-        password,
-        username: recovery.username,
-      },
+      dato_x_sicuro: { email, password, username: recovery.username },
     });
   } catch (error) {
     console.error("--- Errore durante l'elaborazione ---");
     console.error(error);
-    return res.status(500).json({
-      error: "Errore interno del server",
-      details: error.message,
-    });
+    return res.status(500).json({ error: "Errore interno del server" });
   }
 };
 
 const recoveryPassword = async (req, res) => {
   try {
     const { email } = req.body;
-
-    const recovery = await authModel.recoveryPassword({
-      email,
-    });
+    const recovery = await authModel.recoveryPassword({ email });
 
     if (recovery.status !== 200) {
-      return res.status(recovery.status).json({
-        isValid: false,
-        errors: [recovery.message],
-      });
+      return res.status(recovery.status).json({ isValid: false, errors: [recovery.message] });
     }
 
-    return res.json({
-      message: recovery.message,
-    });
+    return res.json({ message: recovery.message });
   } catch (error) {
     console.error("--- Errore durante l'elaborazione ---");
     console.error(error);
@@ -191,7 +159,6 @@ const recoveryPasswordToken = async (req, res) => {
     const { token } = req.params;
     const { newPassword } = req.body;
 
-    // Verifica se il token è valido e non è scaduto
     const tokenData = await redisClient.get(`password_recovery:${token}`);
     if (!tokenData) {
       return res.status(400).json({ isValid: false, errors: ["Token non valido o scaduto"] });
@@ -199,19 +166,14 @@ const recoveryPasswordToken = async (req, res) => {
     
     const { username, email } = JSON.parse(tokenData);
 
-    // Resetta la password
     const resetResult = await authModel.resetPasswordToken({
-      username,
-      email,
-      newPassword,
-      tokenData,
+      username, email, newPassword, tokenData,
     });
 
     if (!resetResult.ok) {
       return res.status(400).json({ isValid: false, errors: [resetResult.error] });
     }
 
-    // Invalida il token dopo averlo utilizzato
     await redisClient.del(`password_recovery:${token}`);
 
     return res.json({ message: "Password reimpostata con successo" });
@@ -222,44 +184,14 @@ const recoveryPasswordToken = async (req, res) => {
   }
 };
 
-const home = async (req, res) => {
-  try {
-    // 1. Leggiamo l'ID utente iniettato dal gateway (app-route)
-    const U_ID = req.headers['x-user-id'];
-    
-    if (!U_ID) {
-      return res.status(401).json({ message: "Non autenticato (identità mancante)" });
-    }
-
-    // 2. Chiamata al model per costruire i dati della UI
-    const result = await authModel.buildHome(U_ID);
-    
-    if (result.status !== 200) {
-      return res.status(result.status).json({ isValid: false, errors: [result.message] });
-    }
-
-    // 3. Invia i dati reali al frontend
-    return res.status(200).json(result); 
-    
-  } catch (error) {
-    console.error("Errore controller home:", error);
-    return res.status(500).json({ error: "Errore interno del server" });
-  }
-};
-
 const logout = async (req, res) => {
   try {
-    // Rimuoviamo il cookie impostandolo con una data di scadenza passata o usando clearCookie
     res.clearCookie('auth_token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'Strict',
       path: '/'
     });
-    
-    // Volendo potremmo invalidare la sessione su Redis/Postgres se abbiamo i dati a disposizione, 
-    // ma per rispondere alla richiesta base rimuoviamo intanto il cookie.
-    
     return res.status(200).json({ message: "Logout effettuato con successo" });
   } catch (error) {
     console.error("Errore durante il logout:", error);
@@ -273,6 +205,5 @@ module.exports = {
   recoveryUsername,
   recoveryPassword,
   recoveryPasswordToken,
-  home,
   logout,
 };
