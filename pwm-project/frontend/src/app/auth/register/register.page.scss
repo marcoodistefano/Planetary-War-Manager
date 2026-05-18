@@ -4,7 +4,7 @@
 
 ion-content {
   --background: #08111f;
-  --overflow: hidden; 
+  --overflow: auto; 
   font-family: 'Courier New', Courier, monospace;
 }
 
@@ -14,7 +14,7 @@ ion-content::part(scroll) {
   justify-content: flex-start;
   align-items: center;
   padding-top: clamp(20px, 10vh, 12vh); 
-  padding-bottom: 10px; 
+  padding-bottom: 20px; 
   min-height: 100%;
 }
 
@@ -113,8 +113,8 @@ form {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) inset;
   border-radius: 9px;
   padding: 0 16px; 
-  margin-bottom: 16px;
-  height: 80px;                 /* Altezza fissa rigorosa */
+  margin-bottom: clamp(10px, 1.5vh, 16px);
+  height: clamp(60px, 8vh, 80px); /* Altezza fluida */
   display: flex;
   flex-direction: column;
   justify-content: center;      /* Centra verticalmente etichetta + input */
