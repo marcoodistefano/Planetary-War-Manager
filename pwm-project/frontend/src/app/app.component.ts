@@ -1,7 +1,9 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
+import { AuthApiService } from './auth/auth-api.service';
+import { isPublicAuthRoute } from './auth/auth-route.config';
 import { NavigationEnd, Router } from '@angular/router';
-import { filter, take } from 'rxjs/operators';
-import { fromEvent, merge, Subscription } from 'rxjs';
+import { fromEvent, merge, of, Subscription } from 'rxjs';
+import { catchError, filter, take } from 'rxjs/operators';
 
 @Component({
   selector: 'app-root',
@@ -22,7 +24,10 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  constructor(private router: Router) {
+  constructor(
+    private router: Router,
+    private authApi: AuthApiService,
+  ) {
     this.isGameRoute = this.isGameUrl(this.router.url);
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
@@ -34,6 +39,12 @@ export class AppComponent implements AfterViewInit, OnDestroy {
         } else {
           this.ensureAudioPlayback();
         }
+      });
+
+    this.router.events
+      .pipe(filter((event) => event instanceof NavigationEnd), take(1))
+      .subscribe(() => {
+        this.checkSessionOnBoot();
       });
   }
 
@@ -47,6 +58,26 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
   private isGameUrl(url: string): boolean {
     return url.startsWith('/game');
+  }
+
+  private checkSessionOnBoot() {
+    if (isPublicAuthRoute(this.router.url)) {
+      return;
+    }
+
+    this.authApi.getProfile().pipe(
+      take(1),
+      catchError(() => {
+        const returnUrl = this.router.url || '/home';
+        try {
+          sessionStorage.setItem('auth:returnUrl', returnUrl);
+        } catch (e) {
+          // ignore
+        }
+        void this.router.navigate(['/login']);
+        return of(false);
+      })
+    ).subscribe();
   }
 
   private ensureAudioPlayback() {

@@ -1,5 +1,6 @@
 import { NgModule } from '@angular/core';
 import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
+import { authGuard } from './auth/guards/auth.guard';
 
 const routes: Routes = [
   {
@@ -9,7 +10,8 @@ const routes: Routes = [
   },
   {
     path: 'home',
-    loadComponent: () => import('./home/home.page').then(m => m.HomePage)
+    loadComponent: () => import('./home/home.page').then(m => m.HomePage),
+    canMatch: [authGuard]
   },
   {
     path: 'login',
@@ -49,23 +51,28 @@ const routes: Routes = [
   },
   {
     path: 'game/match',
-    loadComponent: () => import('./game/match/match.page').then(m => m.MatchPage)
+    loadComponent: () => import('./game/match/match.page').then(m => m.MatchPage),
+    canMatch: [authGuard]
   },
   {
     path: 'game/match/:id',
-    loadComponent: () => import('./game/match/match.page').then(m => m.MatchPage)
+    loadComponent: () => import('./game/match/match.page').then(m => m.MatchPage),
+    canMatch: [authGuard]
   },
   {
     path: 'profile',
-    loadComponent: () => import('./profile/profile.page').then(m => m.ProfilePage)
+    loadComponent: () => import('./profile/profile.page').then(m => m.ProfilePage),
+    canMatch: [authGuard]
   },
   {
     path: 'history',
-    loadComponent: () => import('./history/history.page').then(m => m.HistoryPage)
+    loadComponent: () => import('./history/history.page').then(m => m.HistoryPage),
+    canMatch: [authGuard]
   },
   {
     path: 'game-browser',
-    loadComponent: () => import('./game-browser/game-browser.page').then(m => m.GameBrowserPage)
+    loadComponent: () => import('./game-browser/game-browser.page').then(m => m.GameBrowserPage),
+    canMatch: [authGuard]
   },
 ];
 

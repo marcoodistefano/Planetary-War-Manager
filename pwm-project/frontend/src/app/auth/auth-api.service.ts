@@ -39,15 +39,15 @@ export class AuthApiService {
   }
 
   login(payload: LoginPayload): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.baseUrl}/auth/login`, payload);
+    return this.http.post<AuthResponse>(`${this.baseUrl}/auth/login`, payload, { withCredentials: true });
   }
 
   register(payload: RegisterPayload): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.baseUrl}/auth/register`, payload);
+    return this.http.post<AuthResponse>(`${this.baseUrl}/auth/register`, payload, { withCredentials: true });
   }
 
   recoveryPassword(payload: RecoveryPasswordPayload): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.baseUrl}/auth/login/recovery/password`, payload);
+    return this.http.post<AuthResponse>(`${this.baseUrl}/auth/login/recovery/password`, payload, { withCredentials: true });
   }
 
   logout(): Observable<AuthResponse> {

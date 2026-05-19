@@ -81,7 +81,14 @@ export class LoginPage implements OnInit, AfterViewInit {
       }))
       .subscribe({
       next: () => {
-        this.router.navigate(['/home']);
+        const nav = this.router.getCurrentNavigation?.() as any;
+        const stateReturn = nav?.extras?.state?.returnUrl ?? (history && (history.state && history.state.returnUrl));
+        const storedReturn = (() => {
+          try { return sessionStorage.getItem('auth:returnUrl'); } catch (e) { return null; }
+        })();
+        const target = stateReturn || storedReturn || '/home';
+        try { sessionStorage.removeItem('auth:returnUrl'); } catch (e) { /* ignore */ }
+        this.router.navigateByUrl(target);
       },
       error: (error) => {
         const apiErrors = error?.error?.errors;
