@@ -3,6 +3,10 @@
 echo "Starting Planetary War Manager (PWM) Microservices..."
 echo "Building and starting containers in detached mode..."
 
+if ! pgrep -f "services/ripristina/host-downloader.js" >/dev/null 2>&1; then
+	nohup node services/ripristina/host-downloader.js > /tmp/pwm-host-downloader.log 2>&1 &
+fi
+
 docker-compose up -d --build
 
 echo ""

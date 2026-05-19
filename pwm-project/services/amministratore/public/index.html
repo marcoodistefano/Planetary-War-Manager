@@ -25,10 +25,21 @@
         <section class="global-controls card">
             <h2>Comandi d'Emergenza</h2>
             <div class="btn-group">
-                <button class="btn btn-yellow" onclick="riavviaTutti()">🔄 Riavvio Globale</button>
-                <button class="btn btn-red" onclick="ripristinaDati()">🔥 Wipe & Restore</button>
+                <button id="restart-all-btn" class="btn btn-yellow" onclick="riavviaTutti()">🔄 Riavvio Globale</button>
+                <button id="restore-all-btn" class="btn btn-red" onclick="ripristinaDati()">🔥 Wipe & Restore</button>
                 <button class="btn btn-blue" onclick="window.open('http://localhost:8085', '_blank')">Postgres</button>
                 <button class="btn btn-blue" onclick="window.open('http://localhost:8086', '_blank')">Redis</button>
+            </div>
+            <p id="global-feedback" class="action-feedback" aria-live="polite"></p>
+            <div class="restore-progress-panel" aria-live="polite">
+                <div class="restore-progress-head">
+                    <span id="restore-progress-label">Nessun ripristino in corso</span>
+                    <span id="restore-progress-percent">0%</span>
+                </div>
+                <div class="restore-progress-track">
+                    <div id="restore-progress-bar" class="restore-progress-bar"></div>
+                </div>
+                <p id="restore-progress-detail" class="restore-progress-detail"></p>
             </div>
         </section>
 

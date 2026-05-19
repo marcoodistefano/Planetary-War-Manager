@@ -34,6 +34,129 @@ app.use('/api', (req, res, next) => {
 // Storia delle performance per le ultime 24 ore
 const statsHistory = {};
 const MAX_HISTORY_POINTS = 1440; // 24 ore * 60 minuti
+const RESTORE_HELPER_URL = process.env.RESTORE_HELPER_URL || 'http://host.docker.internal:3011';
+
+const restoreState = {
+    active: false,
+    phase: 'idle',
+    message: 'In attesa di un ripristino.',
+    error: null,
+    progress: 0,
+    currentFile: null,
+    currentFileBytes: 0,
+    currentFileTotalBytes: 0,
+    totalBytes: 0,
+    completedBytes: 0,
+    files: [],
+    startedAt: null,
+    completedAt: null
+};
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function snapshotRestoreState() {
+    return JSON.parse(JSON.stringify(restoreState));
+}
+
+async function getHelperStatus() {
+    const response = await axios.get(`${RESTORE_HELPER_URL}/status`);
+    return response.data;
+}
+
+async function restartProjectContainers({ includeAdmin = false } = {}) {
+    const allContainers = await docker.listContainers();
+    const projectContainers = allContainers.filter(c => c.Names[0].replace('/', '').startsWith('pwm-'));
+
+    let adminContainerId = null;
+
+    for (const c of projectContainers) {
+        if (c.Names[0].includes('amministratore')) {
+            adminContainerId = c.Id;
+            if (!includeAdmin) {
+                continue;
+            }
+        }
+
+        if (!includeAdmin && c.Names[0].includes('amministratore')) {
+            continue;
+        }
+
+        try {
+            const container = docker.getContainer(c.Id);
+            await container.restart();
+        } catch (error) {
+            console.error(`Errore riavvio ${c.Names[0]}:`, error.message);
+        }
+    }
+
+    if (includeAdmin && adminContainerId) {
+        try {
+            const admin = docker.getContainer(adminContainerId);
+            await admin.restart();
+        } catch (error) {
+            console.error('Errore riavvio amministratore:', error.message);
+        }
+    }
+
+    return projectContainers.length;
+}
+
+async function runRestoreWorkflow() {
+    restoreState.active = true;
+    restoreState.phase = 'starting';
+    restoreState.message = 'Avvio ripristino in corso.';
+    restoreState.error = null;
+    restoreState.startedAt = new Date().toISOString();
+    restoreState.completedAt = null;
+
+    try {
+        await axios.post(`${RESTORE_HELPER_URL}/restore`);
+        restoreState.phase = 'downloading';
+
+        while (true) {
+            const helperStatus = await getHelperStatus();
+
+            restoreState.progress = helperStatus.progressPercent || 0;
+            restoreState.currentFile = helperStatus.currentFile || null;
+            restoreState.currentFileBytes = helperStatus.currentFileBytes || 0;
+            restoreState.currentFileTotalBytes = helperStatus.currentFileTotalBytes || 0;
+            restoreState.totalBytes = helperStatus.totalBytes || 0;
+            restoreState.completedBytes = helperStatus.completedBytes || 0;
+            restoreState.files = helperStatus.files || [];
+            restoreState.message = helperStatus.message || 'Download in corso.';
+
+            if (helperStatus.state === 'completed') {
+                break;
+            }
+
+            if (helperStatus.state === 'error') {
+                throw new Error(helperStatus.error || 'Ripristino fallito');
+            }
+
+            await sleep(1000);
+        }
+
+        restoreState.phase = 'restarting';
+        restoreState.message = 'Download completati, riavvio dei container in corso.';
+
+        await restartProjectContainers({ includeAdmin: false });
+
+        restoreState.phase = 'completed';
+        restoreState.active = false;
+        restoreState.progress = 100;
+        restoreState.completedAt = new Date().toISOString();
+        restoreState.message = 'Ripristino completato con successo.';
+    } catch (error) {
+        restoreState.phase = 'error';
+        restoreState.active = false;
+        restoreState.error = error.message;
+        restoreState.message = error.message;
+        restoreState.completedAt = new Date().toISOString();
+        throw error;
+    }
+}
 
 async function fetchAndStoreStats() {
     try {
@@ -162,12 +285,30 @@ app.get('/api/stats/history', (req, res) => {
 // Restore trigger
 app.post('/api/restore', async (req, res) => {
     try {
-        // Call the ripristina service
-        const response = await axios.post('http://ripristina:3000/restore');
-        res.json(response.data);
+        if (restoreState.active) {
+            return res.status(409).json({ success: false, message: 'Un ripristino è già in corso.', status: snapshotRestoreState() });
+        }
+
+        runRestoreWorkflow().catch((error) => {
+            console.error('Errore workflow restore:', error.message);
+        });
+
+        res.status(202).json({
+            success: true,
+            message: 'Ripristino avviato.',
+            status: snapshotRestoreState()
+        });
     } catch (error) {
+        if (error.response) {
+            return res.status(error.response.status).json(error.response.data);
+        }
+
         res.status(500).json({ error: error.message });
     }
+});
+
+app.get('/api/restore/status', (req, res) => {
+    res.json(snapshotRestoreState());
 });
 
 // Endpoint per riavviare tutti i container

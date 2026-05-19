@@ -186,6 +186,69 @@ h1 span {
     cursor: not-allowed;
 }
 
+.action-feedback {
+    min-height: 1.2em;
+    margin: 14px 0 0;
+    font-size: 0.85rem;
+    letter-spacing: 0.4px;
+    color: var(--text);
+}
+
+.action-feedback.is-info {
+    color: var(--neon-blue);
+}
+
+.action-feedback.is-success {
+    color: var(--neon-green);
+}
+
+.action-feedback.is-error {
+    color: var(--neon-red);
+}
+
+.restore-progress-panel {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.28);
+}
+
+.restore-progress-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 0.8rem;
+    letter-spacing: 0.4px;
+    margin-bottom: 10px;
+    color: var(--text);
+}
+
+.restore-progress-track {
+    height: 10px;
+    width: 100%;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.restore-progress-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--neon-blue), var(--neon-green));
+    box-shadow: 0 0 12px rgba(0, 242, 255, 0.35);
+    transition: width 0.35s ease;
+}
+
+.restore-progress-detail {
+    min-height: 1.4em;
+    margin: 10px 0 0;
+    font-size: 0.82rem;
+    color: var(--text);
+    opacity: 0.92;
+}
+
 /* 7. ELEMENTI EXTRA (WEAVE SCOPE / BADGES) */
 .iframe-wrapper {
     height: 500px; 

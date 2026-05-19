@@ -1,6 +1,7 @@
 const PROJECT_PREFIX = 'pwm-'; // Filtro per i container del progetto
 const token = localStorage.getItem('adminToken');
 const charts = {};
+let restorePollTimer = null;
 
 if (!token) window.location.href = '/login.html';
 
@@ -144,6 +145,173 @@ function renderChart(name, history) {
 async function azione(id, act) { 
     await fetch(`/api/containers/${id}/${act}`, { method: 'POST' }); 
     setTimeout(updateDashboard, 1500); 
+}
+
+function setGlobalFeedback(message, kind = 'info') {
+    const feedback = document.getElementById('global-feedback');
+    if (!feedback) return;
+
+    feedback.className = `action-feedback is-${kind}`;
+    feedback.textContent = message;
+}
+
+function renderRestoreStatus(status) {
+    const label = document.getElementById('restore-progress-label');
+    const percent = document.getElementById('restore-progress-percent');
+    const bar = document.getElementById('restore-progress-bar');
+    const detail = document.getElementById('restore-progress-detail');
+
+    if (!label || !percent || !bar || !detail) {
+        return;
+    }
+
+    const phase = status.phase || status.state || 'idle';
+    const progress = Math.max(0, Math.min(100, Number(status.progressPercent ?? status.progress ?? 0)));
+    const currentFile = status.currentFile || 'Nessun file attivo';
+    const currentBytes = Number(status.currentFileBytes || 0);
+    const currentTotal = Number(status.currentFileTotalBytes || 0);
+    const totalBytes = Number(status.totalBytes || 0);
+    const completedBytes = Number(status.completedBytes || 0);
+
+    bar.style.width = `${progress}%`;
+    percent.textContent = `${progress}%`;
+
+    if (phase === 'downloading') {
+        label.textContent = 'Download in corso';
+        const filePercent = currentTotal > 0 ? Math.round((currentBytes / currentTotal) * 100) : 0;
+        detail.textContent = `${currentFile} - ${filePercent}% file. Totale: ${totalBytes > 0 ? `${Math.round(completedBytes / 1024 / 1024)} MB / ${Math.round(totalBytes / 1024 / 1024)} MB` : `${progress}%`}.`;
+    } else if (phase === 'restarting') {
+        label.textContent = 'Riavvio container in corso';
+        detail.textContent = 'I download sono terminati. I container PWM vengono riavviati automaticamente.';
+    } else if (phase === 'completed') {
+        label.textContent = 'Ripristino completato';
+        detail.textContent = 'Download e riavvio completati.';
+    } else if (phase === 'error') {
+        label.textContent = 'Ripristino fallito';
+        detail.textContent = status.error || 'Si è verificato un errore durante il ripristino.';
+    } else if (phase === 'starting') {
+        label.textContent = 'Avvio ripristino';
+        detail.textContent = status.message || 'Preparazione download in corso.';
+    } else {
+        label.textContent = 'Nessun ripristino in corso';
+        detail.textContent = status.message || 'Premi Wipe & Restore per avviare il processo.';
+    }
+}
+
+function stopRestorePolling() {
+    if (restorePollTimer) {
+        clearTimeout(restorePollTimer);
+        restorePollTimer = null;
+    }
+}
+
+async function fetchRestoreStatus() {
+    const response = await fetch('/api/restore/status');
+    if (!response.ok) {
+        throw new Error('Impossibile leggere lo stato del ripristino');
+    }
+
+    return response.json();
+}
+
+async function pollRestoreStatus() {
+    try {
+        const status = await fetchRestoreStatus();
+        renderRestoreStatus(status);
+
+        if (status.phase === 'completed') {
+            stopRestorePolling();
+            setGlobalFeedback('Ripristino completato e container riavviati.', 'success');
+            const button = document.getElementById('restore-all-btn');
+            if (button) {
+                button.disabled = false;
+                button.textContent = '🔥 Wipe & Restore';
+            }
+            setTimeout(updateDashboard, 1500);
+            return;
+        }
+
+        if (status.phase === 'error') {
+            stopRestorePolling();
+            setGlobalFeedback(status.error || 'Ripristino fallito.', 'error');
+            const button = document.getElementById('restore-all-btn');
+            if (button) {
+                button.disabled = false;
+                button.textContent = '🔥 Wipe & Restore';
+            }
+            return;
+        }
+
+        restorePollTimer = setTimeout(pollRestoreStatus, 1000);
+    } catch (error) {
+        stopRestorePolling();
+        setGlobalFeedback(error.message || 'Impossibile leggere il progresso del ripristino.', 'error');
+        const button = document.getElementById('restore-all-btn');
+        if (button) {
+            button.disabled = false;
+            button.textContent = '🔥 Wipe & Restore';
+        }
+    }
+}
+
+async function riavviaTutti() {
+    const button = document.getElementById('restart-all-btn');
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = '⏳ Riavvio in corso...';
+    }
+
+    setGlobalFeedback('Riavvio globale avviato: i container PWM verranno riavviati in sequenza.', 'info');
+
+    try {
+        const response = await fetch('/api/restart-all', { method: 'POST' });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Riavvio globale fallito');
+        }
+
+        setGlobalFeedback('Riavvio globale completato con successo.', 'success');
+        setTimeout(updateDashboard, 1500);
+    } catch (error) {
+        setGlobalFeedback(error.message || 'Riavvio globale fallito.', 'error');
+        throw error;
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = '🔄 Riavvio Globale';
+        }
+    }
+}
+
+async function ripristinaDati() {
+    const button = document.getElementById('restore-all-btn');
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = '⏳ Ripristino in corso...';
+    }
+
+    stopRestorePolling();
+    setGlobalFeedback('Ripristino avviato: download e copia degli asset condivisi in corso.', 'info');
+    renderRestoreStatus({ phase: 'starting', progress: 0, message: 'Avvio ripristino...' });
+
+    try {
+        const response = await fetch('/api/restore', { method: 'POST' });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Ripristino fallito');
+        }
+
+        const data = await response.json().catch(() => ({}));
+        setGlobalFeedback(data.message || 'Ripristino avviato.', 'info');
+        pollRestoreStatus();
+    } catch (error) {
+        setGlobalFeedback(error.message || 'Ripristino fallito.', 'error');
+        throw error;
+    }
 }
 
 function logout() { localStorage.removeItem('adminToken'); window.location.href = '/login.html'; }
