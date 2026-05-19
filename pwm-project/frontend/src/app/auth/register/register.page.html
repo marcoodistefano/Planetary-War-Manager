@@ -40,6 +40,10 @@
         </div>
       </div>
 
+      <div class="form-note" role="note" aria-label="Requisito password">
+        <span class="form-note__text">NB: La password deve contenere almeno 12 caratteri.</span>
+      </div>
+
       <ion-button expand="block" type="submit" [disabled]="!RegisterForm.valid || isSubmitting">REGISTRAZIONE</ion-button>
       <ion-text class="form-error" color="danger" *ngIf="errorMessage">{{ errorMessage }}</ion-text>
 

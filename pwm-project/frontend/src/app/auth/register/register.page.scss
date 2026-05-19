@@ -1,10 +1,9 @@
-/* ==========================================================================
+/* ========================================================================== 
    1. SETTAGGI GLOBALI E BACKGROUND VIDEO
    ========================================================================== */
-
 ion-content {
   --background: #08111f;
-  --overflow: auto; 
+  --overflow: auto;
   font-family: 'Courier New', Courier, monospace;
 }
 
@@ -13,8 +12,8 @@ ion-content::part(scroll) {
   flex-direction: column;
   justify-content: flex-start;
   align-items: center;
-  padding-top: clamp(20px, 10vh, 12vh); 
-  padding-bottom: 20px; 
+  padding-top: clamp(20px, 10vh, 12vh);
+  padding-bottom: 20px;
   min-height: 100%;
 }
 
@@ -31,9 +30,6 @@ ion-content::part(scroll) {
     object-fit: cover;
     object-position: center;
     filter: brightness(0.72) saturate(1.05) contrast(1.05);
-    transform: translateZ(0);
-    will-change: transform;
-    backface-visibility: hidden;
   }
 
   &__overlay {
@@ -44,28 +40,27 @@ ion-content::part(scroll) {
   }
 }
 
-/* ==========================================================================
-   2. TITOLO E SCRITTA SUPERIORE (EYEBROW)
+/* ========================================================================== 
+   2. TITOLO (EYEBROW + H1)
    ========================================================================== */
-
 .title-block {
   width: 100%;
   text-align: center;
-  margin-bottom: clamp(10px, 3vh, 30px); 
-  flex-shrink: 0; 
+  margin-bottom: 3vh;
+  flex-shrink: 0;
   z-index: 10;
-  
+
   .eyebrow {
-    margin: 0 0 6px;
+    margin: 0 0 8px;
     color: #b6cee9;
-    font-size: clamp(0.55rem, 1.5vh, 0.62rem);
+    font-size: 0.62rem;
     letter-spacing: 0.16em;
     text-transform: uppercase;
   }
 
   h1 {
     color: #f4f7fb;
-    font-size: clamp(1.8rem, 4vw, 3.6rem); 
+    font-size: clamp(1.8rem, 4vw, 3.6rem);
     line-height: 0.95;
     letter-spacing: 0.04em;
     font-weight: 800;
@@ -75,55 +70,76 @@ ion-content::part(scroll) {
   }
 }
 
-/* ==========================================================================
+.form-note {
+  width: 100%;
+  margin: 10px 0 0;
+  text-align: center;
+  color: rgba(244, 247, 251, 0.72);
+  font-size: 0.76rem;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+
+  &__tag {
+    display: block;
+    margin: 0 0 4px;
+    color: #79c0ff;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  &__text {
+    display: block;
+  }
+}
+
+/* ========================================================================== 
    3. LAYOUT DEL FORM
    ========================================================================== */
-
 .register-container {
   width: 100%;
-  max-width: 460px; 
-  padding: 0 24px; 
+  max-width: 420px;
+  padding: 0 24px;
   z-index: 10;
-  flex-shrink: 1; 
+  flex-shrink: 0;
   transform-style: preserve-3d;
 }
 
 form {
-  background: rgba(6, 11, 18, 0.85); 
+  background: rgba(6, 11, 18, 0.85);
   border: 1px solid rgba(88, 166, 255, 0.15);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(95, 208, 255, 0.03) inset;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-radius: 18px;
-  padding: clamp(15px, 3.5vh, 30px) 24px; 
+  padding: 35px 24px;
   width: 100%;
-  margin: 0; 
+  margin: 0;
   transform: translateZ(0);
-  -webkit-font-smoothing: antialiased;
-  backface-visibility: hidden;
 }
 
-/* ==========================================================================
-   4. CAMPI DI INPUT (STILE E UNIFORMITÀ)
+/* ========================================================================== 
+   4. CAMPI DI INPUT E TIPOGRAFIA
    ========================================================================== */
-
 .field-container {
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(95, 208, 255, 0.2);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) inset;
   border-radius: 9px;
-  padding: 0 16px; 
+  padding: 0 16px;
   margin-bottom: clamp(10px, 1.5vh, 16px);
-  height: clamp(60px, 8vh, 80px); /* Altezza fluida */
+  height: clamp(60px, 8vh, 80px);
   display: flex;
   flex-direction: column;
-  justify-content: center;      /* Centra verticalmente etichetta + input */
-  transition: all 0.2s ease; 
+  justify-content: center;
+  transition: all 0.2s ease;
+  width: 100%;
 
   &:focus-within {
     background: rgba(0, 0, 0, 0.7);
     border-color: rgba(95, 208, 255, 0.8);
-    box-shadow: 0 0 15px rgba(95, 208, 255, 0.15) inset, 0 0 15px rgba(95, 208, 255, 0.2);
+    box-shadow: 0 0 15px rgba(95, 208, 255, 0.2);
   }
 }
 
@@ -134,14 +150,13 @@ form {
   font-weight: 800;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  margin-bottom: 4px;           /* Margine identico ovunque */
+  margin-bottom: 4px;
   text-shadow: 0 0 5px rgba(121, 192, 255, 0.4);
   line-height: 1.2;
 }
 
-/* Regola universale per testo, select e input */
-ion-input, 
-ion-select, 
+ion-input,
+ion-select,
 .selected-value span,
 .placeholder-text {
   --color: #f4f7fb;
@@ -152,18 +167,17 @@ ion-select,
   --padding-top: 0;
   --padding-bottom: 0;
   --background: transparent;
-  
+
   color: #f4f7fb !important;
   font-family: 'Courier New', Courier, monospace !important;
-  font-size: 0.95rem !important; 
+  font-size: 0.95rem !important;
   font-weight: 500 !important;
   letter-spacing: 0.5px;
-  margin-top: 2px;              /* Spazio costante sotto l'etichetta */
+  margin-top: 2px;
   width: 100%;
   min-height: auto;
 }
 
-/* Shadow DOM Fixes */
 ion-input::part(native) {
   font-family: 'Courier New', Courier, monospace !important;
   font-size: 0.95rem !important;
@@ -177,15 +191,15 @@ ion-input::part(placeholder) {
   opacity: 1;
 }
 
-/* Campo Regione (Select personalizzata) */
 .clickable-field {
   cursor: pointer;
+
   .selected-value {
     display: flex;
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    
+
     ion-icon {
       color: #79c0ff;
       font-size: 1.2rem;
@@ -194,14 +208,15 @@ ion-input::part(placeholder) {
   }
 }
 
-/* Gestione Password */
 .password-wrapper {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
 
-  ion-input { flex: 1; }
+  ion-input {
+    flex: 1;
+  }
 }
 
 .toggle-eye-btn {
@@ -210,6 +225,7 @@ ion-input::part(placeholder) {
   --padding-end: 0;
   margin: 0;
   height: 24px;
+
   &::part(native) {
     border: none !important;
     background: transparent !important;
@@ -217,13 +233,12 @@ ion-input::part(placeholder) {
   }
 }
 
-/* ==========================================================================
-   5. BOTTONI E FOOTER DEL FORM
+/* ========================================================================== 
+   5. BOTTONI E LINK
    ========================================================================== */
-
 ion-button {
-  margin-top: clamp(8px, 1.5vh, 12px); 
-  height: clamp(50px, 7vh, 60px); 
+  margin-top: 10px;
+  height: 54px;
   font-weight: 700;
   text-transform: uppercase;
   --background: linear-gradient(135deg, rgba(103, 184, 255, 0.22), rgba(45, 114, 210, 0.28));
@@ -236,15 +251,23 @@ ion-button {
   }
 }
 
+.form-error {
+  display: block;
+  margin-top: 12px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .form-footer {
   text-align: center;
-  margin-top: clamp(12px, 2.5vh, 20px);
-  position: relative;
+  margin-top: 25px;
   z-index: 10;
 
   p {
     color: rgba(244, 247, 251, 0.7);
-    font-size: clamp(0.75rem, 1.5vh, 0.85rem);
+    font-size: 0.85rem;
+    margin-top: 10px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -253,18 +276,22 @@ ion-button {
 }
 
 .secondary-link {
+  display: inline-block;
   color: #58A6FF;
   text-decoration: none;
+  font-size: 0.85rem;
   font-weight: bold;
   cursor: pointer;
   transition: color 0.2s ease;
-  &:hover { color: #86d7ff; }
+
+  &:hover {
+    color: #86d7ff;
+  }
 }
 
-/* ==========================================================================
-   6. FOOTER HUD (STATUS BAR)
+/* ========================================================================== 
+   6. FOOTER HUD
    ========================================================================== */
-
 ion-footer {
   --background: transparent;
   background: transparent;
@@ -312,57 +339,97 @@ ion-footer {
   color: rgba(255, 255, 255, 0.2);
 }
 
-/* ==========================================================================
-   7. RESPONSIVE (MEDIA QUERIES)
+/* ========================================================================== 
+   7. RESPONSIVE
    ========================================================================== */
-
-/* Tablet e Mobile */
 @media (max-width: 768px) {
-  .register-container { padding: 0 16px; }
-  form { padding: 35px 14px; }
-  .field-container { padding: 0 12px; }
+  form {
+    padding: 35px 14px;
+  }
+
+  .field-container {
+    padding: 14px 12px 0;
+  }
+
+  .register-container {
+    padding: 0 16px;
+  }
+
+  .form-note {
+    margin-top: 8px;
+    font-size: 0.72rem;
+
+    &__tag {
+      font-size: 0.54rem;
+    }
+  }
 
   .hud-footer {
     width: calc(100% - 16px);
   }
+
   .hud-footer-content {
     flex-direction: column;
     gap: 6px;
     text-align: center;
   }
-  .divider { display: none; }
-}
 
-/* Schermi a bassa altezza (es. iPhone SE) */
-@media (max-height: 700px) {
-  ion-content::part(scroll) { padding-top: 3vh; }
-  .title-block h1 { font-size: 1.8rem; }
-  .title-block .eyebrow { display: block; font-size: 0.5rem; margin-bottom: 2px; } 
-  .field-container { 
-    margin-bottom: 8px; 
-    height: 65px;       
+  .divider {
+    display: none;
   }
-  ion-button { height: 48px; margin-top: 5px; }
 }
 
-/* ==========================================================================
+@media (max-height: 700px) {
+  ion-content::part(scroll) {
+    padding-top: 3vh;
+  }
+
+  .title-block h1 {
+    font-size: 1.8rem;
+  }
+
+  .title-block .eyebrow {
+    display: block;
+    font-size: 0.5rem;
+    margin-bottom: 2px;
+  }
+
+  .field-container {
+    margin-bottom: 8px;
+    height: 65px;
+    padding-top: 8px;
+  }
+
+  .form-note {
+    margin-top: 6px;
+    font-size: 0.68rem;
+  }
+
+  ion-button {
+    height: 48px;
+    margin-top: 5px;
+  }
+}
+
+/* ========================================================================== 
    8. MODALE TATTICA (ESTETICA HUD)
    ========================================================================== */
 
 .tactical-modal {
   --width: clamp(320px, 45%, 500px);
-  --height: 60%; 
-  --border-radius: 16px; /* Aumentato per un arrotondamento ben visibile */
+  --height: 60%;
+  --border-radius: 16px;
   --background: transparent;
 
   &::part(content) {
     border: 1px solid rgba(88, 166, 255, 0.4);
-    border-radius: 16px; /* IMPORTANTE: Arrotonda anche il contenitore del vetro sfocato */
+    border-radius: 16px;
     box-shadow: 0 0 30px rgba(0, 110, 255, 0.2);
     background: rgba(6, 15, 25, 0.95);
     backdrop-filter: blur(15px);
   }
 }
+
 .hologram-container {
   height: 100%;
   display: flex;
@@ -370,13 +437,12 @@ ion-footer {
   position: relative;
   overflow: hidden;
 
-  // Effetto Scanline (righe orizzontali)
   &::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
-                linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%),
+      linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
     background-size: 100% 4px, 3px 100%;
     pointer-events: none;
     z-index: 10;
@@ -403,12 +469,12 @@ ion-footer {
   --color: #f4f7fb;
   --placeholder-color: rgba(121, 192, 255, 0.4);
   --icon-color: #79c0ff;
-  --border-radius: 12px; /* Barra di ricerca più stondata */
+  --border-radius: 12px;
   padding: 0;
-  
+
   &::part(searchbar-input-container) {
     border: 1px solid rgba(88, 166, 255, 0.3);
-    border-radius: 12px; /* Applica l'arrotondamento al contenitore nativo */
+    border-radius: 12px;
   }
 }
 
@@ -437,14 +503,14 @@ ion-footer {
     width: 100%;
     padding: 8px 10px;
     border: 1px solid rgba(88, 166, 255, 0.1);
-    border-radius: 10px; /* Riquadri delle nazioni stondati */
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.02);
     position: relative;
-    overflow: hidden; /* Evita che l'effetto hover "esca" dai bordi arrotondati */
+    overflow: hidden;
   }
 
   .flag-hex {
-    width: 32px; /* Esagono della bandiera ridotto */
+    width: 32px;
     height: 32px;
     background: rgba(88, 166, 255, 0.1);
     display: flex;
@@ -453,13 +519,15 @@ ion-footer {
     clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
     margin-right: 12px;
     border: 1px solid rgba(88, 166, 255, 0.3);
-    
-    .flag-icon { font-size: 1.1rem; } /* Emoji bandiera ridotta */
+
+    .flag-icon {
+      font-size: 1.1rem;
+    }
   }
 
   .country-name {
     color: #f4f7fb;
-    font-size: 0.9rem; /* Font più piccolo per adattarsi */
+    font-size: 0.9rem;
     font-weight: bold;
     margin: 0;
   }
@@ -472,27 +540,23 @@ ion-footer {
     letter-spacing: 1px;
   }
 
-  // Bracket decorativo laterale (si vede al click/hover)
   &:active .item-inner-wrapper {
     border-left: 4px solid #79c0ff;
     background: rgba(88, 166, 255, 0.15);
   }
 }
-/* ==========================================================================
+
+/* ========================================================================== 
    9. FIX SCROLL E SPAZIATURA CONTENUTO MODALE
    ========================================================================== */
 
 .hud-content {
-  /* Ripristina lo scorrimento verticale bloccato dalla regola globale */
-  --overflow: auto !important; 
-  
+  --overflow: auto !important;
+
   &::part(scroll) {
-    /* Azzera il padding enorme ereditato dal main layout */
-    padding-top: 8px !important; 
+    padding-top: 8px !important;
     padding-bottom: 16px !important;
-    
-    /* Assicura che la lista non venga schiacciata al centro */
-    align-items: stretch !important; 
+    align-items: stretch !important;
   }
 }
 
