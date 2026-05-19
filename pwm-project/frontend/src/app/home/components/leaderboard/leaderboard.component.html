@@ -1,7 +1,6 @@
 <ion-content class="transparent-bg">
   <div class="modal-wrapper">
     <div class="panel">
-      
       <div class="title-block">
         <p class="eyebrow">Classifiche Settore</p>
         <h2>LEADERBOARD</h2>
@@ -9,19 +8,17 @@
 
       <div class="leaderboard-toggle">
         <button [class.active]="currentView === 'global'" (click)="switchView('global')">GLOBALE</button>
-        <button [class.active]="currentView === 'regional'" (click)="switchView('regional')">REGIONALE (EU)</button>
+        <button [class.active]="currentView === 'regional'" (click)="switchView('regional')">{{ dynamicRegionalLabel }}</button>
       </div>
 
       <div class="leaderboard-scroll-container">
         <div class="leaderboard-list">
-          
-          <div class="leaderboard-entry" *ngFor="let player of leaderboard" [class.highlight]="player.player === 'Generale_Inverno'">
+          <div class="leaderboard-entry" *ngFor="let player of leaderboard" [class.highlight]="player.player === loggedInPlayer">
             <span class="rank">#{{ player.rank }}</span>
             <span class="flag">{{ flagEmoji(player.region) }}</span>
             <span class="name">{{ player.player }}</span>
             <span class="score">{{ player.score | number }}</span>
           </div>
-
         </div>
       </div>
 
@@ -30,7 +27,6 @@
           [ CHIUDI TERMINALE ]
         </button>
       </div>
-
     </div>
   </div>
 </ion-content>

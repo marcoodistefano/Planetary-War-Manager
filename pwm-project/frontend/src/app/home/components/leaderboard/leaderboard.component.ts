@@ -1,6 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { IonicModule, ModalController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
+import { HomeService } from '../../home';
+import { ApiResponse } from '../../home-data.model';
+
+interface LeaderboardEntry {
+  rank: number;
+  region: string;
+  player: string;
+  score: number;
+}
 
 @Component({
   selector: 'app-leaderboard',
@@ -11,44 +20,128 @@ import { CommonModule } from '@angular/common';
 })
 export class LeaderboardComponent implements OnInit {
   
-  leaderboard: any[] = []; 
+  leaderboard: LeaderboardEntry[] = [];
   currentView: 'global' | 'regional' = 'global';
+  currentRegion = '';
+  currentRegionCode = '';
+  currentUsername = '';
 
-  // Dati fittizi - Rete Globale (Utilizzando codici nazione ISO 3166-1 alpha-2)
-  mockGlobal = [
-    { rank: 1, region: 'JP', player: 'CyberNinja', score: 2450 }, // Giappone
-    { rank: 2, region: 'US', player: 'Maverick', score: 2380 },   // Stati Uniti
-    { rank: 3, region: 'IT', player: 'Generale_Inverno', score: 2100 }, // Italia
-    { rank: 4, region: 'BR', player: 'ElComandante', score: 1950 }, // Brasile
-    { rank: 5, region: 'AU', player: 'DropBear', score: 1890 },   // Australia
-    { rank: 6, region: 'CA', player: 'GhostProtocol', score: 1850 }, // Canada
-    { rank: 7, region: 'DE', player: 'IronWall', score: 1820 }    // Germania
-  ];
+  private globalLeaderboard: LeaderboardEntry[] = [];
+  private regionalLeaderboard: LeaderboardEntry[] = [];
 
-  // Dati fittizi - Rete Regionale (Es. Server Europei)
-  mockRegional = [
-    { rank: 1, region: 'IT', player: 'Generale_Inverno', score: 2100 }, // Italia
-    { rank: 2, region: 'DE', player: 'IronWall', score: 1820 }, // Germania
-    { rank: 3, region: 'SE', player: 'VikingActual', score: 1750 }, // Svezia
-    { rank: 4, region: 'GR', player: 'Spartan01', score: 1690 }, // Grecia
-    { rank: 5, region: 'FR', player: 'RedBaron', score: 1610 }, // Francia
-    { rank: 6, region: 'GB', player: 'Centurion', score: 1580 }, // Regno Unito
-    { rank: 7, region: 'ES', player: 'NightOwl', score: 1520 }  // Spagna
-  ];
-
-  constructor(private modalCtrl: ModalController) {}
+  constructor(
+    private modalCtrl: ModalController,
+    private homeService: HomeService
+  ) {}
 
   ngOnInit() {
     this.loadData();
   }
 
   loadData() {
-    this.leaderboard = this.currentView === 'global' ? this.mockGlobal : this.mockRegional;
+    this.homeService.getDashboardData().subscribe({
+      next: (response: ApiResponse) => {
+        const info = response.data;
+        this.currentUsername = info.user_profile?.username || '';
+        this.currentRegion = info.user_profile?.reg || '';
+        this.currentRegionCode = this.normalizeRegionCode(this.currentRegion);
+
+        this.globalLeaderboard = (info.leaderboard_globale || []).map((player: any, index: number) => ({
+          rank: index + 1,
+          region: this.normalizeRegionCode(player.reg),
+          player: player.username,
+          score: player.elo_rating
+        }));
+
+        this.regionalLeaderboard = (info.leaderboard_regionale || []).map((player: any, index: number) => ({
+          rank: index + 1,
+          region: this.normalizeRegionCode(player.reg),
+          player: player.username,
+          score: player.elo_rating
+        }));
+
+        this.syncLeaderboard();
+      },
+      error: (err) => {
+        console.error('Errore nel caricamento della leaderboard:', err);
+        this.globalLeaderboard = [];
+        this.regionalLeaderboard = [];
+        this.leaderboard = [];
+      }
+    });
   }
 
   switchView(view: 'global' | 'regional') {
     this.currentView = view;
-    this.loadData();
+    this.syncLeaderboard();
+  }
+
+  get dynamicRegionalLabel(): string {
+    return this.currentRegionCode ? `REGIONALE ${this.currentRegionCode}` : 'REGIONALE';
+  }
+
+  get loggedInPlayer(): string {
+    return this.currentUsername;
+  }
+
+  private syncLeaderboard() {
+    this.leaderboard = this.currentView === 'global' ? this.globalLeaderboard : this.regionalLeaderboard;
+  }
+
+  private normalizeRegionCode(region: string): string {
+    if (!region) return '';
+
+    const normalized = region.trim().toLowerCase();
+    if (normalized.length === 2) {
+      return normalized.toUpperCase();
+    }
+
+    const regionMap: Record<string, string> = {
+      afghanistan: 'AF',
+      albania: 'AL',
+      algeria: 'DZ',
+      argentina: 'AR',
+      australia: 'AU',
+      austria: 'AT',
+      belgium: 'BE',
+      brazil: 'BR',
+      canada: 'CA',
+      china: 'CN',
+      croatia: 'HR',
+      denmark: 'DK',
+      egypt: 'EG',
+      england: 'GB',
+      europe: 'EU',
+      finland: 'FI',
+      france: 'FR',
+      germany: 'DE',
+      greece: 'GR',
+      hungary: 'HU',
+      india: 'IN',
+      indonesia: 'ID',
+      ireland: 'IE',
+      israel: 'IL',
+      italy: 'IT',
+      japan: 'JP',
+      mexico: 'MX',
+      netherlands: 'NL',
+      norway: 'NO',
+      poland: 'PL',
+      portugal: 'PT',
+      romania: 'RO',
+      russia: 'RU',
+      serbia: 'RS',
+      spain: 'ES',
+      sweden: 'SE',
+      switzerland: 'CH',
+      turkey: 'TR',
+      uk: 'GB',
+      'united kingdom': 'GB',
+      usa: 'US',
+      'united states': 'US'
+    };
+
+    return regionMap[normalized] || normalized.substring(0, 2).toUpperCase();
   }
 
   /**
