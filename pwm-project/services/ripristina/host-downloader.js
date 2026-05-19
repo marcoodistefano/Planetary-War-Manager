@@ -19,7 +19,6 @@ const ASSET_SOURCES = [
 ];
 
 let restoreJob = null;
-
 function createRestoreJob() {
     return {
         state: 'idle',
@@ -114,6 +113,44 @@ async function prepareSources() {
 }
 
 async function downloadFile(source, index) {
+    // Determine destination paths and skip early if file already exists to avoid double-counting
+    // (check before issuing the HTTP request).
+    // We still try to deduce the filename from the URL if possible.
+    const tentativeName = path.basename(new URL(source.url).pathname) || `${source.name}`;
+    const destinationPath = path.join(TARGET_DIR, tentativeName);
+    const tempPath = `${destinationPath}${TEMP_SUFFIX}`;
+
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+
+    const fileState = restoreJob.files[index];
+
+    // If destination already exists, use its size and mark as skipped without downloading.
+    try {
+        const st = await fs.stat(destinationPath);
+        if (st && st.size >= 0) {
+            const existingSize = st.size;
+            fileState.state = 'skipped';
+            // If we don't know the remote totalBytes, use the existing file size so totals align.
+            if (!fileState.totalBytes || fileState.totalBytes <= 0) {
+                // increase restoreJob.totalBytes so totals are consistent
+                restoreJob.totalBytes = (restoreJob.totalBytes || 0) + existingSize;
+                fileState.totalBytes = existingSize;
+            }
+            fileState.downloadedBytes = existingSize;
+            fileState.progressPercent = fileState.totalBytes > 0
+                ? Math.min(100, Math.round((fileState.downloadedBytes / fileState.totalBytes) * 100))
+                : 100;
+
+            restoreJob.completedBytes = (restoreJob.completedBytes || 0) + existingSize;
+            updateProgress();
+            console.log(`File esistente trovato, salto sovrascrittura: ${destinationPath}`);
+            return;
+        }
+    } catch (e) {
+        // file does not exist — continue to download
+    }
+
+    // Proceed to download since file is not present
     const response = await fetch(source.url, { redirect: 'follow' });
 
     if (!response.ok || !response.body) {
@@ -121,19 +158,20 @@ async function downloadFile(source, index) {
     }
 
     const downloadedFileName = getDownloadedFileName(source, response);
-    const destinationPath = path.join(TARGET_DIR, downloadedFileName);
-    const tempPath = `${destinationPath}${TEMP_SUFFIX}`;
+    // If the content-disposition suggests a different filename, update destination paths
+    const finalDestination = path.join(TARGET_DIR, downloadedFileName);
+    const finalTemp = `${finalDestination}${TEMP_SUFFIX}`;
 
-    await fs.mkdir(path.dirname(destinationPath), { recursive: true });
-    await fs.rm(tempPath, { force: true }).catch(() => {});
+    // Ensure directory and remove any previous temp file for this destination
+    await fs.mkdir(path.dirname(finalDestination), { recursive: true });
+    await fs.rm(finalTemp, { force: true }).catch(() => {});
 
-    const fileState = restoreJob.files[index];
     fileState.state = 'downloading';
     restoreJob.currentFile = downloadedFileName;
     restoreJob.currentFileBytes = 0;
     restoreJob.currentFileTotalBytes = source.totalBytes || Number(response.headers.get('content-length') || 0) || 0;
 
-    const fileStream = createWriteStream(tempPath);
+    const fileStream = createWriteStream(finalTemp);
     const reader = response.body.getReader();
 
     try {
@@ -159,47 +197,20 @@ async function downloadFile(source, index) {
 
         fileStream.end();
         await once(fileStream, 'finish');
-        // If destination already exists, do NOT overwrite or delete it. Preserve existing files.
-        let destExists = false;
-        try {
-            const st = await fs.stat(destinationPath);
-            destExists = !!st;
-        } catch (e) {
-            destExists = false;
-        }
 
-        if (destExists) {
-            // Skip overwrite: remove temp file and mark as skipped. Count existing bytes towards progress.
-            const existingStat = await fs.stat(destinationPath).catch(() => null);
-            const existingSize = existingStat ? existingStat.size : 0;
+        await fs.rename(finalTemp, finalDestination);
 
-            // Remove temp partial file
-            await fs.rm(tempPath, { force: true }).catch(() => {});
-
-            fileState.state = 'skipped';
-            fileState.downloadedBytes = existingSize;
-            fileState.progressPercent = fileState.totalBytes > 0
-                ? Math.min(100, Math.round((fileState.downloadedBytes / fileState.totalBytes) * 100))
-                : 100;
-
-            // Ensure completedBytes accounts for existing file
-            restoreJob.completedBytes = (restoreJob.completedBytes || 0) + existingSize;
-            updateProgress();
-            console.log(`File esistente trovato, salto sovrascrittura: ${destinationPath}`);
-        } else {
-            await fs.rename(tempPath, destinationPath);
-
-            fileState.state = 'completed';
-            fileState.downloadedBytes = fileState.totalBytes || fileState.downloadedBytes;
-            fileState.progressPercent = 100;
-        }
+        fileState.state = 'completed';
+        fileState.downloadedBytes = fileState.totalBytes || fileState.downloadedBytes;
+        fileState.progressPercent = 100;
     } catch (error) {
         fileState.state = 'error';
         fileState.error = error.message;
         fileStream.destroy();
-        await fs.rm(tempPath, { force: true }).catch(() => {});
+        await fs.rm(finalTemp, { force: true }).catch(() => {});
         throw error;
     }
+
 }
 
 async function restoreAssets() {
@@ -213,10 +224,17 @@ async function restoreAssets() {
 
     const files = await prepareSources();
 
-    for (const [index, source] of files.entries()) {
-        console.log(`Scaricamento ${source.name} da ${source.url}`);
-        await downloadFile(source, index);
-    }
+    // Avvia tutti i download in parallelo (massima parallellizzazione tra le sorgenti)
+    const workers = files.map((source, index) => {
+        console.log(`Avvio download parallelo ${source.name} da ${source.url}`);
+        return downloadFile(source, index).catch((err) => {
+            console.error(`Errore download ${source.name}:`, err.message || err);
+            // Rilancia per far fallire l'intero restore se desiderato
+            throw err;
+        });
+    });
+
+    await Promise.all(workers);
 }
 
 const server = http.createServer(async (req, res) => {

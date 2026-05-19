@@ -160,6 +160,7 @@ function renderRestoreStatus(status) {
     const percent = document.getElementById('restore-progress-percent');
     const bar = document.getElementById('restore-progress-bar');
     const detail = document.getElementById('restore-progress-detail');
+    const filesList = document.getElementById('restore-files-list');
 
     if (!label || !percent || !bar || !detail) {
         return;
@@ -172,20 +173,44 @@ function renderRestoreStatus(status) {
     const currentTotal = Number(status.currentFileTotalBytes || 0);
     const totalBytes = Number(status.totalBytes || 0);
     const completedBytes = Number(status.completedBytes || 0);
+    const files = status.files || [];
+
+    // Protezione: non mostrare completedBytes maggiore di totalBytes
+    const cappedCompleted = totalBytes > 0 ? Math.min(completedBytes, totalBytes) : completedBytes;
 
     bar.style.width = `${progress}%`;
     percent.textContent = `${progress}%`;
 
     if (phase === 'downloading') {
         label.textContent = 'Download in corso';
-        const filePercent = currentTotal > 0 ? Math.round((currentBytes / currentTotal) * 100) : 0;
-        detail.textContent = `${currentFile} - ${filePercent}% file. Totale: ${totalBytes > 0 ? `${Math.round(completedBytes / 1024 / 1024)} MB / ${Math.round(totalBytes / 1024 / 1024)} MB` : `${progress}%`}.`;
+        // Render per-file bars if multiple
+            if (files.length > 0) {
+            filesList.innerHTML = '';
+            files.forEach(f => {
+                const fp = Math.max(0, Math.min(100, Number(f.progressPercent ?? 0)));
+                const entry = document.createElement('div');
+                entry.className = 'file-entry';
+                entry.innerHTML = `
+                    <div class="file-label">${f.name || f.url}</div>
+                    <div class="file-track"><div class="file-bar" style="width:${fp}%"></div></div>
+                    <div class="file-percent">${fp}%</div>
+                `;
+                filesList.appendChild(entry);
+            });
+
+            detail.textContent = `Totale: ${totalBytes > 0 ? `${Math.round(cappedCompleted / 1024 / 1024)} MB / ${Math.round(totalBytes / 1024 / 1024)} MB` : `${progress}%`}.`;
+        } else {
+            filesList.innerHTML = '';
+            const filePercent = currentTotal > 0 ? Math.round((currentBytes / currentTotal) * 100) : 0;
+            detail.textContent = `${currentFile} - ${filePercent}% file. Totale: ${totalBytes > 0 ? `${Math.round(cappedCompleted / 1024 / 1024)} MB / ${Math.round(totalBytes / 1024 / 1024)} MB` : `${progress}%`}.`;
+        }
     } else if (phase === 'restarting') {
         label.textContent = 'Riavvio container in corso';
         detail.textContent = 'I download sono terminati. I container PWM vengono riavviati automaticamente.';
     } else if (phase === 'completed') {
-        label.textContent = 'Ripristino completato';
+        label.textContent = 'Tutti i file ripristinati';
         detail.textContent = 'Download e riavvio completati.';
+        filesList.innerHTML = '';
     } else if (phase === 'error') {
         label.textContent = 'Ripristino fallito';
         detail.textContent = status.error || 'Si è verificato un errore durante il ripristino.';
@@ -195,6 +220,7 @@ function renderRestoreStatus(status) {
     } else {
         label.textContent = 'Nessun ripristino in corso';
         detail.textContent = status.message || 'Premi Wipe & Restore per avviare il processo.';
+        filesList.innerHTML = '';
     }
 }
 

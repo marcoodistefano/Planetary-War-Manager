@@ -249,6 +249,50 @@ h1 span {
     opacity: 0.92;
 }
 
+.restore-files-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.file-entry {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.file-label {
+    flex: 1 1 40%;
+    font-size: 0.82rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-track {
+    flex: 1 1 50%;
+    height: 8px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.file-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--neon-blue), var(--neon-green));
+    transition: width 0.25s ease;
+}
+
+.file-percent {
+    width: 48px;
+    text-align: right;
+    font-size: 0.78rem;
+    color: var(--text);
+}
+
 /* 7. ELEMENTI EXTRA (WEAVE SCOPE / BADGES) */
 .iframe-wrapper {
     height: 500px; 

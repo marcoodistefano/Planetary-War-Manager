@@ -307,8 +307,35 @@ app.post('/api/restore', async (req, res) => {
     }
 });
 
-app.get('/api/restore/status', (req, res) => {
-    res.json(snapshotRestoreState());
+app.get('/api/restore/status', async (req, res) => {
+    try {
+        // If our local restoreState is active, prefer it; otherwise fetch helper status
+        if (restoreState.active) {
+            return res.json(snapshotRestoreState());
+        }
+
+        const helperStatus = await getHelperStatus();
+
+        const mapped = {
+            active: helperStatus.state === 'running' || helperStatus.phase === 'downloading',
+            phase: helperStatus.phase || helperStatus.state || 'idle',
+            message: helperStatus.message || 'In attesa di un ripristino.',
+            error: helperStatus.error || null,
+            progress: helperStatus.progressPercent || helperStatus.progress || 0,
+            currentFile: helperStatus.currentFile || null,
+            currentFileBytes: helperStatus.currentFileBytes || 0,
+            currentFileTotalBytes: helperStatus.currentFileTotalBytes || 0,
+            totalBytes: helperStatus.totalBytes || 0,
+            completedBytes: helperStatus.completedBytes || 0,
+            files: helperStatus.files || [],
+            startedAt: helperStatus.startedAt || null,
+            completedAt: helperStatus.completedAt || null
+        };
+
+        return res.json(mapped);
+    } catch (error) {
+        return res.json(snapshotRestoreState());
+    }
 });
 
 // Endpoint per riavviare tutti i container
