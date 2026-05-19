@@ -63,7 +63,9 @@
         <div *ngFor="let res of resourceConfig" 
              class="res-item" 
              [class.premium]="res.id === 'oro'" 
-             [class.trigger-item]="res.isTrigger">
+                [class.trigger-item]="res.isTrigger"
+                [class.open]="res.isTrigger && isTroopsDropdownOpen"
+            (click)="res.isTrigger && toggleTroopsDropdown($event)">
           
           <span class="res-icon">{{ res.icon }}</span>
           <div class="res-data">
@@ -102,18 +104,54 @@
     </div>
 
     <div class="vertical-resource-bar mobile-only scrollable-y-hidden">
-      <div *ngFor="let res of resourceConfig" class="mini-res-item" [class.premium]="res.id === 'oro'">
+      <div *ngFor="let res of resourceConfig"
+           class="mini-res-item"
+           [class.premium]="res.id === 'oro'"
+           [class.trigger-item]="res.isTrigger"
+           [class.open]="res.isTrigger && isTroopsDropdownOpen"
+           (click)="res.isTrigger && toggleTroopsDropdown($event)">
         <span class="icon">{{ res.icon }}</span>
         <span class="val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number: '1.0-0' }}</span>
         <span class="val" *ngIf="res.isTrigger">INFO</span>
+        <div class="troops-dropdown" *ngIf="res.isTrigger && !isTouchLayout">
+          <div class="dropdown-header">ARMATA DISPIEGATA</div>
+          <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
+            <span class="t-key">{{ troop.key }}</span>
+            <span class="t-val">{{ troop.value }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="vertical-resource-bar mobile-only scrollable-y-hidden">
-      <div *ngFor="let res of resourceConfig" class="mini-res-item" [class.premium]="res.id === 'oro'">
+      <div *ngFor="let res of resourceConfig"
+           class="mini-res-item"
+           [class.premium]="res.id === 'oro'"
+           [class.trigger-item]="res.isTrigger"
+           [class.open]="res.isTrigger && isTroopsDropdownOpen"
+           (click)="res.isTrigger && toggleTroopsDropdown($event)">
         <span class="icon">{{ res.icon }}</span>
         <span class="val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number: '1.0-0' }}</span>
         <span class="val" *ngIf="res.isTrigger">INFO</span>
+        <div class="troops-dropdown" *ngIf="res.isTrigger && !isTouchLayout">
+          <div class="dropdown-header">ARMATA DISPIEGATA</div>
+          <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
+            <span class="t-key">{{ troop.key }}</span>
+            <span class="t-val">{{ troop.value }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      *ngIf="isTroopsDropdownOpen && isTouchLayout"
+      class="troops-dropdown troops-dropdown-float"
+      [style.left.px]="troopsDropdownX"
+      [style.top.px]="troopsDropdownY">
+      <div class="dropdown-header">ARMATA DISPIEGATA</div>
+      <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
+        <span class="t-key">{{ troop.key }}</span>
+        <span class="t-val">{{ troop.value }}</span>
       </div>
     </div>
 

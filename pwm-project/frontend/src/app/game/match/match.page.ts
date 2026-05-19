@@ -47,6 +47,7 @@ export class MatchPage implements OnInit, AfterViewInit {
   currentHoveredName = '';
   sensorSocket: any;
   private touchTimer: any;
+  isTouchLayout = false;
 
   // --- 2. STATO DELL'INTERFACCIA (UI) ---
   isProfileModalOpen = false;
@@ -60,6 +61,9 @@ export class MatchPage implements OnInit, AfterViewInit {
   isChatOpen = false;
   isMarketModalOpen = false;
   isArmyModalOpen = false;
+  isTroopsDropdownOpen = false;
+  troopsDropdownX = 0;
+  troopsDropdownY = 0;
 
   activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
 
@@ -152,11 +156,17 @@ export class MatchPage implements OnInit, AfterViewInit {
 
   ngOnInit() {
     this.loadGameRules();
+    this.isTouchLayout = this.isTouchViewport();
     this.sensorSocket = io('http://localhost:3030', { auth: { token: "IL_TUO_JWT_TOKEN" } });
     this.sensorSocket.on('point_data', (data: any) => this.handlePointData(data));
     window.addEventListener('click', () => {
       if (this.isRadialMenuVisible) {
         this.isRadialMenuVisible = false;
+        this.cdr.detectChanges();
+      }
+
+      if (this.isTroopsDropdownOpen) {
+        this.isTroopsDropdownOpen = false;
         this.cdr.detectChanges();
       }
     });
@@ -246,6 +256,28 @@ export class MatchPage implements OnInit, AfterViewInit {
   toggleMapSettings() { this.isMapSettingsOpen = !this.isMapSettingsOpen; this.closeMobileMenu();}
   setBuildCategory(cat: 'risorse' | 'armamenti') { this.activeBuildCategory = cat; }
   setOpenProfile(isOpen: boolean) { this.isProfileModalOpen = isOpen; }
+
+  toggleTroopsDropdown(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (this.isTouchViewport()) {
+      const target = event.currentTarget as HTMLElement | null;
+      const rect = target?.getBoundingClientRect();
+
+      if (rect) {
+        this.troopsDropdownX = Math.max(12, rect.left - 12);
+        this.troopsDropdownY = rect.top + rect.height / 2;
+      }
+    }
+
+    this.isTroopsDropdownOpen = !this.isTroopsDropdownOpen;
+    this.cdr.detectChanges();
+  }
+
+  private isTouchViewport() {
+    return window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 1024;
+  }
 
   // --- LOGICA DELLE REGOLE (CDB) ---
 
@@ -361,17 +393,31 @@ export class MatchPage implements OnInit, AfterViewInit {
 
     this.map.on('dragstart', () => {
       this.closeRadialOnInteraction();
+      this.closeTroopsDropdownOnInteraction();
     });
 
     // AGGIUNGI QUESTO: Chiude il menu quando inizia lo zoom
     this.map.on('zoomstart', () => {
       this.closeRadialOnInteraction();
+      this.closeTroopsDropdownOnInteraction();
+    });
+
+    this.map.on('movestart', () => {
+      this.closeRadialOnInteraction();
+      this.closeTroopsDropdownOnInteraction();
     });
   }
 
   private closeRadialOnInteraction() {
     if (this.isRadialMenuVisible) {
       this.isRadialMenuVisible = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  private closeTroopsDropdownOnInteraction() {
+    if (this.isTroopsDropdownOpen) {
+      this.isTroopsDropdownOpen = false;
       this.cdr.detectChanges();
     }
   }
