@@ -5,7 +5,8 @@
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "seed:matches": "node tests/seed-matches.js"
   },
   "dependencies": {
     "argon2": "^0.41.1",

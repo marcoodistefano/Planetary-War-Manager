@@ -356,6 +356,11 @@ server.on("upgrade", async (req, socket, head) => {
   const targetHostName = targetUrl.hostname;
   const targetHostHeader = targetUrl.host;
 
+  const trustedHeaders = {
+    "x-user-id": validation.decoded.sub,
+    "x-session-id": validation.sessionId,
+  };
+
   const targetSocket = net.connect(targetPort, targetHostName, () => {
     // Scrittura manuale della richiesta HTTP per il microservizio interno
     const requestLine = req.method + " " + req.url + " HTTP/1.1\r\n";
@@ -365,10 +370,14 @@ server.on("upgrade", async (req, socket, head) => {
     const headerKeys = Object.keys(req.headers);
     for (let i = 0; i < headerKeys.length; i++) {
       const key = headerKeys[i];
-      if (key.toLowerCase() !== "host") {
+      const lowerKey = key.toLowerCase();
+      if (lowerKey !== "host" && lowerKey !== "x-user-id" && lowerKey !== "x-session-id") {
         headerLines += key + ": " + req.headers[key] + "\r\n";
       }
     }
+
+    headerLines += "x-user-id: " + trustedHeaders["x-user-id"] + "\r\n";
+    headerLines += "x-session-id: " + trustedHeaders["x-session-id"] + "\r\n";
     
     headerLines += "Host: " + targetHostHeader + "\r\n";
     headerLines += "\r\n"; // Fine degli header

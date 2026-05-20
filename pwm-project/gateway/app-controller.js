@@ -158,6 +158,9 @@ const normalizePayload = async (req) => {
     }
 
     const rawBody = req.body || {};
+    //bypass dell'ID dell'avatar, se presente, per evitare problemi di validazione in Sauron, che lo rileverebbe come HEX
+    //l'avatar arriva come: avatar_id
+    console.log("Raw body prima di Sauron:", rawBody);
     const result = await validator(rawBody);
 
     if (result.isValid === false) {

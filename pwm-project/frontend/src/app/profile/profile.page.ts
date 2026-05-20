@@ -142,7 +142,7 @@ export class ProfilePage implements OnInit, AfterViewInit {
     const avatarId = idWithPrefix ? parseInt(idWithPrefix.replace('id_', ''), 10) : null; // 2
 
     if (avatarId && !isNaN(avatarId)) {
-      this.authService.updateAvatar(avatarId.toString()).subscribe({
+      this.authService.updateAvatar("avatar_" + avatarId.toString()).subscribe({
         next: (res) => {
           console.log("Avatar aggiornato nel DB!");
           // Aggiorna lo stato locale e notifica le altre pagine

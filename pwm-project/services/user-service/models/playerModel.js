@@ -187,9 +187,11 @@ const buildHome = async (U_ID) => {
 
 const getAvatar = async (U_ID) => {
   try {
+    const sanitize_avatar = U_ID.split("avatar_").join(""); // Rimuove "avatar_" per la corretta scrittura nel DB
+    console.log("Recupero avatar per U_ID:", U_ID);
     const q = await db.query(
       `SELECT avatar_id FROM utenti WHERE id_user = $1 LIMIT 1`,
-      [U_ID]
+      [sanitize_avatar]
     );
     const row = q.rows[0];
     if (!row) return { status: 404, error: 'Utente non trovato' };
@@ -202,6 +204,7 @@ const getAvatar = async (U_ID) => {
 
 const updateAvatar = async (U_ID, avatarId) => {
   try {
+    console.log("Recupero avatar per U_ID:", U_ID);
     const result = await db.query(
       `UPDATE utenti SET avatar_id = $1 WHERE id_user = $2 RETURNING avatar_id`,
       [avatarId, U_ID]

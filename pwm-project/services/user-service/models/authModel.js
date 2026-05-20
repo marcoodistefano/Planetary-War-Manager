@@ -30,11 +30,12 @@ const registerUser = async ({ username, email, password, region }) => {
   if (region === null) {
     return { status: 400, error: "Regione non fornita" };
   }
-  
+  const friend_ID = aslan.generate_secure_token(10); //NB, si deve utilizzare UUID, ci potrebbero essere collisioni o attese troppo lunghe per 
+  //la conferma da parte del DB del token univoco.
   try {
     const { rows } = await db.query(
-      "INSERT INTO utenti (username, email, password_hash, reg) VALUES ($1, $2, $3, $4) RETURNING id_user",
-      [username, email, passwordHash, normalizeReg],
+      "INSERT INTO utenti (username, email, password_hash, reg, codice_amico) VALUES ($1, $2, $3, $4, $5) RETURNING id_user",
+      [username, email, passwordHash, normalizeReg, friend_ID],
     );
     return { passwordHash, uuid: rows[0]?.id_user };
   } catch (error) {

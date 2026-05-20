@@ -142,10 +142,16 @@ services:
   # CHAT
   chat:
     build: ./services/chat
+    working_dir: /app/services/chat
+    volumes:
+      - ./services/chat:/app/services/chat
+      - ./services/shared:/app/services/shared
     depends_on:
       - redis
+      - db
     environment:
       - REDIS_URL=redis://redis:6379
+      - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
     networks:
       - pwm-net
 
@@ -153,7 +159,7 @@ services:
   gateway:
     image: nginx:alpine
     ports:
-      - "80:80"
+      - "80:80" #modificherei questa porta, è la nota di HTTP ma in websocket non usiamo questa porta.
     volumes:
       - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
       - ../frontend/www:/usr/share/nginx/html

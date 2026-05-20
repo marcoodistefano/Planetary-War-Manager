@@ -85,8 +85,8 @@ const updateAvatar = async (req, res) => {
     if (avatarId === undefined || avatarId === null) {
       return res.status(400).json({ error: "ID avatar mancante" });
     }
-
-    const avatarInt = parseInt(avatarId, 10);
+    const sanitize_avatar = avatarId.split("avatar_").join(""); // Rimuove "avatar_" per la corretta scrittura nel DB
+    const avatarInt = parseInt(sanitize_avatar, 10);
     if (Number.isNaN(avatarInt) || avatarInt < 1 || avatarInt > 37) {
       console.warn(`avatarId non valido ricevuto: ${avatarId} -> parsed: ${avatarInt}`);
       return res.status(400).json({ error: "ID avatar non valido" });
