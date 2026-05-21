@@ -3,6 +3,7 @@ import { ModalController, IonicModule } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms'; // Importato per ngModel
 import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-create-match',
@@ -12,6 +13,8 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
   imports: [IonicModule, CommonModule, FormsModule, HttpClientModule]
 })
 export class CreateMatchComponent {
+  readonly duplicateMatchErrorMessage = 'Non puoi creare una nuova partita perché ne hai già una attiva.\nRiprova nel momento in cui la partita precedentemente creata non sará terminata!';
+
   // Modello dati per il match
   matchData = {
     missione: '',
@@ -44,13 +47,27 @@ export class CreateMatchComponent {
     console.log('Trasmissione ordini di battaglia...');
 
     try {
-      const response: any = await this.http.post('/match/create', this.matchData, { 
-        withCredentials: true 
-      }).toPromise();
+      const response: any = await firstValueFrom(
+        this.http.post('/match/create', this.matchData, {
+          withCredentials: true
+        })
+      );
+
       console.log('Risposta Cluster:', response);
-      this.modalCtrl.dismiss({ created: true, matchId: response.data.matchId });
+      this.modalCtrl.dismiss({
+        created: true,
+        matchId: response?.data?.matchId
+      });
     } catch (error) {
       console.error('Errore durante la trasmissione:', error);
+
+      const status = (error as { status?: number })?.status;
+      if (status === 400) {
+        this.modalCtrl.dismiss({
+          created: false,
+          errorMessage: this.duplicateMatchErrorMessage
+        });
+      }
     }
   }
 

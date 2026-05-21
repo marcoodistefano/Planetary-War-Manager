@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
-import { ModalController } from '@ionic/angular';
+import { ModalController, ToastController } from '@ionic/angular';
 
 // Importazione del Service e del Modello
 import { HomeService } from './home'; 
@@ -52,6 +52,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     private router: Router, 
     private titleService: Title,
     private modalCtrl: ModalController,
+    private toastCtrl: ToastController,
     private homeService: HomeService, // Iniezione del Service creato
     private userState: UserStateService
   ) { }
@@ -266,7 +267,33 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
       component: CreateMatchComponent,
       cssClass: 'tactical-modal'
     });
-    return await modal.present();
+
+    await modal.present();
+
+    const { data } = await modal.onDidDismiss();
+
+    if (data?.created) {
+      const toast = await this.toastCtrl.create({
+        message: 'La partita è stata creata con successo',
+        duration: 5000,
+        position: 'top',
+        cssClass: 'tactical-toast tactical-toast-success',
+        icon: 'checkmark-circle-outline'
+      });
+      await toast.present();
+      return;
+    }
+
+    if (data?.errorMessage) {
+      const toast = await this.toastCtrl.create({
+        message: data.errorMessage,
+        duration: 5000,
+        position: 'top',
+        cssClass: 'tactical-toast tactical-toast-error',
+        icon: 'alert-circle-outline'
+      });
+      await toast.present();
+    }
   }
 
   viewActiveGames() {

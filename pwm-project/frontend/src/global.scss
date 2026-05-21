@@ -170,6 +170,61 @@ ion-modal.tactical-modal {
     --color-checked: #58a6ff;
   }
 }
+
+/* ==========================================================================
+   TOAST TATTICI (SUCCESS / ERROR)
+   ========================================================================== */
+ion-toast.tactical-toast {
+  --width: min(92vw, 620px);
+  --border-radius: 18px;
+  --box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45), 0 0 18px rgba(88, 166, 255, 0.2);
+
+  &::part(container) {
+    border-radius: 18px;
+    border: 1px solid rgba(95, 208, 255, 0.28);
+    backdrop-filter: blur(10px) saturate(135%);
+    -webkit-backdrop-filter: blur(10px) saturate(135%);
+  }
+
+  &::part(message) {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.84rem;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+    white-space: pre-line;
+  }
+
+  &::part(icon) {
+    font-size: 1.2rem;
+    margin-right: 6px;
+  }
+}
+
+ion-toast.tactical-toast-success {
+  --background: linear-gradient(135deg, rgba(10, 31, 20, 0.94), rgba(7, 18, 28, 0.94));
+  --color: #dfffea;
+
+  &::part(container) {
+    border-color: rgba(63, 185, 80, 0.45);
+  }
+
+  &::part(icon) {
+    color: #3fb950;
+  }
+}
+
+ion-toast.tactical-toast-error {
+  --background: linear-gradient(135deg, rgba(43, 13, 18, 0.95), rgba(18, 7, 13, 0.95));
+  --color: #ffe8ea;
+
+  &::part(container) {
+    border-color: rgba(255, 123, 114, 0.5);
+  }
+
+  &::part(icon) {
+    color: #ff7b72;
+  }
+}
 /* ==========================================================================
    GLOBAL RESPONSIVE DESIGN & ULTRAWIDE COMPATIBILITY (21:9, SMALL DISPLAYS)
    ========================================================================== */
