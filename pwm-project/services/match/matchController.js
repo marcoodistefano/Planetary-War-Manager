@@ -42,7 +42,24 @@ const create = async (req, res) => {
 };
 
 // Placeholder per le espansioni future
-const join = async (req, res) => notImplemented(res);
+const join = async (req, res) => {
+  try {
+    const playerId = req.headers['x-user-id']; 
+    if (!playerId) return res.status(401).json({ error: "Identità non verificabile." });
+
+    const joinData = await model.joinMatch({
+      playerId: playerId,
+      matchId: req.params.id //da vedere cosa arriva dal front: il matchhId è il codice a 10 caratteri, non l'UUID o il nome!
+    });
+
+    const statusCode = parseInt(joinData.status, 10) || 500;
+    return res.status(statusCode).json(joinData);
+
+  } catch (error) {
+    console.error("[SYS_ERR] Cortocircuito:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
+  } 
+};
 const leave = async (req, res) => notImplemented(res);
 const getPlayers = async (req, res) => notImplemented(res);
 const getStatus = async (req, res) => notImplemented(res);

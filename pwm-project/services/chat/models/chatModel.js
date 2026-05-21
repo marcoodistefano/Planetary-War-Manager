@@ -56,7 +56,12 @@ return len
 `;
 
 const normalizeTipo = (tipo) => {
-  if (tipo === 1 || tipo === "1" || tipo === "alleanza" || tipo === "alliance") {
+  if (
+    tipo === 1 ||
+    tipo === "1" ||
+    tipo === "alleanza" ||
+    tipo === "alliance"
+  ) {
     return { code: 1, label: "alleanza" };
   }
   if (tipo === 2 || tipo === "2" || tipo === "globale" || tipo === "global") {
@@ -65,7 +70,13 @@ const normalizeTipo = (tipo) => {
   return { code: 0, label: "privata" };
 };
 
-const buildChatListKey = ({ matchId, tipoCode, destinatario, senderId, recipientId }) => {
+const buildChatListKey = ({
+  matchId,
+  tipoCode,
+  destinatario,
+  senderId,
+  recipientId,
+}) => {
   if (tipoCode === 2) {
     return `chat:match:${matchId}:global`;
   }
@@ -78,12 +89,12 @@ const buildChatListKey = ({ matchId, tipoCode, destinatario, senderId, recipient
 
 const resolveMatchId = async (matchId) => {
   if (!matchId) return null;
-  const cacheKey = `chat:match:alias:${matchId}`;
+  const cacheKey = `user_session:match_unito${matchId}`;
   const cached = await redisClient.get(cacheKey);
   if (cached) return cached;
 
   const { rows } = await db.query(
-    "SELECT id_partita FROM partite WHERE id_partita = $1 OR id_partita_hash = $1 OR id_partita_visualizzato = $1 LIMIT 1",
+    "SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1 LIMIT 1",
     [matchId],
   );
 
@@ -92,14 +103,18 @@ const resolveMatchId = async (matchId) => {
 
   await redisClient.setEx(cacheKey, CACHE_TTL_SECONDS, resolved);
   if (String(resolved) !== String(matchId)) {
-    await redisClient.setEx(`chat:match:alias:${resolved}`, CACHE_TTL_SECONDS, resolved);
+    await redisClient.setEx(
+      `chat:match:alias:${resolved}`,
+      CACHE_TTL_SECONDS,
+      resolved,
+    );
   }
   return resolved;
 };
 
 const ensureUserInMatch = async ({ userId, matchId }) => {
   if (!userId || !matchId) return false;
-  const participantsKey = `chat:match:${matchId}:participants`;
+  const participantsKey = `running_match:${matchId}:participants`;
 
   const isMember = await redisClient.sIsMember(participantsKey, userId);
   if (isMember) return true;
@@ -107,7 +122,7 @@ const ensureUserInMatch = async ({ userId, matchId }) => {
   const hasCache = await redisClient.exists(participantsKey);
   if (hasCache) {
     const { rows } = await db.query(
-      "SELECT 1 FROM partecipanti_partite WHERE partita_id = $1 AND user_id = $2",
+      "SELECT 1 FROM partecipanti_partite WHERE partita_id = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1) AND user_id = $2",
       [matchId, userId],
     );
     if (rows.length > 0) {
@@ -118,7 +133,7 @@ const ensureUserInMatch = async ({ userId, matchId }) => {
   }
 
   const { rows } = await db.query(
-    "SELECT user_id FROM partecipanti_partite WHERE partita_id = $1",
+    "SELECT user_id FROM partecipanti_partite WHERE partita_id = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1) ",
     [matchId],
   );
 
@@ -132,14 +147,14 @@ const ensureUserInMatch = async ({ userId, matchId }) => {
 };
 
 const getParticipants = async (matchId) => {
-  const participantsKey = `chat:match:${matchId}:participants`;
+  const participantsKey = `running_match:${matchId}:participants`;
   const hasCache = await redisClient.exists(participantsKey);
   if (hasCache) {
     return await redisClient.sMembers(participantsKey);
   }
 
   const { rows } = await db.query(
-    "SELECT user_id FROM partecipanti_partite WHERE partita_id = $1",
+    "SELECT user_id FROM partecipanti_partite WHERE partita_id = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1) ",
     [matchId],
   );
   const members = rows.map((row) => row.user_id);
@@ -160,7 +175,7 @@ const getAllianceMembers = async (matchId, allianceId) => {
   }
 
   const { rows } = await db.query(
-    "SELECT user_id FROM partecipanti_partite WHERE partita_id = $1 AND id_alleanza = $2",
+    "SELECT user_id FROM partecipanti_partite WHERE partita_id = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1) AND id_alleanza = $2",
     [matchId, allianceId],
   );
   const members = rows.map((row) => row.user_id);
@@ -183,7 +198,7 @@ const resolveUserIdByUsername = async (matchId, username) => {
   if (cached) return cached;
 
   const { rows } = await db.query(
-    "SELECT u.id_user FROM utenti u INNER JOIN partecipanti_partite p ON p.user_id = u.id_user WHERE u.username = $1 AND p.partita_id = $2 LIMIT 1",
+    "SELECT u.id_user FROM utenti u INNER JOIN partecipanti_partite p ON p.user_id = u.id_user WHERE u.username = $1 AND p.partita_id = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $2) LIMIT 1",
     [normalized, matchId],
   );
 
@@ -209,7 +224,12 @@ const storeMessageInRedis = async (listKey, message) => {
   const payload = JSON.stringify(message);
   await redisClient.eval(LUA_PUSH_AND_TRIM, {
     keys: [listKey, bytesKey],
-    arguments: [payload, String(MAX_MESSAGES), String(MAX_BYTES), String(TTL_SECONDS)],
+    arguments: [
+      payload,
+      String(MAX_MESSAGES),
+      String(MAX_BYTES),
+      String(TTL_SECONDS),
+    ],
   });
 };
 
@@ -221,15 +241,24 @@ const publishMessage = async ({ matchId, targetUsers, payload }) => {
   );
 };
 
-const persistMessage = async ({ idMex, userId, matchId, content, timestamp, tipoLabel, recipients }) => {
+const persistMessage = async ({
+  idMex,
+  userId,
+  matchId,
+  content,
+  timestamp,
+  tipoLabel,
+  recipients,
+}) => {
   const client = await db.connect();
   const uniqueRecipients = [...new Set(recipients)].filter(Boolean);
 
   try {
     await client.query("BEGIN");
     await client.query(
-      "INSERT INTO messaggi (id_mex, id_user_send, id_partita, content, time_stamp) VALUES ($1, $2, $3, $4, $5)",
-      [idMex, userId, matchId, content, timestamp],
+      "INSERT INTO messaggi (id_mex, id_user_send, id_partita, content, time_stamp) VALUES ($1, $2, (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $3), $4, $5);"[
+        (idMex, userId, matchId, content, timestamp)
+      ],
     );
 
     if (uniqueRecipients.length > 0) {
@@ -258,7 +287,12 @@ const persistMessageAsync = (payload) => {
   });
 };
 
-const resolveRecipients = async ({ matchId, tipoCode, destinatario, senderId }) => {
+const resolveRecipients = async ({
+  matchId,
+  tipoCode,
+  destinatario,
+  senderId,
+}) => {
   if (tipoCode === 2) {
     const participants = await getParticipants(matchId);
     if (participants.length === 0) {
@@ -282,7 +316,11 @@ const resolveRecipients = async ({ matchId, tipoCode, destinatario, senderId }) 
     }
     const uniqueMembers = [...new Set(members)];
     if (!uniqueMembers.includes(senderId)) {
-      return { ok: false, status: 403, error: "Utente non appartenente all'alleanza" };
+      return {
+        ok: false,
+        status: 403,
+        error: "Utente non appartenente all'alleanza",
+      };
     }
     return {
       ok: true,
@@ -305,7 +343,13 @@ const resolveRecipients = async ({ matchId, tipoCode, destinatario, senderId }) 
   };
 };
 
-const processMessage = async ({ userId, matchId, content, destinatario, tipo }) => {
+const processMessage = async ({
+  userId,
+  matchId,
+  content,
+  destinatario,
+  tipo,
+}) => {
   if (!userId) {
     return { ok: false, status: 401, error: "Identita mancante" };
   }
@@ -335,11 +379,17 @@ const processMessage = async ({ userId, matchId, content, destinatario, tipo }) 
     destinatarioValue = destinatarioValue.trim();
   }
 
-  if (tipoInfo.code !== 2 && (!destinatarioValue || String(destinatarioValue).trim() === "")) {
+  if (
+    tipoInfo.code !== 2 &&
+    (!destinatarioValue || String(destinatarioValue).trim() === "")
+  ) {
     return { ok: false, status: 400, error: "Destinatario mancante" };
   }
 
-  const isMember = await ensureUserInMatch({ userId, matchId: resolvedMatchId });
+  const isMember = await ensureUserInMatch({
+    userId,
+    matchId: resolvedMatchId,
+  });
   if (!isMember) {
     return { ok: false, status: 403, error: "Utente non in partita" };
   }
@@ -402,7 +452,13 @@ const processMessage = async ({ userId, matchId, content, destinatario, tipo }) 
   return { ok: true, message };
 };
 
-const getRecentMessages = async ({ userId, matchId, tipo, destinatario, limit }) => {
+const getRecentMessages = async ({
+  userId,
+  matchId,
+  tipo,
+  destinatario,
+  limit,
+}) => {
   if (!userId) {
     return { ok: false, status: 401, error: "Identita mancante" };
   }
@@ -412,7 +468,10 @@ const getRecentMessages = async ({ userId, matchId, tipo, destinatario, limit })
     return { ok: false, status: 404, error: "Partita non trovata" };
   }
 
-  const isMember = await ensureUserInMatch({ userId, matchId: resolvedMatchId });
+  const isMember = await ensureUserInMatch({
+    userId,
+    matchId: resolvedMatchId,
+  });
   if (!isMember) {
     return { ok: false, status: 403, error: "Utente non in partita" };
   }
@@ -429,19 +488,32 @@ const getRecentMessages = async ({ userId, matchId, tipo, destinatario, limit })
     destinatarioValue = destinatarioValue.trim();
   }
 
-  if (tipoInfo.code === 1 && (!destinatarioValue || String(destinatarioValue).trim() === "")) {
+  if (
+    tipoInfo.code === 1 &&
+    (!destinatarioValue || String(destinatarioValue).trim() === "")
+  ) {
     return { ok: false, status: 400, error: "Destinatario mancante" };
   }
 
   if (tipoInfo.code === 1) {
-    const members = await getAllianceMembers(resolvedMatchId, destinatarioValue);
+    const members = await getAllianceMembers(
+      resolvedMatchId,
+      destinatarioValue,
+    );
     if (!members.includes(userId)) {
-      return { ok: false, status: 403, error: "Utente non appartenente all'alleanza" };
+      return {
+        ok: false,
+        status: 403,
+        error: "Utente non appartenente all'alleanza",
+      };
     }
   }
 
   if (tipoInfo.code === 0) {
-    recipientId = await resolveUserIdByUsername(resolvedMatchId, destinatarioValue);
+    recipientId = await resolveUserIdByUsername(
+      resolvedMatchId,
+      destinatarioValue,
+    );
     if (!recipientId) {
       return { ok: false, status: 404, error: "Destinatario non valido" };
     }
@@ -455,7 +527,10 @@ const getRecentMessages = async ({ userId, matchId, tipo, destinatario, limit })
     recipientId,
   });
 
-  const safeLimit = Math.min(Math.max(toInt(limit, DEFAULT_LIMIT), 1), MAX_LIMIT);
+  const safeLimit = Math.min(
+    Math.max(toInt(limit, DEFAULT_LIMIT), 1),
+    MAX_LIMIT,
+  );
   const items = await redisClient.lRange(listKey, -safeLimit, -1);
   const parsed = items.map((item) => {
     try {
@@ -474,7 +549,10 @@ const authorizeWsConnection = async ({ userId, matchId }) => {
     return { ok: false, status: 404, error: "Partita non trovata" };
   }
 
-  const isMember = await ensureUserInMatch({ userId, matchId: resolvedMatchId });
+  const isMember = await ensureUserInMatch({
+    userId,
+    matchId: resolvedMatchId,
+  });
   if (!isMember) {
     return { ok: false, status: 403, error: "Accesso negato alla partita" };
   }

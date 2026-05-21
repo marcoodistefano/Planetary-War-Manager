@@ -86,6 +86,7 @@ services:
       - REDIS_URL=redis://redis:6379 # <--- FONDAMENTALE per il Comm-Link
       - JWT_SECRET=${SECRET_KEY}
       - SECRET_KEY=${SECRET_KEY}
+      - CHAT_SERVICE_URL=http://chat:3001
       - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
     networks:
       - pwm-net
