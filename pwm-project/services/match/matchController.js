@@ -4,45 +4,39 @@ const notImplemented = (res) => res.status(501).json({ error: "Hardware o Endpoi
 
 const create = async (req, res) => {
   try {
-    // 1. ISOLAMENTO AUTORIZZATIVO (Zero Trust tra Servizi)
-    // Leggiamo l'identità garantita dal Gateway tramite l'header interno
     const playerId = req.headers['x-user-id']; 
+    if (!playerId) return res.status(401).json({ error: "Identità non verificabile." });
 
-    if (!playerId) {
-      console.warn("[SECURITY_BREACH] Richiesta rifiutata: ID Utente mancante dall'header interno.");
-      return res.status(401).json({ error: "Accesso negato: Identità non verificabile." });
-    }
+    const ui = req.body; // Dati grezzi dal frontend
 
-    // 2. INCAPSULAMENTO E CHIAMATA AL MODEL (CPU/IO)
+    // MAPPATURA LOGICA: Traduciamo l'interfaccia nel linguaggio di Eru
+    const gameMode = {
+      stato: "In attesa", 
+      squad: ui.isSquad,
+      alleanzeConsentite: ui.alleanze,
+      ranked: ui.hasElo,
+      alleanzeWin: ui.alleanze, // Default: se ci sono alleanze, possono vincere
+      randomSpawn: true,        // Default di sistema
+      maxPlayers: ui.maxPlayers,
+      duration: ui.durata,
+      moltiplicatoreTemporale: ui.moltiplicatore,
+      modalita: ui.modalita,
+      // ERU si aspetta un array di stringhe per le regioni
+      regioni: [ui.regione] 
+    };
+
+    // Eseguiamo la creazione (Una sola volta!)
     const matchResult = await model.createMatch({
       playerId: playerId,
-      gameMode: req.body // Il payload validato da Sauron
+      gameMode: gameMode
     });
 
-    // 3. MULTIPLAXER DELLA RISPOSTA (Cast dei Tipi)
-    // Trasformiamo la stringa di stato in un vero Integer HTTP
     const statusCode = parseInt(matchResult.status, 10) || 500;
-
-    if (statusCode === 200) {
-      // Circuito Chiuso: Successo
-      return res.status(200).json({
-        message: "Match istanziato con successo nel cluster",
-        data: matchResult // Contiene matchId e altri metadati
-      });
-    } else {
-      // Errore logico dal Model (es. "Utente già in partita")
-      return res.status(statusCode).json({
-        error: matchResult.message
-      });
-    }
+    return res.status(statusCode).json(matchResult);
 
   } catch (error) {
-    // 4. GESTIONE KERNEL PANIC
-    console.error("[SYS_ERR] Cortocircuito nel Match Controller:", error);
-    return res.status(500).json({
-      error: "Errore interno del server durante l'elaborazione del segnale",
-      details: error.message,
-    });
+    console.error("[SYS_ERR] Cortocircuito:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
   } 
 };
 

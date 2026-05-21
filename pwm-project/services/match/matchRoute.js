@@ -3,14 +3,14 @@ const matchController = require("./matchController.js");
 
 const router = express.Router();
 
-router.post("/match/create", matchController.create);
-router.post("/match/join", matchController.join);
-router.get("/match/:id", matchController.getMatch);
-router.post("/match/:id/leave", matchController.leave);
-router.get("/match/:id/players", matchController.getPlayers);
-router.get("/match/:id/status", matchController.getStatus);
-router.get("/match/:id/result", matchController.getResult);
-router.get("/match/:id/history", matchController.getHistory);
-
+// Rimuovi "/match" dall'inizio di ogni percorso
+router.post("/create", matchController.create);          // Diventa /match/create
+router.post("/join", matchController.join);              // Diventa /match/join
+router.get("/:id", matchController.getMatch);            // Diventa /match/:id
+router.post("/:id/leave", matchController.leave);        // Diventa /match/:id/leave
+router.get("/:id/players", matchController.getPlayers);  // Diventa /match/:id/players
+router.get("/:id/status", matchController.getStatus);    // Diventa /match/:id/status
+router.get("/:id/result", matchController.getResult);    // Diventa /match/:id/result
+router.get("/:id/history", matchController.getHistory);  // Diventa /match/:id/history
 
 module.exports = router;

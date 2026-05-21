@@ -13,11 +13,11 @@
             <p class="custom-label">SETTORE 01: GEOGRAFIA</p>
             <div class="setting-item">
               <label>IDENTIFICATIVO MISSIONE</label>
-              <input type="text" class="tactical-input" placeholder="Operazione...">
+              <input type="text" class="tactical-input" [(ngModel)]="matchData.missione" placeholder="Operazione...">
             </div>
             <div class="setting-item">
               <label>REGIONE OPERATIVA</label>
-              <select class="tactical-select">
+              <select class="tactical-select" [(ngModel)]="matchData.regione">
                 <option *ngFor="let r of regioni" [value]="r">{{ r }}</option>
               </select>
             </div>
@@ -55,13 +55,14 @@
               <label>GIOCO A SQUADRE (SQUAD)</label>
               <ion-toggle class="tactical-toggle"></ion-toggle>
             </div>
+            <ion-range [(ngModel)]="matchData.vittoriaSoglia" min="10" max="100" step="5" snaps="true" pin="true" color="primary" class="tactical-range"></ion-range>
             <div class="setting-item toggle-group">
               <label>PARTITA CLASSIFICATA (ELO)</label>
-              <ion-toggle class="tactical-toggle" color="primary" checked></ion-toggle>
+              <ion-toggle [(ngModel)]="matchData.hasElo" class="tactical-toggle" color="primary"></ion-toggle>
             </div>
             <div class="setting-item toggle-group">
               <label>ALLEANZE CONSENTITE</label>
-              <ion-toggle class="tactical-toggle" checked></ion-toggle>
+              <ion-toggle [(ngModel)]="matchData.alleanze" class="tactical-toggle" color="primary"></ion-toggle>
             </div>
           </div>
 
