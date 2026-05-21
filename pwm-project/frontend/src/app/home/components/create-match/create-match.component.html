@@ -23,7 +23,7 @@
             </div>
             <div class="setting-item">
               <label>SCALA SETTORE (MAP_SIZE)</label>
-              <select class="tactical-select">
+              <select class="tactical-select" [(ngModel)]="matchData.mapSize">
                 <option>Small</option>
                 <option>Medium</option>
                 <option>Large</option>
@@ -43,7 +43,7 @@
             <p class="custom-label">SETTORE 02: OBIETTIVI</p>
             <div class="setting-item">
               <label>MODALITÀ DI GIOCO</label>
-              <select class="tactical-select">
+              <select class="tactical-select" [(ngModel)]="matchData.modalita">
                 <option *ngFor="let mod of modalitaGioco" [value]="mod">{{ mod }}</option>
               </select>
             </div>
@@ -53,7 +53,7 @@
             </div>
             <div class="setting-item toggle-group">
               <label>GIOCO A SQUADRE (SQUAD)</label>
-              <ion-toggle class="tactical-toggle"></ion-toggle>
+              <ion-toggle class="tactical-toggle" [(ngModel)]="matchData.isSquad"></ion-toggle>
             </div>
             <ion-range [(ngModel)]="matchData.vittoriaSoglia" min="10" max="100" step="5" snaps="true" pin="true" color="primary" class="tactical-range"></ion-range>
             <div class="setting-item toggle-group">

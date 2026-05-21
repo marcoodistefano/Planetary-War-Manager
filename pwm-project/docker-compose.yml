@@ -93,7 +93,7 @@ services:
     build: ./services/match
     working_dir: /app/services/match
     ports:
-      - "3001:3000" # <--- app-route -> match-service (porta interna 3000)
+      - "3004:3004" # <--- app-route -> match-service (porta interna 3004)
     volumes:
       - ./services/match:/app/services/match
       - ./services/shared:/app/services/shared

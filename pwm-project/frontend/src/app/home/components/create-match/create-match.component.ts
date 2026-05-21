@@ -43,11 +43,10 @@ export class CreateMatchComponent {
   async confirmCreation() {
     console.log('Trasmissione ordini di battaglia...');
 
-    // Simuliamo l'ID utente (nella realtà verrebbe dal servizio di autenticazione)
-    const headers = { 'x-user-id': 'USER_12345' };
-
     try {
-      const response: any = await this.http.post('http://localhost:3000/match/create', this.matchData, { headers }).toPromise();
+      const response: any = await this.http.post('/match/create', this.matchData, { 
+        withCredentials: true 
+      }).toPromise();
       console.log('Risposta Cluster:', response);
       this.modalCtrl.dismiss({ created: true, matchId: response.data.matchId });
     } catch (error) {

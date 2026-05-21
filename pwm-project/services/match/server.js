@@ -10,6 +10,6 @@ app.use("/match", matchRoutes);
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
-app.listen(3000, () =>
-  console.log("Match service attivo su http://localhost:3000"),
+app.listen(3004, () =>
+  console.log("Match service attivo su http://localhost:3004"),
 );

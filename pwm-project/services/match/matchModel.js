@@ -15,7 +15,7 @@ const createMatch = async ({ playerId, gameMode }) => {
       [playerId]
     );
 
-    if (parseInt(activeMatches[0].count) > 0) {
+    if (activeMatches.rows && activeMatches.rows.length > 0 && parseInt(activeMatches.rows[0].count) > 0) {
       return { status: "400", message: "Hai già una partita attiva come host." };
     }
 
@@ -25,23 +25,33 @@ const createMatch = async ({ playerId, gameMode }) => {
     if (eruRes.binary_match.length !== 56) throw new Error("Errore critico di clock nel Multiplexer Eru.");
 
     // C. Generazione Identificativi
-    const id_partita_hash = await aslan.generateSecureToken(256);
+    const id_partita_hash = await aslan.generateSecureToken(255);
     const id_partita_visualizzato = await aslan.generateSecureToken(10);
 
     // D. Transazione SQL (Persistenza)
-    const client = await db.getClient();
+    const client = await db.connect();
     try {
       await client.query('BEGIN');
 
-      await client.query(
-        `INSERT INTO partite (id_partita_hash, id_partita_visualizzato, id_host, struttura_partita, has_elo) 
-         VALUES ($1, $2, $3, $4::bit(56), $5);`,
-        [id_partita_hash, id_partita_visualizzato, playerId, eruRes.binary_match, gameMode.hasElo || false]
+      const matchInsert = await client.query(
+        `INSERT INTO partite (nome_partita, id_partita_hash, id_partita_visualizzato, id_host, struttura_partita, has_elo) 
+         VALUES ($1, $2, $3, $4, $5::bit(56), $6)
+         RETURNING id_partita;`,
+        [
+          gameMode.nome_partita || "Operazione senza nome",
+          id_partita_hash,
+          id_partita_visualizzato,
+          playerId,
+          eruRes.binary_match,
+          gameMode.hasElo || false,
+        ]
       );
 
+      const partitaId = matchInsert.rows[0].id_partita;
+
       await client.query(
-        `INSERT INTO partecipazioni (id_partita_hash, id_user) VALUES ($1, $2);`,
-        [id_partita_hash, playerId]
+        `INSERT INTO partecipanti_partite (partita_id, user_id) VALUES ($1, $2);`,
+        [partitaId, playerId]
       );
 
       await client.query('COMMIT');
@@ -75,7 +85,7 @@ const createMatch = async ({ playerId, gameMode }) => {
 // ============================================================================
 const join_Match = async (playerId, id_partita_hash) => {
   try {
-    const client = await db.getClient();
+    const client = await db.connect();
     const redisKey = `match:${id_partita_hash}:status`;
 
     try {
@@ -83,23 +93,24 @@ const join_Match = async (playerId, id_partita_hash) => {
 
       // 1. Lock riga database
       const matchQuery = await client.query(
-        `SELECT struttura_partita::text AS struct FROM partite WHERE id_partita_hash = $1 FOR UPDATE;`, 
+        `SELECT id_partita, struttura_partita::text AS struct FROM partite WHERE id_partita_hash = $1 FOR UPDATE;`, 
         [id_partita_hash]
       );
 
       if (matchQuery.rows.length === 0) throw { customStatus: "404", message: "Partita non trovata." };
+      const partitaId = matchQuery.rows[0].id_partita;
       const currentStruct = matchQuery.rows[0].struct;
 
       // 2. Verifica se utente già presente
       const checkUser = await client.query(
-        `SELECT 1 FROM partecipazioni WHERE id_partita_hash = $1 AND id_user = $2`,
-        [id_partita_hash, playerId]
+        `SELECT 1 FROM partecipanti_partite WHERE partita_id = $1 AND user_id = $2`,
+        [partitaId, playerId]
       );
       if (checkUser.rows.length > 0) throw { customStatus: "400", message: "Sei già in questa partita." };
 
       // 3. Inserimento e conteggio
-      await client.query(`INSERT INTO partecipazioni (id_partita_hash, id_user) VALUES ($1, $2);`, [id_partita_hash, playerId]);
-      const countRes = await client.query(`SELECT count(*) FROM partecipazioni WHERE id_partita_hash = $1;`, [id_partita_hash]);
+      await client.query(`INSERT INTO partecipanti_partite (partita_id, user_id) VALUES ($1, $2);`, [partitaId, playerId]);
+      const countRes = await client.query(`SELECT count(*) FROM partecipanti_partite WHERE partita_id = $1;`, [partitaId]);
       const playerCount = parseInt(countRes.rows[0].count);
 
       // 4. Check Avvio con Eru
@@ -133,4 +144,9 @@ const join_Match = async (playerId, id_partita_hash) => {
     console.error("[SYS_ERR] Errore durante join_Match:", error);
     return { status: "500", message: "Errore durante il join alla partita." };
   }
+};
+
+module.exports = {
+  createMatch,
+  join_Match
 };
