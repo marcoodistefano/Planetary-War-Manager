@@ -115,15 +115,34 @@ ion-content {
   }
 }
 
+.table-head {
+  display: grid;
+  grid-template-columns: minmax(0, 2.3fr) minmax(140px, 1.2fr) minmax(120px, 0.9fr) 120px 120px;
+  gap: 14px;
+  padding: 0 16px 4px;
+  color: #86d7ff;
+  font-size: 0.58rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
 .mission-card-extended {
   background: rgba(1, 36, 46, 0.15) !important; border: 1px solid rgba(95, 208, 255, 0.2) !important;
   padding: 16px; border-radius: 12px;
-  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 2.3fr) minmax(140px, 1.2fr) minmax(120px, 0.9fr) 120px 120px;
+  align-items: center;
+  gap: 14px;
   transition: all 0.2s ease; flex-shrink: 0;
+
+  .card-main-info { grid-column: 1; }
+  .card-stats-block { grid-column: 2 / span 3; }
+  .card-actions { grid-column: 5; }
 
   &:hover { background: rgba(1, 36, 46, 0.3) !important; border-color: rgba(134, 215, 255, 0.4) !important; transform: translateX(4px); }
 
-  .card-main-info { flex: 1.5; min-width: 0; } /* min-width: 0 salva dal flex overflow text */
+  .card-main-info { min-width: 0; } /* min-width: 0 salva dal flex overflow text */
 
   .card-header {
     display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
@@ -136,13 +155,28 @@ ion-content {
 }
 
 .card-stats-block {
-  flex: 2; display: flex; gap: 15px; border-left: 1px solid rgba(95, 208, 255, 0.15); padding-left: 20px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; border-left: 1px solid rgba(95, 208, 255, 0.15); padding-left: 18px;
   
   .stat-unit {
     display: flex; flex-direction: column; flex: 1;
-    .stat-label { color: #86d7ff; font-size: 0.55rem; text-transform: uppercase; font-weight: bold; opacity: 0.8; margin-bottom: 4px; }
-    .stat-value { color: #fff; font-size: 1rem; font-weight: bold; &.highlight { color: #86d7ff; text-shadow: 0 0 8px rgba(134, 215, 255, 0.4); } }
+    .stat-label { color: #86d7ff; font-size: 0.52rem; text-transform: uppercase; font-weight: bold; opacity: 0.8; margin-bottom: 4px; }
+    .stat-value { color: #fff; font-size: 0.92rem; font-weight: bold; &.highlight { color: #86d7ff; text-shadow: 0 0 8px rgba(134, 215, 255, 0.4); } }
   }
+}
+
+.region-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(134, 215, 255, 0.35);
+  background: rgba(134, 215, 255, 0.08);
+  color: #86d7ff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
 }
 
 .card-actions {
@@ -157,6 +191,15 @@ ion-content {
   font-size: 0.75rem; padding: 10px 16px; border-radius: 8px; font-weight: bold; letter-spacing: 1px; cursor: pointer; transition: all 0.3s ease; white-space: nowrap;
   
   &:hover { border-color: #86d7ff; box-shadow: 0 0 20px rgba(134, 215, 255, 0.4), inset 0 0 15px rgba(134, 215, 255, 0.2); transform: translateY(-2px); }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 30px 10px;
+  color: #86d7ff;
+  opacity: 0.8;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
 }
 
 /* ==========================================================================
@@ -198,10 +241,12 @@ ion-content {
   /* Il pannello diventa più fluido su mobile */
   .panel { border-radius: 12px; box-shadow: none; border-color: rgba(95, 208, 255, 0.2); padding: 10px; overflow: visible; }
   .results-container .scroll-area { overflow: visible; height: auto; }
+  .table-head { display: none; }
 
   /* Impila la Card della missione in verticale */
   .mission-card-extended {
-    flex-direction: column; align-items: flex-start; gap: 15px; padding: 15px;
+    grid-template-columns: 1fr;
+    align-items: flex-start; gap: 15px; padding: 15px;
     
     .card-main-info { width: 100%; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; }
     

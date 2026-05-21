@@ -36,19 +36,27 @@
         
         <div class="panel-controls">
           <div class="tabs-dock-center">
-            <button [class.active]="view === 'active'" (click)="view = 'active'">OPERAZIONI ATTIVE</button>
-            <button [class.active]="view === 'finished'" (click)="view = 'finished'">ARCHIVIO STORICO</button>
+            <button [class.active]="view === 'active'" (click)="setView('active')">OPERAZIONI ATTIVE</button>
+            <button [class.active]="view === 'finished'" (click)="setView('finished')">ARCHIVIO STORICO</button>
           </div>
       
           <div class="search-section">
-            <ion-searchbar class="glass-searchbar transparent-element" placeholder="Filtra per nome missione, creatore o settore..."></ion-searchbar>
+            <ion-searchbar class="glass-searchbar transparent-element" placeholder="Filtra per nome missione, creatore o settore..." (ionInput)="onSearch($event)"></ion-searchbar>
           </div>
         </div>
 
         <div class="results-container">
           <div class="scroll-area">
             
-            <article class="mission-card-extended inner-panel" *ngFor="let m of mockMatches">
+            <div class="table-head">
+              <span>Missione</span>
+              <span>Creatore</span>
+              <span>Regione</span>
+              <span>Giocatori</span>
+              <span>Stato</span>
+            </div>
+
+            <article class="mission-card-extended inner-panel" *ngFor="let m of visibleMatches">
               
               <div class="card-main-info">
                 <div class="card-header">
@@ -58,21 +66,22 @@
                   </span>
                 </div>
                 <h3>{{ m.name }}</h3>
-                <p class="creator-info">Comandante: <strong>{{ m.creator }}</strong></p>
+                <p class="creator-info">Comandante: <strong>{{ m.creatorDisplayName || m.creator }}</strong> · {{ m.timeCreated }}</p>
               </div>
 
               <div class="card-stats-block">
                 <div class="stat-unit">
                   <span class="stat-label">REGIONE GIOCATA</span>
-                  <span class="stat-value">{{ m.region }}</span>
+                  <span class="region-badge" *ngIf="m.regionPlayable">{{ m.regionPlayable }}</span>
+                  <span class="stat-value" *ngIf="!m.regionPlayable">N/D</span>
                 </div>
                 <div class="stat-unit">
                   <span class="stat-label">ARROLATI</span>
-                  <span class="stat-value highlight">{{ m.joined }}/{{ m.total }}</span>
+                  <span class="stat-value highlight">{{ m.playersLabel }}</span>
                 </div>
                 <div class="stat-unit">
-                  <span class="stat-label">TEMPO TRASCORSO</span>
-                  <span class="stat-value">14H 20M</span>
+                  <span class="stat-label">ESITO</span>
+                  <span class="stat-value highlight">{{ m.outcome || m.status }}</span>
                 </div>
               </div>
 
@@ -80,6 +89,10 @@
                 <button class="primary-glow">{{ view === 'active' ? 'ENTRA IN PARTITA' : 'REPLAY DATI' }}</button>
               </div>
             </article>
+
+            <div *ngIf="visibleMatches.length === 0" class="empty-state">
+              Nessuna operazione trovata nella sezione selezionata.
+            </div>
 
           </div>
         </div>

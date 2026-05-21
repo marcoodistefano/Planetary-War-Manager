@@ -20,6 +20,7 @@ export interface HomeData {
   // Mappe degli oggetti match1, match2 ecc. creati da buildMatchMap nel backend
   match_attivi: { [key: string]: any }; 
   last_created_match: { [key: string]: any };
+  match_chiuse?: { [key: string]: any };
   
   friends_information: any[];
 }

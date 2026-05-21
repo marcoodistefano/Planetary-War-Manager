@@ -84,9 +84,13 @@ const buildHome = async (U_ID) => {
           m.struttura_partita, 
           m.created_at AS data_creazione, 
           m.id_host,
+          u.username AS creator_username,
+          u.username AS creator_display_name,
+          u.avatar_id AS creator_avatar,
           (SELECT count(user_id) FROM partecipanti_partite p2 WHERE p2.partita_id = m.id_partita) AS numero_partecipanti
       FROM partecipanti_partite p
       INNER JOIN partite m ON p.partita_id = m.id_partita
+      LEFT JOIN utenti u ON m.id_host = u.id_user
       WHERE p.user_id = $1 
         AND substring(m.struttura_partita::text from 1 for 2) IN ('00', '01')
       ORDER BY m.created_at DESC`,
@@ -99,13 +103,46 @@ const buildHome = async (U_ID) => {
           m.struttura_partita, 
           m.created_at AS data_creazione, 
           m.id_host,
+          u.username AS creator_username,
+          u.username AS creator_display_name,
+          u.avatar_id AS creator_avatar,
           (SELECT count(user_id) FROM partecipanti_partite p2 WHERE p2.partita_id = m.id_partita) AS numero_partecipanti
       FROM partecipanti_partite p
       INNER JOIN partite m ON p.partita_id = m.id_partita
+      LEFT JOIN utenti u ON m.id_host = u.id_user
       WHERE p.user_id = $1 
         AND substring(m.struttura_partita::text from 1 for 2) IN ('00', '01')
       ORDER BY m.created_at DESC 
       LIMIT 10;`,
+        [U_ID],
+      );
+
+    const match_chiuse = await db.query(
+        `SELECT 
+          m.nome_partita AS nome_match,
+          m.struttura_partita,
+          m.created_at AS data_creazione,
+          m.id_host,
+          u.username AS creator_username,
+          u.username AS creator_display_name,
+          u.avatar_id AS creator_avatar,
+          p.time_death,
+          p.rank,
+          p.punteggio,
+          (SELECT count(user_id) FROM partecipanti_partite p2 WHERE p2.partita_id = m.id_partita) AS numero_partecipanti,
+          CASE
+            WHEN p.time_death IS NOT NULL THEN 'Eliminato'
+            WHEN p.rank = 1 THEN 'Vinta'
+            WHEN substring(m.struttura_partita::text from 1 for 2) IN ('10', '11') THEN 'Terminata'
+            ELSE 'Terminata'
+          END AS outcome
+      FROM partecipanti_partite p
+      INNER JOIN partite m ON p.partita_id = m.id_partita
+      LEFT JOIN utenti u ON m.id_host = u.id_user
+      WHERE p.user_id = $1 
+        AND substring(m.struttura_partita::text from 1 for 2) IN ('10', '11')
+      ORDER BY m.created_at DESC
+      LIMIT 50;`,
         [U_ID],
       );
 
@@ -125,6 +162,7 @@ const buildHome = async (U_ID) => {
 
     const decompress_match_attivi = buildMatchMap(match_attivi.rows);
     const decompress_match_unito = buildMatchMap(last_created_match.rows);
+    const decompress_match_chiuse = buildMatchMap(match_chiuse.rows);
     
     const Information = {
       user_profile: currentUser,
@@ -133,6 +171,7 @@ const buildHome = async (U_ID) => {
       user_position: user_position.rows[0]?.user_rank,
       match_attivi: decompress_match_attivi,
       last_created_match: decompress_match_unito,
+      match_chiuse: decompress_match_chiuse,
       friends_information: friends_information.rows,
     };
 

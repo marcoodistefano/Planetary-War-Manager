@@ -44,6 +44,30 @@
 
 .search-container { flex-shrink: 0; margin-bottom: 15px; }
 
+.sort-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.sort-button {
+  background: rgba(88, 166, 255, 0.12);
+  border: 1px solid rgba(88, 166, 255, 0.28);
+  color: #dfefff;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(88, 166, 255, 0.2);
+  }
+}
+
 /* INPUT DI RICERCA */
 .tactical-input {
   width: 100%; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(88, 166, 255, 0.3);
@@ -62,14 +86,14 @@
 
 /* CARTE DELLE PARTITE */
 .game-card {
-  display: flex; justify-content: space-between; align-items: center;
+  display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
   padding: 15px; background: rgba(1, 36, 46, 0.2); border: 1px solid rgba(88, 166, 255, 0.2);
   border-radius: 9px; transition: 0.2s;
   &:hover { background: rgba(88, 166, 255, 0.1); border-color: var(--primary-blue); }
   
   .game-info {
     h3 { margin: 0 0 5px 0; color: #fff; font-size: 1rem; }
-    .meta { color: #8892b0; font-size: 0.65rem; font-weight: bold; letter-spacing: 0.5px; }
+    .meta { color: #8892b0; font-size: 0.65rem; font-weight: bold; letter-spacing: 0.5px; line-height: 1.35; }
   }
 }
 

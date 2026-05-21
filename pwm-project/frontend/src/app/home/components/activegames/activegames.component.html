@@ -13,9 +13,13 @@
           <div class="game-card" *ngFor="let game of activeGames">
             <div class="game-info">
               <h3>{{ game.name }}</h3>
-              <div class="meta">{{ game.players }} GIOCATORI · {{ activeGameTimeText(game) | uppercase }}</div>
+              <div class="meta">{{ game.creatorDisplayName || game.creator }} · {{ game.timeCreatedFormatted || activeGameTimeText(game) }}</div>
             </div>
-            <span class="status-badge">{{ game.status }}</span>
+            <div class="badge-row">
+              <span class="region-badge" *ngIf="game.regionPlayable">{{ game.regionPlayable }}</span>
+              <span class="players-badge">{{ game.playersLabel || game.players }}</span>
+              <span class="status-badge">{{ game.status }}</span>
+            </div>
           </div>
 
           <div *ngIf="activeGames.length === 0" class="no-results">

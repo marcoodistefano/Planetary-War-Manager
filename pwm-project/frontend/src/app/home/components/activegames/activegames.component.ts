@@ -15,9 +15,9 @@ export class ActivegamesComponent implements OnInit {
 
   // Dati fittizi di backup nel caso il componente venga aperto senza parametri
   fallbackGames: any[] = [
-    { id: 101, name: 'Conflitto in Eurasia', players: '3/8', status: 'IN CORSO', turnNumber: 12 },
-    { id: 102, name: 'Difesa del Settore 7', players: '5/5', status: 'TURNO 4', startTime: new Date(Date.now() - 7200000) }, // 2 ore fa
-    { id: 103, name: 'Campagna del Deserto', players: '2/6', status: 'IN CORSO', turnNumber: 3 }
+    { id: 101, name: 'Conflitto in Eurasia', players: 3, playersLabel: '3 giocatori', regionPlayable: 'Europa, Asia', status: 'IN CORSO', turnNumber: 12 },
+    { id: 102, name: 'Difesa del Settore 7', players: 5, playersLabel: '5 giocatori', regionPlayable: 'Italia', status: 'TURNO 4', startTime: new Date(Date.now() - 7200000) }, // 2 ore fa
+    { id: 103, name: 'Campagna del Deserto', players: 2, playersLabel: '2 giocatori', regionPlayable: 'Africa', status: 'IN CORSO', turnNumber: 3 }
   ];
 
   constructor(private modalCtrl: ModalController) {}

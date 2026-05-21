@@ -110,12 +110,30 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
 
         // 2. Mappatura Partite Attive (Converte l'oggetto match1, match2... in array)
         if (info.match_attivi) {
-          this.activeGames = Object.values(info.match_attivi).map((m: any) => ({
-            name: m.nome_match,
-            players: m.numero_partecipanti,
-            startTime: m.data_creazione,
-            status: 'In corso'
-          }));
+          this.activeGames = Object.values(info.match_attivi).map((m: any) => {
+            const playersCount = Number(m.numero_partecipanti) || 0;
+            const playersLabel = playersCount === 1 ? `${playersCount} giocatore` : `${playersCount} giocatori`;
+            // Extract playable regions from decoded struttura_partita if present
+            let regionPlayable = '';
+            try {
+              if (m.struttura_partita && Array.isArray(m.struttura_partita.regioni)) {
+                regionPlayable = m.struttura_partita.regioni.join(', ');
+              }
+            } catch (e) { regionPlayable = ''; }
+
+            return {
+              name: m.nome_match,
+              creator: String(m.creator_username || m.creator_display_name || m.id_host || 'Sconosciuto').trim(),
+              creatorDisplayName: m.creator_display_name || null,
+              creatorAvatar: m.creator_avatar || null,
+              players: playersCount,
+              playersLabel,
+              regionPlayable,
+              startTime: m.data_creazione,
+              timeCreatedFormatted: this.formatTimestamp(m.data_creazione),
+              status: 'In corso'
+            };
+          });
         }
 
         // 3. Mappatura Leaderboard Globale
@@ -130,13 +148,49 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
 
         // 4. Mappatura Nuove Partite Create
         if (info.last_created_match) {
-          this.newGames = Object.values(info.last_created_match).map((m: any) => ({
-            name: m.nome_match,
-            creator: m.id_host, // Potresti voler risolvere l'host in un nome reale se disponibile
-            players: `${m.numero_partecipanti}`,
-            timeCreated: m.data_creazione
-          }));
+          this.newGames = Object.values(info.last_created_match).map((m: any) => {
+            // Try to pick a human-friendly creator name from possible fields
+            let creatorName = 'Sconosciuto';
+            if (m.creator_display_name) creatorName = m.creator_display_name;
+            else if (m.creator_username) creatorName = m.creator_username;
+            else if (m.creator) creatorName = m.creator;
+            else if (m.host_username) creatorName = m.host_username;
+            else if (m.id_host) {
+              if (typeof m.id_host === 'string') {
+                // fallback to id string if no username available
+                creatorName = m.id_host;
+              } else if (typeof m.id_host === 'object') {
+                creatorName = m.id_host.username || m.id_host.name || m.id_host.id || 'Sconosciuto';
+              }
+            }
+
+            const playersCount = Number(m.numero_partecipanti) || 0;
+            const playersLabel = playersCount === 1 ? `${playersCount} giocatore` : `${playersCount} giocatori`;
+            // regioni giocabili
+            let regionPlayable = '';
+            try {
+              if (m.struttura_partita && Array.isArray(m.struttura_partita.regioni)) {
+                regionPlayable = m.struttura_partita.regioni.join(', ');
+              }
+            } catch (e) { regionPlayable = ''; }
+
+            return {
+              name: m.nome_match,
+              creator: String(creatorName).trim(),
+              creatorDisplayName: m.creator_display_name || null,
+              creatorAvatar: m.creator_avatar || null,
+              players: playersCount,
+              playersLabel,
+              regionPlayable,
+              timeCreated: m.data_creazione,
+              timeCreatedFormatted: this.formatTimestamp(m.data_creazione)
+            };
+          });
           this.filteredNewGames = [...this.newGames];
+        }
+
+        if (info.match_chiuse) {
+          this.finishedGames = Object.keys(info.match_chiuse).length;
         }
       },
       error: (err) => {
@@ -160,6 +214,16 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   // === METODI PER IL PLAYBACK DEL VIDEO ===
   ngAfterViewInit() {
     this.playBackgroundVideo();
+  }
+
+  private formatTimestamp(input?: string | Date) {
+    if (!input) return '';
+    const d = (input instanceof Date) ? input : new Date(input);
+    if (Number.isNaN(d.getTime())) return String(input);
+    return new Intl.DateTimeFormat('it-IT', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    }).format(d);
   }
 
   ionViewDidEnter() {
@@ -249,15 +313,16 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
       case 'Obiettivi': await this.openModal(ObjectivesComponent); break;
       case 'Amici': await this.openModal(FriendsComponent); break;
       case 'Leaderboard': await this.openModal(LeaderboardComponent); break;
-      case 'Partite Attive': await this.openModal(ActivegamesComponent); break;
-      case 'Nuove Partite': await this.openModal(NewgamesComponent); break;
+      case 'Partite Attive': await this.openModal(ActivegamesComponent, { componentProps: { activeGames: this.activeGames } }); break;
+      case 'Nuove Partite': await this.openModal(NewgamesComponent, { componentProps: { games: this.filteredNewGames } }); break;
     }
   }
 
-  private async openModal(component: any) {
+  private async openModal(component: any, opts?: { componentProps?: any }) {
     const modal = await this.modalCtrl.create({
       component: component,
-      cssClass: 'tactical-modal'
+      cssClass: 'tactical-modal',
+      ...(opts || {})
     });
     return await modal.present();
   }
