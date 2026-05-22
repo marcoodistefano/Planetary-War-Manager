@@ -60,10 +60,10 @@
 .top-navbar {
   position: absolute;
   top: calc(2 * var(--unit));
-  left: 50%;
-  transform: translateX(-50%);
-  width: 98%; 
-  max-width: 1800px; 
+  left: calc(2 * var(--unit));
+  right: calc(2 * var(--unit));
+  width: auto;
+  max-width: none;
   height: calc(5 * var(--unit));
   min-height: 60px;
   z-index: 1000;
