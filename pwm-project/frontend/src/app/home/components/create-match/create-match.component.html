@@ -46,10 +46,22 @@
             </div>
 
             <div class="setting-item">
-              <label>REGIONE OPERATIVA</label>
-              <select class="tactical-select" [(ngModel)]="matchData.regione">
-                <option *ngFor="let r of regioni" [value]="r">{{ r }}</option>
-              </select>
+              <label>REGIONI OPERATIVE</label>
+              <div class="region-hint">Seleziona una o piu aree. World resta sempre esclusiva.</div>
+              <div class="region-picker">
+                <button
+                  type="button"
+                  class="region-chip"
+                  *ngFor="let r of regionOptions"
+                  [class.active]="isRegionSelected(r)"
+                  [disabled]="!canSelectRegion(r) && !isRegionSelected(r)"
+                  (click)="toggleRegion(r)"
+                >
+                  <span>{{ r }}</span>
+                  <ion-icon [name]="isRegionSelected(r) ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+                </button>
+              </div>
+              <div class="region-summary">Selezionate: {{ selectedRegionsLabel }}</div>
             </div>
 
             <div class="setting-item">

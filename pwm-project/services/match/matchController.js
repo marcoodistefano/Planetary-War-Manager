@@ -2,6 +2,24 @@ const model = require("./matchModel");
 
 const notImplemented = (res) => res.status(501).json({ error: "Hardware o Endpoint non implementato" });
 
+const normalizeRegions = (ui) => {
+  if (Array.isArray(ui.regioni) && ui.regioni.length > 0) {
+    const uniqueRegions = [...new Set(ui.regioni.filter(Boolean))];
+
+    if (uniqueRegions.includes("World") && uniqueRegions.length > 1) {
+      return uniqueRegions.filter((region) => region !== "World");
+    }
+
+    return uniqueRegions;
+  }
+
+  if (typeof ui.regione === "string" && ui.regione.trim() !== "") {
+    return [ui.regione];
+  }
+
+  return ["World"];
+};
+
 const create = async (req, res) => {
   try {
     const playerId = req.headers['x-user-id']; 
@@ -23,7 +41,7 @@ const create = async (req, res) => {
       moltiplicatoreTemporale: ui.moltiplicatore,
       modalita: ui.modalita,
       // ERU si aspetta un array di stringhe per le regioni
-      regioni: [ui.regione] 
+      regioni: normalizeRegions(ui)
     };
 
     // Eseguiamo la creazione (Una sola volta!)
