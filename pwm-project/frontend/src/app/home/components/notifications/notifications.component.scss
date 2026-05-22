@@ -1,9 +1,17 @@
+@use "../_home-modal-shell";
+
 :host {
+  --primary-blue: #86d7ff;
+  --primary-glow: rgba(134, 215, 255, 0.3);
   --danger-color: #ff7b72;
-  --primary-blue: #58a6ff;
   --warning-color: #ffa657;
-  --glass-bg: rgba(5, 10, 20, 0.95);
-  font-family: 'Courier New', Courier, monospace;
+  --glass-bg: rgba(7, 15, 28, 0.85);
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: block;
+  font-family: 'Inter', sans-serif;
+  background: transparent !important;
 }
 
 .transparent-bg { --background: transparent !important; }

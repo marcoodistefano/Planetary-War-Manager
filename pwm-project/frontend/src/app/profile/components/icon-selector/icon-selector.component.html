@@ -1,29 +1,60 @@
 <ion-content [scrollY]="false" class="transparent-bg">
-  <div class="modal-wrapper">
-    <div class="panel icon-panel">
-      
-      <div class="title-block">
-        <p class="eyebrow">Database Personale</p>
-        <h2>SELEZIONA AVATAR OPERATIVO</h2>
-      </div>
+  <div class="create-match-backdrop" (click)="close()">
+    <div class="create-match-frame compact-frame avatar-frame-shell" (click)="$event.stopPropagation()">
+      <div class="create-match-sidebar compact-sidebar">
+        <div class="brand">
+          <span class="system-name">PROFILE EDITOR</span>
+          <span class="version">OPS_CENTER V.4.0</span>
+        </div>
 
-      <div class="inner-panel grid-scroll-container">
-        <div class="avatar-grid">
-          <div class="icon-item" *ngFor="let icon of icons" (click)="select(icon.path)">
-            <div class="avatar-frame">
-              <img [src]="icon.path" alt="avatar" />
-            </div>
-            <div class="avatar-label">{{ icon.id }}</div>
+        <nav>
+          <div class="nav-item active">
+            <ion-icon name="image-outline"></ion-icon><span>AVATAR</span>
           </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button class="exit-btn" (click)="close()">
+            <ion-icon name="close-outline" class="close-icon"></ion-icon>
+            <span class="close-label">[ CHIUDI ]</span>
+          </button>
         </div>
       </div>
 
-      <div class="action-dock">
-        <button class="logout-button" (click)="close()">
-          [ ANNULLA OPERAZIONE ]
-        </button>
-      </div>
+      <div class="create-match-main scrollable-y compact-main">
+        <div class="content-container compact-content">
+          <div class="header-info">
+            <p class="track-label">Database Personale</p>
+          </div>
 
+          <div class="sections-grid single-section">
+            <div class="build-card no-hover">
+              <div class="build-info">
+                <span class="item-name">SELEZIONA AVATAR OPERATIVO</span>
+                <span class="item-tier">ASSET</span>
+              </div>
+
+              <div class="grid-scroll-container">
+                <div class="avatar-grid">
+                  <div class="icon-item" *ngFor="let icon of icons" (click)="select(icon.path)">
+                    <div class="avatar-frame">
+                      <img [src]="icon.path" alt="avatar" />
+                    </div>
+                    <div class="avatar-label">{{ icon.id }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="action-footer">
+                <button class="logout-button" (click)="close()">
+                  <ion-icon name="close-outline" class="close-icon"></ion-icon>
+                  <span class="close-label">[ ANNULLA OPERAZIONE ]</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </ion-content>

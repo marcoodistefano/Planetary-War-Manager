@@ -1,109 +1,139 @@
-<ion-content [scrollY]="false" class="transparent-bg">
-  <div class="modal-wrapper">
-    <div class="panel extra-wide-panel">
-      
-      <div class="title-block">
-        <h2>CREA NUOVA PARTITA</h2>
+<div class="create-match-backdrop" (click)="close()">
+
+  <div class="create-match-frame" (click)="$event.stopPropagation()">
+
+    <div class="create-match-sidebar">
+      <div class="brand">
+        <span class="system-name">MATCH CREATOR</span>
+        <span class="version">OPS_CENTER V.4.0</span>
       </div>
 
-      <div class="settings-scroll-container">
+      <nav>
+        <div class="nav-item active">
+          <ion-icon name="globe-outline"></ion-icon><span>CONFIGURAZIONE</span>
+        </div>
+        <div class="nav-item disabled">
+          <ion-icon name="people-outline"></ion-icon><span>INVITI</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="exit-btn" (click)="close()" >
+          <ion-icon name="power-outline" class="close-icon"></ion-icon>
+          <span class="close-label">[ CHIUDI ]</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="create-match-main scrollable-y">
+      <div class="content-container">
+
+        <div class="header-info">
+          <p class="track-label">Parametri Operativi Missione</p>
+        </div>
+
         <div class="sections-grid">
-          
-          <div class="inner-panel">
-            <p class="custom-label">SETTORE 01: GEOGRAFIA</p>
+
+          <div class="build-card no-hover">
+            <div class="build-info">
+              <span class="item-name">SETTORE 01: GEOGRAFIA</span>
+              <span class="item-tier">POSIZIONAMENTO</span>
+            </div>
+
             <div class="setting-item">
               <label>IDENTIFICATIVO MISSIONE</label>
               <input type="text" class="tactical-input" [(ngModel)]="matchData.missione" placeholder="Operazione...">
             </div>
+
             <div class="setting-item">
               <label>REGIONE OPERATIVA</label>
               <select class="tactical-select" [(ngModel)]="matchData.regione">
                 <option *ngFor="let r of regioni" [value]="r">{{ r }}</option>
               </select>
             </div>
-            <div class="setting-item">
-              <label>SCALA SETTORE (MAP_SIZE)</label>
-              <select class="tactical-select" [(ngModel)]="matchData.mapSize">
-                <option>Small</option>
-                <option>Medium</option>
-                <option>Large</option>
-                <option>XLarge</option>
-                <option>Huge</option>
-              </select>
-            </div>
+
             <div class="setting-item">
               <label>CAPACITÀ COMANDANTI</label>
-              <select class="tactical-select">
+              <select class="tactical-select" [(ngModel)]="matchData.maxPlayers">
                 <option *ngFor="let p of maxPlayers" [value]="p">{{ p }} Partecipanti</option>
               </select>
             </div>
           </div>
 
-          <div class="inner-panel">
-            <p class="custom-label">SETTORE 02: OBIETTIVI</p>
+          <div class="build-card no-hover">
+            <div class="build-info">
+              <span class="item-name">SETTORE 02: OBIETTIVI</span>
+              <span class="item-tier">REGOLE</span>
+            </div>
+
             <div class="setting-item">
               <label>MODALITÀ DI GIOCO</label>
               <select class="tactical-select" [(ngModel)]="matchData.modalita">
                 <option *ngFor="let mod of modalitaGioco" [value]="mod">{{ mod }}</option>
               </select>
             </div>
-            <div class="setting-item">
-              <label>SOGLIA VITTORIA (%)</label>
-              <ion-range min="10" max="100" step="5" snaps="true" pin="true" color="primary" class="tactical-range"></ion-range>
+
+            <div class="setting-item range-item">
+              <label>SOGLIA VITTORIA: {{ matchData.vittoriaSoglia }}%</label>
+              <ion-range [(ngModel)]="matchData.vittoriaSoglia" min="10" max="100" step="5" snaps="true" pin="true" color="primary" class="tactical-range"></ion-range>
             </div>
-            <div class="setting-item toggle-group">
-              <label>GIOCO A SQUADRE (SQUAD)</label>
-              <ion-toggle class="tactical-toggle" [(ngModel)]="matchData.isSquad"></ion-toggle>
-            </div>
-            <ion-range [(ngModel)]="matchData.vittoriaSoglia" min="10" max="100" step="5" snaps="true" pin="true" color="primary" class="tactical-range"></ion-range>
-            <div class="setting-item toggle-group">
-              <label>PARTITA CLASSIFICATA (ELO)</label>
-              <ion-toggle [(ngModel)]="matchData.hasElo" class="tactical-toggle" color="primary"></ion-toggle>
-            </div>
-            <div class="setting-item toggle-group">
-              <label>ALLEANZE CONSENTITE</label>
-              <ion-toggle [(ngModel)]="matchData.alleanze" class="tactical-toggle" color="primary"></ion-toggle>
+
+            <div class="toggle-list">
+              <div class="setting-item toggle-group">
+                <label>GIOCO A SQUADRE (SQUAD)</label>
+                <ion-toggle class="tactical-toggle" [(ngModel)]="matchData.isSquad"></ion-toggle>
+              </div>
+              <div class="setting-item toggle-group">
+                <label>PARTITA CLASSIFICATA (ELO)</label>
+                <ion-toggle [(ngModel)]="matchData.hasElo" class="tactical-toggle"></ion-toggle>
+              </div>
+              <div class="setting-item toggle-group">
+                <label>ALLEANZE CONSENTITE</label>
+                <ion-toggle [(ngModel)]="matchData.alleanze" class="tactical-toggle"></ion-toggle>
+              </div>
             </div>
           </div>
 
-          <div class="inner-panel">
-            <p class="custom-label">SETTORE 03: CRONOLOGIA</p>
+          <div class="build-card no-hover">
+            <div class="build-info">
+              <span class="item-name">SETTORE 03: CRONOLOGIA</span>
+              <span class="item-tier">TEMPISTICA</span>
+            </div>
+
             <div class="setting-item">
               <label>DURATA MASSIMA OPERAZIONE</label>
-              <select class="tactical-select">
+              <select class="tactical-select" [(ngModel)]="matchData.durata">
                 <option *ngFor="let d of durataMax" [value]="d">{{ d }}</option>
               </select>
             </div>
+
             <div class="setting-item">
               <label>MOLTIPLICATORE TEMPORALE</label>
-              <select class="tactical-select">
+              <select class="tactical-select" [(ngModel)]="matchData.moltiplicatore">
                 <option *ngFor="let m of moltiplicatori" [value]="m">{{ m }}</option>
               </select>
             </div>
+
             <div class="setting-item">
-              <label>PROGRAMMAZIONE AVVIO</label>
-              <select class="tactical-select">
-                <option>Immediato</option>
-                <option>Tra 1 Ora</option>
-                <option>Tra 6 Ore</option>
-                <option>Tra 12 Ore</option>
-                <option>Tra 24 Ore</option>
+              <label>AVVIO PARTITA</label>
+              <select class="tactical-select" [(ngModel)]="matchData.avvio">
+                <option value="Immediato">Immediato</option>
               </select>
-            </div>
-            <div class="setting-item">
-              <label>QUORUM MINIMO AVVIO</label>
-              <input type="number" class="tactical-input" value="2" min="2">
             </div>
           </div>
 
         </div>
-      </div>
 
-      <div class="action-dock">
-        <button class="primary-glow" (click)="confirmCreation()">TRASMETTI ORDINI DI BATTAGLIA</button>
-        <button class="logout-button" (click)="close()">[ CHIUDI TERMINALE ]</button>
-      </div>
+        <div class="hud-separator"></div>
 
+        <div class="action-footer">
+          <button class="primary-glow full-width" (click)="confirmCreation()">
+            TRASMETTI ORDINI DI BATTAGLIA
+          </button>
+        </div>
+
+      </div>
     </div>
+
   </div>
-</ion-content>
+</div>

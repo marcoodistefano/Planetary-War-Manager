@@ -110,32 +110,40 @@
 
 /* ==========================================================================
    STILI GLOBALI MODALI CYBER / TACTICAL
-   Da inserire in global.scss
    ========================================================================== */
 ion-modal.tactical-modal {
   --background: transparent;
   --box-shadow: none;
   --border-radius: 0;
-  
-  /* Agiamo direttamente sulla Shadow DOM del modale */
+
   &::part(content) {
     background: transparent;
     box-shadow: none;
     border: none;
-    // Rimuove eventuali outline o bordi nativi
-    outline: none; 
+    outline: none;
   }
 }
 
-.tactical-modal {
-  // Rimuove lo sfondo predefinito del contenitore Ionic
+ion-modal.home-modal,
+ion-modal.create-match-modal,
+ion-modal.profile-modal {
   --background: transparent;
-  
-  // Rimuove l'ombra e i bordi del contenitore nativo
-  ::part(content) {
-    border-radius: 24px; // Allinea al raggio del tuo glass-panel
-    box-shadow: none;    // Elimina l'ombra esterna automatica
+  --box-shadow: none;
+  --border-radius: 0;
+  --width: 100vw;
+  --height: 100vh;
+  --max-width: 100vw;
+  --max-height: 100vh;
+
+  &::part(content) {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
     background: transparent;
+    box-shadow: none;
+    border: none;
+    outline: none;
   }
 }
 

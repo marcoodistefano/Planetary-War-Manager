@@ -1,27 +1,53 @@
 <ion-content class="transparent-bg">
-  <div class="modal-wrapper">
-    <div class="panel">
-      
-      <div class="title-block">
-        <p class="eyebrow">Protocollo di Rete</p>
-        <h2>MODIFICA USERNAME</h2>
+  <div class="create-match-backdrop" (click)="close()">
+    <div class="create-match-frame compact-frame" (click)="$event.stopPropagation()">
+      <div class="create-match-sidebar compact-sidebar">
+        <div class="brand">
+          <span class="system-name">PROFILE EDITOR</span>
+          <span class="version">OPS_CENTER V.4.0</span>
+        </div>
+
+        <nav>
+          <div class="nav-item active">
+            <ion-icon name="person-outline"></ion-icon><span>USERNAME</span>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button class="exit-btn" (click)="close()">
+            <ion-icon name="close-outline" class="close-icon"></ion-icon>
+            <span class="close-label">[ CHIUDI ]</span>
+          </button>
+        </div>
       </div>
 
-      <div class="inner-panel">
-        <p class="custom-label">NUOVO IDENTIFICATIVO TERMINALE</p>
-        <input type="text" [(ngModel)]="newName" placeholder="Inserisci nome..." class="tactical-input" />
-      </div>
+      <div class="create-match-main scrollable-y compact-main">
+        <div class="content-container compact-content">
+          <div class="header-info">
+            <p class="track-label">Protocollo di Rete</p>
+          </div>
 
-      <div class="action-dock">
-        <button class="primary-glow" (click)="confirm()" [disabled]="newName.length < 3">
-          AGGIORNA USERNAME
-        </button>
-        
-        <button class="logout-button" (click)="close()">
-          [ ANNULLA OPERAZIONE ]
-        </button>
-      </div>
+          <div class="sections-grid single-section">
+            <div class="build-card no-hover">
+              <div class="build-info">
+                <span class="item-name">MODIFICA USERNAME</span>
+                <span class="item-tier">IDENTIFICATIVO</span>
+              </div>
 
+              <div class="setting-item">
+                <label>NUOVO IDENTIFICATIVO TERMINALE</label>
+                <input type="text" [(ngModel)]="newName" placeholder="Inserisci nome..." class="tactical-input" />
+              </div>
+
+              <div class="action-footer">
+                <button class="primary-glow full-width" (click)="confirm()" [disabled]="newName.length < 3">
+                  AGGIORNA USERNAME
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </ion-content>

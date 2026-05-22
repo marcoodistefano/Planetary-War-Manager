@@ -1,7 +1,29 @@
-<ion-content [scrollY]="false" class="transparent-bg">
-  <div class="modal-wrapper">
-    <div class="panel">
-      
+<div class="create-match-backdrop" (click)="close()">
+  <div class="create-match-frame" (click)="$event.stopPropagation()">
+    <div class="create-match-sidebar">
+      <div class="brand">
+        <span class="system-name">NOTIFICHE HUD</span>
+        <span class="version">OPS_CENTER V.4.0</span>
+      </div>
+
+      <nav>
+        <div class="nav-item active">
+          <ion-icon name="notifications-outline"></ion-icon><span>LOG</span>
+        </div>
+        <div class="nav-item disabled">
+          <ion-icon name="alert-circle-outline"></ion-icon><span>EVENTI</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="exit-btn" (click)="close()">
+          <ion-icon name="power-outline" class="close-icon"></ion-icon>
+          <span class="close-label">[ CHIUDI ]</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="create-match-main scrollable-y">
       <div class="title-block">
         <p class="eyebrow">Log Operativo Sistema</p>
         <h2>NOTIFICHE HUD</h2>
@@ -16,13 +38,7 @@
           <div class="log-body">{{ n.msg }}</div>
         </div>
       </div>
-
-      <div class="action-dock">
-        <button class="logout-button" (click)="close()">
-          [ CHIUDI TERMINALE ]
-        </button>
-      </div>
-
     </div>
+
   </div>
-</ion-content>
+</div>

@@ -19,7 +19,6 @@ export class CreateMatchComponent {
   matchData = {
     missione: '',
     regione: 'World',
-    mapSize: 'Medium',
     maxPlayers: '10',
     modalita: 'Tutti contro tutti',
     vittoriaSoglia: 50,
@@ -28,8 +27,7 @@ export class CreateMatchComponent {
     alleanze: true,
     durata: '1 giorno',
     moltiplicatore: 'x1',
-    avvio: 'Immediato',
-    quorum: 2
+    avvio: 'Immediato'
   };
 
   regioni = ['World', 'Europe', 'Asia', 'Africa', 'Oceania', 'America North', 'America South', 'Antartica'];

@@ -1,7 +1,29 @@
-<ion-content [scrollY]="false" class="transparent-bg">
-  <div class="modal-wrapper">
-    <div class="panel">
-      
+<div class="create-match-backdrop" (click)="close()">
+  <div class="create-match-frame" (click)="$event.stopPropagation()">
+    <div class="create-match-sidebar">
+      <div class="brand">
+        <span class="system-name">RETE DIPLOMATICA</span>
+        <span class="version">OPS_CENTER V.4.0</span>
+      </div>
+
+      <nav>
+        <div class="nav-item active">
+          <ion-icon name="people-outline"></ion-icon><span>CONTATTI</span>
+        </div>
+        <div class="nav-item disabled">
+          <ion-icon name="mail-outline"></ion-icon><span>RICHIESTE</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="exit-btn" (click)="close()">
+          <ion-icon name="power-outline" class="close-icon"></ion-icon>
+          <span class="close-label">[ CHIUDI ]</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="create-match-main scrollable-y">
       <div class="title-block">
         <p class="eyebrow">Canale Comunicazioni Protette</p>
         <h2>RETE DIPLOMATICA</h2>
@@ -56,7 +78,6 @@
         <button class="primary-glow" (click)="showAddFriendPopup = true">
           AGGIUNGI TRAMITE CODICE
         </button>
-        <button class="logout-button" (click)="close()">[ CHIUDI TERMINALE ]</button>
       </div>
 
       <div class="overlay-popup" *ngIf="showAddFriendPopup" (click)="showAddFriendPopup = false">
@@ -72,4 +93,4 @@
 
     </div>
   </div>
-</ion-content>
+</div>

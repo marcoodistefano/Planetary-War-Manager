@@ -321,7 +321,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   private async openModal(component: any, opts?: { componentProps?: any }) {
     const modal = await this.modalCtrl.create({
       component: component,
-      cssClass: 'tactical-modal',
+      cssClass: 'home-modal',
       ...(opts || {})
     });
     return await modal.present();
@@ -330,7 +330,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   async openCreateMatch() {
     const modal = await this.modalCtrl.create({
       component: CreateMatchComponent,
-      cssClass: 'tactical-modal'
+      cssClass: 'home-modal'
     });
 
     await modal.present();

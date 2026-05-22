@@ -1,0 +1,132 @@
+@use "../../home/components/_home-modal-shell";
+
+.transparent-bg,
+.transparent-content {
+  --background: transparent !important;
+}
+
+:host {
+  --primary-blue: #86d7ff;
+  --primary-glow: rgba(134, 215, 255, 0.3);
+  --danger-color: #ff7b72;
+  --glass-bg: rgba(7, 15, 28, 0.85);
+  --glass-border: rgba(134, 215, 255, 0.25);
+  --text-muted: #a0a0b0;
+  font-family: 'Inter', sans-serif;
+  background: transparent !important;
+}
+
+.modal-wrapper {
+  padding: 30px 20px;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.panel,
+.glass-panel {
+  width: 100%;
+  background: linear-gradient(135deg, rgba(7, 15, 28, 0.94) 0%, rgba(13, 25, 48, 0.98) 100%);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(134, 215, 255, 0.08);
+  backdrop-filter: blur(18px) saturate(140%);
+  border-radius: 18px;
+  box-sizing: border-box;
+}
+
+.title-block,
+.header-section {
+  text-align: center;
+
+  .eyebrow {
+    color: #86d7ff;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 0 0 5px;
+  }
+
+  h2,
+  .neon-title {
+    margin: 0;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(134, 215, 255, 0.4);
+  }
+}
+
+.action-dock,
+.footer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.primary-glow,
+.action-btn.primary-glow {
+  width: 100%;
+  background: rgba(134, 215, 255, 0.12);
+  border: 1px solid var(--primary-blue);
+  color: #fff;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 1px;
+  transition: 0.3s;
+
+  &:hover:not(:disabled) {
+    background: var(--primary-blue);
+    color: #051120;
+    box-shadow: 0 0 20px var(--primary-glow);
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.logout-button,
+.cancel-link {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: 0.3s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+
+  &:hover {
+    color: var(--danger-color);
+  }
+}
+
+.exit-btn,
+.logout-button {
+  .close-icon {
+    display: none;
+  }
+
+  .close-label {
+    display: inline;
+  }
+}
+
+@media (max-width: 768px) {
+  .exit-btn,
+  .logout-button {
+    .close-icon {
+      display: inline-flex;
+    }
+
+    .close-label {
+      display: none;
+    }
+  }
+}

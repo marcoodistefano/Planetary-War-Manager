@@ -8,6 +8,9 @@ import { IconSelectorComponent } from './components/icon-selector/icon-selector.
 import { ChangeNameComponent } from './components/change-name/change-name.component';
 import { ChangePasswordComponent } from './components/change-password/change-password.component';
 import { SettingsComponent } from './components/settings/settings.component';
+import { NotificationsComponent } from '../home/components/notifications/notifications.component';
+import { ObjectivesComponent } from '../home/components/objectives/objectives.component';
+import { FriendsComponent } from '../home/components/friends/friends.component';
 import { AuthApiService } from '../auth/auth-api.service';
 import { UserStateService } from '../user-state.service';
 
@@ -128,7 +131,7 @@ export class ProfilePage implements OnInit, AfterViewInit {
   async changeAvatar() {
   const modal = await this.modalCtrl.create({
     component: IconSelectorComponent,
-    cssClass: 'tactical-modal' // <--- DEVE ESSERE tactical-modal!
+    cssClass: 'profile-modal'
   });
   await modal.present();
 
@@ -163,7 +166,7 @@ export class ProfilePage implements OnInit, AfterViewInit {
 async changeUsername() {
   const modal = await this.modalCtrl.create({
     component: ChangeNameComponent,
-    cssClass: 'tactical-modal' // <--- DEVE ESSERE QUI
+    cssClass: 'profile-modal'
   });
   return await modal.present();
 }
@@ -171,7 +174,7 @@ async changeUsername() {
 async changePassword() {
   const modal = await this.modalCtrl.create({
     component: ChangePasswordComponent,
-    cssClass: 'tactical-modal' // <--- E ANCHE QUI
+    cssClass: 'profile-modal'
   });
   return await modal.present();
 }
@@ -191,14 +194,23 @@ async changePassword() {
       error: () => this.router.navigate(['/login'])
     });
   }
-  openMatchHistory() { console.log("Apertura Archivio: Recupero snapshot PostgreSQL per il Timelapse..."); }
-  manageFriends() { console.log("Accesso alla Rete Diplomatica: Caricamento lista amici pending/accepted..."); }
+  async openObjectives() {
+    await this.openProfileModal(ObjectivesComponent);
+  }
+
+  async openNotifications() {
+    await this.openProfileModal(NotificationsComponent);
+  }
+
+  async manageFriends() {
+    await this.openProfileModal(FriendsComponent);
+  }
   
   
   async openSettings() {
     const modal = await this.modalCtrl.create({
       component: SettingsComponent,
-      cssClass: 'tactical-modal'
+      cssClass: 'profile-modal'
     });
     await modal.present();
 
@@ -213,6 +225,15 @@ async changePassword() {
       // localStorage.setItem('sys_lang', data.language);
     }
     }
+
+  private async openProfileModal(component: any, opts?: { componentProps?: any }) {
+    const modal = await this.modalCtrl.create({
+      component,
+      cssClass: 'profile-modal',
+      ...(opts || {})
+    });
+    await modal.present();
+  }
 
   async ionViewWillLeave() {
     try {

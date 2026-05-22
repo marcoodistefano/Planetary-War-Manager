@@ -1,74 +1,101 @@
 <ion-content class="transparent-bg">
-  <div class="modal-wrapper">
-    <div class="panel">
-      
-      <div class="title-block">
-        <p class="eyebrow">Strategic System Config</p>
-        <h2>IMPOSTAZIONI SISTEMA</h2>
+  <div class="create-match-backdrop" (click)="close()">
+    <div class="create-match-frame compact-frame settings-frame" (click)="$event.stopPropagation()">
+      <div class="create-match-sidebar compact-sidebar">
+        <div class="brand">
+          <span class="system-name">PROFILE EDITOR</span>
+          <span class="version">OPS_CENTER V.4.0</span>
+        </div>
+
+        <nav>
+          <div class="nav-item active">
+            <ion-icon name="settings-outline"></ion-icon><span>IMPOSTAZIONI</span>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button class="exit-btn" (click)="close()">
+            <ion-icon name="close-outline" class="close-icon"></ion-icon>
+            <span class="close-label">[ CHIUDI ]</span>
+          </button>
+        </div>
       </div>
 
-      <div class="settings-scroll-container">
-        
-        <div class="inner-panel">
-          <p class="custom-label">COMUNICAZIONI AUDIO</p>
-          
-          <div class="setting-item">
-            <label>VOLUME MASTER</label>
-            <ion-range min="0" max="100" [(ngModel)]="settings.masterVol" class="tactical-range"></ion-range>
+      <div class="create-match-main scrollable-y compact-main">
+        <div class="content-container compact-content">
+          <div class="header-info">
+            <p class="track-label">Strategic System Config</p>
           </div>
 
-          <div class="setting-item toggle-group">
-            <label>SINTESI VOCALE AI</label>
-            <ion-toggle [(ngModel)]="settings.voiceAssist" class="tactical-toggle"></ion-toggle>
-          </div>
-        </div>
-
-        <div class="inner-panel">
-          <p class="custom-label">VISUALIZZAZIONE OLOGRAFICA</p>
-          
-          <div class="setting-item toggle-group">
-            <label>EFFETTO SCANLINES</label>
-            <ion-toggle [(ngModel)]="settings.scanlines" class="tactical-toggle"></ion-toggle>
-          </div>
-
-          <div class="setting-item toggle-group">
-            <label>ANIMAZIONI BELLICHE</label>
-            <ion-toggle [(ngModel)]="settings.animations" class="tactical-toggle"></ion-toggle>
-          </div>
-        </div>
-
-        <div class="inner-panel">
-          <p class="custom-label">PROTOCOLLI DI SISTEMA</p>
-          
-          <div class="setting-item custom-dropdown-container">
-            <label>LINGUA TERMINALE</label>
-            
-            <div class="tactical-select-trigger" (click)="isLangMenuOpen = !isLangMenuOpen">
-              <span>{{ settings.language === 'it' ? 'ITALIANO' : 'ENGLISH' }}</span>
-              <ion-icon [name]="isLangMenuOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
-            </div>
-
-            <div class="tactical-dropdown-menu" *ngIf="isLangMenuOpen">
-              <div class="dropdown-option" (click)="selectLang('it')" [class.active]="settings.language === 'it'">
-                ITALIANO
+          <div class="sections-grid single-section">
+            <div class="build-card no-hover">
+              <div class="build-info">
+                <span class="item-name">IMPOSTAZIONI SISTEMA</span>
+                <span class="item-tier">PANNELLO</span>
               </div>
-              <div class="dropdown-option" (click)="selectLang('en')" [class.active]="settings.language === 'en'">
-                ENGLISH
+
+              <div class="settings-scroll-container">
+                <div class="inner-panel">
+                  <p class="custom-label">COMUNICAZIONI AUDIO</p>
+
+                  <div class="setting-item">
+                    <label>VOLUME MASTER</label>
+                    <ion-range min="0" max="100" [(ngModel)]="settings.masterVol" class="tactical-range"></ion-range>
+                  </div>
+
+                  <div class="setting-item toggle-group">
+                    <label>SINTESI VOCALE AI</label>
+                    <ion-toggle [(ngModel)]="settings.voiceAssist" class="tactical-toggle"></ion-toggle>
+                  </div>
+                </div>
+
+                <div class="inner-panel">
+                  <p class="custom-label">VISUALIZZAZIONE OLOGRAFICA</p>
+
+                  <div class="setting-item toggle-group">
+                    <label>EFFETTO SCANLINES</label>
+                    <ion-toggle [(ngModel)]="settings.scanlines" class="tactical-toggle"></ion-toggle>
+                  </div>
+
+                  <div class="setting-item toggle-group">
+                    <label>ANIMAZIONI BELLICHE</label>
+                    <ion-toggle [(ngModel)]="settings.animations" class="tactical-toggle"></ion-toggle>
+                  </div>
+                </div>
+
+                <div class="inner-panel">
+                  <p class="custom-label">PROTOCOLLI DI SISTEMA</p>
+
+                  <div class="setting-item custom-dropdown-container">
+                    <label>LINGUA TERMINALE</label>
+
+                    <div class="tactical-select-trigger" (click)="isLangMenuOpen = !isLangMenuOpen">
+                      <span>{{ settings.language === 'it' ? 'ITALIANO' : 'ENGLISH' }}</span>
+                      <ion-icon [name]="isLangMenuOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+                    </div>
+
+                    <div class="tactical-dropdown-menu" *ngIf="isLangMenuOpen">
+                      <div class="dropdown-option" (click)="selectLang('it')" [class.active]="settings.language === 'it'">
+                        ITALIANO
+                      </div>
+                      <div class="dropdown-option" (click)="selectLang('en')" [class.active]="settings.language === 'en'">
+                        ENGLISH
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              <div class="action-footer">
+                <button class="primary-glow full-width" (click)="save()">
+                  SALVA CONFIGURAZIONE
+                </button>
               </div>
             </div>
-
           </div>
         </div>
-
-      </div> <div class="action-dock">
-        <button class="primary-glow" (click)="save()">
-          SALVA CONFIGURAZIONE
-        </button>
-        <button class="logout-button" (click)="close()">
-          [ CHIUDI TERMINALE ]
-        </button>
       </div>
-
     </div>
   </div>
 </ion-content>

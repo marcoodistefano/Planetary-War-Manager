@@ -45,10 +45,10 @@
         </button>
       </nav>
 
-      <div class="drawer-footer">
+        <div class="drawer-footer">
         <div class="user-info">
           <span class="user-name">{{ currentPlayer.name }}</span>
-          <span class="user-level">Livello 24</span>
+          <span class="user-level">ELO {{ currentPlayer.score }}</span>
         </div>
         <button type="button" class="logout-btn" aria-label="Esci">
           <ion-icon name="log-out-outline"></ion-icon>
@@ -170,7 +170,7 @@
               <img [src]="currentPlayer.avatar" alt="Profile" style="width: 100%; height: 100%; object-fit: cover;">
             </div>
             <h2 class="profile-name">{{ currentPlayer.name }}</h2>
-            <small class="profile-level">Livello 24</small>
+            <small class="profile-level">ELO: {{ currentPlayer.score }}</small>
           </div>
 
           <div class="quick-actions">
