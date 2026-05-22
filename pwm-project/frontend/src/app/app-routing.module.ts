@@ -74,6 +74,11 @@ const routes: Routes = [
     loadComponent: () => import('./game-browser/game-browser.page').then(m => m.GameBrowserPage),
     canMatch: [authGuard]
   },
+  {
+    path: 'leaderboard',
+    loadComponent: () => import('./leaderboard/leaderboard.page').then(m => m.LeaderboardPage),
+    canMatch: [authGuard]
+  },
 ];
 
 @NgModule({
