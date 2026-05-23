@@ -33,7 +33,9 @@ const createMatch = async ({ playerId, gameMode }) => {
       throw new Error("Errore critico di clock nel Multiplexer Eru.");
 
     // C. Generazione Identificativi
-    const id_partita_hash = await aslan.generateSecureToken(255);
+    const id_partita_hash = await aslan.generateSecureToken(255); //L'hash della partita deve essere calcolato passando come parametri TUTTE le info della partita! 
+    //ad ora è un token casuale, ma è da modificare. 
+    //TO UPDATE
     const id_partita_visualizzato = await aslan.generateSecureToken(10);
 
     // D. Transazione SQL (Persistenza)
@@ -183,7 +185,11 @@ const join_Match = async (playerId, id_partita_hash) => {
 // 3. LISTA PARTITE JOINABILI (MINIMAL) [SOLO IN FASE DI CARICAMENTO REDIS]
 // ============================================================================
 const listJoinableMatches = async () => {
+  //ALLA PRIMA INTERAZIONE (ALL'AVVIO) SI PRENDONO LE INFO DAL DB.
+  //L'UTENTE CHIAMANTE DEVE CONTATTARE REDIS.
+  //TO UPDATE
   try {
+    //IF NOT IN REDIS...ELSE RETURN FROM REDIS
     const query = `
       SELECT
         m.id_partita,

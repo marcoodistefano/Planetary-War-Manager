@@ -72,14 +72,20 @@ const join = async (req, res) => {
 
     const statusCode = parseInt(joinData.status, 10) || 500;
     return res.status(statusCode).json(joinData);
-
+    //al join devo verificare che, se la partita è startata (totalmente e non è più possibile unirsi in termini di tempo) o di numero di giocatori, venga restituito un errore specifico (es. 403) con messaggio chiaro (es. "Partita già iniziata, non è più possibile unirsi.")
+    //e occorre updetare REDIS!
+    //TO UPDATE
   } catch (error) {
     console.error("[SYS_ERR] Cortocircuito:", error);
     return res.status(500).json({ error: "Errore interno", details: error.message });
   } 
 };
 
-const joinable = async (req, res) => {
+const joinable = async (req, res) => {//get partite joinable, disponibile all'utente per GET visualizzazione partite joinable.
+  //il client fa una GET a /match/joinable ogni X secondi. OPPURE WS? 
+  //ALLA PRIMA INTERAZIONE (ALL'AVVIO) SI PRENDONO LE INFO DAL DB.
+  //L'UTENTE CHIAMANTE DEVE CONTATTARE REDIS.
+  //TO UPDATE
   try {
     const result = await model.listJoinableMatches();
     const statusCode = parseInt(result.status, 10) || 500;
