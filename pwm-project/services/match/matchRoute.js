@@ -8,7 +8,6 @@ router.post("/create", matchController.create);          // Diventa /match/creat
 router.post("/join", matchController.join);              // Diventa /match/join
 router.get("/joinable", matchController.joinable);        // Diventa /match/joinable 
 router.post("/:id/join", matchController.join);          // Diventa /match/:id/join
-router.post("/join", matchController.join);              // Compatibilità con eventuali chiamate legacy
 router.get("/:id", matchController.getMatch);            // Diventa /match/:id
 router.post("/:id/leave", matchController.leave);        // Diventa /match/:id/leave
 router.get("/:id/players", matchController.getPlayers);  // Diventa /match/:id/players

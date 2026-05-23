@@ -90,9 +90,10 @@ const updateAvatar = async (req, res) => {
   try {
     const U_ID = req.headers['x-user-id'];
     if (!U_ID) return res.status(401).json({ message: "Non autenticato" });
-
+    console.log("updateAvatar chiamato per U_ID:", U_ID);
     const { avatarId } = req.body;
     // Log e validazione input: assicuriamoci di avere un intero valido
+    console.log("HEADER RICHIESTA:",req.headers);
     console.log(`updateAvatar called for U_ID=${U_ID} with raw avatarId=`, avatarId);
 
     if (avatarId === undefined || avatarId === null) {
@@ -113,6 +114,85 @@ const updateAvatar = async (req, res) => {
   }
 };
 
+const getFriends = async (req, res) => {
+  try {
+    const U_ID = req.headers['x-user-id']; //FIXARE! NON DEVE MANCO ESSERE INVIATA IN FASE DI LOGIN! QUI OPERO SOLO COL TOKEN JWT
+    if (!U_ID) return res.status(401).json({ message: "Non autenticato" });
+    const result = await playerModel.getFriends(U_ID);
+    return res.status(result.status).json(result);
+  } catch (error) {   
+    console.error("Errore controller getFriends:", error);
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
+
+const getFriendPendingRequests = async (req, res) => {
+  try {
+    const U_ID = req.headers['x-user-id'];
+    if (!U_ID) return res.status(401).json({ message: "Non autenticato" });
+    const result = await playerModel.getFriendPendingRequests(U_ID);
+    return res.status(result.status).json(result);
+  } catch (error) {
+    console.error("Errore controller getFriendPendingRequests:", error);
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
+
+const sendFriendRequest_byCode = async (req, res) => {
+  try {
+    const username_utente = req.headers['x-user-id'];//FIXARE! NON DEVE MANCO ESSERE INVIATA IN FASE DI LOGIN! QUI OPERO SOLO COL TOKEN JWT
+    const { friendId } = req.body;
+    if (!username_utente) return res.status(401).json({ message: "Non autenticato" });
+    if (!friendId) return res.status(400).json({ message: "ID amico mancante" });
+    const result = await playerModel.sendFriendRequest_byCode(username_utente, friendId);
+    return res.status(result.status).json(result);
+  } catch (error) {
+    console.error("Errore controller sendFriendRequest_byCode:", error);
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
+
+const sendFriendRequest_byUsername = async (req, res) => {
+  try {
+    const username_utente = req.headers['x-user-id'];//FIXARE! NON DEVE MANCO ESSERE INVIATA IN FASE DI LOGIN! QUI OPERO SOLO COL TOKEN JWT
+    const { username_destinatario } = req.body;
+    if (!username_utente) return res.status(401).json({ message: "Non autenticato" });
+    if (!username_destinatario) return res.status(400).json({ message: "Username destinatario mancante" });
+    const result = await playerModel.sendFriendRequest_byUsername(username_utente, username_destinatario);
+    return res.status(result.status).json(result);
+  } catch (error) {
+    console.error("Errore controller sendFriendRequest_byUsername:", error);
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
+const respondToFriendRequest = async (req, res) => {
+  try {
+    const username_utente = req.headers['x-user-id'];//FIXARE! NON DEVE MANCO ESSERE INVIATA IN FASE DI LOGIN! QUI OPERO SOLO COL TOKEN JWT
+    const username_req = req.headers['username'];
+    const { requestId, accept } = req.body;
+    if (!username_req) return res.status(401).json({ message: "Non autenticato" });
+    if (!requestId) return res.status(400).json({ message: "ID richiesta mancante" });
+    const result = await playerModel.respondToFriendRequest(username_utente, username_req, requestId, accept);
+    return res.status(result.status).json(result);
+  } catch (error) {
+    console.error("Errore controller respondToFriendRequest:", error);
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
+const removeFriend = async (req, res) => {
+  try {
+    const username_utente = req.headers['x-user-id'];//FIXARE! NON DEVE MANCO ESSERE INVIATA IN FASE DI LOGIN! QUI OPERO SOLO
+    const { friendId } = req.body;
+    if (!username_utente) return res.status(401).json({ message: "Non autenticato" });
+    if (!friendId) return res.status(400).json({ message: "ID amico mancante" });
+    const result = await playerModel.removeFriend(username_utente, friendId);
+    return res.status(result.status).json(result);
+  } catch (error) {
+    console.error("Errore controller removeFriend:", error);
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
+
 
 module.exports = {
   home,
@@ -121,5 +201,11 @@ module.exports = {
   getAvatar,
   updateUsername,
   updatePassword,
-  updateAvatar
+  updateAvatar,
+  getFriends,
+  getFriendPendingRequests,
+  sendFriendRequest_byCode,
+  sendFriendRequest_byUsername, 
+  respondToFriendRequest,
+  removeFriend
 };

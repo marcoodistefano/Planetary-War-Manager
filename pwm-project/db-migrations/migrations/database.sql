@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS utenti (
     two_fa_enabled BOOLEAN DEFAULT FALSE,
     is_banned BOOLEAN DEFAULT FALSE,
     is_perma_banned BOOLEAN DEFAULT FALSE,
-    codice_amico VARCHAR(10) UNIQUE DEFAULT uuid_generate_v4(),
+    codice_amico VARCHAR(10) UNIQUE DEFAULT uuid_generate_v4()
 );
 
 CREATE TABLE IF NOT EXISTS richieste_amici (
@@ -200,7 +200,7 @@ CREATE TABLE IF NOT EXISTS storico_partecipanti_partite (
     truppe_eliminate INT DEFAULT 0,
     truppe_perse INT DEFAULT 0,
     perc_distruzione REAL DEFAULT 0.0,
-    id_alleanza UUID uuid_generate_v4() DEFAULT NULL,
+    id_alleanza UUID DEFAULT NULL,
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     abbandono_alleanza_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, partita_id),

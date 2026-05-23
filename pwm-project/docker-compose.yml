@@ -32,6 +32,27 @@ services:
       - "5432:5432" # Ti permette di collegarti con programmi esterni dal tuo PC
     networks:
       - pwm-net
+
+  # MIGRAZIONI POSTGRES (ESEGUE SOLO I FILE NON APPLICATI)
+  db-migrate:
+    image: postgres:15-alpine
+    profiles:
+      - migrate
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=commander_admin
+      - DB_PASSWORD=secret
+      - DB_NAME=pwm_tactical_database
+      - MIGRATIONS_DIR=/migrate/migrations
+    volumes:
+      - ./db-migrations:/migrate:ro
+    entrypoint: ["/bin/sh", "/migrate/migrate.sh"]
+    restart: "no"
+    networks:
+      - pwm-net
   # FRONTEND IN DEV MODE (CON HOT-RELOAD)
   frontend-dev:
     build: 
