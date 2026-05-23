@@ -60,6 +60,17 @@ const join = async (req, res) => {
     return res.status(500).json({ error: "Errore interno", details: error.message });
   } 
 };
+
+const joinable = async (req, res) => {
+  try {
+    const result = await model.listJoinableMatches();
+    const statusCode = parseInt(result.status, 10) || 500;
+    return res.status(statusCode).json(result);
+  } catch (error) {
+    console.error("[SYS_ERR] Cortocircuito joinable:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
+  }
+};
 const leave = async (req, res) => notImplemented(res);
 const getPlayers = async (req, res) => notImplemented(res);
 const getStatus = async (req, res) => notImplemented(res);
@@ -70,6 +81,7 @@ const getHistory = async (req, res) => notImplemented(res);
 module.exports = { 
   create, 
   join, 
+  joinable,
   leave, 
   getPlayers, 
   getStatus, 

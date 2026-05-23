@@ -322,6 +322,48 @@ const Eru = {
     }
   },
 
+  decode_stato: (bits) => {
+    switch (bits) {
+      case STATO.IN_ATTESA: return "In attesa";
+      case STATO.IN_CORSO: return "In corso";
+      case STATO.TERMINATA: return "Terminata";
+      case STATO.ELIMINATA: return "Eliminata";
+      default: return "Sconosciuto";
+    }
+  },
+
+  decode_max_players: (bits, isSquadBit) => {
+    if (isSquadBit === SQUAD.SQUAD) {
+      const map = ["1v1", "2v2", "3v3", "4v4", "5v5", "10v10", "25v25", "50v50"];
+      return map[Number(bits)] || "Sconosciuto";
+    }
+    const map = ["10", "20", "30", "50", "100", "250", "500", "500"];
+    return map[Number(bits)] || "500";
+  },
+
+  decode_max_players_count: (bits, isSquadBit) => {
+    if (isSquadBit === SQUAD.SQUAD) {
+      const map = [2, 4, 6, 8, 10, 20, 50, 100];
+      return map[Number(bits)] || 0;
+    }
+    const map = [10, 20, 30, 50, 100, 250, 500, 500];
+    return map[Number(bits)] || 0;
+  },
+
+  decode_match: (binaryString) => {
+    const matchReg = typeof binaryString === "string" ? BigInt("0b" + binaryString) : BigInt(binaryString);
+    const statoBits = (matchReg >> 54n) & 0b11n;
+    const isSquadBits = (matchReg >> 53n) & 0b1n;
+    const maxPlayersBits = (matchReg >> 46n) & 0b111n;
+
+    return {
+      stato: Eru.decode_stato(statoBits),
+      is_squad: isSquadBits === SQUAD.SQUAD,
+      maxPlayers: Eru.decode_max_players(maxPlayersBits, isSquadBits),
+      maxPlayersCount: Eru.decode_max_players_count(maxPlayersBits, isSquadBits),
+    };
+  },
+
   switch_regioni: (regione) => {
     switch (regione) {
       case "World": return REGIONI.WORLD;

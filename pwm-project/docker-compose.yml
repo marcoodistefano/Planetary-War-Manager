@@ -140,6 +140,21 @@ services:
     networks:
       - pwm-net
 
+  # CACHE WARMUP (BOOTSTRAP REDIS)
+  cache-warmup:
+    build: ./services/cache-warmup
+    depends_on:
+      - redis
+      - db
+      - match-service
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
+      - MATCH_SERVICE_URL=http://match-service:3004
+    restart: unless-stopped
+    networks:
+      - pwm-net
+
   # CHAT
   chat:
     build: ./services/chat

@@ -6,6 +6,7 @@ const router = express.Router();
 // Rimuovi "/match" dall'inizio di ogni percorso
 router.post("/create", matchController.create);          // Diventa /match/create
 router.post("/join", matchController.join);              // Diventa /match/join
+router.get("/joinable", matchController.joinable);        // Diventa /match/joinable
 router.get("/:id", matchController.getMatch);            // Diventa /match/:id
 router.post("/:id/leave", matchController.leave);        // Diventa /match/:id/leave
 router.get("/:id/players", matchController.getPlayers);  // Diventa /match/:id/players
