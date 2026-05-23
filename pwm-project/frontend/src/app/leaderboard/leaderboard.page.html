@@ -7,7 +7,7 @@
   <div class="browser-page">
     <header class="mobile-header">
       <div class="header-left">
-        <ion-button fill="clear" class="back-link" routerLink="/home">
+        <ion-button fill="clear" class="back-link" (click)="goHome()">
           <ion-icon name="chevron-back-outline"></ion-icon>
           Home
         </ion-button>
@@ -20,7 +20,7 @@
 
     <div class="browser-container">
       <div class="header-nav desktop-only">
-        <ion-button fill="clear" class="back-link" routerLink="/home">
+        <ion-button fill="clear" class="back-link" (click)="goHome()">
           <ion-icon name="chevron-back-outline"></ion-icon>
           TORNA AL COMANDO
         </ion-button>

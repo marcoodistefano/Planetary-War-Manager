@@ -56,6 +56,9 @@ const createMatch = async ({ playerId, gameMode }) => {
 
       await client.query('COMMIT');
 
+      // Invalida la home dell'host: la lista delle partite create deve rigenerarsi subito
+      await redis.del(`home_info:${playerId}`);
+
       // E. ISTANZIAZIONE REDIS (Iniezione in Memoria Volatile)
       // La partita viene caricata in Redis con un TTL (Time-To-Live) di 24 ore
       // per evitare "Memory Leak" di partite mai concluse.
@@ -131,6 +134,9 @@ const join_Match = async (playerId, id_partita_hash) => {
       }
 
       await client.query('COMMIT');
+
+      // Anche il join cambia la home dell'utente: rimuoviamo il cache snapshot
+      await redis.del(`home_info:${playerId}`);
       return { status: "200", message: "Join completato.", structure: eru_start.struttura_partita };
 
     } catch (innerError) {

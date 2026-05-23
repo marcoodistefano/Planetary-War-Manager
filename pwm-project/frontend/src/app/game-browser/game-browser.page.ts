@@ -1,7 +1,7 @@
 import { AfterViewInit, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { HomeService } from '../home/home';
 
@@ -13,10 +13,8 @@ import { HomeService } from '../home/home';
   imports: [IonicModule, CommonModule, RouterModule]
 })
 export class GameBrowserPage implements OnInit, AfterViewInit {
-  view: 'active' | 'finished' = 'active';
   searchQuery = '';
   activeMatches: any[] = [];
-  finishedMatches: any[] = [];
   visibleMatches: any[] = [];
   
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
@@ -24,12 +22,11 @@ export class GameBrowserPage implements OnInit, AfterViewInit {
   constructor(
     private titleService: Title,
     private homeService: HomeService,
-    private route: ActivatedRoute
+    private router: Router
   ) { }
 
   ngOnInit() {
-    this.titleService.setTitle('PWM | Archivio Operazioni');
-    this.view = this.route.snapshot.queryParamMap.get('tab') === 'finished' ? 'finished' : 'active';
+    this.titleService.setTitle('PWM | Partite Disponibili');
     this.loadMatches();
   }
 
@@ -41,22 +38,30 @@ export class GameBrowserPage implements OnInit, AfterViewInit {
     this.playBackgroundVideo();
   }
 
-  setView(view: 'active' | 'finished') {
-    this.view = view;
-    this.applyFilters();
-  }
-
   onSearch(event: any) {
     this.searchQuery = String(event?.target?.value || '').trim().toLowerCase();
     this.applyFilters();
   }
 
-  private loadMatches() {
-    this.homeService.getDashboardData().subscribe({
-      next: (response) => {
-        const info = response.data;
+  joinMatch(match: any) {
+    if (!match?.joinId) return;
 
-        const mapMatches = (collection: { [key: string]: any } | undefined, type: 'active' | 'finished') => {
+    this.homeService.joinMatch(match.joinId).subscribe({
+      next: () => {
+        const routeId = match.routeId || match.joinId;
+        localStorage.setItem('pwm_last_joined_match', routeId);
+        this.router.navigate(['/game/match', routeId]);
+      },
+      error: (error) => {
+        console.error('Errore durante il join della partita:', error);
+      }
+    });
+  }
+
+  private loadMatches() {
+    this.homeService.getActiveMatchesBrowserData().subscribe({
+      next: (response) => {
+        const mapMatches = (collection: { [key: string]: any } | undefined) => {
           if (!collection) return [];
           return Object.values(collection).map((m: any) => {
             const playersCount = Number(m.numero_partecipanti) || 0;
@@ -64,39 +69,40 @@ export class GameBrowserPage implements OnInit, AfterViewInit {
             const regionPlayable = Array.isArray(m.struttura_partita?.regioni) ? m.struttura_partita.regioni.join(', ') : '';
             const creator = String(m.creator_display_name || m.creator_username || m.id_host || 'Sconosciuto').trim();
             const timeCreated = this.formatTimestamp(m.data_creazione);
-            const status = type === 'finished' ? (m.outcome || m.stato || 'Terminata') : (m.stato || 'In corso');
+            const joinId = m.id_partita_hash || m.id_partita_visualizzato || m.id_partita || m.id_host || m.nome_match;
+            const routeId = m.id_partita_visualizzato || m.id_partita_hash || m.id_partita || m.id_host || m.nome_match;
 
             return {
-              id: m.id_partita || m.id_host || m.nome_match,
+              id: routeId,
+              joinId,
+              routeId,
               name: m.nome_match,
               creator,
               creatorDisplayName: m.creator_display_name || null,
               players: playersCount,
               playersLabel,
               regionPlayable,
-              status,
+              status: 'Aperta',
               timeCreated,
               startTime: m.data_creazione,
-              outcome: m.outcome || null,
+              outcome: null,
             };
           });
         };
 
-        this.activeMatches = mapMatches(info.match_attivi, 'active').sort((a, b) => new Date(b.startTime || b.timeCreated).getTime() - new Date(a.startTime || a.timeCreated).getTime());
-        this.finishedMatches = mapMatches(info.match_chiuse, 'finished').sort((a, b) => new Date(b.startTime || b.timeCreated).getTime() - new Date(a.startTime || a.timeCreated).getTime());
+        this.activeMatches = mapMatches(response.data).sort((a, b) => new Date(b.startTime || b.timeCreated).getTime() - new Date(a.startTime || a.timeCreated).getTime());
         this.applyFilters();
       },
       error: (err) => {
-        console.error('Errore nel caricamento dei match del browser:', err);
+        console.error('Errore nel caricamento delle partite disponibili:', err);
         this.activeMatches = [];
-        this.finishedMatches = [];
         this.applyFilters();
       }
     });
   }
 
   private applyFilters() {
-    const source = this.view === 'active' ? this.activeMatches : this.finishedMatches;
+    const source = this.activeMatches;
     if (!this.searchQuery) {
       this.visibleMatches = [...source];
       return;

@@ -191,6 +191,7 @@ ion-content {
   font-size: 0.75rem; padding: 10px 16px; border-radius: 8px; font-weight: bold; letter-spacing: 1px; cursor: pointer; transition: all 0.3s ease; white-space: nowrap;
   
   &:hover { border-color: #86d7ff; box-shadow: 0 0 20px rgba(134, 215, 255, 0.4), inset 0 0 15px rgba(134, 215, 255, 0.2); transform: translateY(-2px); }
+  &:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow: none; }
 }
 
 .empty-state {

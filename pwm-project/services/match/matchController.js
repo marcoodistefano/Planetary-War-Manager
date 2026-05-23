@@ -65,10 +65,10 @@ const join = async (req, res) => {
     const playerId = req.headers['x-user-id']; 
     if (!playerId) return res.status(401).json({ error: "Identità non verificabile." });
 
-    const joinData = await model.joinMatch({
-      playerId: playerId,
-      matchId: req.params.id //da vedere cosa arriva dal front: il matchhId è il codice a 10 caratteri, non l'UUID o il nome!
-    });
+    const matchId = req.params.id || req.body?.matchId;
+    if (!matchId) return res.status(400).json({ error: "Match id mancante." });
+
+    const joinData = await model.join_Match(playerId, matchId);
 
     const statusCode = parseInt(joinData.status, 10) || 500;
     return res.status(statusCode).json(joinData);

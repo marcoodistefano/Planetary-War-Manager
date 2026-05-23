@@ -90,6 +90,10 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  goHome() {
+    this.router.navigate(['/home']);
+  }
+
   loadData() {
     this.homeService.getDashboardData().subscribe({
       next: (response: ApiResponse) => {
@@ -395,9 +399,5 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
     video.playsInline = true;
     video.load();
     video.play().catch(() => undefined);
-  }
-
-  goHome() {
-    this.router.navigate(['/home']);
   }
 }

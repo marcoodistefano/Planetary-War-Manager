@@ -5,6 +5,7 @@ const router = express.Router();
 
 // Rotta per la dashboard/home page dell'utente
 router.get("/home", playerController.home);
+router.get("/home/active-matches", playerController.getActiveMatchesBrowser);
 router.get("/player/profile", playerController.getProfile);
 router.get("/player/avatar", playerController.getAvatar);
 router.post("/player/profile/username", playerController.updateUsername);

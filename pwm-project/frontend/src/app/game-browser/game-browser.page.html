@@ -27,21 +27,16 @@
           TORNA AL COMANDO
         </ion-button>
         <div class="title-block">
-          <p class="eyebrow">Dossier Operativo</p>
-          <h1>ARCHIVIO OPERAZIONI</h1>
+          <p class="eyebrow">Lista di ingaggio</p>
+          <h1>PARTITE JOINABILI</h1>
         </div>
       </div>
 
       <div class="panel main-panel">
         
         <div class="panel-controls">
-          <div class="tabs-dock-center">
-            <button [class.active]="view === 'active'" (click)="setView('active')">OPERAZIONI ATTIVE</button>
-            <button [class.active]="view === 'finished'" (click)="setView('finished')">ARCHIVIO STORICO</button>
-          </div>
-      
           <div class="search-section">
-            <ion-searchbar class="glass-searchbar transparent-element" placeholder="Filtra per nome missione, creatore o settore..." (ionInput)="onSearch($event)"></ion-searchbar>
+            <ion-searchbar class="glass-searchbar transparent-element" placeholder="Filtra per nome missione, creatore o regione..." (ionInput)="onSearch($event)"></ion-searchbar>
           </div>
         </div>
 
@@ -53,18 +48,12 @@
               <span>Creatore</span>
               <span>Regione</span>
               <span>Giocatori</span>
-              <span>Stato</span>
+              <span>Accesso</span>
             </div>
 
             <article class="mission-card-extended inner-panel" *ngFor="let m of visibleMatches">
               
               <div class="card-main-info">
-                <div class="card-header">
-                  <span class="sector-tag">PARTITA "{{m.id}}"</span>
-                  <span class="m-status" [class.done]="view === 'finished'">
-                    {{ view === 'active' ? '● OPERATIVA' : '■ TERMINATA' }}
-                  </span>
-                </div>
                 <h3>{{ m.name }}</h3>
                 <p class="creator-info">Comandante: <strong>{{ m.creatorDisplayName || m.creator }}</strong> · {{ m.timeCreated }}</p>
               </div>
@@ -80,13 +69,13 @@
                   <span class="stat-value highlight">{{ m.playersLabel }}</span>
                 </div>
                 <div class="stat-unit">
-                  <span class="stat-label">ESITO</span>
-                  <span class="stat-value highlight">{{ m.outcome || m.status }}</span>
+                  <span class="stat-label">STATO</span>
+                  <span class="stat-value highlight">{{ m.status }}</span>
                 </div>
               </div>
 
               <div class="card-actions">
-                <button class="primary-glow">{{ view === 'active' ? 'ENTRA IN PARTITA' : 'REPLAY DATI' }}</button>
+                <button type="button" class="primary-glow" [disabled]="!m.joinId" (click)="joinMatch(m)">PARTECIPA</button>
               </div>
             </article>
 

@@ -30,6 +30,35 @@ const buildMatchMap = (rows) => {
   }, {});
 };
 
+const buildActiveMatchesBrowser = async (U_ID) => {
+  try {
+    const activeMatches = await db.query(
+      `SELECT 
+        m.id_partita,
+        m.id_partita_hash,
+        m.id_partita_visualizzato,
+        m.nome_partita AS nome_match, 
+        m.struttura_partita, 
+        m.created_at AS data_creazione, 
+        u.username AS creator_username,
+        u.username AS creator_display_name,
+        u.avatar_id AS creator_avatar,
+        (SELECT count(user_id) FROM partecipanti_partite p2 WHERE p2.partita_id = m.id_partita) AS numero_partecipanti
+      FROM partite m
+      LEFT JOIN utenti u ON m.id_host = u.id_user
+      WHERE substring(m.struttura_partita::text from 1 for 2) IN ('00', '01')
+        AND m.id_host IS DISTINCT FROM $1
+      ORDER BY m.created_at DESC;`,
+      [U_ID],
+    );
+
+    return { status: 200, data: buildMatchMap(activeMatches.rows) };
+  } catch (error) {
+    console.error("Errore generato dentro buildActiveMatchesBrowser:", error);
+    return { status: 500, error: "Errore interno del server" };
+  }
+};
+
 const buildHome = async (U_ID) => {
   try {
     const cachedData = await fetchFromRedis(U_ID);
@@ -80,6 +109,8 @@ const buildHome = async (U_ID) => {
     // 4. MATCH ATTIVI E CREATI
     const match_attivi = await db.query(
         `SELECT 
+          m.id_partita_hash,
+          m.id_partita_visualizzato,
           m.nome_partita AS nome_match, 
           m.struttura_partita, 
           m.created_at AS data_creazione, 
@@ -98,6 +129,8 @@ const buildHome = async (U_ID) => {
 
     const last_created_match = await db.query(
         `SELECT 
+          m.id_partita_hash,
+          m.id_partita_visualizzato,
           m.nome_partita AS nome_match, 
           m.struttura_partita, 
           m.created_at AS data_creazione, 
@@ -105,10 +138,15 @@ const buildHome = async (U_ID) => {
           u.username AS creator_display_name,
           u.avatar_id AS creator_avatar,
           (SELECT count(user_id) FROM partecipanti_partite p2 WHERE p2.partita_id = m.id_partita) AS numero_partecipanti
-      FROM partecipanti_partite p
-      INNER JOIN partite m ON p.partita_id = m.id_partita
+      FROM partite m
       LEFT JOIN utenti u ON m.id_host = u.id_user
-      WHERE p.user_id = $1 
+      WHERE m.id_host IS DISTINCT FROM $1
+        AND NOT EXISTS (
+          SELECT 1
+          FROM partecipanti_partite p
+          WHERE p.partita_id = m.id_partita
+            AND p.user_id = $1
+        )
         AND substring(m.struttura_partita::text from 1 for 2) IN ('00', '01')
       ORDER BY m.created_at DESC 
       LIMIT 10;`,
@@ -117,6 +155,8 @@ const buildHome = async (U_ID) => {
 
     const match_chiuse = await db.query(
         `SELECT 
+          m.id_partita_hash,
+          m.id_partita_visualizzato,
           m.nome_partita AS nome_match,
           m.struttura_partita,
           m.created_at AS data_creazione,
@@ -262,6 +302,7 @@ const updateAvatar = async (U_ID, avatarId) => {
 
 module.exports = {
   buildHome,
+  buildActiveMatchesBrowser,
   getProfileData,
   getAvatar,
   updateAvatar

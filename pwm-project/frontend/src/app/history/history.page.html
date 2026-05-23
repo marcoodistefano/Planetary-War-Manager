@@ -1,13 +1,132 @@
-<ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>history</ion-title>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">history</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <div class="auth-background" aria-hidden="true">
+    <video #backgroundVideo class="auth-background__video" autoplay muted loop playsinline preload="metadata" src="assets/background_gif/background_gif.mp4"></video>
+    <div class="auth-background__overlay"></div>
+  </div>
+
+  <div class="browser-page history-page">
+    <div class="overlay"></div>
+
+    <header class="mobile-header">
+      <div class="header-left">
+        <ion-button fill="clear" class="back-link" routerLink="/home">
+          <ion-icon name="chevron-back-outline"></ion-icon>
+          Home
+        </ion-button>
+      </div>
+      <div class="header-center">
+        <div class="nav-title">STORICO</div>
+      </div>
+      <div class="header-right"></div>
+    </header>
+
+    <div class="browser-container">
+      <div class="header-nav desktop-only">
+        <ion-button fill="clear" class="back-link" routerLink="/home">
+          <ion-icon name="chevron-back-outline"></ion-icon>
+          TORNA AL COMANDO
+        </ion-button>
+        <div class="title-block">
+          <p class="eyebrow">Diario operativo</p>
+          <h1>STORICO PERSONALE</h1>
+        </div>
+      </div>
+
+      <div class="panel main-panel">
+        <div class="panel-controls">
+          <div class="tabs-dock-center">
+            <button type="button" [class.active]="view === 'all'" (click)="switchView('all')">TUTTO</button>
+            <button type="button" [class.active]="view === 'active'" (click)="switchView('active')">ATTIVE ({{ activeCount }})</button>
+            <button type="button" [class.active]="view === 'finished'" (click)="switchView('finished')">CONCLUSE ({{ finishedCount }})</button>
+          </div>
+
+          <div class="search-section">
+            <ion-searchbar class="glass-searchbar transparent-element" placeholder="Filtra per nome missione, creatore, regione o esito..." (ionInput)="onSearch($event)"></ion-searchbar>
+          </div>
+        </div>
+
+        <div class="history-summary">
+          <div class="summary-card">
+            <span class="summary-label">Totale</span>
+            <strong>{{ allMatches.length }}</strong>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Attive</span>
+            <strong>{{ activeCount }}</strong>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Concluse</span>
+            <strong>{{ finishedCount }}</strong>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Vittorie</span>
+            <strong>{{ victoryCount }}</strong>
+          </div>
+        </div>
+
+        <div class="results-container">
+          <div class="scroll-area">
+            <div class="table-head">
+              <span>Missione</span>
+              <span>Comandante</span>
+              <span>Regione</span>
+              <span>Esito</span>
+              <span>Azione</span>
+            </div>
+
+            <article class="mission-card-extended inner-panel history-card" *ngFor="let m of visibleMatches">
+              <div class="card-main-info">
+                <div class="card-header">
+                  <span class="sector-tag">PARTITA "{{ m.id }}"</span>
+                  <span class="m-status" [class.done]="m.phase === 'finished'">
+                    {{ m.phaseLabel }}
+                  </span>
+                </div>
+                <h3>{{ m.name }}</h3>
+                <p class="creator-info">Comandante: <strong>{{ m.creatorDisplayName || m.creator }}</strong> · {{ m.timeCreated }}</p>
+              </div>
+
+              <div class="card-stats-block">
+                <div class="stat-unit">
+                  <span class="stat-label">REGIONE</span>
+                  <span class="region-badge" *ngIf="m.regionPlayable; else noRegion">{{ m.regionPlayable }}</span>
+                  <ng-template #noRegion>
+                    <span class="stat-value">N/D</span>
+                  </ng-template>
+                </div>
+                <div class="stat-unit">
+                  <span class="stat-label">GIOCATORI</span>
+                  <span class="stat-value highlight">{{ m.playersLabel }}</span>
+                </div>
+                <div class="stat-unit">
+                  <span class="stat-label">RISULTATO</span>
+                  <span class="stat-value highlight">{{ m.resultText }}</span>
+                </div>
+              </div>
+
+              <div class="card-actions">
+                <button type="button" class="primary-glow" (click)="openMatch(m)">{{ m.phase === 'active' ? 'RIPRENDI' : 'RIVEDI' }}</button>
+              </div>
+            </article>
+
+            <div *ngIf="visibleMatches.length === 0" class="empty-state">
+              Nessuna operazione trovata nello storico selezionato.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud-footer">
+      <div class="hud-footer-content">
+        <div class="footer-left">
+          <span class="status-dot"></span> COMM-LINK: <span class="status-text">ARCHIVIO ATTIVO</span>
+        </div>
+        <div class="footer-center">
+          &copy; 2026 PLANETARY WAR MANAGER <span class="divider">///</span> STRATEGIC COMMAND
+        </div>
+        <div class="footer-right">SYS.VER 1.0.4</div>
+      </div>
+    </div>
+  </div>
 </ion-content>

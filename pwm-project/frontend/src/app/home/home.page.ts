@@ -44,7 +44,8 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   
   finishedGames = 0;
   leaderboardView: 'global' | 'regional' = 'global';
-  quickActions = ['Profilo', 'Notifiche', 'Impostazioni', 'Obiettivi', 'Amici'];
+  quickActions = ['Profilo', 'Notifiche', 'Impostazioni', 'Amici', 'Partite attive', 'Storico Partite' ];
+  lastJoinedMatchId: string | null = null;
 
   private avatarSub?: Subscription;
 
@@ -61,6 +62,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnInit() {
     this.titleService.setTitle('PWM | Homepage');
+    this.refreshLastJoinedMatch();
     this.loadDashboardData(); // Carica i dati dal backend all'avvio
     
     // Effettua un fetch ogni 2 minuti (120000 ms)
@@ -75,7 +77,12 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ionViewWillEnter() {
+    this.refreshLastJoinedMatch();
     this.loadDashboardData();
+  }
+
+  private refreshLastJoinedMatch() {
+    this.lastJoinedMatchId = localStorage.getItem('pwm_last_joined_match');
   }
 
   private avatarPath(avatarId: number) {
@@ -113,6 +120,8 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
           this.activeGames = Object.values(info.match_attivi).map((m: any) => {
             const playersCount = Number(m.numero_partecipanti) || 0;
             const playersLabel = playersCount === 1 ? `${playersCount} giocatore` : `${playersCount} giocatori`;
+            const joinId = m.id_partita_hash || m.id_partita_visualizzato || m.id_partita || m.id_host || m.nome_match;
+            const routeId = m.id_partita_visualizzato || m.id_partita_hash || m.id_partita || m.id_host || m.nome_match;
             // Extract playable regions from decoded struttura_partita if present
             let regionPlayable = '';
             try {
@@ -122,6 +131,8 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
             } catch (e) { regionPlayable = ''; }
 
             return {
+              joinId,
+              routeId,
               name: m.nome_match,
               creator: String(m.creator_username || m.creator_display_name || m.id_host || 'Sconosciuto').trim(),
               creatorDisplayName: m.creator_display_name || null,
@@ -166,6 +177,8 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
 
             const playersCount = Number(m.numero_partecipanti) || 0;
             const playersLabel = playersCount === 1 ? `${playersCount} giocatore` : `${playersCount} giocatori`;
+            const joinId = m.id_partita_hash || m.id_partita_visualizzato || m.id_partita || m.id_host || m.nome_match;
+            const routeId = m.id_partita_visualizzato || m.id_partita_hash || m.id_partita || m.id_host || m.nome_match;
             // regioni giocabili
             let regionPlayable = '';
             try {
@@ -175,6 +188,8 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
             } catch (e) { regionPlayable = ''; }
 
             return {
+              joinId,
+              routeId,
               name: m.nome_match,
               creator: String(creatorName).trim(),
               creatorDisplayName: m.creator_display_name || null,
@@ -305,16 +320,26 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     return 'Inizio recente';
   }
 
+  openActiveGame(game: any) {
+    const routeId = game?.routeId || game?.joinId;
+    if (!routeId) return;
+    this.router.navigate(['/game/match', routeId]);
+  }
+
   async handleQuickAction(action: string) {
-    switch (action) {
+    switch (String(action).trim().toLowerCase()) {
       case 'Profilo': this.router.navigate(['/profile']); break;
       case 'Notifiche': await this.openModal(NotificationsComponent); break;
       case 'Impostazioni': await this.openModal(SettingsComponent); break;
-      case 'Obiettivi': await this.openModal(ObjectivesComponent); break;
       case 'Amici': await this.openModal(FriendsComponent); break;
       case 'Leaderboard': await this.openModal(LeaderboardComponent); break;
-      case 'Partite Attive': await this.openModal(ActivegamesComponent, { componentProps: { activeGames: this.activeGames } }); break;
-      case 'Nuove Partite': await this.openModal(NewgamesComponent, { componentProps: { games: this.filteredNewGames } }); break;
+      case 'partite attive':
+        this.router.navigate(['/history'], { queryParams: { tab: 'active' } });
+        break;
+      case 'storico partite':
+        this.router.navigate(['/history'], { queryParams: { tab: 'finished' } });
+        break;
+      case 'nuove partite': await this.openModal(NewgamesComponent, { componentProps: { games: this.filteredNewGames } }); break;
     }
   }
 
@@ -361,12 +386,50 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  viewActiveGames() {
-    this.router.navigate(['/game-browser'], { queryParams: { tab: 'active' } });
+  viewCreatedGames() {
+    this.router.navigate(['/game-browser']);
   }
 
-  viewFinishedGames() {
-    this.router.navigate(['/game-browser'], { queryParams: { tab: 'finished' } });
+  joinNewGame(game: any) {
+    if (!game?.joinId) return;
+
+    this.homeService.joinMatch(game.joinId).subscribe({
+      next: () => {
+        const routeId = game.routeId || game.joinId;
+        localStorage.setItem('pwm_last_joined_match', routeId);
+        this.lastJoinedMatchId = routeId;
+
+        // Rimuove immediatamente la partita dalla lista "in attesa"
+        this.newGames = this.newGames.filter((g: any) => g.joinId !== game.joinId);
+        this.filteredNewGames = this.filteredNewGames.filter((g: any) => g.joinId !== game.joinId);
+
+        // Ricarica i dati dalla dashboard: la partita comparirà in "partite attive"
+        this.loadDashboardData();
+      },
+      error: (error) => {
+        console.error('Errore durante il join della partita:', error);
+      }
+    });
+  }
+
+  async goToLastJoinedMatch() {
+    const storedMatchId = this.lastJoinedMatchId || localStorage.getItem('pwm_last_joined_match');
+    const activeByStored = this.activeGames.find((g: any) => g.routeId === storedMatchId || g.joinId === storedMatchId);
+    const matchId = activeByStored?.routeId || storedMatchId || this.activeGames[0]?.routeId || this.activeGames[0]?.joinId;
+
+    if (!matchId) {
+      const toast = await this.toastCtrl.create({
+        message: 'Non ti sei ancora connesso a nessuna partita!',
+        duration: 4000,
+        position: 'top',
+        cssClass: 'tactical-toast tactical-toast-warning',
+        icon: 'information-circle-outline'
+      });
+      await toast.present();
+      return;
+    }
+
+    this.router.navigate(['/game/match', matchId]);
   }
 
   async ionViewWillLeave() {

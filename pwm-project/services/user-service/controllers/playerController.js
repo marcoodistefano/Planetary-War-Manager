@@ -25,6 +25,19 @@ const home = async (req, res) => {
   }
 };
 
+const getActiveMatchesBrowser = async (req, res) => {
+  try {
+    const U_ID = req.headers['x-user-id'];
+    if (!U_ID) return res.status(401).json({ message: "Non autenticato" });
+
+    const result = await playerModel.buildActiveMatchesBrowser(U_ID);
+    return res.status(result.status).json(result);
+  } catch (error) {
+    console.error("Errore controller getActiveMatchesBrowser:", error);
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
+
   const getProfile = async (req, res) => {
   try {
     const U_ID = req.headers['x-user-id'];
@@ -103,6 +116,7 @@ const updateAvatar = async (req, res) => {
 
 module.exports = {
   home,
+  getActiveMatchesBrowser,
   getProfile,
   getAvatar,
   updateUsername,
