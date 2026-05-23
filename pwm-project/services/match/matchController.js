@@ -2,6 +2,24 @@ const model = require("./matchModel");
 
 const notImplemented = (res) => res.status(501).json({ error: "Hardware o Endpoint non implementato" });
 
+const normalizeRegions = (ui) => {
+  if (Array.isArray(ui.regioni) && ui.regioni.length > 0) {
+    const uniqueRegions = [...new Set(ui.regioni.filter(Boolean))];
+
+    if (uniqueRegions.includes("World") && uniqueRegions.length > 1) {
+      return uniqueRegions.filter((region) => region !== "World");
+    }
+
+    return uniqueRegions;
+  }
+
+  if (typeof ui.regione === "string" && ui.regione.trim() !== "") {
+    return [ui.regione];
+  }
+
+  return ["World"];
+};
+
 const create = async (req, res) => {
   try {
     const playerId = req.headers['x-user-id']; 
@@ -23,7 +41,7 @@ const create = async (req, res) => {
       moltiplicatoreTemporale: ui.moltiplicatore,
       modalita: ui.modalita,
       // ERU si aspetta un array di stringhe per le regioni
-      regioni: [ui.regione] 
+      regioni: normalizeRegions(ui)
     };
 
     // Eseguiamo la creazione (Una sola volta!)
@@ -47,10 +65,10 @@ const join = async (req, res) => {
     const playerId = req.headers['x-user-id']; 
     if (!playerId) return res.status(401).json({ error: "Identità non verificabile." });
 
-    const joinData = await model.joinMatch({
-      playerId: playerId,
-      matchId: req.params.id //da vedere cosa arriva dal front: il matchhId è il codice a 10 caratteri, non l'UUID o il nome!
-    });
+    const matchId = req.params.id || req.body?.matchId;
+    if (!matchId) return res.status(400).json({ error: "Match id mancante." });
+
+    const joinData = await model.join_Match(playerId, matchId);
 
     const statusCode = parseInt(joinData.status, 10) || 500;
     return res.status(statusCode).json(joinData);

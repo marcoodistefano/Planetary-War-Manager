@@ -136,7 +136,9 @@
                   <div class="meta">{{ game.players }} giocatori · {{ activeGameTimeText(game) }}</div>
                 </div>
               </div>
-              <span class="status-badge">{{ game.status }}</span>
+              <div class="game-actions">
+                <button type="button" class="join-button transparent-element" (click)="openActiveGame(game)">Accedi</button>
+              </div>
             </article>
           </div>
         </section>
@@ -149,15 +151,14 @@
           <h1>Planetary War<br>Manager</h1>
         </div>
 
-        <button type="button" class="return-last-match" routerLink="/game/match">
+        <button type="button" class="return-last-match" (click)="goToLastJoinedMatch()">
           torna all'ultima partita
         </button>
 
         <div class="games-container buttons-bottom">
           <div class="games-actions">
             <button type="button" class="primary-button" (click)="openCreateMatch()">Crea nuova partita</button>
-            <button type="button" class="ghost-button" (click)="viewActiveGames()">Vedi tutte le partite attive</button>
-            <button type="button" class="ghost-button" (click)="viewFinishedGames()">Partite terminate ({{ finishedGames }})</button>
+            <button type="button" class="ghost-button" (click)="viewCreatedGames()">Partite create</button>
           </div>
         </div>
       </div>
@@ -203,7 +204,7 @@
                   <div class="meta">{{ game.playersLabel }} · Creata da {{ game.creator }}· {{ game.timeCreatedFormatted }}</div>
                 </div>
               </div>
-              <button type="button" class="join-button transparent-element">Partecipa</button>
+              <button type="button" class="join-button transparent-element" (click)="joinNewGame(game)">Partecipa</button>
             </article>
           </div>
         </section>

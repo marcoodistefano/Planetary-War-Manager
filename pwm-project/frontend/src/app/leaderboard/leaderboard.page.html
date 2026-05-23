@@ -1,0 +1,138 @@
+<ion-content [fullscreen]="true">
+  <div class="auth-background" aria-hidden="true">
+    <video #backgroundVideo class="auth-background__video" autoplay muted loop playsinline preload="metadata" src="assets/background_gif/background_gif.mp4"></video>
+    <div class="auth-background__overlay"></div>
+  </div>
+
+  <div class="browser-page">
+    <header class="mobile-header">
+      <div class="header-left">
+        <ion-button fill="clear" class="back-link" (click)="goHome()">
+          <ion-icon name="chevron-back-outline"></ion-icon>
+          Home
+        </ion-button>
+      </div>
+      <div class="header-center">
+        <div class="nav-title">LEADERBOARD</div>
+      </div>
+      <div class="header-right"></div>
+    </header>
+
+    <div class="browser-container">
+      <div class="header-nav desktop-only">
+        <ion-button fill="clear" class="back-link" (click)="goHome()">
+          <ion-icon name="chevron-back-outline"></ion-icon>
+          TORNA AL COMANDO
+        </ion-button>
+        <div class="title-block">
+          <p class="eyebrow">Dossier Classifiche</p>
+          <h1>LEADERBOARD COMPLETA</h1>
+        </div>
+      </div>
+
+      <div class="panel main-panel">
+        <div class="panel-controls">
+          <div class="tabs-dock-center">
+            <button type="button" [class.active]="currentView === 'global'" (click)="switchView('global')">GLOBALE</button>
+            <button type="button" [class.active]="currentView === 'regional'" (click)="switchView('regional')">REGIONALE</button>
+          </div>
+
+          <div class="search-section">
+            <ion-searchbar class="glass-searchbar transparent-element" placeholder="Filtra per nome, regione o punteggio..." (ionInput)="onSearchChange($event)"></ion-searchbar>
+          </div>
+
+          <div class="pagination-summary">
+            <div class="summary-block">
+              <span class="summary-label">Vista</span>
+              <span class="summary-value">{{ viewLabel }}</span>
+            </div>
+            <div class="summary-block">
+              <span class="summary-label">Voci</span>
+              <span class="summary-value">{{ filteredLeaderboard.length }}</span>
+            </div>
+            <div class="summary-block">
+              <span class="summary-label">Pagina</span>
+              <span class="summary-value">{{ pageRangeLabel }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="results-container">
+          <div class="scroll-area">
+            <div class="table-head">
+              <span>Posizione</span>
+              <span>Comandante</span>
+              <span>Regione</span>
+              <span>ELO</span>
+            </div>
+
+            <article class="leaderboard-row inner-panel" *ngFor="let player of pagedLeaderboard" [class.highlight]="player.player === currentUsername">
+              <div class="col-position">
+                <div class="row-header">
+                  <span class="sector-tag">CLASSIFICA #{{ player.rank }}</span>
+                </div>
+                <p class="creator-info">Posizione globale: <strong>{{ player.rank }}</strong></p>
+              </div>
+
+              <div class="col-player">
+                <h3>{{ player.player }}</h3>
+              </div>
+
+              <div class="col-region">
+                <div class="stat-unit">
+                  <span class="stat-label">REGIONE</span>
+                  <span class="region-badge">
+                    <span class="flag">{{ flagEmoji(player.regionCode) }}</span>
+                    <span class="region-name">{{ player.regionName || player.region || 'N/D' }}</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="col-elo">
+                <div class="stat-unit">
+                  <span class="stat-label">PUNTEGGIO</span>
+                  <span class="stat-value highlight">{{ player.score | number }}</span>
+                </div>
+                <div class="row-actions">
+                  <button type="button" class="primary-glow" routerLink="/profile">PROFILO</button>
+                </div>
+              </div>
+            </article>
+
+            <div *ngIf="pagedLeaderboard.length === 0" class="empty-state">
+              Nessun comandante trovato nella sezione selezionata.
+            </div>
+          </div>
+        </div>
+
+        <div class="pagination-dock">
+          <button type="button" class="page-nav" (click)="previousPage()" [disabled]="currentPage === 1">PRECEDENTE</button>
+
+          <div class="page-buttons">
+            <button
+              type="button"
+              *ngFor="let page of pageNumbers"
+              [class.active]="currentPage === page"
+              (click)="goToPage(page)">
+              {{ (page - 1) * pageSize + 1 }}-{{ page * pageSize }}
+            </button>
+          </div>
+
+          <button type="button" class="page-nav" (click)="nextPage()" [disabled]="currentPage === totalPages">SUCCESSIVA</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud-footer">
+      <div class="hud-footer-content">
+        <div class="footer-left">
+          <span class="status-dot"></span> COMM-LINK: <span class="status-text">ONLINE</span>
+        </div>
+        <div class="footer-center">
+          &copy; 2026 PLANETARY WAR MANAGER <span class="divider">///</span> STRATEGIC COMMAND
+        </div>
+        <div class="footer-right">SYS.VER 1.0.4</div>
+      </div>
+    </div>
+  </div>
+</ion-content>
