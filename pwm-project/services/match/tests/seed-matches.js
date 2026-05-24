@@ -1,7 +1,6 @@
 const baseUrl = process.env.GATEWAY_URL || "http://localhost:4000";
 const matchServiceUrl = process.env.MATCH_SERVICE_URL || "http://localhost:3001";
 const authTokensRaw = process.env.AUTH_TOKENS || process.env.AUTH_TOKEN || "";
-const userId = process.env.USER_ID || "";
 
 const authTokens = authTokensRaw
   .split(",")
@@ -10,8 +9,8 @@ const authTokens = authTokensRaw
 
 const useGateway = authTokens.length > 0;
 
-if (!useGateway && !userId) {
-  console.error("[SEED] Missing AUTH_TOKEN/AUTH_TOKENS or USER_ID.");
+if (authTokens.length === 0) {
+  console.error("[SEED] Missing AUTH_TOKEN/AUTH_TOKENS.");
   process.exit(1);
 }
 
@@ -63,11 +62,7 @@ const postMatch = async ({ payload, token }) => {
     : new URL("/match/create", matchServiceUrl);
 
   const headers = { "Content-Type": "application/json" };
-  if (useGateway) {
-    headers.Authorization = `Bearer ${token}`;
-  } else {
-    headers["x-user-id"] = userId;
-  }
+  headers.Authorization = `Bearer ${token}`;
 
   const response = await fetch(targetUrl.toString(), {
     method: "POST",
@@ -97,14 +92,10 @@ const postMatch = async ({ payload, token }) => {
 const run = async () => {
   const jobs = [];
 
-  if (useGateway) {
-    authTokens.forEach((token, index) => {
-      const payload = payloads[index % payloads.length];
-      jobs.push({ token, payload });
-    });
-  } else {
-    jobs.push({ token: null, payload: payloads[0] });
-  }
+  authTokens.forEach((token, index) => {
+    const payload = payloads[index % payloads.length];
+    jobs.push({ token, payload });
+  });
 
   console.log(`[SEED] Creating ${jobs.length} match(es)...`);
 

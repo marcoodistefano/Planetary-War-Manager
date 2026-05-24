@@ -11,7 +11,7 @@ const controller = require("./app-controller.js");
 // Ho separato i servizi HTTP da quelli WebSocket per massima chiarezza
 const SERVICE_TARGETS = {
   user: process.env.AUTH_SERVICE_URL || "http://user-service:3000",
-  match: process.env.MATCH_SERVICE_URL || "http://match-service:3004", 
+  match: process.env.MATCH_SERVICE_URL || "http://match-service:3004",
   chat: process.env.CHAT_SERVICE_URL || "http://chat-service:3001",
   movement: process.env.MOVEMENT_SERVICE_URL || "http://movement-service:3002",
   combat: process.env.COMBAT_SERVICE_URL || "http://combat-service:3003",
@@ -36,7 +36,10 @@ const corsOptions = {
   credentials: true,
 };
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.SECRET_KEY || "CHIAVE_SEGRETA_TEMPORANEA_SUPER_SICURA";
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  process.env.SECRET_KEY ||
+  "CHIAVE_SEGRETA_TEMPORANEA_SUPER_SICURA";
 
 // 2. DEFINIZIONE ROTTE
 const PUBLIC_PATHS = [
@@ -47,7 +50,7 @@ const PUBLIC_PATHS = [
   "/auth/login",
   "/auth/logout",
   "/auth/register",
-  "/auth/login/recovery/password"
+  "/auth/login/recovery/password",
 ];
 
 // 3. FUNZIONI DI SUPPORTO (Unrolled e Semplificate)
@@ -75,10 +78,10 @@ const isWebSocketRoute = (pathname) => {
 const isWebSocketUpgrade = (req) => {
   const upgradeHeader = req.headers.upgrade;
   if (!upgradeHeader) return false;
-  
+
   const headerLower = upgradeHeader.toLowerCase();
   if (headerLower === "websocket") return true;
-  
+
   return false;
 };
 
@@ -93,7 +96,7 @@ const parseCookies = (cookieHeader) => {
     const item = cookieParts[i].trim();
     const keyValue = item.split("=");
     const rawKey = keyValue[0];
-    
+
     if (rawKey) {
       // Ricostruisce il valore nel caso contenga il simbolo '='
       const rawValue = keyValue.slice(1).join("=");
@@ -123,7 +126,7 @@ const extractTokenFromRequest = (req) => {
   // Passaggio 3: Controllo parametri URL (Query String)
   const rawUrlString = req.url || req.originalUrl || "/";
   const parsedUrl = new URL(rawUrlString, "http://localhost");
-  
+
   const tokenFromQuery = parsedUrl.searchParams.get("token");
   if (tokenFromQuery) return tokenFromQuery;
 
@@ -157,7 +160,7 @@ const validateSessionToken = async (token) => {
   // 3. Verifica esistenza nel Database Redis
   const sessionKey = "session:" + sessionId;
   const sessionDataString = await redisClient.get(sessionKey);
-  
+
   if (!sessionDataString) {
     return { ok: false, status: 401, error: "Sessione terminata o non valida" };
   }
@@ -170,7 +173,12 @@ const validateSessionToken = async (token) => {
     sessionData = sessionDataString; // Fallback se non è JSON
   }
 
-  return { ok: true, decoded: decoded, sessionId: sessionId, sessionData: sessionData };
+  return {
+    ok: true,
+    decoded: decoded,
+    sessionId: sessionId,
+    sessionData: sessionData,
+  };
 };
 
 // --- MIDDLEWARE EXPRESS ---
@@ -204,7 +212,7 @@ const normalizeRequest = async (req, res, next) => {
     if (!safeRequest.isValid) {
       return res.status(400).json(safeRequest.body);
     }
-    
+
     req.safeRequest = safeRequest;
     return next();
   } catch (error) {
@@ -229,7 +237,12 @@ const requireJwt = async (req, res, next) => {
   const validation = await validateSessionToken(token);
 
   if (validation.ok === false) {
-    console.warn("Accesso negato HTTP. Path:", pathname, "- Motivo:", validation.error);
+    console.warn(
+      "Accesso negato HTTP. Path:",
+      pathname,
+      "- Motivo:",
+      validation.error,
+    );
     return res.status(validation.status).json({ error: validation.error });
   }
 
@@ -246,7 +259,7 @@ const requireJwt = async (req, res, next) => {
 // 3. MIDDLEWARE: Inoltro HTTP
 const forwardToService = async (req, res) => {
   if (req.path === "/health") return res.json({ status: "ok" });
-  
+
   const routeGroup = req.safeRequest?.routeGroup; // es. "auth"
   let targetBaseUrl = null;
 
@@ -255,7 +268,9 @@ const forwardToService = async (req, res) => {
   }
 
   if (!targetBaseUrl) {
-    return res.status(404).json({ error: "Microservizio non trovato per questa route" });
+    return res
+      .status(404)
+      .json({ error: "Microservizio non trovato per questa route" });
   }
 
   const rawUrlString = req.originalUrl;
@@ -263,33 +278,34 @@ const forwardToService = async (req, res) => {
 
   // Prepariamo gli header sicuri
   const cleanHeaders = {};
-  const badHeaders = ["connection", "content-length", "host", "keep-alive", "transfer-encoding", "upgrade"];
-  
+  const badHeaders = [
+    "connection",
+    "content-length",
+    "host",
+    "keep-alive",
+    "transfer-encoding",
+    "upgrade",
+  ];
+
   const headerKeys = Object.keys(req.headers);
   for (let i = 0; i < headerKeys.length; i++) {
     const key = headerKeys[i];
     const lowerKey = key.toLowerCase();
-    
+
     if (!badHeaders.includes(lowerKey)) {
       cleanHeaders[key] = req.headers[key];
     }
   }
 
-  // ---> PATCH DI SICUREZZA: INIEZIONE IDENTITÀ (TRUSTED HEADERS) <---
-  if (req.user) {
-    // Trasmettiamo l'identità ai microservizi a valle tramite header custom
-    cleanHeaders["x-user-id"] = req.user.uuid;
-    cleanHeaders["x-session-id"] = req.user.sessionId;
-  }
-
-  const hasBody = req.safeRequest.body && Object.keys(req.safeRequest.body).length > 0;
+  const hasBody =
+    req.safeRequest.body && Object.keys(req.safeRequest.body).length > 0;
   if (hasBody) {
     cleanHeaders["content-type"] = "application/json";
   }
-try {
+  try {
     const fetchOptions = {
       method: req.method,
-      headers: cleanHeaders
+      headers: cleanHeaders,
     };
 
     if (hasBody && req.method !== "GET" && req.method !== "HEAD") {
@@ -297,64 +313,93 @@ try {
     }
 
     // ========================================================================
-    // TELEMETRIA: ISPEZIONE DEL PACCHETTO IN INGRESSO (GATEWAY IN)
+    // TELEMETRIA 1: DEEP INSPECTION DEL PACCHETTO IN INGRESSO (GATEWAY IN)
     // ========================================================================
     const sourceIp = req.ip || req.socket.remoteAddress;
-    const authStatus = req.user ? `Auth_UUID: ${req.user.uuid}` : "Unauthenticated (Public Route)";
-    
-    // Cloniamo il body per mascherare dati sensibili prima di loggare
-    let safePayloadLog = req.safeRequest.body ? { ...req.safeRequest.body } : {};
-    if (safePayloadLog.password) safePayloadLog.password = "********"; 
+    const authStatus = req.user
+      ? `Auth_UUID: ${req.user.uuid}`
+      : "Unauthenticated (Public Route)";
+
+    // SECURITY PATTERN: Cloniamo il body per mascherare ESCLUSIVAMENTE dati critici.
+    // Il resto del payload passa integralmente.
+    let safePayloadLog = req.safeRequest.body
+      ? { ...req.safeRequest.body }
+      : {};
+    if (safePayloadLog.password) safePayloadLog.password = "********";
     if (safePayloadLog.token) safePayloadLog.token = "[MASKED_TOKEN]";
 
     console.log(`\n[⬇️ GATEWAY IN] ${req.method} ${req.originalUrl}`);
     console.log(` ├─ Source IP: ${sourceIp}`);
     console.log(` ├─ Identity : ${authStatus}`);
-    console.log(` └─ Payload  :`, Object.keys(safePayloadLog).length ? safePayloadLog : "Nessun Payload");
-
+    console.log(` ├─ Headers  :`, req.headers); // Aggiunta lettura Header in ingresso
+    console.log(
+      ` └─ Payload  :`,
+      Object.keys(safePayloadLog).length ? safePayloadLog : "Nessun Payload",
+    );
     // ========================================================================
-    // TELEMETRIA: ISPEZIONE DEL PACCHETTO IN USCITA (GATEWAY OUT)
+    // TELEMETRIA 2: ISPEZIONE DEL PACCHETTO IN USCITA (GATEWAY OUT)
     // ========================================================================
     console.log(`[↗️ GATEWAY OUT] Forwarding to -> ${targetUrl.href}`);
     console.log(` ├─ Method   : ${fetchOptions.method}`);
-    // Logghiamo gli header nascondendo eventuali Authorization token originali se presenti
+
+    // Maschera del token di autorizzazione originale per evitare leak nei log
     const logHeaders = { ...cleanHeaders };
-    if (logHeaders['authorization']) logHeaders['authorization'] = 'Bearer [MASKED]';
+    if (logHeaders["authorization"])
+      logHeaders["authorization"] = "Bearer [MASKED]";
+
     console.log(` ├─ Headers  :`, logHeaders);
     if (fetchOptions.body) {
+      // Il body inoltrato viene stampato per intero (stringa JSON)
       console.log(` └─ Body     :`, fetchOptions.body);
+    } else {
+      console.log(` └─ Body     : Nessun Payload`);
     }
 
     // --- ESECUZIONE DELLA CHIAMATA AL MICROSERVIZIO ---
-    const startTime = performance.now(); // Cronometriamo la latenza del microservizio
+    const startTime = performance.now();
     const response = await fetch(targetUrl, fetchOptions);
     const responsePayload = await response.text();
     const endTime = performance.now();
 
     const latencyMs = (endTime - startTime).toFixed(2);
 
-    // ========================================================================
-    // TELEMETRIA: RISPOSTA DEL MICROSERVIZIO (SERVICE IN)
-    // ========================================================================
-    console.log(`[✅ SERVICE RES] Status: ${response.status} | Latenza: ${latencyMs}ms`);
-    // Se la risposta è gigantesca (es. una lista di 1000 utenti), tronchiamo il log per non intasare il terminale
-    const truncatedPayload = responsePayload.length > 500 
-                             ? responsePayload
-                             : responsePayload;
-    console.log(` └─ Payload  :`, truncatedPayload, `\n`);
-
-    // Copiamo gli header di risposta
+    // Costruzione dell'oggetto header di risposta per la telemetria
+    const responseHeadersLog = {};
     response.headers.forEach((value, key) => {
+      responseHeadersLog[key] = value;
+      // Inoltriamo fisicamente gli header sicuri al client
       if (!badHeaders.includes(key.toLowerCase())) {
         res.setHeader(key, value);
       }
     });
 
+    // ========================================================================
+    // TELEMETRIA 3: RISPOSTA DEL MICROSERVIZIO (SERVICE RES)
+    // ========================================================================
+    console.log(
+      `[✅ SERVICE RES] Status: ${response.status} | Latenza: ${latencyMs}ms`,
+    );
+    console.log(` ├─ Origin   : ${targetUrl.href}`);
+    console.log(` ├─ Headers  :`, responseHeadersLog); // Aggiunta lettura Header di risposta
+
+    // Rimossa logica di troncamento: il payload di risposta viene stampato PER INTERO
+    console.log(
+      ` └─ Payload  :`,
+      responsePayload ? responsePayload : "Nessun Payload",
+      `\n`,
+    );
+
     return res.status(response.status).send(responsePayload);
   } catch (error) {
-    console.error(`\n[❌ SYS_ERR] Fallimento nel forwarding HTTP verso ${targetUrl.href}`);
+    console.error(
+      `\n[❌ SYS_ERR] Cortocircuito nel forwarding HTTP verso ${targetUrl.href}`,
+    );
     console.error(` └─ Dettaglio:`, error.message);
-    return res.status(502).json({ error: "Impossibile contattare il servizio di destinazione HTTP" });
+    return res
+      .status(502)
+      .json({
+        error: "Impossibile contattare il servizio di destinazione HTTP",
+      });
   }
 };
 
@@ -368,14 +413,16 @@ const server = http.createServer(app);
 
 const rejectUpgrade = (socket, message) => {
   const payload = JSON.stringify({ error: message });
-  const responseString = 
+  const responseString =
     "HTTP/1.1 401 Unauthorized\r\n" +
     "Connection: close\r\n" +
     "Content-Type: application/json\r\n" +
-    "Content-Length: " + Buffer.byteLength(payload) + "\r\n" +
+    "Content-Length: " +
+    Buffer.byteLength(payload) +
+    "\r\n" +
     "\r\n" +
     payload;
-  
+
   socket.write(responseString);
   socket.destroy();
 };
@@ -389,28 +436,41 @@ server.on("upgrade", async (req, socket, head) => {
   // 2. Controllo rotta autorizzata
   const parsedUrl = new URL(req.url, "http://localhost");
   const pathname = parsedUrl.pathname;
-  
+
   if (!isWebSocketRoute(pathname)) {
-    return rejectUpgrade(socket, "Route non autorizzata per WebSocket. Usa /chat, /movement o /combat");
+    return rejectUpgrade(
+      socket,
+      "Route non autorizzata per WebSocket. Usa /chat, /movement o /combat",
+    );
   }
 
   // 3. Validazione Sicurezza (Il JWT deve essere valido prima di aprire il tunnel)
   const token = extractTokenFromRequest(req);
   const validation = await validateSessionToken(token);
-  
+
   if (validation.ok === false) {
-    console.warn("Accesso negato WS. Path:", pathname, "- Motivo:", validation.error);
+    console.warn(
+      "Accesso negato WS. Path:",
+      pathname,
+      "- Motivo:",
+      validation.error,
+    );
     return rejectUpgrade(socket, validation.error);
   }
 
   // 4. Determinazione del target basato sul path
   let targetBaseUrlStr = null;
   if (pathname.startsWith("/chat")) targetBaseUrlStr = SERVICE_TARGETS.chat;
-  else if (pathname.startsWith("/movement")) targetBaseUrlStr = SERVICE_TARGETS.movement;
-  else if (pathname.startsWith("/combat")) targetBaseUrlStr = SERVICE_TARGETS.combat;
+  else if (pathname.startsWith("/movement"))
+    targetBaseUrlStr = SERVICE_TARGETS.movement;
+  else if (pathname.startsWith("/combat"))
+    targetBaseUrlStr = SERVICE_TARGETS.combat;
 
   if (!targetBaseUrlStr) {
-    return rejectUpgrade(socket, "Servizio WebSocket di destinazione sconosciuto");
+    return rejectUpgrade(
+      socket,
+      "Servizio WebSocket di destinazione sconosciuto",
+    );
   }
 
   // 5. Connessione Fisica TCP (Piping)
@@ -419,29 +479,25 @@ server.on("upgrade", async (req, socket, head) => {
   const targetHostName = targetUrl.hostname;
   const targetHostHeader = targetUrl.host;
 
-  const trustedHeaders = {
-    "x-user-id": validation.decoded.sub,
-    "x-session-id": validation.sessionId,
-  };
-
   const targetSocket = net.connect(targetPort, targetHostName, () => {
     // Scrittura manuale della richiesta HTTP per il microservizio interno
     const requestLine = req.method + " " + req.url + " HTTP/1.1\r\n";
     let headerLines = "";
-    
+
     // Passaggio degli header sicuri
     const headerKeys = Object.keys(req.headers);
     for (let i = 0; i < headerKeys.length; i++) {
       const key = headerKeys[i];
       const lowerKey = key.toLowerCase();
-      if (lowerKey !== "host" && lowerKey !== "x-user-id" && lowerKey !== "x-session-id") {
+      if (
+        lowerKey !== "host" &&
+        lowerKey !== "x-user-id" &&
+        lowerKey !== "x-session-id"
+      ) {
         headerLines += key + ": " + req.headers[key] + "\r\n";
       }
     }
 
-    headerLines += "x-user-id: " + trustedHeaders["x-user-id"] + "\r\n";
-    headerLines += "x-session-id: " + trustedHeaders["x-session-id"] + "\r\n";
-    
     headerLines += "Host: " + targetHostHeader + "\r\n";
     headerLines += "\r\n"; // Fine degli header
 

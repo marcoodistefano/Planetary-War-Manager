@@ -108,7 +108,7 @@ const login = async (req, res) => {
       path: '/',
       maxAge: SESSION_TTL * 1000 
     });
-
+    
     return res.json({ status: 200, message: "Login avvenuto con successo" });
 
   } catch (error) {

@@ -1,12 +1,21 @@
 const playerModel = require("../models/playerModel.js");
+const { getAuthContextFromRequest } = require("../../shared/authContext.js");
+
+const resolveUserId = async (req, res) => {
+  const auth = await getAuthContextFromRequest(req);
+  if (!auth.ok) {
+    res.status(auth.status || 401).json({ message: "Non autenticato" });
+    return null;
+  }
+
+  return auth.userId;
+};
 
 const home = async (req, res) => {
   try {
-    // 1. Leggiamo l'ID utente iniettato dal gateway (app-route)
-    const U_ID = req.headers['x-user-id'];
-    
+    const U_ID = await resolveUserId(req, res);
     if (!U_ID) {
-      return res.status(401).json({ message: "Non autenticato (identità mancante)" });
+      return;
     }
 
     // 2. Chiamata al model per costruire i dati della UI
@@ -27,8 +36,8 @@ const home = async (req, res) => {
 
 const getActiveMatchesBrowser = async (req, res) => {
   try {
-    const U_ID = req.headers['x-user-id'];
-    if (!U_ID) return res.status(401).json({ message: "Non autenticato" });
+    const U_ID = await resolveUserId(req, res);
+    if (!U_ID) return;
 
     const result = await playerModel.buildActiveMatchesBrowser(U_ID);
     return res.status(result.status).json(result);
@@ -40,8 +49,8 @@ const getActiveMatchesBrowser = async (req, res) => {
 
   const getProfile = async (req, res) => {
   try {
-    const U_ID = req.headers['x-user-id'];
-    if (!U_ID) return res.status(401).json({ message: "Non autenticato" });
+    const U_ID = await resolveUserId(req, res);
+    if (!U_ID) return;
 
     const result = await playerModel.getProfileData(U_ID);
     return res.status(result.status).json(result);
@@ -53,8 +62,8 @@ const getActiveMatchesBrowser = async (req, res) => {
 
 const getAvatar = async (req, res) => {
   try {
-    const U_ID = req.headers['x-user-id'];
-    if (!U_ID) return res.status(401).json({ message: "Non autenticato" });
+    const U_ID = await resolveUserId(req, res);
+    if (!U_ID) return;
 
     const result = await playerModel.getAvatar(U_ID);
     return res.status(result.status).json(result);
@@ -66,7 +75,8 @@ const getAvatar = async (req, res) => {
 
 const updateUsername = async (req, res) => {
   try {
-    const U_ID = req.headers['x-user-id'];
+    const U_ID = await resolveUserId(req, res);
+    if (!U_ID) return;
     const { newUsername } = req.body;
     // Qui andrà la chiamata al model per aggiornare
     return res.json({ message: "Username aggiornato in costruzione" });
@@ -77,7 +87,8 @@ const updateUsername = async (req, res) => {
 
 const updatePassword = async (req, res) => {
   try {
-    const U_ID = req.headers['x-user-id'];
+    const U_ID = await resolveUserId(req, res);
+    if (!U_ID) return;
     const { oldPassword, newPassword } = req.body;
     // Qui andrà la chiamata al model per aggiornare
     return res.json({ message: "Password aggiornata in costruzione" });
@@ -88,8 +99,8 @@ const updatePassword = async (req, res) => {
 
 const updateAvatar = async (req, res) => {
   try {
-    const U_ID = req.headers['x-user-id'];
-    if (!U_ID) return res.status(401).json({ message: "Non autenticato" });
+    const U_ID = await resolveUserId(req, res);
+    if (!U_ID) return;
     console.log("updateAvatar chiamato per U_ID:", U_ID);
     const { avatarId } = req.body;
     // Log e validazione input: assicuriamoci di avere un intero valido
@@ -116,8 +127,8 @@ const updateAvatar = async (req, res) => {
 
 const getFriends = async (req, res) => {
   try {
-    const U_ID = req.headers['x-user-id']; //FIXARE! NON DEVE MANCO ESSERE INVIATA IN FASE DI LOGIN! QUI OPERO SOLO COL TOKEN JWT
-    if (!U_ID) return res.status(401).json({ message: "Non autenticato" });
+    const U_ID = await resolveUserId(req, res);
+    if (!U_ID) return;
     const result = await playerModel.getFriends(U_ID);
     return res.status(result.status).json(result);
   } catch (error) {   
@@ -128,8 +139,8 @@ const getFriends = async (req, res) => {
 
 const getFriendPendingRequests = async (req, res) => {
   try {
-    const U_ID = req.headers['x-user-id'];
-    if (!U_ID) return res.status(401).json({ message: "Non autenticato" });
+    const U_ID = await resolveUserId(req, res);
+    if (!U_ID) return;
     const result = await playerModel.getFriendPendingRequests(U_ID);
     return res.status(result.status).json(result);
   } catch (error) {
@@ -140,9 +151,9 @@ const getFriendPendingRequests = async (req, res) => {
 
 const sendFriendRequest_byCode = async (req, res) => {
   try {
-    const username_utente = req.headers['x-user-id'];//FIXARE! NON DEVE MANCO ESSERE INVIATA IN FASE DI LOGIN! QUI OPERO SOLO COL TOKEN JWT
+    const username_utente = await resolveUserId(req, res);
     const { friendId } = req.body;
-    if (!username_utente) return res.status(401).json({ message: "Non autenticato" });
+    if (!username_utente) return;
     if (!friendId) return res.status(400).json({ message: "ID amico mancante" });
     const result = await playerModel.sendFriendRequest_byCode(username_utente, friendId);
     return res.status(result.status).json(result);
@@ -154,9 +165,9 @@ const sendFriendRequest_byCode = async (req, res) => {
 
 const sendFriendRequest_byUsername = async (req, res) => {
   try {
-    const username_utente = req.headers['x-user-id'];//FIXARE! NON DEVE MANCO ESSERE INVIATA IN FASE DI LOGIN! QUI OPERO SOLO COL TOKEN JWT
+    const username_utente = await resolveUserId(req, res);
     const { username_destinatario } = req.body;
-    if (!username_utente) return res.status(401).json({ message: "Non autenticato" });
+    if (!username_utente) return;
     if (!username_destinatario) return res.status(400).json({ message: "Username destinatario mancante" });
     const result = await playerModel.sendFriendRequest_byUsername(username_utente, username_destinatario);
     return res.status(result.status).json(result);
@@ -167,9 +178,10 @@ const sendFriendRequest_byUsername = async (req, res) => {
 };
 const respondToFriendRequest = async (req, res) => {
   try {
-    const username_utente = req.headers['x-user-id'];//FIXARE! NON DEVE MANCO ESSERE INVIATA IN FASE DI LOGIN! QUI OPERO SOLO COL TOKEN JWT
+    const username_utente = await resolveUserId(req, res);
     const username_req = req.headers['username'];
     const { requestId, accept } = req.body;
+    if (!username_utente) return;
     if (!username_req) return res.status(401).json({ message: "Non autenticato" });
     if (!requestId) return res.status(400).json({ message: "ID richiesta mancante" });
     const result = await playerModel.respondToFriendRequest(username_utente, username_req, requestId, accept);
@@ -181,9 +193,9 @@ const respondToFriendRequest = async (req, res) => {
 };
 const removeFriend = async (req, res) => {
   try {
-    const username_utente = req.headers['x-user-id'];//FIXARE! NON DEVE MANCO ESSERE INVIATA IN FASE DI LOGIN! QUI OPERO SOLO
+    const username_utente = await resolveUserId(req, res);
     const { friendId } = req.body;
-    if (!username_utente) return res.status(401).json({ message: "Non autenticato" });
+    if (!username_utente) return;
     if (!friendId) return res.status(400).json({ message: "ID amico mancante" });
     const result = await playerModel.removeFriend(username_utente, friendId);
     return res.status(result.status).json(result);

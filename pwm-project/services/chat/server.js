@@ -3,6 +3,7 @@ const http = require("http");
 const cors = require("cors");
 const { WebSocketServer } = require("ws");
 const redisClient = require("../shared/redisClient.js");
+const { getAuthContextFromRequest } = require("../shared/authContext.js");
 const chatModel = require("./models/chatModel.js");
 const { initDispatcher } = require("./Dispatcher/webDispatcher.js");
 
@@ -48,18 +49,6 @@ const extractMatchId = (rawUrl) => {
   if (parts[0] !== "chat") return null;
   if (parts[1]) return parts[1];
   return parsed.searchParams.get("matchId") || parsed.searchParams.get("id_partita");
-};
-
-const resolveUserIdFromSession = async (sessionId) => {
-  if (!sessionId) return null;
-  const sessionDataString = await redisClient.get(`session:${sessionId}`);
-  if (!sessionDataString) return null;
-  try {
-    const parsed = JSON.parse(sessionDataString);
-    return parsed?.userId || null;
-  } catch (error) {
-    return null;
-  }
 };
 
 wss.on("connection", async (ws, req, userId, rawMatchId) => {
@@ -139,29 +128,14 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 // ============================================================================
 server.on("upgrade", async (request, socket, head) => {
   try {
-    const headerUserId = request.headers["x-user-id"]
-      ? String(request.headers["x-user-id"])
-      : null;
-    const sessionId = request.headers["x-session-id"]
-      ? String(request.headers["x-session-id"])
-      : null;
-
-    const sessionUserId = await resolveUserIdFromSession(sessionId);
-    const userId = headerUserId || sessionUserId;
-
-    if (headerUserId && sessionUserId && headerUserId !== sessionUserId) {
-      console.warn("[SECURITY] Tentativo di tunnel WS rifiutato: Identita incoerente.");
+    const auth = await getAuthContextFromRequest(request);
+    if (!auth.ok) {
+      console.warn("[SECURITY] Tentativo di tunnel WS rifiutato:", auth.error);
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       socket.destroy();
       return;
     }
-
-    if (!userId) {
-      console.warn("[SECURITY] Tentativo di tunnel WS rifiutato: Identita mancante.");
-      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-      socket.destroy();
-      return;
-    }
+    const userId = auth.userId;
 
     const matchId = extractMatchId(request.url);
     if (!matchId) {

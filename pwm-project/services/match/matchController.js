@@ -1,4 +1,5 @@
 const model = require("./matchModel");
+const { getAuthContextFromRequest } = require("../shared/authContext.js");
 
 const notImplemented = (res) => res.status(501).json({ error: "Hardware o Endpoint non implementato" });
 
@@ -22,8 +23,9 @@ const normalizeRegions = (ui) => {
 
 const create = async (req, res) => {
   try {
-    const playerId = req.headers['x-user-id']; 
-    if (!playerId) return res.status(401).json({ error: "Identità non verificabile." });
+    const auth = await getAuthContextFromRequest(req);
+    if (!auth.ok) return res.status(auth.status || 401).json({ error: "Identita non verificabile." });
+    const playerId = auth.userId;
 
     const ui = req.body; // Dati grezzi dal frontend
 
@@ -62,8 +64,9 @@ const create = async (req, res) => {
 // Placeholder per le espansioni future
 const join = async (req, res) => {
   try {
-    const playerId = req.headers['x-user-id']; 
-    if (!playerId) return res.status(401).json({ error: "Identità non verificabile." });
+    const auth = await getAuthContextFromRequest(req);
+    if (!auth.ok) return res.status(auth.status || 401).json({ error: "Identita non verificabile." });
+    const playerId = auth.userId;
 
     const matchId = req.params.id || req.body?.matchId;
     if (!matchId) return res.status(400).json({ error: "Match id mancante." });

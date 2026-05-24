@@ -1,18 +1,15 @@
 const chatModel = require("../models/chatModel.js");
-
-const getUserIdFromRequest = (req) => {
-  const headerValue = req.headers["x-user-id"];
-  return headerValue ? String(headerValue) : null;
-};
+const { getAuthContextFromRequest } = require("../../shared/authContext.js");
 
 const getHistory = async (req, res) => {
   try {
-    const userId = getUserIdFromRequest(req);
-    if (!userId) {
+    const auth = await getAuthContextFromRequest(req);
+    if (!auth.ok) {
       return res
-        .status(401)
+        .status(auth.status || 401)
         .json({ error: "Accesso negato: Identita non verificabile." });
     }
+    const userId = auth.userId;
 
     const { limit, matchId, id_partita: idPartita, destinatario, tipo } = req.query;
     const result = await chatModel.getRecentMessages({
@@ -36,12 +33,13 @@ const getHistory = async (req, res) => {
 
 const postMessage = async (req, res) => {
   try {
-    const userId = getUserIdFromRequest(req);
-    if (!userId) {
+    const auth = await getAuthContextFromRequest(req);
+    if (!auth.ok) {
       return res
-        .status(401)
+        .status(auth.status || 401)
         .json({ error: "Accesso negato: Identita non verificabile." });
     }
+    const userId = auth.userId;
 
     const { matchId, id_partita: idPartita, destinatario, tipo, content, message, text } = req.body || {};
     const result = await chatModel.processMessage({
