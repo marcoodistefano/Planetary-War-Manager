@@ -39,8 +39,9 @@
       <button class="nav-action-btn primary-glow" [class.active]="isTechModalOpen" (click)="toggleTechModal()">
         <ion-icon name="flask-outline"></ion-icon> <span>RICERCHE TECH</span>
       </button>
-      <button class="nav-action-btn primary-glow" [class.active]="isChatOpen" (click)="toggleChat()">
+      <button class="nav-action-btn primary-glow chat-counter" [class.active]="isChatOpen" (click)="toggleChat()">
         <ion-icon name="chatbubbles-outline"></ion-icon> <span>COMUNICAZIONI</span>
+        <span class="chat-badge" *ngIf="chatUnreadCount > 0">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
       </button>
       <button class="nav-action-btn primary-glow" (click)="goToHome()">
         <ion-icon name="home-outline"></ion-icon> <span>TORNA ALLA HOME</span>
@@ -99,7 +100,10 @@
     </div>
 
     <div class="mobile-top-navbar mobile-only">
-      <ion-menu-button class="holographic-menu-btn"></ion-menu-button>
+      <div class="menu-button-wrap">
+        <ion-menu-button class="holographic-menu-btn"></ion-menu-button>
+        <span class="chat-badge menu-badge" *ngIf="chatUnreadCount > 0">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
+      </div>
       <div class="mobile-logo">PWM</div>
     </div>
 
@@ -253,19 +257,26 @@
     </div> 
 
     <div class="hud-stack-right">
-      <div class="hud-chat-panel" *ngIf="isChatOpen">
-        <app-in-game-chat (close)="toggleChat()"></app-in-game-chat>
+      <div class="hud-chat-panel" [class.is-hidden]="!isChatOpen">
+        <app-in-game-chat
+          [currentUser]="userProfile.username"
+          [playersInMatch]="matchPlayers"
+          [matchId]="currentMatchId"
+          [panelVisible]="isChatOpen"
+          (unreadCountChange)="chatUnreadCount = $event"
+          (close)="toggleChat()"></app-in-game-chat>
       </div>
       <div class="tactical-actions-row desktop-only">
-        <button class="nav-action-btn primary-glow" [class.active]="isChatOpen" (click)="toggleChat()">
+        <button class="nav-action-btn primary-glow chat-counter" [class.active]="isChatOpen" (click)="toggleChat()">
           <ion-icon name="chatbubbles-outline"></ion-icon>
           <span>COMUNICAZIONI</span>
+          <span class="chat-badge" *ngIf="chatUnreadCount > 0">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
         </button>
       </div>
     </div>
 
     <div class="modal-overlay-container" *ngIf="isProfileModalOpen">
-      <app-profile-modal (close)="setOpenProfile(false)"></app-profile-modal>
+      <app-profile-modal [profile]="userProfile" (close)="setOpenProfile(false)"></app-profile-modal>
     </div>
     
     <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>

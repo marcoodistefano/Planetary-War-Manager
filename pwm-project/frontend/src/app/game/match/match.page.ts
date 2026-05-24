@@ -2,7 +2,9 @@ import { Component, OnInit, AfterViewInit, ChangeDetectorRef } from '@angular/co
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController, MenuController } from '@ionic/angular'; // <--- AGGIUNTO MenuController
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { HomeService } from '../../home/home';
+import { AuthApiService } from '../../auth/auth-api.service';
 
 // Componenti
 import { ProfileModalComponent } from '../components/profile-modal/profile-modal.component';
@@ -64,6 +66,9 @@ export class MatchPage implements OnInit, AfterViewInit {
   isTroopsDropdownOpen = false;
   troopsDropdownX = 0;
   troopsDropdownY = 0;
+  chatUnreadCount = 0;
+  currentMatchId = '';
+  matchPlayers: string[] = [];
 
   activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
 
@@ -76,7 +81,7 @@ export class MatchPage implements OnInit, AfterViewInit {
   };
 
   userProfile = {
-    username: 'Comandante_Alpha',
+    username: 'Caricamento...',
     rank: 'Generale di Brigata',
     experience: 85, matchesWon: 24, matchesLost: 5
   };
@@ -151,11 +156,17 @@ export class MatchPage implements OnInit, AfterViewInit {
     private router: Router, 
     private cdr: ChangeDetectorRef,
     private modalCtrl: ModalController,
-    private menuCtrl: MenuController
+    private menuCtrl: MenuController,
+    private route: ActivatedRoute,
+    private homeService: HomeService,
+    private authApi: AuthApiService
   ) { }
 
   ngOnInit() {
+    this.currentMatchId = this.route.snapshot.paramMap.get('id') || localStorage.getItem('pwm_last_joined_match') || '';
     this.loadGameRules();
+    this.loadUserProfile();
+    this.loadMatchContext();
     this.isTouchLayout = this.isTouchViewport();
     this.sensorSocket = io('http://localhost:3030', { auth: { token: "IL_TUO_JWT_TOKEN" } });
     this.sensorSocket.on('point_data', (data: any) => this.handlePointData(data));
@@ -174,6 +185,120 @@ export class MatchPage implements OnInit, AfterViewInit {
 
   ionViewWillEnter() {
     this.loadGameRules();
+    this.loadUserProfile();
+    this.loadMatchContext();
+  }
+
+  private loadMatchContext() {
+    this.homeService.getDashboardData().subscribe({
+      next: (response: any) => {
+        const info = response?.data;
+        const matchEntry = this.findCurrentMatchEntry(info);
+        const extractedPlayers = this.extractPlayersFromMatchEntry(matchEntry);
+
+        this.matchPlayers = extractedPlayers.length > 0
+          ? extractedPlayers
+          : [];
+
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        console.error('Errore nel recupero dei dati partita per la chat:', error);
+      }
+    });
+  }
+
+  private findCurrentMatchEntry(info: any) {
+    const allMatches = [
+      ...(info?.match_attivi ? Object.values(info.match_attivi) : []),
+      ...(info?.last_created_match ? Object.values(info.last_created_match) : []),
+    ];
+
+    const normalizedMatchId = String(this.currentMatchId || '').trim();
+    if (!normalizedMatchId) {
+      return null;
+    }
+
+    return allMatches.find((match: any) => {
+      const candidates = [
+        match?.id_partita_visualizzato,
+        match?.id_partita_hash,
+        match?.id_partita,
+        match?.routeId,
+        match?.joinId,
+        match?.matchId,
+      ].filter(Boolean).map((value) => String(value).trim());
+
+      return candidates.includes(normalizedMatchId);
+    }) || null;
+  }
+
+  private extractPlayersFromMatchEntry(matchEntry: any): string[] {
+    if (!matchEntry) {
+      return [];
+    }
+
+    const candidateFields = [
+      matchEntry.players,
+      matchEntry.playerNames,
+      matchEntry.player_names,
+      matchEntry.participants,
+      matchEntry.partecipanti,
+      matchEntry.members,
+      matchEntry.users,
+    ];
+
+    const names: string[] = [];
+
+    for (const field of candidateFields) {
+      if (!Array.isArray(field)) {
+        continue;
+      }
+
+      for (const entry of field) {
+        let resolvedName = '';
+
+        if (typeof entry === 'string') {
+          resolvedName = entry;
+        } else if (entry && typeof entry === 'object') {
+          const typedEntry = entry as any;
+          resolvedName = typedEntry.username || typedEntry.name || typedEntry.player || typedEntry.displayName || typedEntry.username_display || '';
+        }
+
+        const normalizedName = String(resolvedName || '').trim();
+        if (normalizedName) {
+          names.push(normalizedName);
+        }
+      }
+    }
+
+    return [...new Set(names)];
+  }
+
+  private loadUserProfile() {
+    this.authApi.getProfile().subscribe({
+      next: (response: any) => {
+        const profile = response?.data?.profile || response?.data?.user_profile || response?.profile || response?.user_profile;
+        if (!profile?.username) {
+          return;
+        }
+
+        this.userProfile = {
+          ...this.userProfile,
+          username: String(profile.username),
+          rank: profile.rank || profile.reg || this.userProfile.rank,
+          experience: profile.experience ?? this.userProfile.experience,
+        };
+
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        console.error('Errore nel recupero del profilo utente per il match:', error);
+        if (error?.status === 401) {
+          this.router.navigate(['/login']);
+        }
+      }
+    });
   }
 
   ngAfterViewInit() {

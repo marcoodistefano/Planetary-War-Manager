@@ -13,11 +13,11 @@ import { Router } from '@angular/router';
 })
 export class ProfileModalComponent {
   @Input() profile: any = {
-    username: 'GHOST_OPERATIVE',
+    username: 'Caricamento...',
     rank: 'COMANDANTE SUPREMO',
-    experience: 75,
-    matchesWon: 142,
-    matchesLost: 29
+    experience: 0,
+    matchesWon: 0,
+    matchesLost: 0
   };
 
   @Input() audioSettings: any = { music: 50, sfx: 80 };

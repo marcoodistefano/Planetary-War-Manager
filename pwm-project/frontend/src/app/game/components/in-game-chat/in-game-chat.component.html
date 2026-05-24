@@ -1,59 +1,123 @@
 <div class="chat-tactical-frame" (click)="$event.stopPropagation()">
-  
   <div class="chat-header">
     <div class="title-block compact">
       <p class="eyebrow">Rete di Comunicazione</p>
       <h2>COMMS LINK</h2>
+      <div class="status-row">
+        <span class="status-pill" [class.online]="connectionStatus === 'connected'">{{ channelStatusLabel }}</span>
+        <span class="status-pill subtle" *ngIf="activeScope === 'alliance' && !hasAllianceChannel">CANALE NON DISPONIBILE</span>
+      </div>
     </div>
     <ion-icon name="close-outline" class="close-icon" (click)="closeChat()"></ion-icon>
   </div>
 
+  <div class="channel-strip">
+    <button
+      type="button"
+      class="channel-chip"
+      [class.active]="activeScope === 'global'"
+      (click)="selectChannel('global')">
+      <span class="chip-icon">🌐</span>
+      <span class="chip-text">GLOBALE</span>
+      <span class="unread-badge" *ngIf="unreadCountFor(channelKey('global')) > 0">{{ displayUnreadCount(unreadCountFor(channelKey('global'))) }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="channel-chip alliance"
+      [class.active]="activeScope === 'alliance'"
+      [class.disabled]="!hasAllianceChannel"
+      (click)="selectChannel('alliance')">
+      <span class="chip-icon">🛡️</span>
+      <span class="chip-text">{{ allianceLabel }}</span>
+      <span class="unread-badge" *ngIf="hasAllianceChannel && unreadCountFor(channelKey('alliance', allianceId)) > 0">{{ displayUnreadCount(unreadCountFor(channelKey('alliance', allianceId))) }}</span>
+    </button>
+
+    <div class="direct-chips" *ngIf="recentContacts.length">
+      <button
+        type="button"
+        class="channel-chip direct"
+        *ngFor="let contact of recentContacts"
+        [class.active]="activeScope === 'direct' && activeDirectRecipient === contact"
+        (click)="startDirectConversation(contact)">
+        <span class="chip-icon">👤</span>
+        <span class="chip-text">{{ contact }}</span>
+        <span class="unread-badge" *ngIf="unreadCountFor(channelKey('direct', contact)) > 0">{{ displayUnreadCount(unreadCountFor(channelKey('direct', contact))) }}</span>
+      </button>
+    </div>
+
+    <button type="button" class="plus-chip" (click)="openNewDirectComposer()" [class.active]="isComposerOpen">
+      <ion-icon name="add"></ion-icon>
+    </button>
+  </div>
+
+  <div class="recipient-picker" *ngIf="isComposerOpen">
+    <div class="recipient-picker-head">
+      <span>Nuovo messaggio diretto</span>
+      <small>Scegli un player con cui vuoi aprire un canale</small>
+    </div>
+    <div class="recipient-pills" *ngIf="directTargets.length; else noTargets">
+      <button
+        type="button"
+        class="recipient-pill"
+        *ngFor="let player of directTargets"
+        (click)="startDirectConversation(player)">
+        {{ player }}
+      </button>
+    </div>
+    <ng-template #noTargets>
+      <div class="empty-hint">Nessun player disponibile per una chat diretta.</div>
+    </ng-template>
+  </div>
+
   <div class="chat-messages scrollable-y" #chatScroll>
-    <div class="message-entry" 
-         *ngFor="let msg of messages" 
-         [class.private]="msg.isPrivate"
-         [class.system]="msg.sender === 'Sistema'">
-      
+    <div
+      class="message-entry"
+      *ngFor="let msg of visibleMessages"
+      [class.private]="msg.isPrivate"
+      [class.system]="msg.isSystem"
+      [class.outgoing]="msg.sender === currentUser">
+
       <span class="msg-time">[{{ msg.timestamp | date:'HH:mm' }}]</span>
-      
-      <span class="msg-sender" *ngIf="!msg.isPrivate" (click)="replyTo(msg.sender)">
+
+      <span class="msg-sender system" *ngIf="msg.isSystem">[Sistema]</span>
+
+      <span class="msg-sender outgoing" *ngIf="!msg.isSystem && msg.sender === currentUser">
+        [Tu<span *ngIf="msg.scope === 'direct' && msg.to"> → {{ msg.to }}</span>]:
+      </span>
+
+      <span class="msg-sender" *ngIf="!msg.isSystem && msg.sender !== currentUser && msg.scope !== 'direct'" (click)="replyTo(msg.sender)">
         {{ msg.sender }}:
       </span>
-      
-      <span class="msg-sender private" *ngIf="msg.isPrivate && msg.sender !== currentUser" (click)="replyTo(msg.sender)">
+
+      <span class="msg-sender private" *ngIf="!msg.isSystem && msg.sender !== currentUser && msg.scope === 'direct'" (click)="replyTo(msg.sender)">
         [Da {{ msg.sender }}]:
-      </span>
-      
-      <span class="msg-sender private" *ngIf="msg.isPrivate && msg.sender === currentUser">
-        [A {{ msg.to }}]:
       </span>
 
       <span class="msg-text">{{ msg.text }}</span>
     </div>
   </div>
-  
+
   <div class="hud-separator"></div>
 
   <div class="chat-input-area">
-    <div class="glass-select-container slim">
-      <select class="tactical-select" [(ngModel)]="recipient">
-        <option value="ALL">🌐 GLOBALE</option>
-        <optgroup label="GIOCATORI">
-          <option *ngFor="let p of playersInMatch" [value]="p">👤 {{ p }}</option>
-        </optgroup>
-      </select>
+    <div class="active-channel-note">
+      <span>{{ activeScope === 'global' ? 'Canale globale' : activeScope === 'alliance' ? allianceLabel : 'Privato' }}</span>
+      <small *ngIf="activeScope === 'direct' && !activeDirectRecipient">Seleziona un player con il pulsante +</small>
+      <small *ngIf="activeScope === 'direct' && activeDirectRecipient">A {{ activeDirectRecipient }}</small>
+      <small *ngIf="activeScope === 'alliance' && !hasAllianceChannel">Questo canale è disattivato perché non fai parte di un'alleanza.</small>
     </div>
-    
+
     <div class="input-row">
-      <input type="text" 
-             class="tactical-input" 
-             [(ngModel)]="newMessage" 
-             (keyup.enter)="sendMessage()" 
-             placeholder="Trasmetti messaggio..." />
+      <input
+        type="text"
+        class="tactical-input"
+        [(ngModel)]="newMessage"
+        (keyup.enter)="sendMessage()"
+        [placeholder]="composerPlaceholder" />
       <button class="send-btn primary-glow" (click)="sendMessage()">
         <ion-icon name="send"></ion-icon>
       </button>
     </div>
   </div>
-
 </div>

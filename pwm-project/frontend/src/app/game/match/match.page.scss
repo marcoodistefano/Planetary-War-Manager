@@ -224,8 +224,8 @@
 }
 
 .hud-stack-right { 
-  right: calc(2 * var(--unit)); 
-  width: clamp(260px, calc(28 * var(--unit)), 380px);
+  right: calc(4.5 * var(--unit)); 
+  width: clamp(330px, calc(28 * var(--unit)), 460px);
   display: flex;
   flex-direction: column;
   justify-content: flex-end; 
@@ -235,6 +235,38 @@
   display: block; 
   pointer-events: auto; 
   margin-bottom: 12px;  
+
+  &.is-hidden {
+    display: none;
+  }
+}
+
+.chat-counter,
+.menu-button-wrap {
+  position: relative;
+  overflow: visible;
+}
+
+.chat-badge,
+.menu-badge {
+  position: absolute;
+  top: -7px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ff3b30;
+  color: #fff;
+  border: 2px solid rgba(7, 15, 28, 0.92);
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 10px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
 }
 
 .tactical-actions-row {
@@ -251,6 +283,11 @@
     background: rgba(7, 15, 28, 0.85);
     backdrop-filter: blur(20px);
     box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+  }
+
+  .nav-action-btn.chat-counter {
+    position: relative;
+    overflow: visible;
   }
 }
 
@@ -753,6 +790,13 @@ ion-menu {
     
     pointer-events: auto; /* Riattivato per intercettare i tocchi sulla barra */
 
+    .menu-button-wrap {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      flex: 0 0 auto;
+    }
+
     .holographic-menu-btn {
       --color: #86d7ff;
       background: rgba(134, 215, 255, 0.1);
@@ -760,6 +804,11 @@ ion-menu {
       border-radius: 8px;
       width: 40px; height: 40px; 
       box-shadow: none; /* Ombre rimosse perché c'è già il background della navbar */
+    }
+
+    .menu-badge {
+      top: -6px;
+      right: -6px;
     }
 
     .mobile-logo {
@@ -828,6 +877,19 @@ ion-menu {
   .hud-stack-left {
     top: 80px; 
     bottom: auto;
+  }
+
+  .hud-stack-right {
+    top: 80px;
+    bottom: auto;
+    right: 10px;
+    width: min(calc(100vw - 20px), 390px);
+    align-items: flex-end;
+  }
+
+  .hud-chat-panel {
+    width: 100%;
+    margin-bottom: 10px;
   }
 }
 /* ==========================================================================
