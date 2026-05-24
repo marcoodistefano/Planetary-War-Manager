@@ -227,7 +227,7 @@ const requireJwt = async (req, res, next) => {
 // 3. MIDDLEWARE: Inoltro HTTP
 const forwardToService = async (req, res) => {
   if (req.path === "/health") return res.json({ status: "ok" });
-
+  
   const routeGroup = req.safeRequest?.routeGroup; // es. "auth"
   let targetBaseUrl = null;
 
@@ -267,8 +267,7 @@ const forwardToService = async (req, res) => {
   if (hasBody) {
     cleanHeaders["content-type"] = "application/json";
   }
-
-  try {
+try {
     const fetchOptions = {
       method: req.method,
       headers: cleanHeaders
@@ -278,8 +277,52 @@ const forwardToService = async (req, res) => {
       fetchOptions.body = JSON.stringify(req.safeRequest.body);
     }
 
+    // ========================================================================
+    // TELEMETRIA: ISPEZIONE DEL PACCHETTO IN INGRESSO (GATEWAY IN)
+    // ========================================================================
+    const sourceIp = req.ip || req.socket.remoteAddress;
+    const authStatus = req.user ? `Auth_UUID: ${req.user.uuid}` : "Unauthenticated (Public Route)";
+    
+    // Cloniamo il body per mascherare dati sensibili prima di loggare
+    let safePayloadLog = req.safeRequest.body ? { ...req.safeRequest.body } : {};
+    if (safePayloadLog.password) safePayloadLog.password = "********"; 
+    if (safePayloadLog.token) safePayloadLog.token = "[MASKED_TOKEN]";
+
+    console.log(`\n[⬇️ GATEWAY IN] ${req.method} ${req.originalUrl}`);
+    console.log(` ├─ Source IP: ${sourceIp}`);
+    console.log(` ├─ Identity : ${authStatus}`);
+    console.log(` └─ Payload  :`, Object.keys(safePayloadLog).length ? safePayloadLog : "Nessun Payload");
+
+    // ========================================================================
+    // TELEMETRIA: ISPEZIONE DEL PACCHETTO IN USCITA (GATEWAY OUT)
+    // ========================================================================
+    console.log(`[↗️ GATEWAY OUT] Forwarding to -> ${targetUrl.href}`);
+    console.log(` ├─ Method   : ${fetchOptions.method}`);
+    // Logghiamo gli header nascondendo eventuali Authorization token originali se presenti
+    const logHeaders = { ...cleanHeaders };
+    if (logHeaders['authorization']) logHeaders['authorization'] = 'Bearer [MASKED]';
+    console.log(` ├─ Headers  :`, logHeaders);
+    if (fetchOptions.body) {
+      console.log(` └─ Body     :`, fetchOptions.body);
+    }
+
+    // --- ESECUZIONE DELLA CHIAMATA AL MICROSERVIZIO ---
+    const startTime = performance.now(); // Cronometriamo la latenza del microservizio
     const response = await fetch(targetUrl, fetchOptions);
     const responsePayload = await response.text();
+    const endTime = performance.now();
+
+    const latencyMs = (endTime - startTime).toFixed(2);
+
+    // ========================================================================
+    // TELEMETRIA: RISPOSTA DEL MICROSERVIZIO (SERVICE IN)
+    // ========================================================================
+    console.log(`[✅ SERVICE RES] Status: ${response.status} | Latenza: ${latencyMs}ms`);
+    // Se la risposta è gigantesca (es. una lista di 1000 utenti), tronchiamo il log per non intasare il terminale
+    const truncatedPayload = responsePayload.length > 500 
+                             ? responsePayload.substring(0, 500) + "... [TRUNCATED]" 
+                             : responsePayload;
+    console.log(` └─ Payload  :`, truncatedPayload, `\n`);
 
     // Copiamo gli header di risposta
     response.headers.forEach((value, key) => {
@@ -290,7 +333,8 @@ const forwardToService = async (req, res) => {
 
     return res.status(response.status).send(responsePayload);
   } catch (error) {
-    console.error("Errore nel forwarding HTTP:", error);
+    console.error(`\n[❌ SYS_ERR] Fallimento nel forwarding HTTP verso ${targetUrl.href}`);
+    console.error(` └─ Dettaglio:`, error.message);
     return res.status(502).json({ error: "Impossibile contattare il servizio di destinazione HTTP" });
   }
 };
