@@ -168,7 +168,8 @@ export class MatchPage implements OnInit, AfterViewInit {
     this.loadUserProfile();
     this.loadMatchContext();
     this.isTouchLayout = this.isTouchViewport();
-    this.sensorSocket = io('http://localhost:3030', { auth: { token: "IL_TUO_JWT_TOKEN" } });
+    // Connect Socket.IO through gateway (relative path) so nginx proxies to engine-move
+    this.sensorSocket = io('/socket.io', { auth: { token: "IL_TUO_JWT_TOKEN" } });
     this.sensorSocket.on('point_data', (data: any) => this.handlePointData(data));
     window.addEventListener('click', () => {
       if (this.isRadialMenuVisible) {

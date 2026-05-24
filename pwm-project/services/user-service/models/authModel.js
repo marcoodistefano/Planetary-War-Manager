@@ -12,6 +12,7 @@ const SMTP_TLS_REJECT_UNAUTHORIZED = process.env.SMTP_TLS_REJECT_UNAUTHORIZED ==
 const SMTP_USER = process.env.SMTP_USER || process.env.MAIL_USER || "benny.waelchi78@ethereal.email";
 const SMTP_PASS = process.env.SMTP_PASS || process.env.MAIL_PASS || "gutRxGp5JfjD9C9cbf";
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || `noreply@${DOMAIN}`;
+const MAX_USERNAME_LENGTH = 32;
 
 const mapUniqueViolation = (error) => {
   if (!error || error.code !== "23505") return null;
@@ -24,6 +25,17 @@ const mapUniqueViolation = (error) => {
 };
 
 const registerUser = async ({ username, email, password, region }) => {
+  if (typeof username !== "string" || username.trim().length === 0) {
+    return { status: 400, error: "Username non fornito" };
+  }
+
+  if (username.length > MAX_USERNAME_LENGTH) {
+    return {
+      status: 400,
+      error: `Username troppo lungo (massimo ${MAX_USERNAME_LENGTH} caratteri)`,
+    };
+  }
+
   const passwordHash = await aslan.hash_password(password);
   const normalizeReg = aslan.normalizeRegion(region);
   

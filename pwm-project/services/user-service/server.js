@@ -5,7 +5,24 @@ const playerRoutes = require("./routes/player.routes.js");
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = new Set([
+  process.env.FRONTEND_URL,
+  "http://localhost:8100",
+  "http://127.0.0.1:8100",
+  "http://localhost",
+  "http://127.0.0.1",
+]);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.has(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Origin non autorizzata: ${origin}`));
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));

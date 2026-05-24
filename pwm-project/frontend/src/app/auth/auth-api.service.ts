@@ -35,7 +35,10 @@ export class AuthApiService {
   private readonly baseUrl: string;
 
   constructor(private http: HttpClient) {
-    this.baseUrl = (environment.apiBaseUrl || '').replace(/\/$/, '');
+    // Ensure frontend requests go through the gateway under `/api` when
+    // `environment.apiBaseUrl` is empty (dev) or not set.
+    const configured = (environment.apiBaseUrl || '').replace(/\/$/, '');
+    this.baseUrl = configured || '/api';
   }
 
   login(payload: LoginPayload): Observable<AuthResponse> {

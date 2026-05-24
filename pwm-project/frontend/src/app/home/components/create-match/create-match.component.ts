@@ -152,7 +152,7 @@ export class CreateMatchComponent {
 
     try {
       const response: any = await firstValueFrom(
-        this.http.post('/match/create', this.matchData, {
+        this.http.post('/api/match/create', this.matchData, {
           withCredentials: true
         })
       );

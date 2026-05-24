@@ -536,7 +536,7 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(payload));
     } else {
-      fetch('/chat/message', {
+      fetch('/api/chat/message', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

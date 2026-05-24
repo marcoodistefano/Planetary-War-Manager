@@ -31,7 +31,7 @@ const Aslan = {
         }
     },
 
-    generate_secure_token: async (length) => {
+    generate_secure_token: (length) => {
         const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         let token = "";
         for (let i = 0; i < length; i++) {

@@ -17,6 +17,25 @@ const SERVICE_TARGETS = {
   combat: process.env.COMBAT_SERVICE_URL || "http://combat-service:3003",
 };
 
+const allowedOrigins = new Set([
+  process.env.FRONTEND_URL,
+  "http://localhost:8100",
+  "http://127.0.0.1:8100",
+  "http://localhost",
+  "http://127.0.0.1",
+]);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.has(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Origin non autorizzata: ${origin}`));
+  },
+  credentials: true,
+};
+
 const JWT_SECRET = process.env.JWT_SECRET || process.env.SECRET_KEY || "CHIAVE_SEGRETA_TEMPORANEA_SUPER_SICURA";
 
 // 2. DEFINIZIONE ROTTE
@@ -155,7 +174,7 @@ const validateSessionToken = async (token) => {
 };
 
 // --- MIDDLEWARE EXPRESS ---
-app.use(cors());
+app.use(cors(corsOptions));
 
 // Parse JSON solo se non è un WebSocket (che romperebbe lo stream)
 app.use((req, res, next) => {
@@ -320,7 +339,7 @@ try {
     console.log(`[✅ SERVICE RES] Status: ${response.status} | Latenza: ${latencyMs}ms`);
     // Se la risposta è gigantesca (es. una lista di 1000 utenti), tronchiamo il log per non intasare il terminale
     const truncatedPayload = responsePayload.length > 500 
-                             ? responsePayload.substring(0, 500) + "... [TRUNCATED]" 
+                             ? responsePayload
                              : responsePayload;
     console.log(` └─ Payload  :`, truncatedPayload, `\n`);
 
