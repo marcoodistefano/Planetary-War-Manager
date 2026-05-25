@@ -61,7 +61,27 @@ const postMessage = async (req, res) => {
   }
 };
 
+const postSystemMessage = async (req, res) => {
+  try{
+    const mex = req.body.message.content;
+    const destinatario = req.body.message.destinatario;
+    const tipo = req.body.message.tipo;
+    const matchId = req.body.matchId;
+    const result = await chatModel.processSYSMessage({
+      userId: "SYSTEM",
+      matchId,
+      destinatario,
+      dest_tipo,
+      tipo,
+      content: mex,
+    });
+  } catch (error) {
+    console.error("[SYS_ERR] System message error:", error);
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
 module.exports = {
   getHistory,
   postMessage,
+  postSystemMessage,
 };

@@ -168,7 +168,7 @@ const getParticipants = async (matchId) => {
 };
 
 const getAllianceMembers = async (matchId, allianceId) => {
-  const cacheKey = `chat:match:${matchId}:alliance:${allianceId}:members`;
+  const cacheKey = `match:${matchId}:alliance:${allianceId}:members`;
   const hasCache = await redisClient.exists(cacheKey);
   if (hasCache) {
     return await redisClient.sMembers(cacheKey);
@@ -397,6 +397,103 @@ const processMessage = async ({
   const allowed = await rateLimitUser(userId, resolvedMatchId);
   if (!allowed) {
     return { ok: false, status: 429, error: "Troppi messaggi inviati" };
+  }
+
+  const recipientsResult = await resolveRecipients({
+    matchId: resolvedMatchId,
+    tipoCode: tipoInfo.code,
+    destinatario: destinatarioValue,
+    senderId: userId,
+  });
+
+  if (!recipientsResult.ok) {
+    return recipientsResult;
+  }
+
+  const { recipients, dbRecipients, recipientId } = recipientsResult;
+  const idMex = crypto.randomUUID();
+  const timestamp = new Date().toISOString();
+
+  const message = {
+    id_mex: idMex,
+    id_user_send: userId,
+    id_partita: resolvedMatchId,
+    content: text,
+    time_stamp: timestamp,
+    tipo: tipoInfo.code,
+    destinatario: destinatarioValue,
+  };
+
+  const listKey = buildChatListKey({
+    matchId: resolvedMatchId,
+    tipoCode: tipoInfo.code,
+    destinatario: destinatarioValue,
+    senderId: userId,
+    recipientId,
+  });
+
+  await storeMessageInRedis(listKey, message);
+  await publishMessage({
+    matchId: resolvedMatchId,
+    targetUsers: recipients,
+    payload: { type: "NEW_MESSAGE", data: message },
+  });
+
+  persistMessageAsync({
+    idMex,
+    userId,
+    matchId: resolvedMatchId,
+    content: text,
+    timestamp,
+    tipoLabel: tipoInfo.label,
+    recipients: dbRecipients,
+  });
+
+  return { ok: true, message };
+};
+
+const processSYSMessage = async (userId, matchId, destinatario, dest_tipo, tipo, content) => {
+  //non ho bisogno di verificare l'identità del mittente visto che sono solo messaggi di sistema  
+  const text = String(content ?? "").trim();
+  if (!text) {
+    return { ok: false, status: 400, error: "Messaggio vuoto" };
+  }
+
+  if (Buffer.byteLength(text, "utf8") > MAX_MESSAGE_LENGTH) {
+    text = text.substring(0, MAX_MESSAGE_LENGTH);
+    console.log("[SYS_WARN] Messaggio di sistema troncato per superamento lunghezza massima:", text);
+  }
+  if(tipo !== "[SYS]"){
+    return { ok: false, status: 400, error: "Tipo di messaggio non valido per SYS" };
+  }
+  if(dest_tipo === "ALL"){
+    const participants = await getParticipants(matchId);
+    if(participants.length === 0){
+      return { ok: false, status: 404, error: "Nessun partecipante trovato" };
+    }
+    //eliminazione match?
+  }
+  if(dest_tipo === "ALLIANCE"){
+    const members = await getAllianceMembers(matchId, destinatario);
+    if(members.length === 0){
+      return { ok: false, status: 404, error: "Alleanza non valida o vuota" };
+    }
+  }
+  if(dest_tipo === "PLAYER"){
+    const recipientId = await resolveUserIdByUsername(matchId, destinatario);
+    if (!recipientId) {
+      return { ok: false, status: 404, error: "Destinatario non valido" };
+    }
+  }
+  if (typeof destinatarioValue === "string") {
+    destinatarioValue = destinatarioValue.trim();
+  }
+  const isMember = await ensureUserInMatch({
+    userId,
+    matchId: resolvedMatchId,
+  });
+  if (!isMember) {
+    return { ok: false, status: 403, error: "Utente non in partita" };
   }
 
   const recipientsResult = await resolveRecipients({
