@@ -33,8 +33,8 @@ const createMatch = async ({ playerId, gameMode }) => {
       throw new Error("Errore critico di clock nel Multiplexer Eru.");
 
     // C. Generazione Identificativi
-    const id_partita_hash = await aslan.generateSecureToken(255); //L'hash della partita deve essere calcolato passando come parametri TUTTE le info della partita! 
-    //ad ora è un token casuale, ma è da modificare. 
+    const id_partita_hash = await aslan.generateSecureToken(255); //L'hash della partita deve essere calcolato passando come parametri TUTTE le info della partita!
+    //ad ora è un token casuale, ma è da modificare.
     //TO UPDATE
     const id_partita_visualizzato = await aslan.generateSecureToken(10);
 
@@ -64,7 +64,7 @@ const createMatch = async ({ playerId, gameMode }) => {
         [partitaId, playerId],
       );
 
-      await client.query('COMMIT');
+      await client.query("COMMIT");
 
       // Invalida la home dell'host: la lista delle partite create deve rigenerarsi subito
       await redis.del(`home_info:${playerId}`);
@@ -161,12 +161,15 @@ const join_Match = async (playerId, id_partita_hash) => {
         );
       }
 
-      await client.query('COMMIT');
+      await client.query("COMMIT");
 
       // Anche il join cambia la home dell'utente: rimuoviamo il cache snapshot
       await redis.del(`home_info:${playerId}`);
-      return { status: "200", message: "Join completato.", structure: eru_start.struttura_partita };
-
+      return {
+        status: "200",
+        message: "Join completato.",
+        structure: eru_start.struttura_partita,
+      };
     } catch (innerError) {
       await client.query("ROLLBACK");
       if (innerError.customStatus)
@@ -238,9 +241,36 @@ const listJoinableMatches = async () => {
     };
   }
 };
-
+const getMatchPlayers = async (matchId) => {
+  try {
+    const cachedPlayers = await redis.get(`match:${matchId}:players`);
+    if (cachedPlayers) {
+      console.log(
+        `[SYS_CACHE] Players per match ${matchId} recuperati da Redis.`,
+      );
+      return { status: "200", players: JSON.parse(cachedPlayers) };
+    } else {
+      const query = `
+        SELECT u.username, u.avatar_id
+        FROM partecipanti_partite pp
+        INNER JOIN utenti u ON pp.user_id = u.id_user
+        INNER JOIN partite p ON pp.partita_id = p.id_partita
+        WHERE p.id_partita = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1);
+      `;
+      const { rows } = await db.query(query, [matchId]);
+      return { status: "200", players: rows };
+    }
+  } catch (error) {
+    console.error("[SYS_ERR] Errore durante getMatchPlayers:", error);
+    return {
+      status: "500",
+      message: "Errore durante il caricamento dei giocatori della partita.",
+    };
+  }
+};
 module.exports = {
   createMatch,
   join_Match,
   listJoinableMatches,
+  getMatchPlayers
 };
