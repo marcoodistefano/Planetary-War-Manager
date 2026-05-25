@@ -333,12 +333,10 @@ const JoinAlliance = async (playerId, matchId, allianceId) => {
     const now = Date.now();
     if (timeLastLeave && now - parseInt(timeLastLeave) < 86400) {
       //24 ore di cooldown prima di poter rientrare in un'alleanza
-      return res
-        .status(400)
-        .json({
-          error:
-            "Non puoi rientrare in un'alleanza prima di 24 ore dall'ultimo abbandono.",
-        });
+      return res.status(400).json({
+        error:
+          "Non puoi rientrare in un'alleanza prima di 24 ore dall'ultimo abbandono.",
+      });
     }
     const countPlayer =
       redis.get(`match:${matchId}:alliance:${allianceId}:join_count`) || 0;
@@ -511,6 +509,97 @@ const LeaveAlliance = async (playerId, matchId, allianceId) => {
   }
 };
 
+const KickAlliance = async (
+  playerId,
+  matchId,
+  allianceId,
+  targetPlayerId,
+  motivation,
+) => {
+  try {
+    const matchCode = await redis.get(`match:${matchId}:ID_PARTITA`);
+    if (!matchCode)
+      return res.status(404).json({ error: "Partita non trovata." });
+    if (!matchId || !allianceId || !targetPlayerId)
+      return res
+        .status(400)
+        .json({ error: "Match id, player target o Alliance id mancante." });
+    const isMember = redis.get(
+      `match:${matchCode}:player:${targetPlayerId}:join:${allianceId}`,
+    );
+    if (!isMember)
+      return res
+        .status(400)
+        .json({
+          error: "Il giocatore target non è un membro di questa alleanza.",
+        });
+    await redis.set(
+      `match:${matchCode}:player:${targetPlayerId}:last_leave:${allianceId}`,
+      Date.now().toString(),
+    );
+    await redis.del(
+      `match:${matchCode}:player:${targetPlayerId}:join:${allianceId}`,
+    );
+    await redis.set(
+      `match:${matchCode}:alliance:${allianceId}:player_count`,
+      -1,
+    );
+    const notify = await fetch(
+      `http://localhost:3000/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: {
+            content: motivation ? `[SYS] Sei stato espulso dall'alleanza ${allianceId}. Motivazione: ${motivation}` : `Sei stato espulso dall'alleanza ${allianceId}.`,
+            destinatario: targetPlayerId,
+            dest_tipo: "USER",
+            tipo: "[SYS]",
+          },
+          matchId: matchCode,
+        }),
+      },
+    );
+    if (!notify.ok) {
+      console.error(
+        "[SYS_ERR] Errore durante la notifica dell'espulsione dall'alleanza:",
+        notify.statusText,
+      );
+    } else {
+      console.log(
+        `[SYS_OK] Notifica dell'espulsione dall'alleanza inviata con successo.`,
+      );
+    }
+    const result = await db.query(
+      `UPDATE partecipanti_partite pp
+        SET abbandono_alleanza_at = CURRENT_TIMESTAMP,
+          id_alleanza = NULL
+        FROM utenti u, alleanze a, partite p
+        WHERE pp.user_id = u.id_user
+          AND pp.id_alleanza = a.id_alliance
+          AND a.partita_id = p.id_partita
+          AND p.id_partita_visualizzato = $1
+          AND a.id_alleanza_visualizzato = $2
+          AND u.username = $3;`,
+      [matchCode, allianceId, targetPlayerId],
+    );
+    if (result.rowCount === 0) {
+      console.error(
+        "[SYS_ERR] Errore durante l'aggiornamento del database per l'espulsione dall'alleanza.",
+      );
+    }
+    return {
+      status: "200",
+      message: "Espulsione dall'alleanza avvenuta con successo",
+    };
+  } catch (error) {
+    console.error("[SYS_ERR] Errore durante KickAlliance:", error);
+    return res
+      .status(500)
+      .json({ error: "Errore interno", details: error.message });
+  }
+};
+
 module.exports = {
   createMatch,
   join_Match,
@@ -518,4 +607,5 @@ module.exports = {
   getMatchPlayers,
   JoinAlliance,
   LeaveAlliance,
+  KickAlliance,
 };

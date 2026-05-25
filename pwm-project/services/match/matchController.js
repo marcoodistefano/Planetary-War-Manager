@@ -268,13 +268,15 @@ const KickAlliance = async (req, res) => {
         .status(auth.status || 401)
         .json({ error: "Identita non verificabile." });
     const playerId = auth.userId;
+    const targetPlayerId = req.body.targetPlayerId; // L'ID del giocatore da espellere è passato come id_alliance
+    const motivation = req.body.motivation; // Motivazione opzionale per l'espulsione
     const matchId = req.params.id;
     const allianceId = req.params.id_alliance;
-    if (!matchId || !allianceId)
+    if (!matchId || !allianceId || !targetPlayerId)
       return res
         .status(400)
-        .json({ error: "Match id o Alliance id mancante." });
-    const result = await model.KickAlliance(playerId, matchId, allianceId);
+        .json({ error: "Match id, player target o Alliance id mancante." });
+    const result = await model.KickAlliance(playerId, matchId, allianceId, targetPlayerId, motivation);
     const statusCode = parseInt(result.status, 10) || 500;
     return res.status(statusCode).json(result);
   } catch (error) {
@@ -298,4 +300,5 @@ module.exports = {
   getAlliance,
   JoinAlliance,
   LeaveAlliance,
+  KickAlliance
 };
