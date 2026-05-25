@@ -195,13 +195,32 @@ export class MatchPage implements OnInit, AfterViewInit {
       next: (response: any) => {
         const info = response?.data;
         const matchEntry = this.findCurrentMatchEntry(info);
-        const extractedPlayers = this.extractPlayersFromMatchEntry(matchEntry);
+        const dashboardPlayers = this.extractPlayersFromMatchEntry(matchEntry);
 
-        this.matchPlayers = extractedPlayers.length > 0
-          ? extractedPlayers
-          : [];
+        if (!this.currentMatchId) {
+          this.matchPlayers = dashboardPlayers.length > 0 ? dashboardPlayers : [];
+          this.cdr.detectChanges();
+          return;
+        }
 
-        this.cdr.detectChanges();
+        this.homeService.getMatchPlayers(this.currentMatchId).subscribe({
+          next: (playersResponse: any) => {
+            const players: any[] = Array.isArray(playersResponse?.players) ? playersResponse.players : [];
+            const playerNames: string[] = players
+              .map((entry: any) => String(entry?.username || entry?.name || entry?.player || '').trim())
+              .filter((name: string): name is string => Boolean(name));
+
+            this.matchPlayers = playerNames.length > 0
+              ? [...new Set(playerNames)]
+              : (dashboardPlayers.length > 0 ? dashboardPlayers : []);
+
+            this.cdr.detectChanges();
+          },
+          error: () => {
+            this.matchPlayers = dashboardPlayers.length > 0 ? dashboardPlayers : [];
+            this.cdr.detectChanges();
+          }
+        });
       },
       error: (error) => {
         console.error('Errore nel recupero dei dati partita per la chat:', error);

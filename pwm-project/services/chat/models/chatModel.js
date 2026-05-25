@@ -210,6 +210,26 @@ const resolveUserIdByUsername = async (matchId, username) => {
   return userId;
 };
 
+const resolveUsernameByUserId = async (userId) => {
+  if (!userId) return null;
+
+  const cacheKey = `chat:user:by-id:${String(userId).trim()}`;
+  const cached = await redisClient.get(cacheKey);
+  if (cached) return cached;
+
+  const { rows } = await db.query(
+    "SELECT username FROM utenti WHERE id_user = $1 LIMIT 1",
+    [userId],
+  );
+
+  const username = rows[0]?.username || null;
+  if (username) {
+    await redisClient.setEx(cacheKey, CACHE_TTL_SECONDS, username);
+  }
+
+  return username;
+};
+
 const rateLimitUser = async (userId, matchId) => {
   const rateKey = `chat:rate:${matchId}:${userId}`;
   const count = await redisClient.incr(rateKey);
@@ -417,6 +437,7 @@ const processMessage = async ({
   const message = {
     id_mex: idMex,
     id_user_send: userId,
+    sender_username: await resolveUsernameByUserId(userId),
     id_partita: resolvedMatchId,
     content: text,
     time_stamp: timestamp,

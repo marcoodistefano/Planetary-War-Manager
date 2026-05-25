@@ -192,6 +192,86 @@
     }
   }
 
+  .match-roster {
+    margin-bottom: 10px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(134, 215, 255, 0.12);
+
+    &__head {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-bottom: 10px;
+
+      span {
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        color: #fff;
+        text-transform: uppercase;
+      }
+
+      small {
+        font-size: 0.66rem;
+        color: rgba(229, 244, 255, 0.64);
+      }
+    }
+
+    &__chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .roster-pill {
+      border: 1px solid rgba(134, 215, 255, 0.18);
+      background: rgba(255, 255, 255, 0.04);
+      color: #e5f4ff;
+      cursor: pointer;
+      transition: 0.2s ease;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+
+      &:hover {
+        transform: translateY(-1px);
+        border-color: rgba(134, 215, 255, 0.38);
+        background: rgba(134, 215, 255, 0.1);
+      }
+
+      &__status {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #86d7ff;
+        box-shadow: 0 0 10px rgba(134, 215, 255, 0.5);
+
+        &.self {
+          background: #86efac;
+          box-shadow: 0 0 10px rgba(34, 197, 94, 0.45);
+        }
+      }
+
+      &__name {
+        white-space: nowrap;
+      }
+
+      &__tag {
+        font-size: 0.58rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        color: #86efac;
+        text-transform: uppercase;
+      }
+    }
+  }
+
   .recipient-picker {
     margin-bottom: 10px;
     padding: 12px;

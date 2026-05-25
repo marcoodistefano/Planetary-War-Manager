@@ -3,6 +3,7 @@ const http = require("http");
 const cors = require("cors");
 const { WebSocketServer } = require("ws");
 const redisClient = require("../shared/redisClient.js");
+const db = require("../shared/postgresClient.js");
 const { getAuthContextFromRequest } = require("../shared/authContext.js");
 const chatModel = require("./models/chatModel.js");
 const { initDispatcher } = require("./Dispatcher/webDispatcher.js");
@@ -20,6 +21,55 @@ app.use(express.json()); // Body parser per i payload delle POST
 
 // Sonda diagnostica per il Gateway/Load Balancer
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+app.get("/chat/presence", async (req, res) => {
+  try {
+    const auth = await getAuthContextFromRequest(req);
+    if (!auth.ok) {
+      return res.status(auth.status || 401).json({ error: auth.error });
+    }
+
+    const matchId = req.query.matchId || req.query.id_partita;
+    const authResult = await chatModel.authorizeWsConnection({
+      userId: auth.userId,
+      matchId,
+    });
+
+    if (!authResult.ok) {
+      return res.status(authResult.status || 403).json({ error: authResult.error });
+    }
+
+    const connectedUserIds = [];
+    for (const [userId, sockets] of clientSockets.entries()) {
+      for (const ws of sockets) {
+        if (ws.readyState === 1 && ws.matchId === authResult.matchId) {
+          connectedUserIds.push(userId);
+          break;
+        }
+      }
+    }
+
+    const uniqueUserIds = [...new Set(connectedUserIds)];
+    if (!uniqueUserIds.length) {
+      return res.json({ users: [] });
+    }
+
+    const result = await db.query(
+      "SELECT id_user, username FROM utenti WHERE id_user = ANY($1::uuid[])",
+      [uniqueUserIds],
+    );
+
+    const users = result.rows.map((row) => ({
+      id: row.id_user,
+      username: row.username,
+    }));
+
+    return res.json({ users, count: users.length });
+  } catch (error) {
+    console.error("[SYS_ERR] Presence error:", error);
+    return res.status(500).json({ error: "Errore interno del server" });
+  }
+});
 
 // Montaggio del bus HTTP
 // Nota: Il Gateway inoltra la richiesta mantenendo il path, es: "/chat/message"

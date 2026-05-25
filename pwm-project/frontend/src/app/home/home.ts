@@ -23,4 +23,8 @@ export class HomeService {
   joinMatch(matchId: string): Observable<any> {
     return this.http.post<any>(`${this.matchApiUrl}/${matchId}/join`, {}, { withCredentials: true });
   }
+
+  getMatchPlayers(matchId: string): Observable<any> {
+    return this.http.get<any>(`${this.matchApiUrl}/${matchId}/players`, { withCredentials: true });
+  }
 }

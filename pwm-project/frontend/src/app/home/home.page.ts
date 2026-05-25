@@ -328,11 +328,11 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
 
   async handleQuickAction(action: string) {
     switch (String(action).trim().toLowerCase()) {
-      case 'Profilo': this.router.navigate(['/profile']); break;
-      case 'Notifiche': await this.openModal(NotificationsComponent); break;
-      case 'Impostazioni': await this.openModal(SettingsComponent); break;
-      case 'Amici': await this.openModal(FriendsComponent); break;
-      case 'Leaderboard': await this.openModal(LeaderboardComponent); break;
+      case 'profilo': this.router.navigate(['/profile']); break;
+      case 'notifiche': await this.openModal(NotificationsComponent); break;
+      case 'impostazioni': await this.openModal(SettingsComponent); break;
+      case 'amici': await this.openModal(FriendsComponent); break;
+      case 'leaderboard': await this.openModal(LeaderboardComponent); break;
       case 'partite attive':
         this.router.navigate(['/history'], { queryParams: { tab: 'active' } });
         break;

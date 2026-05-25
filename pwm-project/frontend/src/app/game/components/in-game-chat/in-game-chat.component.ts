@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { ActivatedRoute } from '@angular/router';
+import { environment } from '../../../../environments/environment';
 
 export interface ChatMessage {
   sender: string;
@@ -55,6 +56,7 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
 
   private socket?: WebSocket;
   private reconnectTimer?: number;
+  private presenceRefreshTimer?: number;
   private shouldReconnect = true;
   private activeChannelLoadedFor = '';
   private lastRenderedCount = 0;
@@ -66,6 +68,7 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
   activeScope: 'global' | 'alliance' | 'direct' = 'global';
   activeDirectRecipient: string | null = null;
   recentContacts: string[] = [];
+  connectedUsers: string[] = [];
   newMessage = '';
   visibleMessages: ChatMessage[] = [];
   channels: ChatChannel[] = [];
@@ -89,6 +92,9 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
     this.shouldReconnect = false;
     if (this.reconnectTimer) {
       window.clearTimeout(this.reconnectTimer);
+    }
+    if (this.presenceRefreshTimer) {
+      window.clearInterval(this.presenceRefreshTimer);
     }
     this.socket?.close();
   }
@@ -120,6 +126,18 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
       .filter((name) => name && roster.has(name));
 
     return [...new Set(names)];
+  }
+
+  get matchRoster(): string[] {
+    return [...new Set(
+      this.playersInMatch
+        .map((name) => String(name || '').trim())
+        .filter((name) => name && name.toLowerCase() !== 'sistema')
+    )];
+  }
+
+  get visibleRoster(): string[] {
+    return this.connectedUsers.length ? this.connectedUsers : this.matchRoster;
   }
 
   get composerPlaceholder(): string {
@@ -193,7 +211,8 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
     }
 
     this.connectionStatus = 'connecting';
-    const wsUrl = `${window.location.origin.replace(/^http/, 'ws')}/chat/${encodeURIComponent(this.resolvedMatchId)}`;
+    const wsBaseUrl = this.getGatewayWsBaseUrl();
+    const wsUrl = `${wsBaseUrl}/chat/${encodeURIComponent(this.resolvedMatchId)}`;
 
     try {
       this.socket = new WebSocket(wsUrl);
@@ -201,6 +220,10 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
       this.socket.onopen = () => {
         this.connectionStatus = 'connected';
         this.ensureChannelHistoryLoaded();
+        this.refreshConnectedUsers();
+        if (!this.presenceRefreshTimer) {
+          this.presenceRefreshTimer = window.setInterval(() => this.refreshConnectedUsers(), 8000);
+        }
         this.emitUnreadState();
         this.cdr.detectChanges();
       };
@@ -218,6 +241,9 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
 
         if (this.shouldReconnect) {
           this.reconnectTimer = window.setTimeout(() => this.connectSocket(), 2500);
+        } else if (this.presenceRefreshTimer) {
+          window.clearInterval(this.presenceRefreshTimer);
+          this.presenceRefreshTimer = undefined;
         }
       };
     } catch (error) {
@@ -262,7 +288,7 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
   }
 
   private mapServiceMessage(message: any): ChatMessage {
-    const sender = String(message?.id_user_send || message?.sender || 'Sistema');
+    const sender = String(message?.sender_username || message?.sender || message?.id_user_send || 'Sistema');
     const recipient = message?.destinatario ? String(message.destinatario) : undefined;
     const scope = this.normalizeScope(message?.tipo, recipient);
     const channelKey = this.channelKey(scope, scope === 'direct' ? recipient || sender : recipient);
@@ -431,7 +457,7 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
     });
 
     try {
-      const response = await fetch(`/chat/history?${params.toString()}`, {
+      const response = await fetch(`${this.getGatewayHttpBaseUrl()}/chat/history?${params.toString()}`, {
         credentials: 'include',
       });
 
@@ -466,6 +492,37 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
     } catch (error) {
       this.visibleMessages = [...(this.messagesByChannel.get(channel.key) || [])];
       this.cdr.detectChanges();
+    }
+  }
+
+  private async refreshConnectedUsers() {
+    if (!this.resolvedMatchId) {
+      this.connectedUsers = this.matchRoster;
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${this.getGatewayHttpBaseUrl()}/chat/presence?matchId=${encodeURIComponent(this.resolvedMatchId)}`,
+        { credentials: 'include' },
+      );
+
+      if (!response.ok) {
+        this.connectedUsers = this.matchRoster;
+        return;
+      }
+
+      const payload = await response.json();
+      const users: string[] = Array.isArray(payload?.users)
+        ? payload.users
+            .map((entry: any) => String(entry?.username || '').trim())
+            .filter((name: string) => name)
+        : [];
+
+      this.connectedUsers = users.length ? [...new Set(users)] : this.matchRoster;
+      this.cdr.detectChanges();
+    } catch (error) {
+      this.connectedUsers = this.matchRoster;
     }
   }
 
@@ -536,7 +593,7 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(payload));
     } else {
-      fetch('/api/chat/message', {
+      fetch(`${this.getGatewayHttpBaseUrl()}/chat/message`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -566,6 +623,20 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.cdr.detectChanges();
     }
+  }
+
+  private getGatewayHttpBaseUrl(): string {
+    const configured = String(environment.apiBaseUrl || '').replace(/\/$/, '');
+    return configured || '';
+  }
+
+  private getGatewayWsBaseUrl(): string {
+    const httpBase = this.getGatewayHttpBaseUrl();
+    if (httpBase) {
+      return httpBase.replace(/^http(s?):\/\//i, 'ws$1://');
+    }
+
+    return window.location.origin.replace(/^http(s?):\/\//i, 'ws$1://');
   }
 
   replyTo(playerName: string) {
