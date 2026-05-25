@@ -276,6 +276,35 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
     const message = this.mapServiceMessage(parsed.data);
     const channelKey = this.resolveChannelKeyFromMessage(message);
 
+    // Strict routing rules:
+    // - Global messages only go to the global channel
+    // - Direct (private) messages are shown ONLY if the current user is sender or recipient
+    if (message.scope === 'direct') {
+      const me = String(this.currentUser || '').trim();
+      const sender = String(message.sender || '').trim();
+      const recipient = String(message.to || '').trim();
+
+      // If the private message doesn't involve the current user, ignore it
+      if (me && sender !== me && recipient !== me) {
+        return; // drop message not meant to this client
+      }
+    }
+
+    if (message.scope === 'global') {
+      // Force channel key for global
+      if (channelKey !== this.channelKey('global')) {
+        // remap to global to avoid accidental duplication
+        this.pushMessage(message, this.channelKey('global'));
+        this.recordRecentContactFromMessage(message);
+        this.handleUnreadForIncomingMessage(this.channelKey('global'));
+        if (this.channelKey('global') === this.activeChannelKey()) {
+          this.visibleMessages = [...(this.messagesByChannel.get(this.channelKey('global')) || [])];
+        }
+        return;
+      }
+    }
+
+    // Default: push to resolved channel
     this.pushMessage(message, channelKey);
     this.recordRecentContactFromMessage(message);
     this.handleUnreadForIncomingMessage(channelKey);

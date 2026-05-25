@@ -93,6 +93,17 @@ const resolveMatchId = async (matchId) => {
   const cached = await redisClient.get(cacheKey);
   if (cached) return cached;
 
+  // If matchId looks like an internal id (already an id_partita), accept it directly
+  const { rows: checkRows } = await db.query(
+    "SELECT 1 FROM partite WHERE id_partita = $1 LIMIT 1",
+    [matchId],
+  );
+
+  if (checkRows && checkRows.length > 0) {
+    await redisClient.setEx(cacheKey, CACHE_TTL_SECONDS, matchId);
+    return matchId;
+  }
+
   const { rows } = await db.query(
     "SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1 LIMIT 1",
     [matchId],
@@ -122,7 +133,7 @@ const ensureUserInMatch = async ({ userId, matchId }) => {
   const hasCache = await redisClient.exists(participantsKey);
   if (hasCache) {
     const { rows } = await db.query(
-      "SELECT 1 FROM partecipanti_partite WHERE partita_id = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1) AND user_id = $2",
+      "SELECT 1 FROM partecipanti_partite WHERE partita_id = $1 AND user_id = $2",
       [matchId, userId],
     );
     if (rows.length > 0) {
@@ -133,7 +144,7 @@ const ensureUserInMatch = async ({ userId, matchId }) => {
   }
 
   const { rows } = await db.query(
-    "SELECT user_id FROM partecipanti_partite WHERE partita_id = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1) ",
+    "SELECT user_id FROM partecipanti_partite WHERE partita_id = $1",
     [matchId],
   );
 
@@ -154,7 +165,7 @@ const getParticipants = async (matchId) => {
   }
 
   const { rows } = await db.query(
-    "SELECT user_id FROM partecipanti_partite WHERE partita_id = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1) ",
+    "SELECT user_id FROM partecipanti_partite WHERE partita_id = $1",
     [matchId],
   );
   const members = rows.map((row) => row.user_id);
@@ -175,7 +186,7 @@ const getAllianceMembers = async (matchId, allianceId) => {
   }
 
   const { rows } = await db.query(
-    "SELECT user_id FROM partecipanti_partite WHERE partita_id = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1) AND id_alleanza = $2",
+    "SELECT user_id FROM partecipanti_partite WHERE partita_id = $1 AND id_alleanza = $2",
     [matchId, allianceId],
   );
   const members = rows.map((row) => row.user_id);
@@ -198,7 +209,7 @@ const resolveUserIdByUsername = async (matchId, username) => {
   if (cached) return cached;
 
   const { rows } = await db.query(
-    "SELECT u.id_user FROM utenti u INNER JOIN partecipanti_partite p ON p.user_id = u.id_user WHERE u.username = $1 AND p.partita_id = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $2) LIMIT 1",
+    "SELECT u.id_user FROM utenti u INNER JOIN partecipanti_partite p ON p.user_id = u.id_user WHERE u.username = $1 AND p.partita_id = $2 LIMIT 1",
     [normalized, matchId],
   );
 
@@ -276,9 +287,8 @@ const persistMessage = async ({
   try {
     await client.query("BEGIN");
     await client.query(
-      "INSERT INTO messaggi (id_mex, id_user_send, id_partita, content, time_stamp) VALUES ($1, $2, (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $3), $4, $5);"[
-        (idMex, userId, matchId, content, timestamp)
-      ],
+      "INSERT INTO messaggi (id_mex, id_user_send, id_partita, content, time_stamp) VALUES ($1, $2, $3, $4, $5)",
+      [idMex, userId, matchId, content, timestamp],
     );
 
     if (uniqueRecipients.length > 0) {

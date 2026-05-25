@@ -189,6 +189,8 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
+      - JWT_SECRET=${SECRET_KEY}
+      - SECRET_KEY=${SECRET_KEY}
     networks:
       - pwm-net
 
