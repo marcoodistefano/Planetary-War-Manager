@@ -160,6 +160,54 @@ const getResult = async (req, res) => notImplemented(res);
 const getMatch = async (req, res) => notImplemented(res);
 const getHistory = async (req, res) => notImplemented(res);
 
+const getAlliance = async (req, res) =>{
+  try {
+    const matchId = req.params.id;
+    if (!await getAuthContextFromRequest(req).ok) return res.status(auth.status || 401).json({ error: "Identita non verificabile." });
+    if (!matchId) return res.status(400).json({ error: "Match id mancante." });
+    const result = await model.getMatchAlliance(matchId);
+    const statusCode = parseInt(result.status, 10) || 500;
+    return res.status(statusCode).json(result);
+  } catch (error) {
+    console.error("[SYS_ERR] Cortocircuito getAlliance:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
+  }
+};
+
+const JoinAlliance = async (req, res) =>{
+  try {
+    const auth = await getAuthContextFromRequest(req);
+    if (!auth.ok) return res.status(auth.status || 401).json({ error: "Identita non verificabile." });
+    const playerId = auth.userId;
+    const matchId = req.params.id;
+    const allianceId = req.params.id_alliance;
+    if (!matchId || !allianceId) return res.status(400).json({ error: "Match id o Alliance id mancante." });
+    const result = await model.joinAlliance(playerId, matchId, allianceId);
+    const statusCode = parseInt(result.status, 10) || 500;
+    return res.status(statusCode).json(result);
+  } catch (error) {
+    console.error("[SYS_ERR] Cortocircuito JoinAlliance:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
+  }
+};
+
+const LeaveAlliance = async (req, res) =>{
+  try {
+    const auth = await getAuthContextFromRequest(req);
+    if (!auth.ok) return res.status(auth.status || 401).json({ error: "Identita non verificabile." });
+    const playerId = auth.userId;
+    const matchId = req.params.id;
+    const allianceId = req.params.id_alliance;
+    if (!matchId || !allianceId) return res.status(400).json({ error: "Match id o Alliance id mancante." });
+    const result = await model.LeaveAlliance(playerId, matchId, allianceId);
+    const statusCode = parseInt(result.status, 10) || 500;
+    return res.status(statusCode).json(result);
+  } catch (error) {
+    console.error("[SYS_ERR] Cortocircuito LeaveAlliance:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
+  }
+};
+
 module.exports = { 
   create, 
   join, 
@@ -169,5 +217,8 @@ module.exports = {
   getStatus, 
   getResult, 
   getMatch, 
-  getHistory 
+  getHistory,
+  getAlliance,
+  JoinAlliance,
+  LeaveAlliance
 };

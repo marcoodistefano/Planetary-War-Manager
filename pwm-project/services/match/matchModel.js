@@ -268,9 +268,162 @@ const getMatchPlayers = async (matchId) => {
     };
   }
 };
+
+const getMatchAlliance = async (matchId) => {
+  try {
+    if (!matchId) return res.status(400).json({ error: "Match id mancante." });
+    const result = redis.get(`match:${matchId}:alliances`);
+    if (result) {
+      console.log(
+        `[SYS_CACHE] Alliances per match ${matchId} recuperati da Redis.`,
+      );
+      return { status: "200", alliances: JSON.parse(result) };
+    } else {
+      try {
+        const query = `
+          SELECT 
+            a.id_alleanza,
+            a.nome_alleanza,
+            a.nome_logo, 
+            COUNT(pa.user_id) AS numero_partecipanti,
+            array_agg(u.username) AS members
+          FROM partite p
+          INNER JOIN alleanze a ON p.id_partita = a.id_partita
+          LEFT JOIN partecipanti_alleanze pa ON a.id_alleanza = pa.id_alleanza
+          LEFT JOIN utenti u ON pa.user_id = u.id_user
+          WHERE p.id_partita_visualizzato = $1
+          GROUP BY 
+            a.id_alleanza, 
+            a.nome_alleanza, 
+            a.nome_logo;
+        `;
+        const { rows } = await db.query(query, [matchId]);
+        if (rows.length > 0) {
+          await redis.set(`match:${matchId}:alliances`, JSON.stringify(rows));
+          return { status: "200", alliances: rows };
+        } else {
+          return {
+            status: "404",
+            message: "Nessuna alleanza trovata per questa partita.",
+          };
+        }
+      } catch (dbError) {
+        throw dbError;
+      }
+    }
+    const statusCode = parseInt(result.status, 10) || 500;
+    return res.status(statusCode).json(result);
+  } catch (error) {
+    console.error("[SYS_ERR] Errore durante getMatchAlliance:", error);
+    return res
+      .status(500)
+      .json({ error: "Errore interno", details: error.message });
+  }
+};
+
+const JoinAlliance = async (playerId, matchId, allianceId) => {
+  try {
+    if (!matchId || !allianceId)
+      return res
+        .status(400)
+        .json({ error: "Match id o Alliance id mancante." });
+    const countPlayer =
+      redis.get(`match:${matchId}:alliance:${allianceId}:join_count`) || 0;
+    const maxPlayers = 4; // Numero massimo di giocatori per alleanza TO UPDATE: OCCORRE VEDERE L'IMPOSTAZIONE PARTITA PER RICAVARE IL NUMERO MASSIMO DI GIOCATORI PER ALLEANZA
+    if (countPlayer >= maxPlayers)
+      return res.status(400).json({ error: "Alleanza già al completo." });
+    else if (countPlayer === 0) {
+      const resDB = await db.query(
+        `SELECT COUNT(p.user_id) AS numero_partecipanti
+        FROM partecipanti_partite p
+        INNER JOIN partite m ON p.id_partita = m.id_partita
+        WHERE m.id_partita_visualizzato = $1 
+          AND p.id_alleanza = $2;`,
+        [matchId, allianceId],
+      );
+      if (resDB.rows.length > 0) {
+        const numeroPartecipanti = parseInt(resDB.rows[0].numero_partecipanti);
+        redis.set(
+          `match:${matchId}:alliance:${allianceId}:join_count`,
+          numeroPartecipanti + 1,
+        );
+        redis.set(
+          `match:${matchId}:player:${playerId}:join:${allianceId}`, "true"
+        );
+        console.log(
+          `[SYS_CACHE] Alleanza ${allianceId} per match ${matchId} ha ora ${numeroPartecipanti + 1} partecipanti in Redis.`,
+        );
+        return {
+          status: "200",
+          message: "Join all'alleanza avvenuto con successo",
+        };
+      } else {
+        const result = redis.set(
+          `match:${matchId}:player:${playerId}:join:${allianceId}`,
+          "true",
+        );
+        if (result) {
+          console.log(
+            `[SYS_CACHE] Player ${playerId} unito all'alleanza ${allianceId} per match ${matchId} in Redis.`,
+          );
+          return {
+            status: "200",
+            message: "Join all'alleanza avvenuto con successo",
+          };
+        } else {
+          return {
+            status: "500",
+            message: "Errore durante il join all'alleanza",
+          };
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[SYS_ERR] Errore durante JoinAlliance:", error);
+    return res
+      .status(500)
+      .json({ error: "Errore interno", details: error.message });
+  }
+};
+const LeaveAlliance = async (playerId, matchId, allianceId) => {
+  try {
+    if (!matchId || !allianceId)
+      return res
+        .status(400)
+        .json({ error: "Match id o Alliance id mancante." });
+    const joined = redis.get(`match:${matchId}:player:${playerId}:join:${allianceId}`);
+    if (!joined)
+      return res
+        .status(400)
+        .json({ error: "Non sei un membro di questa alleanza." });
+    const countPlayer = redis.get(`match:${matchId}:alliance:${allianceId}:join_count`) || 0;
+    if (countPlayer > 0) {
+      redis.set(
+        `match:${matchId}:alliance:${allianceId}:join_count`,
+        countPlayer - 1,
+      );
+      redis.del(`match:${matchId}:player:${playerId}:join:${allianceId}`);
+      console.log(
+        `[SYS_CACHE] Player ${playerId} ha lasciato l'alleanza ${allianceId} per match ${matchId} in Redis.`,
+      );
+      return {
+        status: "200",
+        message: "Lascio all'alleanza avvenuto con successo",
+      };
+    }
+  } catch (error) {
+    console.error("[SYS_ERR] Errore durante LeaveAlliance:", error);
+    return res
+      .status(500)
+      .json({ error: "Errore interno", details: error.message });
+  }
+};
+
 module.exports = {
   createMatch,
   join_Match,
   listJoinableMatches,
-  getMatchPlayers
+  getMatchPlayers,
+  JoinAlliance,
+  LeaveAlliance
 };

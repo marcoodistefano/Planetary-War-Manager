@@ -14,5 +14,8 @@ router.get("/:id/players", matchController.getPlayers);  // Diventa /match/:id/p
 router.get("/:id/status", matchController.getStatus);    // Diventa /match/:id/status
 router.get("/:id/result", matchController.getResult);    // Diventa /match/:id      result
 router.get("/:id/history", matchController.getHistory);  // Diventa /match/:id/history
+router.get("/:id/alliance", matchController.getAlliance);
+router.post("/:id/join/:id_alliance", matchController.JoinAlliance);
+router.post("/:id/leave/:id_alliance", matchController.LeaveAlliance);
 
 module.exports = router;
