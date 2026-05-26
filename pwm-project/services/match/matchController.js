@@ -194,7 +194,8 @@ const getHistory = async (req, res) => notImplemented(res);
 const getAlliance = async (req, res) => {
   try {
     const matchId = req.params.id;
-    if (!(await getAuthContextFromRequest(req).ok))
+    const auth = await getAuthContextFromRequest(req);
+    if (!auth.ok)
       return res
         .status(auth.status || 401)
         .json({ error: "Identita non verificabile." });
@@ -249,7 +250,7 @@ const LeaveAlliance = async (req, res) => {
       return res
         .status(400)
         .json({ error: "Match id o Alliance id mancante." });
-    const result = await model.LeaveAlliance(playerId, matchId, allianceId);
+    const result = await model.leaveAlliance(playerId, matchId, allianceId);
     const statusCode = parseInt(result.status, 10) || 500;
     return res.status(statusCode).json(result);
   } catch (error) {
@@ -276,7 +277,7 @@ const KickAlliance = async (req, res) => {
       return res
         .status(400)
         .json({ error: "Match id, player target o Alliance id mancante." });
-    const result = await model.KickAlliance(playerId, matchId, allianceId, targetPlayerId, motivation);
+    const result = await model.kickAlliance(playerId, matchId, allianceId, targetPlayerId, motivation);
     const statusCode = parseInt(result.status, 10) || 500;
     return res.status(statusCode).json(result);
   } catch (error) {

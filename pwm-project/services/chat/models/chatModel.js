@@ -70,6 +70,20 @@ const normalizeTipo = (tipo) => {
   return { code: 0, label: "privata" };
 };
 
+const normalizeChatTypeLabel = (value) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["globale", "global", "broadcast", "2"].includes(normalized)) {
+    return "globale";
+  }
+  if (["alleanza", "alliance", "1"].includes(normalized)) {
+    return "alleanza";
+  }
+  if (["privata", "private", "direct", "0"].includes(normalized)) {
+    return "privata";
+  }
+  return normalized || "privata";
+};
+
 const buildChatListKey = ({
   matchId,
   tipoCode,
@@ -280,6 +294,18 @@ const publishMessage = async ({ matchId, targetUsers, payload }) => {
   );
 };
 
+const sanitizeMessageForClient = (msg) => {
+  if (!msg || typeof msg !== 'object') return msg;
+  const copy = { ...msg };
+  // Remove fields that can contain user UUIDs
+  delete copy.id_user_send;
+  delete copy.id_user_receiver;
+  delete copy.id_user;
+  delete copy.user_id;
+  delete copy.sender_id;
+  return copy;
+};
+
 const persistMessage = async ({
   idMex,
   userId,
@@ -408,6 +434,7 @@ const processMessage = async ({
 
   const tipoInfo = normalizeTipo(tipo);
   let destinatarioValue = destinatario;
+  let recipientId = null;
 
   if (tipoInfo.code === 2) {
     destinatarioValue = "ALL";
@@ -448,7 +475,8 @@ const processMessage = async ({
     return recipientsResult;
   }
 
-  const { recipients, dbRecipients, recipientId } = recipientsResult;
+  const { recipients, dbRecipients, recipientId: resolvedRecipientId } = recipientsResult;
+  recipientId = resolvedRecipientId || null;
   const idMex = crypto.randomUUID();
   const timestamp = new Date().toISOString();
 
@@ -461,6 +489,7 @@ const processMessage = async ({
     time_stamp: timestamp,
     tipo: tipoInfo.code,
     destinatario: destinatarioValue,
+    scope: tipoInfo.label === 'globale' ? 'global' : (tipoInfo.label === 'alleanza' ? 'alliance' : 'direct'),
   };
 
   const listKey = buildChatListKey({
@@ -472,10 +501,12 @@ const processMessage = async ({
   });
 
   await storeMessageInRedis(listKey, message);
+  // Publish a sanitized copy for clients (no UUIDs)
+  const safeMessage = sanitizeMessageForClient(message);
   await publishMessage({
     matchId: resolvedMatchId,
     targetUsers: recipients,
-    payload: { type: "NEW_MESSAGE", data: message },
+    payload: { type: "NEW_MESSAGE", data: safeMessage },
   });
 
   persistMessageAsync({
@@ -569,10 +600,11 @@ const processSYSMessage = async (userId, matchId, destinatario, dest_tipo, tipo,
   });
 
   await storeMessageInRedis(listKey, message);
+  const safeMessage = sanitizeMessageForClient(message);
   await publishMessage({
     matchId: resolvedMatchId,
     targetUsers: recipients,
-    payload: { type: "NEW_MESSAGE", data: message },
+    payload: { type: "NEW_MESSAGE", data: safeMessage },
   });
 
   persistMessageAsync({
@@ -676,7 +708,88 @@ const getRecentMessages = async ({
     }
   });
 
-  return { ok: true, items: parsed };
+  // If Redis has no cached items for this chat, fall back to DB so history
+  // is available after restarts or cache eviction.
+  if (!parsed || parsed.length === 0) {
+    try {
+      const historyMode = tipoInfo.code;
+      const typeCandidates =
+        historyMode === 2
+          ? ["globale", "global", "broadcast", "2"]
+          : historyMode === 1
+            ? ["alleanza", "alliance", "1"]
+            : ["privata", "private", "direct", "0"];
+
+      let historyQuery = `SELECT m.id_mex, m.id_user_send, su.username AS sender_username, m.id_partita, m.content, m.time_stamp, c.tipo_chat, c.id_user_receiver, ru.username AS recipient_username
+        FROM messaggi m
+        JOIN chat c ON c.id_mex = m.id_mex
+        LEFT JOIN utenti su ON su.id_user = m.id_user_send
+        LEFT JOIN utenti ru ON ru.id_user = c.id_user_receiver
+        WHERE m.id_partita = $1`;
+      let historyParams = [resolvedMatchId, typeCandidates];
+
+      if (historyMode === 2) {
+        historyQuery += ` AND LOWER(c.tipo_chat) = ANY($2::text[])`;
+      } else if (historyMode === 1) {
+        historyQuery += ` AND LOWER(c.tipo_chat) = ANY($2::text[])`;
+      } else {
+        historyQuery += ` AND LOWER(c.tipo_chat) = ANY($2::text[])`;
+
+        const resolvedDirectRecipient = await resolveUserIdByUsername(
+          resolvedMatchId,
+          destinatarioValue,
+        );
+
+        if (resolvedDirectRecipient) {
+          historyParams.push(resolvedDirectRecipient, userId);
+          historyQuery += ` AND ((m.id_user_send = $3 AND c.id_user_receiver = $4) OR (m.id_user_send = $4 AND c.id_user_receiver = $3))`;
+        } else {
+          historyParams.push(userId);
+          historyQuery += ` AND c.id_user_receiver = $3`;
+        }
+      }
+
+      historyParams.push(safeLimit);
+      historyQuery += ` ORDER BY m.time_stamp DESC LIMIT $${historyParams.length}`;
+
+      const { rows } = await db.query(historyQuery, historyParams);
+
+      // rows are returned newest-first; reverse to oldest-first to match Redis order
+      const dbMessages = (rows || []).reverse().map((r) => ({
+        id_mex: r.id_mex,
+        id_user_send: r.id_user_send,
+        sender_username: r.sender_username,
+        id_partita: r.id_partita,
+        content: r.content,
+        time_stamp: r.time_stamp && r.time_stamp.toISOString ? r.time_stamp.toISOString() : r.time_stamp,
+        tipo: normalizeChatTypeLabel(r.tipo_chat) === "globale" ? 2 : (normalizeChatTypeLabel(r.tipo_chat) === "alleanza" ? 1 : 0),
+        destinatario: normalizeChatTypeLabel(r.tipo_chat) === "globale" ? "ALL" : (normalizeChatTypeLabel(r.tipo_chat) === "alleanza" ? destinatarioValue : (r.recipient_username || destinatarioValue)),
+        scope: normalizeChatTypeLabel(r.tipo_chat) === "globale" ? "global" : (normalizeChatTypeLabel(r.tipo_chat) === "alleanza" ? "alliance" : "direct"),
+      }));
+
+      const sanitizedDb = dbMessages.map((m) => sanitizeMessageForClient(m));
+
+      // Repopulate Redis cache in background to speed up subsequent reads
+      setImmediate(async () => {
+        try {
+          for (const msg of dbMessages) {
+            await storeMessageInRedis(listKey, msg);
+          }
+        } catch (err) {
+          console.error('[SYS_ERR] Ripopolamento cache Redis fallito:', err);
+        }
+      });
+
+      return { ok: true, items: sanitizedDb };
+    } catch (error) {
+      console.error("[SYS_ERR] Recupero history DB fallito:", error);
+      // fall back to returning whatever (possibly empty) Redis parsed items
+    }
+  }
+
+  // Sanitize messages before sending to client
+  const sanitized = parsed.map((m) => sanitizeMessageForClient(m));
+  return { ok: true, items: sanitized };
 };
 
 const authorizeWsConnection = async ({ userId, matchId }) => {

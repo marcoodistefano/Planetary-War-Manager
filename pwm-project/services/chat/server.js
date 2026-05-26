@@ -60,7 +60,6 @@ app.get("/chat/presence", async (req, res) => {
     );
 
     const users = result.rows.map((row) => ({
-      id: row.id_user,
       username: row.username,
     }));
 

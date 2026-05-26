@@ -3,6 +3,24 @@ const db = require("../shared/postgresClient.js");
 const redis = require("../shared/redisClient.js"); // Client Redis collegato
 const Eru = require("./middleware/Eru.js");
 
+// Helper: write match state under three Redis keys (internal id, hash, visual id)
+const setMatchCacheAllIds = async ({ id_partita, id_partita_hash, id_partita_visualizzato, stateObj, ttlSeconds = 86400 }) => {
+  try {
+    const payload = typeof stateObj === "string" ? stateObj : JSON.stringify(stateObj || {});
+    const keys = [
+      `match:${id_partita}`,
+      `match:${id_partita_hash}`,
+      `match:${id_partita_visualizzato}`,
+    ];
+    const ops = keys.map((k) => redis.set(k, payload));
+    await Promise.all(ops);
+    // apply TTL to non-empty keys
+    await Promise.all(keys.map((k) => redis.expire(k, ttlSeconds)));
+  } catch (e) {
+    console.error("[SYS_WARN] setMatchCacheAllIds failed:", e.message);
+  }
+};
+
 // ============================================================================
 // 1. CREAZIONE PARTITA (Postgres + Istanza Redis)
 // ============================================================================
@@ -70,11 +88,21 @@ const createMatch = async ({ playerId, gameMode }) => {
       await redis.del(`home_info:${playerId}`);
 
       // E. ISTANZIAZIONE REDIS (Iniezione in Memoria Volatile)
-      // La partita viene caricata in Redis con un TTL (Time-To-Live) di 24 ore
-      // per evitare "Memory Leak" di partite mai concluse.
-      const redisKey = `match:${id_partita_hash}:status`;
-      await redis.set(redisKey, eruRes.binary_match);
-      await redis.expire(redisKey, 86400);
+      // La partita viene caricata in Redis sotto tutte e tre le chiavi
+      // (id_partita, id_partita_hash, id_partita_visualizzato)
+      const matchCache = {
+        id_partita: partitaId,
+        id_partita_hash: id_partita_hash,
+        id_partita_visualizzato: id_partita_visualizzato,
+        struttura_partita: eruRes.binary_match,
+        created_at: new Date().toISOString(),
+      };
+      await setMatchCacheAllIds({
+        id_partita: partitaId,
+        id_partita_hash: id_partita_hash,
+        id_partita_visualizzato: id_partita_visualizzato,
+        stateObj: matchCache,
+      });
 
       console.log(
         `[SYS_OK] Partita istanziata su Postgres e caricata in cache Redis: ${id_partita_hash}`,
@@ -154,7 +182,19 @@ const join_Match = async (playerId, id_partita_hash) => {
 
         // B. Sincronizzazione Redis
         // Sovrascriviamo il frame in cache con il nuovo stato "IN_CORSO"
-        await redis.set(redisKey, eru_start.struttura_partita);
+        const matchCache = {
+          id_partita: partitaId,
+          id_partita_hash: id_partita_hash,
+          id_partita_visualizzato: id_partita_visualizzato,
+          struttura_partita: eru_start.struttura_partita,
+          updated_at: new Date().toISOString(),
+        };
+        await setMatchCacheAllIds({
+          id_partita: partitaId,
+          id_partita_hash: id_partita_hash,
+          id_partita_visualizzato: id_partita_visualizzato,
+          stateObj: matchCache,
+        });
 
         console.log(
           `[SYS_EVENT] Match ${id_partita_hash} AVVIATO. Cache Redis aggiornata.`,
@@ -271,101 +311,159 @@ const getMatchPlayers = async (matchId) => {
 
 const getMatchAlliance = async (matchId) => {
   try {
-    if (!matchId) return res.status(400).json({ error: "Match id mancante." });
-    const result = redis.get(`match:${matchId}:alliances`);
-    if (result) {
+    if (!matchId) return { status: "400", message: "Match id mancante." };
+    const cached = await redis.get(`match:${matchId}:alliances`);
+    if (cached) {
       console.log(
         `[SYS_CACHE] Alliances per match ${matchId} recuperati da Redis.`,
       );
-      return { status: "200", alliances: JSON.parse(result) };
+      return { status: "200", alliances: JSON.parse(cached) };
     } else {
-      try {
-        const query = `
-          SELECT 
-            a.id_alleanza,
-            a.nome_alleanza,
-            a.nome_logo, 
-            COUNT(pa.user_id) AS numero_partecipanti,
-            array_agg(u.username) AS members
-          FROM partite p
-          INNER JOIN alleanze a ON p.id_partita = a.id_partita
-          LEFT JOIN partecipanti_alleanze pa ON a.id_alleanza = pa.id_alleanza
-          LEFT JOIN utenti u ON pa.user_id = u.id_user
-          WHERE p.id_partita_visualizzato = $1
-          GROUP BY 
-            a.id_alleanza, 
-            a.nome_alleanza, 
-            a.nome_logo;
-        `;
-        const { rows } = await db.query(query, [matchId]);
-        if (rows.length > 0) {
-          await redis.set(`match:${matchId}:alliances`, JSON.stringify(rows));
-          return { status: "200", alliances: rows };
-        } else {
-          return {
-            status: "404",
-            message: "Nessuna alleanza trovata per questa partita.",
-          };
-        }
-      } catch (dbError) {
-        throw dbError;
+      const query = `
+        SELECT 
+          a.id_alleanza,
+          a.nome_alleanza,
+          a.nome_logo, 
+          COUNT(pa.user_id) AS numero_partecipanti,
+          COALESCE(
+            array_agg(u.username) FILTER (WHERE u.username IS NOT NULL),
+            ARRAY[]::text[]
+          ) AS members
+        FROM partite p
+        INNER JOIN alleanze a ON p.id_partita = a.id_partita
+        LEFT JOIN partecipanti_partite pa ON a.id_alleanza = pa.id_alleanza AND pa.partita_id = p.id_partita
+        LEFT JOIN utenti u ON pa.user_id = u.id_user
+        WHERE p.id_partita_visualizzato = $1
+        GROUP BY 
+          a.id_alleanza, 
+          a.nome_alleanza, 
+          a.nome_logo;
+      `;
+      const { rows } = await db.query(query, [matchId]);
+      if (rows.length > 0) {
+        await redis.set(`match:${matchId}:alliances`, JSON.stringify(rows));
+        return { status: "200", alliances: rows };
+      } else {
+        return {
+          status: "404",
+          message: "Nessuna alleanza trovata per questa partita.",
+        };
       }
     }
-    const statusCode = parseInt(result.status, 10) || 500;
-    return res.status(statusCode).json(result);
   } catch (error) {
     console.error("[SYS_ERR] Errore durante getMatchAlliance:", error);
-    return res
-      .status(500)
-      .json({ error: "Errore interno", details: error.message });
+    return { status: "500", message: "Errore interno", details: error.message };
   }
 };
 
-const JoinAlliance = async (playerId, matchId, allianceId) => {
+const joinAlliance = async (playerId, matchId, allianceId) => {
   try {
     if (!matchId || !allianceId)
-      return res
-        .status(400)
-        .json({ error: "Match id o Alliance id mancante." });
-    const timeLastLeave = await redis.get(
-      `match:${matchId}:player:${playerId}:last_leave:${allianceId}`,
-    );
-    const now = Date.now();
-    if (timeLastLeave && now - parseInt(timeLastLeave) < 86400) {
-      //24 ore di cooldown prima di poter rientrare in un'alleanza
-      return res.status(400).json({
-        error:
-          "Non puoi rientrare in un'alleanza prima di 24 ore dall'ultimo abbandono.",
-      });
-    }
-    const countPlayer =
-      redis.get(`match:${matchId}:alliance:${allianceId}:join_count`) || 0;
-    const maxPlayers = 4; // Numero massimo di giocatori per alleanza TO UPDATE: OCCORRE VEDERE L'IMPOSTAZIONE PARTITA PER RICAVARE IL NUMERO MASSIMO DI GIOCATORI PER ALLEANZA
-    if (countPlayer >= maxPlayers)
-      return res.status(400).json({ error: "Alleanza già al completo." });
-    else if (countPlayer === 0) {
-      const resDB = await db.query(
-        `SELECT COUNT(p.user_id) AS numero_partecipanti
-        FROM partecipanti_partite p
-        INNER JOIN partite m ON p.id_partita = m.id_partita
-        WHERE m.id_partita_visualizzato = $1 
-          AND p.id_alleanza = $2;`,
-        [matchId, allianceId],
+      return { status: "400", message: "Match id o Alliance id mancante." };
+
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      const fail = (status, message) => {
+        const error = new Error(message);
+        error.customStatus = status;
+        throw error;
+      };
+
+      const matchRes = await client.query(
+        `SELECT p.id_partita, p.id_partita_visualizzato
+         FROM partite p
+         WHERE p.id_partita_visualizzato = $1
+         LIMIT 1`,
+        [matchId],
       );
-      if (resDB.rows.length > 0) {
-        const numeroPartecipanti = parseInt(resDB.rows[0].numero_partecipanti);
-        redis.set(
-          `match:${matchId}:alliance:${allianceId}:join_count`,
-          numeroPartecipanti + 1,
-        );
-        redis.set(
-          `match:${matchId}:player:${playerId}:join:${allianceId}`,
-          "true",
-        );
-        console.log(
-          `[SYS_CACHE] Alleanza ${allianceId} per match ${matchId} ha ora ${numeroPartecipanti + 1} partecipanti in Redis.`,
-        );
-        const notify = await fetch(
+      if (matchRes.rows.length === 0) {
+        fail("404", "Partita non trovata.");
+      }
+
+      const allianceRes = await client.query(
+        `SELECT a.id_alleanza, a.id_alleanza_visualizzato, a.partita_id, COALESCE(a.max_membri, 4) AS max_membri
+         FROM alleanze a
+         WHERE a.id_alleanza_visualizzato = $1 AND a.partita_id = $2
+         LIMIT 1`,
+        [allianceId, matchRes.rows[0].id_partita],
+      );
+      if (allianceRes.rows.length === 0) {
+        fail("404", "Alleanza non trovata per questa partita.");
+      }
+
+      const alliancePk = allianceRes.rows[0].id_alleanza;
+
+      const membershipRes = await client.query(
+        `SELECT id_alleanza, abbandono_alleanza_at
+         FROM partecipanti_partite
+         WHERE user_id = $1 AND partita_id = $2
+         FOR UPDATE`,
+        [playerId, matchRes.rows[0].id_partita],
+      );
+      if (membershipRes.rows.length === 0) {
+        fail("404", "Partecipante non trovato nella partita.");
+      }
+
+      const currentAllianceId = membershipRes.rows[0].id_alleanza;
+      if (currentAllianceId && String(currentAllianceId) === String(alliancePk)) {
+        fail("400", "Sei già in questa alleanza.");
+      }
+      if (currentAllianceId && String(currentAllianceId) !== String(alliancePk)) {
+        fail("400", "Devi lasciare l'alleanza attuale prima di unirti a un'altra.");
+      }
+
+      // Use DB-stored last leave time to enforce 24h cooldown across any alliance
+      const lastLeaveAt = membershipRes.rows[0].abbandono_alleanza_at;
+      const now = Date.now();
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      if (lastLeaveAt) {
+        const lastLeaveTs = new Date(lastLeaveAt).getTime();
+        if (now - lastLeaveTs < DAY_MS) {
+          fail(
+            "400",
+            "Non puoi unirti a un'alleanza entro 24 ore dall'ultimo abbandono.",
+          );
+        }
+      }
+
+      const countRes = await client.query(
+        `SELECT COUNT(*)::int AS count
+         FROM partecipanti_partite
+         WHERE partita_id = $1 AND id_alleanza = $2`,
+        [matchRes.rows[0].id_partita, alliancePk],
+      );
+      const countPlayer = parseInt(countRes.rows[0].count || "0", 10);
+      const maxPlayers = allianceRes.rows[0].max_membri || 4;
+      if (countPlayer >= maxPlayers) {
+        fail("400", "Alleanza già al completo.");
+      }
+
+      const updateRes = await client.query(
+        `UPDATE partecipanti_partite
+         SET id_alleanza = $1,
+             abbandono_alleanza_at = NULL
+         WHERE user_id = $2 AND partita_id = $3`,
+        [alliancePk, playerId, matchRes.rows[0].id_partita],
+      );
+
+      if (updateRes.rowCount === 0) {
+        fail("500", "Impossibile aggiornare l'alleanza del giocatore.");
+      }
+
+      await client.query("COMMIT");
+
+      const nextCount = countPlayer + 1;
+      await redis.set(`match:${matchId}:alliance:${allianceId}:join_count`, String(nextCount));
+      await redis.set(`match:${matchId}:player:${playerId}:join:${allianceId}`, "true");
+
+      console.log(
+        `[SYS_CACHE] Player ${playerId} unito all'alleanza ${allianceId} per match ${matchId}.`,
+      );
+
+      // Notify chat system (best-effort, do not fail the operation)
+      try {
+        await fetch(
           `http://localhost:3000/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
           {
             method: "POST",
@@ -377,139 +475,138 @@ const JoinAlliance = async (playerId, matchId, allianceId) => {
                 dest_tipo: "ALLIANCE",
                 tipo: "[SYS]",
               },
-              matchId: matchCode,
+              matchId,
             }),
           },
         );
-        if (!notify.ok) {
-          console.error(
-            "[SYS_ERR] Errore durante la notifica dell'ingresso dell'alleanza:",
-            notify.statusText,
-          );
-        } else {
-          console.log(
-            `[SYS_OK] Notifica dell'ingresso dell'alleanza inviata con successo.`,
-          );
-        }
-        return {
-          status: "200",
-          message: "Join all'alleanza avvenuto con successo",
-        };
-      } else {
-        const result = redis.set(
-          `match:${matchId}:player:${playerId}:join:${allianceId}`,
-          "true",
-        );
-        if (result) {
-          console.log(
-            `[SYS_CACHE] Player ${playerId} unito all'alleanza ${allianceId} per match ${matchId} in Redis.`,
-          );
-          return {
-            status: "200",
-            message: "Join all'alleanza avvenuto con successo",
-          };
-        } else {
-          return {
-            status: "500",
-            message: "Errore durante il join all'alleanza",
-          };
-        }
+      } catch (e) {
+        console.error("[SYS_WARN] Fallita notifica chat joinAlliance:", e.message);
       }
+
+      return { status: "200", message: "Join all'alleanza avvenuto con successo" };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (error.customStatus) {
+        return { status: error.customStatus, message: error.message };
+      }
+      throw error;
+    } finally {
+      client.release();
     }
   } catch (error) {
-    console.error("[SYS_ERR] Errore durante JoinAlliance:", error);
-    return res
-      .status(500)
-      .json({ error: "Errore interno", details: error.message });
+    console.error("[SYS_ERR] Errore durante joinAlliance:", error);
+    return { status: "500", message: "Errore interno", details: error.message };
   }
 };
-const LeaveAlliance = async (playerId, matchId, allianceId) => {
+const leaveAlliance = async (playerId, matchId, allianceId) => {
   try {
-    const matchCode = await redis.get(`match:${matchId}:ID_PARTITA`);
-    if (!matchCode)
-      return res.status(404).json({ error: "Partita non trovata." });
     if (!matchId || !allianceId)
-      return res
-        .status(400)
-        .json({ error: "Match id o Alliance id mancante." });
-    //TO UPDATE: OCCORRE APPLICARE TIMEOUT ANCHE ALL'ALLEANZA
-    const joined = redis.get(
-      `match:${matchCode}:player:${playerId}:join:${allianceId}`,
-    );
-    if (!joined)
-      return res
-        .status(400)
-        .json({ error: "Non sei un membro di questa alleanza." });
-    const countPlayer =
-      redis.get(`match:${matchCode}:alliance:${allianceId}:join_count`) || 0;
-    if (countPlayer > 0) {
-      redis.set(
-        `match:${matchCode}:alliance:${allianceId}:join_count`,
-        countPlayer - 1,
+      return { status: "400", message: "Match id o Alliance id mancante." };
+
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+
+      const matchRes = await client.query(
+        `SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1 LIMIT 1`,
+        [matchId],
       );
-      redis.del(`match:${matchCode}:player:${playerId}:join:${allianceId}`);
-      console.log(
-        `[SYS_CACHE] Player ${playerId} ha lasciato l'alleanza ${allianceId} per match ${matchId} in Redis.`,
-      );
-      //invio un messaggio in chat "alleanza" per notificare l'abbandono dell'alleanza
-      const notify = await fetch(
-        `http://localhost:3000/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: {
-              content: `[SYS] Il giocatore ${playerId} ha lasciato l'alleanza ${allianceId}.`,
-              destinatario: allianceId,
-              dest_tipo: "ALLIANCE",
-              tipo: "[SYS]",
-            },
-            matchId: matchCode,
-          }),
-        },
-      );
-      if (!notify.ok) {
-        console.error(
-          "[SYS_ERR] Errore durante la notifica dell'abbandono dell'alleanza:",
-          notify.statusText,
-        );
-      } else {
-        console.log(
-          `[SYS_OK] Notifica dell'abbandono dell'alleanza inviata con successo.`,
-        );
+      if (matchRes.rows.length === 0) {
+        return { status: "404", message: "Partita non trovata." };
       }
-      const writeDB = await db.query(
-        `UPDATE partecipanti_partite pp
-          SET abbandono_alleanza_at = CURRENT_TIMESTAMP, 
-            id_alleanza = NULL
-          FROM utenti u, alleanze a, partite p
-          WHERE pp.user_id = u.id_user
-            AND pp.id_alleanza = a.id_alliance
-            AND a.partita_id = p.id_partita
-            AND p.id_partita_visualizzato = $1
-            AND a.id_alleanza_visualizzato = $2
-            AND u.username = $3;`,
-        [matchCode, allianceId, playerId],
+
+      const allianceRes = await client.query(
+        `SELECT id_alleanza FROM alleanze WHERE id_alleanza_visualizzato = $1 AND partita_id = $2 LIMIT 1`,
+        [allianceId, matchRes.rows[0].id_partita],
       );
-      if (writeDB.rowCount === 0) {
-        console.error(
-          "[SYS_ERR] Errore durante l'aggiornamento del database per l'abbandono dell'alleanza.",
+      if (allianceRes.rows.length === 0) {
+        return { status: "404", message: "Alleanza non trovata per questa partita." };
+      }
+
+      const writeDB = await client.query(
+        `SELECT id_alleanza
+         FROM partecipanti_partite
+         WHERE user_id = $1 AND partita_id = $2
+         FOR UPDATE`,
+        [playerId, matchRes.rows[0].id_partita],
+      );
+      if (writeDB.rows.length === 0) {
+        return { status: "404", message: "Partecipante non trovato nella partita." };
+      }
+
+      const currentAllianceId = writeDB.rows[0].id_alleanza;
+      if (!currentAllianceId || String(currentAllianceId) !== String(allianceRes.rows[0].id_alleanza)) {
+        return { status: "400", message: "Non sei un membro di questa alleanza." };
+      }
+
+      await client.query(
+        `UPDATE partecipanti_partite
+         SET abbandono_alleanza_at = CURRENT_TIMESTAMP,
+             id_alleanza = NULL
+         WHERE user_id = $1 AND partita_id = $2`,
+        [playerId, matchRes.rows[0].id_partita],
+      );
+
+      const countRes = await client.query(
+        `SELECT COUNT(*)::int AS count
+         FROM partecipanti_partite
+         WHERE partita_id = $1 AND id_alleanza = $2`,
+        [matchRes.rows[0].id_partita, allianceRes.rows[0].id_alleanza],
+      );
+
+      await client.query("COMMIT");
+
+      const countPlayer = parseInt(countRes.rows[0].count || "0", 10);
+      await redis.set(`match:${matchId}:alliance:${allianceId}:join_count`, String(countPlayer));
+      await redis.del(`match:${matchId}:player:${playerId}:join:${allianceId}`);
+      await redis.set(
+        `match:${matchId}:player:${playerId}:last_leave:${allianceId}`,
+        Date.now().toString(),
+      );
+      console.log(
+        `[SYS_CACHE] Player ${playerId} ha lasciato l'alleanza ${allianceId} per match ${matchId}.`,
+      );
+
+      try {
+        await fetch(
+          `http://localhost:3000/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: {
+                content: `[SYS] Il giocatore ${playerId} ha lasciato l'alleanza ${allianceId}.`,
+                destinatario: allianceId,
+                dest_tipo: "ALLIANCE",
+                tipo: "[SYS]",
+              },
+              matchId,
+            }),
+          },
         );
+      } catch (e) {
+        console.error("[SYS_WARN] Fallita notifica chat leaveAlliance:", e.message);
       }
       return {
         status: "200",
         message: "Lascio all'alleanza avvenuto con successo",
       };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (error.customStatus) {
+        return { status: error.customStatus, message: error.message };
+      }
+      throw error;
+    } finally {
+      client.release();
     }
   } catch (error) {
-    console.error("[SYS_ERR] Errore durante LeaveAlliance:", error);
-    return res
-      .status(500)
-      .json({ error: "Errore interno", details: error.message });
+    console.error("[SYS_ERR] Errore durante leaveAlliance:", error);
+    return { status: "500", message: "Errore interno", details: error.message };
   }
 };
 
-const KickAlliance = async (
+const kickAlliance = async (
   playerId,
   matchId,
   allianceId,
@@ -517,86 +614,114 @@ const KickAlliance = async (
   motivation,
 ) => {
   try {
-    const matchCode = await redis.get(`match:${matchId}:ID_PARTITA`);
-    if (!matchCode)
-      return res.status(404).json({ error: "Partita non trovata." });
     if (!matchId || !allianceId || !targetPlayerId)
-      return res
-        .status(400)
-        .json({ error: "Match id, player target o Alliance id mancante." });
-    const isMember = redis.get(
-      `match:${matchCode}:player:${targetPlayerId}:join:${allianceId}`,
-    );
-    if (!isMember)
-      return res
-        .status(400)
-        .json({
-          error: "Il giocatore target non è un membro di questa alleanza.",
-        });
-    await redis.set(
-      `match:${matchCode}:player:${targetPlayerId}:last_leave:${allianceId}`,
-      Date.now().toString(),
-    );
-    await redis.del(
-      `match:${matchCode}:player:${targetPlayerId}:join:${allianceId}`,
-    );
-    await redis.set(
-      `match:${matchCode}:alliance:${allianceId}:player_count`,
-      -1,
-    );
-    const notify = await fetch(
-      `http://localhost:3000/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: {
-            content: motivation ? `[SYS] Sei stato espulso dall'alleanza ${allianceId}. Motivazione: ${motivation}` : `Sei stato espulso dall'alleanza ${allianceId}.`,
-            destinatario: targetPlayerId,
-            dest_tipo: "USER",
-            tipo: "[SYS]",
+      return { status: "400", message: "Match id, player target o Alliance id mancante." };
+
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+
+      const matchRes = await client.query(
+        `SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1 LIMIT 1`,
+        [matchId],
+      );
+      if (matchRes.rows.length === 0) {
+        return { status: "404", message: "Partita non trovata." };
+      }
+
+      const allianceRes = await client.query(
+        `SELECT id_alleanza FROM alleanze WHERE id_alleanza_visualizzato = $1 AND partita_id = $2 LIMIT 1`,
+        [allianceId, matchRes.rows[0].id_partita],
+      );
+      if (allianceRes.rows.length === 0) {
+        return { status: "404", message: "Alleanza non trovata per questa partita." };
+      }
+
+      const membershipRes = await client.query(
+        `SELECT id_alleanza
+         FROM partecipanti_partite
+         WHERE user_id = $1 AND partita_id = $2
+         FOR UPDATE`,
+        [targetPlayerId, matchRes.rows[0].id_partita],
+      );
+      if (membershipRes.rows.length === 0) {
+        return { status: "404", message: "Partecipante target non trovato nella partita." };
+      }
+
+      if (
+        !membershipRes.rows[0].id_alleanza ||
+        String(membershipRes.rows[0].id_alleanza) !== String(allianceRes.rows[0].id_alleanza)
+      ) {
+        return { status: "400", message: "Il giocatore target non è un membro di questa alleanza." };
+      }
+
+      await client.query(
+        `UPDATE partecipanti_partite
+         SET abbandono_alleanza_at = CURRENT_TIMESTAMP,
+             id_alleanza = NULL
+         WHERE user_id = $1 AND partita_id = $2`,
+        [targetPlayerId, matchRes.rows[0].id_partita],
+      );
+
+      const countRes = await client.query(
+        `SELECT COUNT(*)::int AS count
+         FROM partecipanti_partite
+         WHERE partita_id = $1 AND id_alleanza = $2`,
+        [matchRes.rows[0].id_partita, allianceRes.rows[0].id_alleanza],
+      );
+
+      await client.query("COMMIT");
+
+      const countPlayer = parseInt(countRes.rows[0].count || "0", 10);
+      await redis.set(
+        `match:${matchId}:alliance:${allianceId}:join_count`,
+        String(countPlayer),
+      );
+      await redis.del(`match:${matchId}:player:${targetPlayerId}:join:${allianceId}`);
+      await redis.set(
+        `match:${matchId}:player:${targetPlayerId}:last_leave:${allianceId}`,
+        Date.now().toString(),
+      );
+
+      try {
+        await fetch(
+          `http://localhost:3000/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: {
+                content: motivation
+                  ? `[SYS] Sei stato espulso dall'alleanza ${allianceId}. Motivazione: ${motivation}`
+                  : `Sei stato espulso dall'alleanza ${allianceId}.`,
+                destinatario: targetPlayerId,
+                dest_tipo: "PLAYER",
+                tipo: "[SYS]",
+              },
+              matchId,
+            }),
           },
-          matchId: matchCode,
-        }),
-      },
-    );
-    if (!notify.ok) {
-      console.error(
-        "[SYS_ERR] Errore durante la notifica dell'espulsione dall'alleanza:",
-        notify.statusText,
-      );
-    } else {
-      console.log(
-        `[SYS_OK] Notifica dell'espulsione dall'alleanza inviata con successo.`,
-      );
+        );
+      } catch (e) {
+        console.error("[SYS_WARN] Fallita notifica chat kickAlliance:", e.message);
+      }
+
+      return {
+        status: "200",
+        message: "Espulsione dall'alleanza avvenuta con successo",
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (error.customStatus) {
+        return { status: error.customStatus, message: error.message };
+      }
+      throw error;
+    } finally {
+      client.release();
     }
-    const result = await db.query(
-      `UPDATE partecipanti_partite pp
-        SET abbandono_alleanza_at = CURRENT_TIMESTAMP,
-          id_alleanza = NULL
-        FROM utenti u, alleanze a, partite p
-        WHERE pp.user_id = u.id_user
-          AND pp.id_alleanza = a.id_alliance
-          AND a.partita_id = p.id_partita
-          AND p.id_partita_visualizzato = $1
-          AND a.id_alleanza_visualizzato = $2
-          AND u.username = $3;`,
-      [matchCode, allianceId, targetPlayerId],
-    );
-    if (result.rowCount === 0) {
-      console.error(
-        "[SYS_ERR] Errore durante l'aggiornamento del database per l'espulsione dall'alleanza.",
-      );
-    }
-    return {
-      status: "200",
-      message: "Espulsione dall'alleanza avvenuta con successo",
-    };
   } catch (error) {
-    console.error("[SYS_ERR] Errore durante KickAlliance:", error);
-    return res
-      .status(500)
-      .json({ error: "Errore interno", details: error.message });
+    console.error("[SYS_ERR] Errore durante kickAlliance:", error);
+    return { status: "500", message: "Errore interno", details: error.message };
   }
 };
 
@@ -605,7 +730,7 @@ module.exports = {
   join_Match,
   listJoinableMatches,
   getMatchPlayers,
-  JoinAlliance,
-  LeaveAlliance,
-  KickAlliance,
+  joinAlliance,
+  leaveAlliance,
+  kickAlliance,
 };

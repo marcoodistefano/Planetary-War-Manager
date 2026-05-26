@@ -1,5 +1,7 @@
 {
   "match": {
+    "id_partita": "",
+    "id_partita_hash": "",
     "id_visualizzato": "",
     "caratteristiche": {
       "nome": "",
@@ -24,6 +26,13 @@
       {
         "id_user": "",
         "username": "",
+        "relazioni_diplomatiche":{
+            "id_user":{
+                "messaggi":[""],
+                "relazione": "",
+                "scambi":[""]
+            }
+        },
         "id_alleanza": "",
         "ruolo": "",
         "is_leader": "",
@@ -172,3 +181,6 @@
     ]
   }
 }
+
+
+

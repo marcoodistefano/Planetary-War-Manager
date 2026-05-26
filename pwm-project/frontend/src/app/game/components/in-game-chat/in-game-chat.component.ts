@@ -349,8 +349,8 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
 
   private mapServiceMessage(message: any): ChatMessage {
     const sender = String(message?.sender_username || message?.sender || message?.id_user_send || 'Sistema');
-    const recipient = message?.destinatario ? String(message.destinatario) : undefined;
-    const scope = this.normalizeScope(message?.tipo, recipient);
+    const recipient = message?.destinatario ? String(message.destinatario) : (message?.recipient_username ? String(message.recipient_username) : undefined);
+    const scope = this.normalizeScope(message?.scope ?? message?.tipo, recipient);
     const channelKey = this.channelKey(scope, scope === 'direct' ? recipient || sender : recipient);
 
     return {
@@ -366,6 +366,10 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
   }
 
   private normalizeScope(tipo: unknown, destinatario?: string): ChatMessage['scope'] {
+    if (tipo === 'global' || tipo === 'alliance' || tipo === 'direct') {
+      return tipo;
+    }
+
     if (tipo === 2 || tipo === '2' || destinatario === 'ALL') {
       return 'global';
     }
