@@ -148,6 +148,8 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
           content: payload.content || payload.message || payload.text,
         });
 
+        console.log(`[WS] processMessage info:`, { payload, resultOk: result.ok, error: result.error });
+
         if (!result.ok) {
           ws.send(JSON.stringify({ type: "ERROR", error: result.error }));
         }

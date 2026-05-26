@@ -51,24 +51,6 @@
     </button>
   </div>
 
-  <div class="match-roster" *ngIf="visibleRoster.length">
-    <div class="match-roster__head">
-      <span>Utenti connessi alla partita</span>
-      <small>{{ visibleRoster.length }} presenti nel canale</small>
-    </div>
-    <div class="match-roster__chips">
-      <button
-        type="button"
-        class="roster-pill"
-        *ngFor="let player of visibleRoster"
-        (click)="player !== currentUser && startDirectConversation(player)">
-        <span class="roster-pill__status" [class.self]="player === currentUser"></span>
-        <span class="roster-pill__name">{{ player }}</span>
-        <span class="roster-pill__tag" *ngIf="player === currentUser">TU</span>
-      </button>
-    </div>
-  </div>
-
   <div class="recipient-picker" *ngIf="isComposerOpen">
     <div class="recipient-picker-head">
       <span>Nuovo messaggio diretto</span>

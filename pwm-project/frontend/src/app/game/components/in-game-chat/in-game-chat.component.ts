@@ -82,6 +82,14 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
 
   ngOnInit() {
     this.resolvedMatchId = this.matchId || this.route.snapshot.paramMap.get('id') || localStorage.getItem('pwm_last_joined_match') || '';
+    if (this.currentUser && this.resolvedMatchId) {
+      const stored = localStorage.getItem(`pwm_chat_contacts_${this.resolvedMatchId}_${this.currentUser}`);
+      if (stored) {
+        try {
+          this.recentContacts = JSON.parse(stored);
+        } catch (e) {}
+      }
+    }
     this.buildChannels();
     this.selectChannel('global');
     this.connectSocket();
@@ -111,7 +119,30 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
   }
 
   get activeChannel(): ChatChannel | undefined {
-    return this.channels.find((channel) => channel.key === this.activeChannelKey()) || this.channels[0];
+    const activeKey = this.activeChannelKey();
+    const channel = this.channels.find((item) => item.key === activeKey);
+
+    if (channel) {
+      return channel;
+    }
+
+    if (this.activeScope === 'direct') {
+      const recipient = this.activeDirectRecipient || '';
+
+      if (!recipient) {
+        return undefined;
+      }
+
+      return {
+        key: this.channelKey('direct', recipient),
+        scope: 'direct',
+        label: recipient,
+        recipient,
+        available: true,
+      };
+    }
+
+    return this.channels[0];
   }
 
   get directTargets(): string[] {
@@ -446,6 +477,9 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
     }
 
     this.recentContacts = [normalized, ...this.recentContacts.filter((item) => item !== normalized)].slice(0, 8);
+    if (this.currentUser && this.resolvedMatchId) {
+      localStorage.setItem(`pwm_chat_contacts_${this.resolvedMatchId}_${this.currentUser}`, JSON.stringify(this.recentContacts));
+    }
   }
 
   private ensureChannelHistoryLoaded() {
@@ -587,6 +621,9 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
 
     if (!this.recentContacts.includes(target)) {
       this.recentContacts = [target, ...this.recentContacts].slice(0, 8);
+      if (this.currentUser && this.resolvedMatchId) {
+        localStorage.setItem(`pwm_chat_contacts_${this.resolvedMatchId}_${this.currentUser}`, JSON.stringify(this.recentContacts));
+      }
     }
 
     this.loadActiveChannelHistory();

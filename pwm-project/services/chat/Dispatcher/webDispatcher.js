@@ -14,6 +14,7 @@ const initDispatcher = async (clientSockets) => {
     // Ci iscriviamo al canale dove il Controller/Model pubblica i nuovi messaggi
     await subscriber.subscribe("ws_broadcast_channel", (messageStr) => {
         try {
+            console.log(`[WS_DISPATCHER] Ricevuto evento da Redis:`, messageStr);
             const event = JSON.parse(messageStr);
             
             // event.targetUsers è un array di ID (es. i due giocatori di una 1v1, o l'intera alleanza)
@@ -25,6 +26,7 @@ const initDispatcher = async (clientSockets) => {
                 const userTunnels = clientSockets.get(userId);
 
                 if (userTunnels) {
+                    console.log(`[WS_DISPATCHER] Trovato tunnel per utente ${userId}, match ${matchId}`);
                     // Se l'utente è connesso (magari anche con più tab aperti), spariamo il payload
                     userTunnels.forEach(ws => {
                         // Verifica hardware: il socket è ancora aperto a livello TCP?

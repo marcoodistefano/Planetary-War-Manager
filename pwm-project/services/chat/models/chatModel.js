@@ -94,14 +94,22 @@ const resolveMatchId = async (matchId) => {
   if (cached) return cached;
 
   // If matchId looks like an internal id (already an id_partita), accept it directly
-  const { rows: checkRows } = await db.query(
-    "SELECT 1 FROM partite WHERE id_partita = $1 LIMIT 1",
-    [matchId],
-  );
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  
+  if (UUID_REGEX.test(matchId)) {
+    try {
+      const { rows: checkRows } = await db.query(
+        "SELECT 1 FROM partite WHERE id_partita = $1 LIMIT 1",
+        [matchId],
+      );
 
-  if (checkRows && checkRows.length > 0) {
-    await redisClient.setEx(cacheKey, CACHE_TTL_SECONDS, matchId);
-    return matchId;
+      if (checkRows && checkRows.length > 0) {
+        await redisClient.setEx(cacheKey, CACHE_TTL_SECONDS, matchId);
+        return matchId;
+      }
+    } catch (err) {
+      console.warn("[SYS_WARN] Invalid UUID passed to resolveMatchId:", matchId);
+    }
   }
 
   const { rows } = await db.query(
