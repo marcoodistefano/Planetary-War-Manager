@@ -280,7 +280,14 @@
     </div>
     
     <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>
-    <app-diplomacy-modal *ngIf="isDiplomacyModalOpen" (close)="isDiplomacyModalOpen = false"></app-diplomacy-modal>
+    <app-diplomacy-modal
+      *ngIf="isDiplomacyModalOpen"
+      [alliances]="matchAlliances"
+      [matchPlayers]="matchPlayers"
+      [matchId]="currentMatchId"
+      [currentUser]="userProfile.username"
+      (alliancesChanged)="reloadMatchAlliances()"
+      (close)="isDiplomacyModalOpen = false"></app-diplomacy-modal>
     <app-intelligence-modal *ngIf="isIntelligenceModalOpen" (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
     <app-market-modal *ngIf="isMarketModalOpen" [playerResources]="playerResources" (close)="toggleMarketModal()"></app-market-modal>
     <app-army-modal *ngIf="isArmyModalOpen" [playerTroops]="playerTroops" (close)="isArmyModalOpen = false"> </app-army-modal>

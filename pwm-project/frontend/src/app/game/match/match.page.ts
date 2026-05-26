@@ -69,6 +69,7 @@ export class MatchPage implements OnInit, AfterViewInit {
   chatUnreadCount = 0;
   currentMatchId = '';
   matchPlayers: string[] = [];
+  matchAlliances: any[] = [];
 
   activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
 
@@ -191,6 +192,8 @@ export class MatchPage implements OnInit, AfterViewInit {
   }
 
   private loadMatchContext() {
+    this.reloadMatchAlliances();
+
     this.homeService.getDashboardData().subscribe({
       next: (response: any) => {
         const info = response?.data;
@@ -224,6 +227,24 @@ export class MatchPage implements OnInit, AfterViewInit {
       },
       error: (error) => {
         console.error('Errore nel recupero dei dati partita per la chat:', error);
+      }
+    });
+  }
+
+  reloadMatchAlliances() {
+    if (!this.currentMatchId) {
+      this.matchAlliances = [];
+      return;
+    }
+
+    this.homeService.getMatchAlliance(this.currentMatchId).subscribe({
+      next: (response: any) => {
+        this.matchAlliances = Array.isArray(response?.alliances) ? response.alliances : [];
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.matchAlliances = [];
+        this.cdr.detectChanges();
       }
     });
   }

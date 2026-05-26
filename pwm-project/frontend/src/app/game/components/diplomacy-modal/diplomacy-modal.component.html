@@ -1,23 +1,20 @@
 <div class="diplomacy-modal-backdrop" (click)="closeModal()">
-  
-  <div class="diplomacy-frame" 
+  <div class="diplomacy-frame"
        (click)="$event.stopPropagation()"
        (mousedown)="onDragStart($event)"
        [style.transform]="'translate(' + transformX + 'px, ' + transformY + 'px)'">
-    
     <div class="diplomacy-sidebar">
-      
       <div class="brand">
         <span class="system-name">DIPLOMACY</span>
         <span class="version">DIPLOMACY_OS V.1.0</span>
       </div>
-      
+
       <nav>
         <div class="nav-item" [class.active]="activeTab === 'status'" (click)="activeTab = 'status'">
           <ion-icon name="people-outline"></ion-icon><span>ALLEANZA</span>
         </div>
-        <div class="nav-item" [class.active]="activeTab === 'treaties'" (click)="activeTab = 'treaties'">
-          <ion-icon name="shield-half-outline"></ion-icon><span>TRATTATI</span>
+        <div class="nav-item" [class.active]="activeTab === 'manage'" (click)="activeTab = 'manage'">
+          <ion-icon name="shield-half-outline"></ion-icon><span>GESTIONE</span>
         </div>
         <div class="nav-item" [class.active]="activeTab === 'search'" (click)="activeTab = 'search'">
           <ion-icon name="search-outline"></ion-icon><span>CERCA</span>
@@ -26,7 +23,7 @@
           <ion-icon name="mail-unread-outline"></ion-icon><span>RICHIESTE</span>
         </div>
       </nav>
-      
+
       <div class="sidebar-footer">
         <button class="exit-btn" (click)="closeModal()">
           <ion-icon name="power-outline"></ion-icon> <span>[ CHIUDI ]</span>
@@ -35,61 +32,113 @@
     </div>
 
     <div class="diplomacy-main scrollable-y">
-         
       <div class="tree-container">
-        
         <ng-container *ngIf="activeTab === 'status'">
-          <div class="alliance-info-header">
-            <div class="alliance-emblem">🛡️</div>
-            <div class="alliance-meta">
-              <span class="alliance-name">{{ myAlliance.name }} [{{ myAlliance.tag }}]</span>
-              <span class="alliance-level">LIVELLO {{ myAlliance.level }}</span>
+          <ng-container *ngIf="alliances.length; else noAllianceDataFallback">
+            <div class="alliance-switcher" *ngIf="alliances.length > 1">
+              <button
+                type="button"
+                class="alliance-switcher-pill"
+                *ngFor="let alliance of alliances; let i = index"
+                [class.active]="i === selectedAllianceIndex"
+                (click)="selectAlliance(i)">
+                <span class="pill-mark">{{ (alliance.nome_alleanza || 'AA') | slice:0:2 | uppercase }}</span>
+                <span class="pill-text">{{ alliance.nome_alleanza }}</span>
+                <span class="pill-count">{{ alliance.numero_partecipanti || 0 }}</span>
+              </button>
             </div>
-          </div>
 
-          <div class="hud-separator"></div>
+            <div class="alliance-info-header" *ngIf="selectedAlliance as alliance">
+              <div class="alliance-emblem">{{ alliance.nome_logo || '🛡️' }}</div>
+              <div class="alliance-meta">
+                <span class="alliance-name">{{ selectedAllianceTitle }} [{{ selectedAllianceTag }}]</span>
+                <span class="alliance-level">MEMBRI {{ selectedAllianceLevel }}</span>
+              </div>
+            </div>
 
-          <p class="section-label">MEMBRI ONLINE</p>
-          <div class="sensor-grid">
-            <div class="sensor-row" *ngFor="let member of myAlliance.members">
-              <span [class.online-text]="member.status === 'online'">
-                <span class="status-dot-mini" [class.online]="member.status === 'online'"></span>
-                {{ member.name }}
-              </span>
-              <span class="sensor-val">{{ member.rank }}</span>
+            <div class="hud-separator"></div>
+
+            <p class="section-label">MEMBRI ALLEANZA</p>
+            <div class="sensor-grid" *ngIf="selectedAllianceMembers.length; else noMembers">
+              <div class="sensor-row" *ngFor="let member of selectedAllianceMembers">
+                <span [class.online-text]="member.status === 'online'">
+                  <span class="status-dot-mini" [class.online]="member.status === 'online'"></span>
+                  {{ member.name }}
+                </span>
+                <span class="sensor-val">{{ member.rank }}</span>
+              </div>
             </div>
-          </div>
-          
-          <div class="hud-separator"></div>
-          
-          <p class="section-label">MEMBRI ATTIVI DI RECENTE</p>
-          <div class="build-card no-hover" style="border-left: 2px solid var(--gold-accent)">
-            <div class="build-info">
-              <span class="item-name">Ufficiale_Bravo</span>
-              <span class="item-tier">Ufficiale</span>
+
+            <ng-template #noMembers>
+              <div class="empty-state">Nessun membro sincronizzato per questa alleanza.</div>
+            </ng-template>
+
+            <div class="hud-separator"></div>
+
+            <p class="section-label">ALLEANZE NEL MATCH</p>
+            <div class="build-card no-hover alliance-card" *ngFor="let alliance of alliances">
+              <div class="build-info">
+                <span class="item-name">{{ alliance.nome_alleanza }}</span>
+                <span class="item-tier">ALLEANZA</span>
+              </div>
+              <div class="build-cost">
+                <span class="cost-unit">👥 MEMBRI: {{ alliance.numero_partecipanti || 0 }}</span>
+                <span class="cost-unit" *ngIf="isCurrentAlliance(alliance)">TUO GRUPPO</span>
+              </div>
+
+              <div class="action-row alliance-action-row">
+                <button
+                  class="primary-glow slim"
+                  *ngIf="canJoinAlliance(alliance)"
+                  [disabled]="isUpdatingAlliance"
+                  (click)="joinAlliance(alliance)">
+                  {{ isUpdatingAlliance ? 'AGGIORNAMENTO...' : 'UNISCITI' }}
+                </button>
+                <button
+                  class="primary-glow slim danger"
+                  *ngIf="isCurrentAlliance(alliance)"
+                  [disabled]="isUpdatingAlliance"
+                  (click)="leaveAlliance(alliance)">
+                  {{ isUpdatingAlliance ? 'AGGIORNAMENTO...' : 'LASCIA' }}
+                </button>
+              </div>
             </div>
-            <div class="build-cost">
-              <span class="cost-unit">⏳ ULTIMA ATTIVITÀ: 2h fa</span>
-            </div>
-          </div>
-          
-          <div style="margin-top: 15px;">
-            <button class="primary-glow full-width">COMUNICAZIONE DI MASSA</button>
-          </div>
+
+          </ng-container>
+
+          <ng-template #noAllianceDataFallback>
+            <div class="empty-state">Nessuna alleanza sincronizzata per questo match.</div>
+          </ng-template>
         </ng-container>
 
-        <ng-container *ngIf="activeTab === 'treaties'">
-          <p class="track-label">Patti Militari e Diplomatici</p>
-          <div class="build-card" *ngFor="let treaty of myAlliance.treaties">
+        <ng-container *ngIf="activeTab === 'manage'">
+          <p class="track-label">Gestione Alleanze</p>
+          <div class="build-card no-hover alliance-card alliance-form-card">
             <div class="build-info">
-              <span class="item-name">{{ treaty.partner }}</span>
-              <span class="item-tier" style="color: var(--gold-accent)">{{ treaty.type }}</span>
+              <span class="item-name">Stato corrente</span>
+              <span class="item-tier" style="color: var(--gold-accent)">{{ currentAlliance ? 'MEMBRO' : 'NEUTRALE' }}</span>
             </div>
-            <div class="build-cost">
-              <span class="cost-unit">⏳ SCADENZA: {{ treaty.duration }}</span>
+
+            <div class="alliance-form">
+              <div class="status-msg" *ngIf="currentAlliance; else noCurrentAlliance">
+                Sei attualmente inserito in <strong>{{ currentAllianceTitle }}</strong>.
+              </div>
+
+              <ng-template #noCurrentAlliance>
+                <div class="status-msg">Non fai parte di nessuna alleanza. Selezionane una dalla lista per unirti.</div>
+              </ng-template>
+
+              <div class="action-row" *ngIf="currentAlliance">
+                <button class="primary-glow slim danger" [disabled]="isUpdatingAlliance" (click)="leaveAlliance(currentAlliance)">
+                  {{ isUpdatingAlliance ? 'AGGIORNAMENTO...' : 'LASCIA ALLEANZA' }}
+                </button>
+              </div>
+
+              <div class="status-msg success" *ngIf="allianceActionSuccess">{{ allianceActionSuccess }}</div>
+              <div class="status-msg error" *ngIf="allianceActionError">{{ allianceActionError }}</div>
             </div>
           </div>
-          <p class="status-msg" style="margin-top: 20px;">Utilizza lo strumento 'Cerca' per contattare altri comandi e avviare protocolli diplomatici.</p>
+          <p class="status-msg" style="margin-top: 20px;">Le azioni disponibili dipendono dal tuo stato nella partita e dall'alleanza selezionata.</p>
         </ng-container>
 
         <ng-container *ngIf="activeTab === 'search'">
@@ -102,20 +151,17 @@
 
         <ng-container *ngIf="activeTab === 'requests'">
           <p class="track-label">Protocolli Diplomatici in Attesa</p>
-          <div class="build-card">
+          <div class="build-card no-hover">
             <div class="build-info">
-              <span class="item-name">Sven</span>
-              <span class="item-tier">Trattato di Non-Aggressione</span>
+              <span class="item-name">Sincronizzazione operativa</span>
+              <span class="item-tier">Nessuna richiesta</span>
             </div>
-            <div class="action-row" style="margin-top: 10px; display: flex; gap: 8px;">
-              <button class="primary-glow slim">ACCETTA</button>
-              <button class="ghost-button mini">RIFIUTA</button>
+            <div class="build-cost">
+              <span class="cost-unit">Le richieste arriveranno qui quando i protocolli saranno attivi.</span>
             </div>
           </div>
         </ng-container>
-
       </div>
     </div>
-
   </div>
 </div>

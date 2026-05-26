@@ -27,4 +27,24 @@ export class HomeService {
   getMatchPlayers(matchId: string): Observable<any> {
     return this.http.get<any>(`${this.matchApiUrl}/${matchId}/players`, { withCredentials: true });
   }
+
+  getMatchAlliance(matchId: string): Observable<any> {
+    return this.http.get<any>(`${this.matchApiUrl}/${matchId}/alliance`, { withCredentials: true });
+  }
+
+  joinMatchAlliance(matchId: string, allianceId: string | number): Observable<any> {
+    return this.http.post<any>(`${this.matchApiUrl}/${matchId}/join/${allianceId}`, {}, { withCredentials: true });
+  }
+
+  leaveMatchAlliance(matchId: string, allianceId: string | number): Observable<any> {
+    return this.http.post<any>(`${this.matchApiUrl}/${matchId}/leave/${allianceId}`, {}, { withCredentials: true });
+  }
+
+  kickMatchAlliance(matchId: string, allianceId: string | number, targetPlayerId: string, motivation = ''): Observable<any> {
+    return this.http.post<any>(
+      `${this.matchApiUrl}/${matchId}/kick/${allianceId}`,
+      { targetPlayerId, motivation },
+      { withCredentials: true },
+    );
+  }
 }
