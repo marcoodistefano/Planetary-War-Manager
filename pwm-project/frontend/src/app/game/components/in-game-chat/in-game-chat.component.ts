@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnDestroy, OnInit, AfterViewChecked, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnDestroy, OnInit, OnChanges, SimpleChanges, AfterViewChecked, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
@@ -31,7 +31,7 @@ interface ChatChannel {
   standalone: true,
   imports: [CommonModule, FormsModule, IonicModule]
 })
-export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked {
+export class InGameChatComponent implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   @Input() currentUser = 'Comandante_Alpha';
   @Input() playersInMatch: string[] = [];
   @Input() allianceId: string | null = null;
@@ -82,18 +82,22 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
 
   ngOnInit() {
     this.resolvedMatchId = this.matchId || this.route.snapshot.paramMap.get('id') || localStorage.getItem('pwm_last_joined_match') || '';
-    if (this.currentUser && this.resolvedMatchId) {
-      const stored = localStorage.getItem(`pwm_chat_contacts_${this.resolvedMatchId}_${this.currentUser}`);
-      if (stored) {
-        try {
-          this.recentContacts = JSON.parse(stored);
-        } catch (e) {}
-      }
-    }
+    this.loadStoredRecentContacts();
     this.buildChannels();
     this.selectChannel('global');
     this.connectSocket();
     this.emitUnreadState();
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['currentUser'] || changes['matchId']) {
+      this.resolvedMatchId = this.matchId || this.route.snapshot.paramMap.get('id') || localStorage.getItem('pwm_last_joined_match') || this.resolvedMatchId;
+      this.loadStoredRecentContacts();
+    }
+
+    if (changes['playersInMatch']) {
+      this.cdr.detectChanges();
+    }
   }
 
   ngOnDestroy() {
@@ -145,18 +149,18 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
     return this.channels[0];
   }
 
-  get directTargets(): string[] {
-    const roster = new Set(
-      this.playersInMatch
+  get conversationContacts(): string[] {
+    return [...new Set(
+      this.recentContacts
         .map((name) => String(name || '').trim())
         .filter((name) => name && name !== this.currentUser && name.toLowerCase() !== 'sistema'),
-    );
+    )];
+  }
 
-    const names = [...this.recentContacts, ...this.playersInMatch]
-      .map((name) => String(name || '').trim())
-      .filter((name) => name && roster.has(name));
+  get availableDirectTargets(): string[] {
+    const conversationRoster = new Set(this.conversationContacts.map((name) => name.toLowerCase()));
 
-    return [...new Set(names)];
+    return this.matchRoster.filter((name) => !conversationRoster.has(name.toLowerCase()) && name !== this.currentUser);
   }
 
   get matchRoster(): string[] {
@@ -232,6 +236,24 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
         available: this.hasAllianceChannel,
       },
     ];
+  }
+
+  private loadStoredRecentContacts() {
+    this.recentContacts = [];
+
+    if (this.currentUser && this.resolvedMatchId) {
+      const stored = localStorage.getItem(`pwm_chat_contacts_${this.resolvedMatchId}_${this.currentUser}`);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            this.recentContacts = parsed
+              .map((name) => String(name || '').trim())
+              .filter((name) => name && name !== this.currentUser && name.toLowerCase() !== 'sistema');
+          }
+        } catch (e) {}
+      }
+    }
   }
 
   private connectSocket() {
@@ -598,6 +620,11 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
       return;
     }
 
+    if (scope === 'direct' && !recipient) {
+      this.openPrivateChannel();
+      return;
+    }
+
     this.activeScope = scope;
     this.activeDirectRecipient = scope === 'direct' ? String(recipient || '').trim() : null;
     this.isComposerOpen = false;
@@ -610,6 +637,27 @@ export class InGameChatComponent implements OnInit, OnDestroy, AfterViewChecked 
 
   openNewDirectComposer() {
     this.isComposerOpen = !this.isComposerOpen;
+  }
+
+  openPrivateChannel() {
+    this.activeScope = 'direct';
+
+    const preferredContact = this.activeDirectRecipient && this.conversationContacts.includes(this.activeDirectRecipient)
+      ? this.activeDirectRecipient
+      : this.conversationContacts[0] || null;
+
+    this.activeDirectRecipient = preferredContact;
+    this.activeChannelLoadedFor = '';
+    this.isComposerOpen = !preferredContact;
+
+    if (preferredContact) {
+      this.loadActiveChannelHistory();
+      if (this._panelVisible) {
+        this.markActiveChannelAsRead();
+      }
+    } else {
+      this.visibleMessages = [];
+    }
   }
 
   startDirectConversation(playerName: string) {

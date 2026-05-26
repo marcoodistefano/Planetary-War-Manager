@@ -54,7 +54,7 @@
 <div class="ion-page" id="main-map-content">
   <ion-content [fullscreen]="true" class="transparent-bg" [scrollY]="false">
     
-    <div class="hud-panel top-navbar desktop-only">
+    <div class="hud-panel top-navbar desktop-only" [class.is-hidden]="isChatOpen">
       
       <div class="nav-group-left">
         <button class="pwm-logo-btn" (click)="goToHome()">PWM</button>
@@ -99,7 +99,7 @@
       </div>
     </div>
 
-    <div class="mobile-top-navbar mobile-only">
+    <div class="mobile-top-navbar mobile-only" [class.is-hidden]="isChatOpen">
       <div class="menu-button-wrap">
         <ion-menu-button class="holographic-menu-btn"></ion-menu-button>
         <span class="chat-badge menu-badge" *ngIf="chatUnreadCount > 0">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
