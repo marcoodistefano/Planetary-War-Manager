@@ -218,6 +218,10 @@
   }
 }
 
+.is-hidden {
+  display: none !important;
+}
+
 .hud-stack-left { 
   left: calc(2 * var(--unit)); 
   width: clamp(280px, calc(30 * var(--unit)), 400px);
@@ -225,7 +229,7 @@
 
 .hud-stack-right { 
   right: calc(4.5 * var(--unit)); 
-  width: clamp(330px, calc(28 * var(--unit)), 460px);
+  width: clamp(360px, calc(34 * var(--unit)), 560px);
   display: flex;
   flex-direction: column;
   justify-content: flex-end; 
@@ -233,6 +237,7 @@
 
 .hud-chat-panel {
   display: block; 
+  width: 100%;
   pointer-events: auto; 
   margin-bottom: 12px;  
 
