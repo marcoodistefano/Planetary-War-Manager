@@ -4,6 +4,7 @@
 
 The script preserves the original structure and values everywhere except for
 any object named ``properties``, which is reduced to a fixed allowlist of keys.
+It now supports dedicated allowlists for regions, airports, cities, and ports.
 """
 
 from __future__ import annotations
@@ -27,22 +28,59 @@ ALLOWED_PROPERTY_KEYS = (
     "admin",
 )
 
+ALLOWED_PROPERTY_KEYS_BY_FILE = {
+    "regions": ALLOWED_PROPERTY_KEYS,
+    "airports": (
+        "scalerank",
+        "featurecla",
+        "type",
+        "name",
+        "location",
+        "gps_code",
+        "iata_code",
+        "wikidataid",
+        "natlscale",
+        "ne_id",
+    ),
+    "cities": (
+        "FEATURECLA",
+        "NAME",
+        "LABEL",
+        "ADM0NAME",
+        "ADM1NAME",
+        "ISO_A2",
+        "LATITUDE",
+        "LONGITUDE",
+        "POP_MAX",
+        "MIN_ZOOM",
+        "NE_ID",
+    ),
+    "ports": (
+        "scalerank",
+        "featurecla",
+        "name",
+        "website",
+        "natlscale",
+        "ne_id",
+    ),
+}
 
-def filter_properties(value: Any) -> Any:
+
+def filter_properties(value: Any, allowed_keys: tuple[str, ...]) -> Any:
     if isinstance(value, dict):
         filtered = {}
         for key, item in value.items():
             if key == "properties" and isinstance(item, dict):
                 filtered[key] = {
                     allowed_key: item[allowed_key]
-                    for allowed_key in ALLOWED_PROPERTY_KEYS
+                    for allowed_key in allowed_keys
                     if allowed_key in item
                 }
             else:
-                filtered[key] = filter_properties(item)
+                filtered[key] = filter_properties(item, allowed_keys)
         return filtered
     if isinstance(value, list):
-        return [filter_properties(item) for item in value]
+        return [filter_properties(item, allowed_keys) for item in value]
     return value
 
 
@@ -69,11 +107,14 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     output_file = args.output_file or args.input_file
+    allowed_keys = ALLOWED_PROPERTY_KEYS_BY_FILE.get(
+        args.input_file.stem.lower(), ALLOWED_PROPERTY_KEYS
+    )
 
     with args.input_file.open("r", encoding="utf-8") as source:
         data = json.load(source)
 
-    filtered_data = filter_properties(data)
+    filtered_data = filter_properties(data, allowed_keys)
 
     if output_file == args.input_file:
         backup_file = args.input_file.with_name(
