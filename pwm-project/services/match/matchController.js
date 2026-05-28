@@ -191,6 +191,35 @@ const getResult = async (req, res) => notImplemented(res);
 const getMatch = async (req, res) => notImplemented(res);
 const getHistory = async (req, res) => notImplemented(res);
 
+const CreateAlliance = async (req, res) => {
+  try {
+    const auth = await getAuthContextFromRequest(req);
+    if (!auth.ok)
+      return res
+        .status(auth.status || 401)
+        .json({ error: "Identita non verificabile." });
+    const playerId = auth.userId;
+    const matchId = req.params.id;
+    const allianceName = req.body?.allianceName || req.body?.nome_alleanza;
+    if (!matchId) return res.status(400).json({ error: "Match id mancante." });
+    if (!allianceName || !String(allianceName).trim()) {
+      return res.status(400).json({ error: "Nome alleanza mancante." });
+    }
+    const result = await model.createAlliance(
+      playerId,
+      matchId,
+      String(allianceName).trim(),
+    );
+    const statusCode = parseInt(result.status, 10) || 500;
+    return res.status(statusCode).json(result);
+  } catch (error) {
+    console.error("[SYS_ERR] Cortocircuito CreateAlliance:", error);
+    return res
+      .status(500)
+      .json({ error: "Errore interno", details: error.message });
+  }
+};
+
 const getAlliance = async (req, res) => {
   try {
     const matchId = req.params.id;
@@ -299,6 +328,7 @@ module.exports = {
   getMatch,
   getHistory,
   getAlliance,
+  CreateAlliance,
   JoinAlliance,
   LeaveAlliance,
   KickAlliance

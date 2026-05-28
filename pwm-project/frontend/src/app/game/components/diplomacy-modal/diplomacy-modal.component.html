@@ -125,7 +125,22 @@
               </div>
 
               <ng-template #noCurrentAlliance>
-                <div class="status-msg">Non fai parte di nessuna alleanza. Selezionane una dalla lista per unirti.</div>
+                <div class="status-msg">Non fai parte di nessuna alleanza. Selezionane una dalla lista oppure creane una nuova.</div>
+                <div class="action-row" style="margin-top: 10px; gap: 8px; align-items: center;">
+                  <input
+                    type="text"
+                    [(ngModel)]="newAllianceName"
+                    maxlength="32"
+                    placeholder="Nome nuova alleanza"
+                    style="flex: 1; min-width: 180px;"
+                  />
+                  <button class="primary-glow slim" [disabled]="isUpdatingAlliance" (click)="createAlliance()">
+                    {{ isUpdatingAlliance ? 'AGGIORNAMENTO...' : 'CREA' }}
+                  </button>
+                </div>
+                <div class="status-msg" style="margin-top: 8px;">
+                  Max 32 caratteri. Consentiti: lettere, numeri, spazio, punto, apostrofo, trattino e underscore.
+                </div>
               </ng-template>
 
               <div class="action-row" *ngIf="currentAlliance">

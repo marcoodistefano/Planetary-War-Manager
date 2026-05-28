@@ -26,6 +26,8 @@ interface MatchAllianceView {
   imports: [CommonModule, IonicModule, FormsModule]
 })
 export class DiplomacyModalComponent implements OnInit, OnChanges {
+  private readonly allianceNameMaxLength = 32;
+
   @Output() close = new EventEmitter<void>();
   @Output() alliancesChanged = new EventEmitter<void>();
   @Input() alliances: MatchAllianceView[] = [];
@@ -39,6 +41,7 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
   allianceActionError = '';
   allianceActionSuccess = '';
   isUpdatingAlliance = false;
+  newAllianceName = '';
 
   isDragging = false;
   dragStartX = 0;
@@ -159,6 +162,28 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
     return !this.isCurrentAlliance(alliance);
   }
 
+  private normalizeAllianceName(value: string): string {
+    return String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private validateAllianceName(value: string): string | null {
+    if (!value) {
+      return 'Inserisci un nome alleanza valido.';
+    }
+
+    if (value.length > this.allianceNameMaxLength) {
+      return `Il nome alleanza non puo superare ${this.allianceNameMaxLength} caratteri.`;
+    }
+
+    if (!/^[a-zA-Z0-9 _.'-]+$/.test(value)) {
+      return 'Il nome alleanza contiene caratteri non consentiti.';
+    }
+
+    return null;
+  }
+
   selectAlliance(index: number) {
     if (index < 0 || index >= this.alliances.length) {
       return;
@@ -198,6 +223,50 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
           (typeof error?.error === 'string' ? error.error : '') ||
           '';
         this.allianceActionError = backendMessage || error?.message || 'Impossibile unirsi all\'alleanza.';
+      }
+    });
+  }
+
+  createAlliance() {
+    if (!this.matchId) {
+      this.allianceActionError = 'Match non disponibile.';
+      return;
+    }
+
+    if (this.currentAlliance) {
+      this.allianceActionError = 'Sei gia in un\'alleanza.';
+      return;
+    }
+
+    const allianceName = this.normalizeAllianceName(this.newAllianceName);
+    const validationError = this.validateAllianceName(allianceName);
+    if (validationError) {
+      this.allianceActionError = validationError;
+      return;
+    }
+
+    this.newAllianceName = allianceName;
+
+    this.allianceActionError = '';
+    this.allianceActionSuccess = '';
+    this.isUpdatingAlliance = true;
+
+    this.homeService.createMatchAlliance(this.matchId, allianceName).subscribe({
+      next: () => {
+        this.isUpdatingAlliance = false;
+        this.newAllianceName = '';
+        this.allianceActionSuccess = 'Alleanza creata con successo.';
+        this.alliancesChanged.emit();
+      },
+      error: (error) => {
+        this.isUpdatingAlliance = false;
+        const backendMessage =
+          error?.error?.message ||
+          error?.error?.error ||
+          error?.error?.details ||
+          (typeof error?.error === 'string' ? error.error : '') ||
+          '';
+        this.allianceActionError = backendMessage || error?.message || 'Impossibile creare l\'alleanza.';
       }
     });
   }

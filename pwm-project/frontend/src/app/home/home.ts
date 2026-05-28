@@ -32,6 +32,14 @@ export class HomeService {
     return this.http.get<any>(`${this.matchApiUrl}/${matchId}/alliance`, { withCredentials: true });
   }
 
+  createMatchAlliance(matchId: string, allianceName: string): Observable<any> {
+    return this.http.post<any>(
+      `${this.matchApiUrl}/${matchId}/create/alliance`,
+      { allianceName, nome_alleanza: allianceName },
+      { withCredentials: true },
+    );
+  }
+
   joinMatchAlliance(matchId: string, allianceId: string | number): Observable<any> {
     return this.http.post<any>(`${this.matchApiUrl}/${matchId}/join/${allianceId}`, {}, { withCredentials: true });
   }
