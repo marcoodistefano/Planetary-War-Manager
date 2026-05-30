@@ -11,10 +11,18 @@ ion-content::part(scroll) {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  align-items: center;
-  padding-top: clamp(20px, 10vh, 12vh); 
-  padding-bottom: 20px; 
+  align-items: center; /* default desktop look preserved */
+  padding-top: clamp(20px, 10vh, 12vh);
+  padding-bottom: 20px;
   min-height: 100%;
+  scroll-behavior: smooth;
+}
+
+@media (max-width: 768px) {
+  ion-content::part(scroll) {
+    align-items: flex-start;
+    scroll-padding-bottom: 300px; /* spazio per tastiera virtuale */
+  }
 }
 
 .auth-background {

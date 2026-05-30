@@ -504,6 +504,8 @@ export class MatchPage implements OnInit, AfterViewInit {
 
         this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3.5);
         this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
+        // sovrapponi gli archi (strade/rotte) generati in shared/assets/map/archs.json
+        this.loadArchesLayer('/assets/map/archs.json');
     });
 
     this.map.on('touchstart', (e: any) => {
@@ -572,6 +574,134 @@ export class MatchPage implements OnInit, AfterViewInit {
       this.closeRadialOnInteraction();
       this.closeTroopsDropdownOnInteraction();
     });
+  }
+
+  // Carica archs.json e lo converte in GeoJSON LineString per la sovrapposizione
+  loadArchesLayer(url: string) {
+    fetch(url).then(res => res.json()).then((data: any) => {
+      try {
+        const lineFeatures: any[] = [];
+        const nodeMap = new Map<string, any>();
+
+        // data è un oggetto con pathN: { arcs: [{lon,lat}, ...], ... }
+        Object.keys(data).forEach(key => {
+          const entry = data[key];
+          if (!entry || !Array.isArray(entry.arcs)) return;
+          const coords = entry.arcs.map((p: any) => [Number(p.lon), Number(p.lat)]).filter((c: any) => c && c.length === 2);
+          if (coords.length < 2) return; // serve almeno una linea
+
+          lineFeatures.push({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: coords },
+            properties: {
+              id: key,
+              city1: entry.city1 || null,
+              city2: entry.city2 || null,
+              distance: entry.distance || null,
+              road_type: entry.road_type || null
+            }
+          });
+
+          // endpoints — usa primo e ultimo punto come "nodi" (città)
+          const first = entry.arcs[0];
+          const last = entry.arcs[entry.arcs.length - 1];
+          if (first && first.lon != null && first.lat != null) {
+            const k = `${Number(first.lon).toFixed(6)},${Number(first.lat).toFixed(6)}`;
+            if (!nodeMap.has(k)) nodeMap.set(k, {
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: [Number(first.lon), Number(first.lat)] },
+              properties: { name: entry.city1 || null }
+            });
+          }
+          if (last && last.lon != null && last.lat != null) {
+            const k2 = `${Number(last.lon).toFixed(6)},${Number(last.lat).toFixed(6)}`;
+            if (!nodeMap.has(k2)) nodeMap.set(k2, {
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: [Number(last.lon), Number(last.lat)] },
+              properties: { name: entry.city2 || null }
+            });
+          }
+        });
+
+        const linesGeo = { type: 'FeatureCollection', features: lineFeatures };
+        const nodesGeo = { type: 'FeatureCollection', features: Array.from(nodeMap.values()) };
+
+        // aggiorna o crea source + layer per le linee
+        if (this.map.getSource('archs')) {
+          (this.map.getSource('archs') as any).setData(linesGeo);
+        } else {
+          this.map.addSource('archs', { type: 'geojson', data: linesGeo, generateId: true });
+
+          this.map.addLayer({
+            id: 'archs-lines',
+            type: 'line',
+            source: 'archs',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: {
+              'line-color': '#ff6b6b',
+              'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.6, 6, 1.6, 10, 2.6],
+              'line-opacity': 0.9
+            }
+          });
+
+          this.map.addLayer({
+            id: 'archs-lines-outline',
+            type: 'line',
+            source: 'archs',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: {
+              'line-color': '#2b2b2b',
+              'line-width': ['interpolate', ['linear'], ['zoom'], 1, 1.2, 6, 2.4, 10, 3.6],
+              'line-opacity': 0.35
+            }
+          });
+        }
+
+        // crea/aggiorna source + layer per i nodi (circle + label)
+        if (this.map.getSource('archs-nodes')) {
+          (this.map.getSource('archs-nodes') as any).setData(nodesGeo);
+        } else {
+          this.map.addSource('archs-nodes', { type: 'geojson', data: nodesGeo, generateId: true });
+
+          // cerchi per i nodi
+          this.map.addLayer({
+            id: 'archs-nodes-circle',
+            type: 'circle',
+            source: 'archs-nodes',
+            minzoom: 4,
+            paint: {
+              'circle-color': '#ffd166',
+              'circle-stroke-color': '#2b2b2b',
+              'circle-stroke-width': 1,
+              'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 3, 6, 6, 10, 10],
+              'circle-opacity': 0.95
+            }
+          });
+
+          // label con nome città (se disponibile)
+          this.map.addLayer({
+            id: 'archs-nodes-label',
+            type: 'symbol',
+            source: 'archs-nodes',
+            minzoom: 4,
+            layout: {
+              'text-field': ['coalesce', ['get', 'name'], ''],
+              'text-size': 11,
+              'text-offset': [0, 1.2],
+              'text-anchor': 'top'
+            },
+            paint: {
+              'text-color': '#ffffff',
+              'text-halo-color': '#000000',
+              'text-halo-width': 1
+            }
+          });
+        }
+
+      } catch (err) {
+        console.error('Errore caricamento archs.json', err);
+      }
+    }).catch(err => console.error('Errore fetch archs.json', err));
   }
 
   private closeRadialOnInteraction() {

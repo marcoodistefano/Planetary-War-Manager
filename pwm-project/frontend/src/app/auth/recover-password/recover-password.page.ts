@@ -1,7 +1,7 @@
-import { AfterViewInit, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common'; 
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';   
-import { IonicModule } from '@ionic/angular';   
+import { IonicModule, IonContent } from '@ionic/angular';   
 import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../auth-api.service';
 import { finalize } from 'rxjs/operators';
@@ -15,13 +15,32 @@ import { Title } from '@angular/platform-browser';
   imports: [IonicModule, CommonModule, FormsModule, ReactiveFormsModule, RouterLink]
 })
 // Assicurati che la classe sia scritta ESATTAMENTE così
-export class RecoverPasswordPage implements OnInit, AfterViewInit {
+export class RecoverPasswordPage implements OnInit, AfterViewInit, OnDestroy {
 
   recoverForm!: FormGroup;
   errorMessage = '';
   successMessage = '';
   isSubmitting = false;
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
+  @ViewChild(IonContent) content?: IonContent;
+
+  private focusHandler = (ev: FocusEvent) => {
+    const target = ev.target as HTMLElement | null;
+    if (!target) return;
+    const tag = target.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || target.closest('ion-input')) {
+      setTimeout(async () => {
+        try {
+          const contentEl = await this.content?.getScrollElement();
+          if (!contentEl) return;
+          const targetRect = target.getBoundingClientRect();
+          const contentRect = contentEl.getBoundingClientRect();
+          const offset = contentEl.scrollTop + (targetRect.top - contentRect.top) - 120;
+          this.content?.scrollToPoint(0, Math.max(0, Math.round(offset)), 300);
+        } catch (e) { /* ignore */ }
+      }, 50);
+    }
+  };
 
   constructor(
     private formBuilder: FormBuilder,
@@ -40,6 +59,7 @@ export class RecoverPasswordPage implements OnInit, AfterViewInit {
   // QUESTO È IL METODO CHE IL COMPILATORE NON TROVA:
   ngAfterViewInit() {
     this.playBackgroundVideo();
+    document.addEventListener('focusin', this.focusHandler);
   }
 
   ionViewDidEnter() {
@@ -79,5 +99,9 @@ export class RecoverPasswordPage implements OnInit, AfterViewInit {
           console.error('Errore recupero:', error);
         },
       });
+  }
+
+  ngOnDestroy() {
+    document.removeEventListener('focusin', this.focusHandler);
   }
 }

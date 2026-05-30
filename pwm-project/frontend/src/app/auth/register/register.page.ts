@@ -1,9 +1,9 @@
-import { AfterViewInit, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common'; 
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';     
 import { Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../auth-api.service';
-import { IonicModule, IonSearchbar } from '@ionic/angular';
+import { IonicModule, IonSearchbar, IonContent } from '@ionic/angular';
 import { finalize } from 'rxjs/operators';
 import { Title } from '@angular/platform-browser';
 
@@ -20,7 +20,7 @@ import { Title } from '@angular/platform-browser';
     RouterLink
   ]
 })
-export class RegisterPage implements OnInit, AfterViewInit {
+export class RegisterPage implements OnInit, AfterViewInit, OnDestroy {
 
   // Variabili del Form
   RegisterForm!: FormGroup;
@@ -36,6 +36,25 @@ export class RegisterPage implements OnInit, AfterViewInit {
 
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
   @ViewChild('countrySearchbar') searchbar?: IonSearchbar;
+  @ViewChild(IonContent) content?: IonContent;
+
+  private focusHandler = (ev: FocusEvent) => {
+    const target = ev.target as HTMLElement | null;
+    if (!target) return;
+    const tag = target.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || target.closest('ion-input')) {
+      setTimeout(async () => {
+        try {
+          const contentEl = await this.content?.getScrollElement();
+          if (!contentEl) return;
+          const targetRect = target.getBoundingClientRect();
+          const contentRect = contentEl.getBoundingClientRect();
+          const offset = contentEl.scrollTop + (targetRect.top - contentRect.top) - 120;
+          this.content?.scrollToPoint(0, Math.max(0, Math.round(offset)), 300);
+        } catch (e) { /* ignore */ }
+      }, 50);
+    }
+  };
 
   constructor(
     private formBuilder: FormBuilder,
@@ -57,6 +76,7 @@ export class RegisterPage implements OnInit, AfterViewInit {
 
   ngAfterViewInit() {
     this.playBackgroundVideo();
+    document.addEventListener('focusin', this.focusHandler);
   }
 
   ionViewDidEnter() {
@@ -161,7 +181,7 @@ export class RegisterPage implements OnInit, AfterViewInit {
         next: () => {
           this.router.navigate(['/login']);
         },
-        error: (error) => {
+        error: (error: any) => {
           const apiErrors = error?.error?.errors;
           if (Array.isArray(apiErrors) && apiErrors.length > 0) {
             this.errorMessage = apiErrors.join(' | ');
@@ -174,4 +194,9 @@ export class RegisterPage implements OnInit, AfterViewInit {
         },
       });
   }
+
+  ngOnDestroy() {
+    document.removeEventListener('focusin', this.focusHandler);
+  }
+
 }
