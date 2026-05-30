@@ -47,6 +47,8 @@ export class MatchPage implements OnInit, AfterViewInit {
   MAPTILER_KEY = 'PGAzmQH2OduY9E8gSi6n';
   hoveredState = { id: null as any, source: null as any };
   currentHoveredName = '';
+  selectedPointName = '';
+  selectedPointCoords = '--';
   sensorSocket: any;
   private touchTimer: any;
   isTouchLayout = false;
@@ -536,6 +538,8 @@ export class MatchPage implements OnInit, AfterViewInit {
       this.clearTouchTimer();
     });
 
+    this.map.on('click', (e: any) => this.handleMapPointSelect(e));
+
     // Mantieni anche il vecchio listener contextmenu per il Desktop
     this.map.on('contextmenu', (e: any) => {
       e.originalEvent.preventDefault();
@@ -750,39 +754,67 @@ export class MatchPage implements OnInit, AfterViewInit {
   }
 
   handleMapMouseMove(e: any) {
+    this.updatePointReadout(e, false);
+  }
+
+  handleMapPointSelect(e: any) {
+    this.updatePointReadout(e, true);
+  }
+
+  private updatePointReadout(e: any, persistSelection: boolean) {
     this.sensorSocket.emit('query_point', { lng: e.lngLat.lng, lat: e.lngLat.lat });
-    
-    let wrappedLng = e.lngLat.lng;
-    while (wrappedLng > 180) wrappedLng -= 360;
-    while (wrappedLng < -180) wrappedLng += 360;
-    
+
+    const coordsText = this.formatMapCoordinates(e.lngLat.lng, e.lngLat.lat);
     const outCoords = document.getElementById('out-coords');
-    if(outCoords) outCoords.innerText = `${wrappedLng.toFixed(3)}, ${e.lngLat.lat.toFixed(3)}`;
+    if (outCoords) outCoords.innerText = coordsText;
+
+    if (persistSelection) {
+      this.selectedPointCoords = coordsText;
+    }
 
     if (this.map.getZoom() > 6) {
         this.clearHoverState();
+        if (!persistSelection && !this.isTouchLayout) {
+          this.selectedPointName = '';
+        }
         return;
     }
-    
+
     if (!this.map.getLayer('nazioni-layer') || !this.map.getLayer('regioni-layer')) return;
 
     const features = this.map.queryRenderedFeatures(e.point, { layers: ['nazioni-layer', 'regioni-layer'] });
-    
+
     if (features.length > 0 && features[0].id !== undefined) {
         const f = features[0];
         const territoryName = f.properties.name || f.properties.ADMIN || 'SCONOSCIUTO';
-        this.currentHoveredName = territoryName.toUpperCase();
+        const readableName = territoryName.toUpperCase();
+        this.currentHoveredName = readableName;
+
+        if (persistSelection || this.isTouchLayout) {
+          this.selectedPointName = readableName;
+        }
 
         if (this.hoveredState.id !== null && this.hoveredState.id !== f.id) {
             this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: false });
         }
-        
+
         this.hoveredState = { id: f.id, source: f.source };
         this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: true });
         this.map.getCanvas().style.cursor = 'pointer';
     } else {
         this.clearHoverState();
+        if (persistSelection || this.isTouchLayout) {
+          this.selectedPointName = '';
+        }
     }
+  }
+
+  private formatMapCoordinates(lng: number, lat: number) {
+    let wrappedLng = lng;
+    while (wrappedLng > 180) wrappedLng -= 360;
+    while (wrappedLng < -180) wrappedLng += 360;
+
+    return `${wrappedLng.toFixed(3)}, ${lat.toFixed(3)}`;
   }
 
   private clearHoverState() {

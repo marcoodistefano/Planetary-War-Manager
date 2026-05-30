@@ -227,6 +227,36 @@
   width: clamp(280px, calc(30 * var(--unit)), 400px);
 }
 
+/* Fallback: assicurati che il pannello combined-control abbia header fisso e titolo troncato
+   anche se il media query tablet non venisse applicato (problemi di width/dpr) */
+.hud-stack-left .hud-panel.combined-control .panel-header {
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 0 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.hud-stack-left .hud-panel.combined-control .title-block {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.hud-stack-left .hud-panel.combined-control .title-block h2 {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 0.95rem !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+}
+
 .hud-stack-right { 
   right: calc(4.5 * var(--unit)); 
   width: clamp(360px, calc(34 * var(--unit)), 560px);
@@ -769,7 +799,7 @@ ion-menu {
   display: none !important;
 }
 
-@media (max-width: 992px) {
+@media (max-width: 767px) {
   .desktop-only { display: none !important; }
   .mobile-only { display: flex !important; }
   
@@ -909,51 +939,180 @@ ion-menu {
   }
 }
 /* ==========================================================================
-   TABLET RESPONSIVE TWEAKS (768px - 1024px)
+   TABLET / SMALL DESKTOP RESPONSIVE TWEAKS (768px - 1310px)
    ========================================================================== */
-@media (min-width: 768px) and (max-width: 1024px) {
-  .mobile-top-navbar {
-    height: 70px;
-    padding: 0 15px;
-  }
-  
-  .mobile-top-navbar .mobile-logo {
-    font-size: 1.8rem;
+@media (min-width: 768px) and (max-width: 1310px) {
+  .ion-page#main-map-content,
+  ion-content.transparent-bg {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
   }
 
-  .mobile-top-navbar .menu-button-wrap {
-    width: 50px;
-    height: 50px;
-  }
-
-  .mobile-top-navbar .holographic-menu-btn {
+  ion-content.transparent-bg::part(scroll) {
     width: 100%;
     height: 100%;
-    ion-icon { font-size: 1.5rem; }
+    overflow: hidden;
   }
 
-  .vertical-resource-bar {
-    top: 130px;
-    right: 15px;
+  .mobile-only { display: none !important; }
+  .desktop-only { display: flex !important; }
+
+  #map-container {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .top-navbar.desktop-only {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    right: 16px;
+    height: auto;
+    min-height: 108px;
+    padding: 12px 16px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    border-radius: 14px;
+  }
+
+  .top-navbar.desktop-only .nav-group-left,
+  .top-navbar.desktop-only .profile-section {
+    height: 50px;
+    flex: 0 0 auto;
+  }
+
+  .top-navbar.desktop-only .nav-group-left {
+    order: 1;
+  }
+
+  .top-navbar.desktop-only .profile-section {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .top-navbar.desktop-only .resource-bar {
+    order: 3;
+    flex: 1 0 100%;
+    width: 100%;
+    gap: 10px;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .top-navbar.desktop-only .res-item {
+    flex: 0 1 auto;
+    min-width: 116px;
+    min-height: 56px;
+    padding: 8px 12px;
     gap: 8px;
-    
-    .mini-res-item {
-      padding: 8px 6px;
-      min-width: 65px;
-      position: relative;
-      
-      .icon { font-size: 1.5rem; }
-      .val { font-size: 0.9rem; margin-top: 4px; }
-    }
+  }
+
+  .top-navbar.desktop-only .res-item .res-icon {
+    font-size: 1.45rem;
+  }
+
+  .top-navbar.desktop-only .res-item .res-val {
+    font-size: 1.08rem;
+  }
+
+  .top-navbar.desktop-only .res-item .res-prod {
+    font-size: 0.76rem;
+  }
+
+  .top-navbar.desktop-only .profile-trigger .profile-avatar-circle {
+    width: 42px;
+    height: 42px;
+  }
+
+  .top-navbar.desktop-only .profile-trigger .profile-info .p-name {
+    font-size: 0.95rem;
+  }
+
+  .top-navbar.desktop-only .profile-trigger .profile-info .p-rank {
+    font-size: 0.68rem;
+  }
+
+  .top-navbar.desktop-only .profile-trigger {
+    gap: 10px;
+  }
+
+  .top-navbar.desktop-only .pwm-logo-btn {
+    height: 46px;
+    min-width: 76px;
+    padding: 0 14px;
+    font-size: 0.95rem;
+  }
+
+  .tactical-actions-row.desktop-only {
+    display: flex !important;
+  }
+
+  .hud-panel.combined-control.desktop-only {
+    display: block !important;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    align-self: stretch;
   }
 
   .hud-stack-left {
-    top: 100px;
-    width: 320px;
+    position: absolute;
+    left: 16px;
+    bottom: 24px;
+    top: auto;
+    width: clamp(300px, 28vw, 420px);
   }
-  
+
+  .hud-stack-right {
+    position: absolute;
+    right: 16px;
+    bottom: 24px;
+    top: auto;
+    width: clamp(380px, 34vw, 580px);
+    align-items: flex-end;
+  }
+
+  .hud-chat-panel {
+    margin-bottom: 12px;
+  }
+
+  .tactical-actions-row {
+    gap: 12px;
+  }
+
+  .tactical-actions-row button {
+    padding: 16px 12px;
+    font-size: 0.8rem;
+  }
+
+  .hud-panel.build-panel {
+    max-width: 100%;
+  }
+
+  .hud-panel.combined-control .panel-content {
+    margin-top: 12px;
+  }
+
+  .build-panel .build-grid.scrollable-y {
+    max-height: 360px;
+  }
+
+  .sensor-grid {
+    gap: 8px;
+  }
+
+  .build-grid.scrollable-y {
+    max-height: 360px;
+  }
+
   ion-menu {
-    --width: 45vw; /* Sui tablet il menu non ha bisogno di prendere il 75% */
+    --width: 33vw;
   }
 
   .res-item.trigger-item.open {
@@ -965,30 +1124,6 @@ ion-menu {
     left: auto;
     transform: none;
     width: min(260px, calc(100vw - 120px));
-  }
-
-  .mini-res-item.trigger-item.open {
-    z-index: 10001;
-  }
-
-  .mini-res-item.trigger-item.open .troops-dropdown {
-    position: absolute;
-    top: 50%;
-    right: calc(100% + 8px);
-    left: auto;
-    transform: translateY(-50%);
-    width: min(240px, calc(100vw - 110px));
-    max-width: calc(100vw - 110px);
-  }
-
-  .troops-dropdown-float {
-    position: fixed;
-    display: block;
-    z-index: 10002;
-    width: min(280px, calc(100vw - 120px));
-    max-width: calc(100vw - 120px);
-    transform: translate(-100%, -50%);
-    pointer-events: auto;
   }
 }
 
