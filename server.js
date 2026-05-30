@@ -46,6 +46,23 @@ async function getPointData(lng, lat) {
     } catch (e) { return { altitude: 0, biomeId: 0 }; }
 }
 
+// Sanitize helper: rimuove campi identificativi sensibili prima di inviare al client
+function sanitizeForClient(obj) {
+    if (obj == null) return obj;
+    if (Array.isArray(obj)) return obj.map(sanitizeForClient);
+    if (typeof obj === 'object') {
+        const copy = Object.assign({}, obj);
+        delete copy.id_user_send;
+        delete copy.id_user_receiver;
+        delete copy.id_user;
+        delete copy.user_id;
+        delete copy.sender_id;
+        delete copy.uuid;
+        return copy;
+    }
+    return obj;
+}
+
 io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     try {
@@ -70,7 +87,7 @@ io.on('connection', (socket) => {
             pipeline.sadd(`modificati:${partitaId}`, t.id_truppa);
         });
         await pipeline.exec();
-        io.to(`user_${socket.userId}`).emit('truppe_batch_update', truppe);
+        io.to(`user_${socket.userId}`).emit('truppe_batch_update', truppe.map(sanitizeForClient));
     });
 
     socket.on('svuota_truppe_test', async (d) => {
