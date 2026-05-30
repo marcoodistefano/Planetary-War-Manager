@@ -1,5 +1,7 @@
 const { createClient } = require("redis");
 const { Pool } = require("pg");
+const fs = require("fs/promises");
+const path = require("path");
 
 const parseIntSafe = (value, fallback) => {
   const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -15,6 +17,14 @@ const MATCHES_JOINABLE_KEY = process.env.MATCHES_JOINABLE_KEY || "Matches:Joinab
 const GLOBAL_LIMIT = parseIntSafe(process.env.LEADERBOARD_GLOBAL_LIMIT, 1000);
 const REGIONAL_LIMIT = parseIntSafe(process.env.LEADERBOARD_REGIONAL_LIMIT, 100);
 const LOOP_DELAY_MS = parseIntSafe(process.env.WARMUP_LOOP_DELAY_MS, 15000);
+const ASSET_ROOT_CANDIDATES = [
+  process.env.ASSET_ROOT,
+  "/app/assets",
+  path.resolve(__dirname, "../../shared/assets"),
+].filter(Boolean);
+const ASSET_DIRECTORIES = ["2Dmodels", "map", "profile_icons"];
+const ASSET_FILES = ["game_rules.json"];
+const ASSET_PREFIXES = ["ETOPO", "lc_mcd12"];
 
 const redis = createClient({ url: REDIS_URL });
 const db = new Pool({ connectionString: DB_URL });
@@ -28,6 +38,18 @@ db.on("error", (err) => {
 });
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const findExistingPath = async (candidates) => {
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch (err) {
+      continue;
+    }
+  }
+  return null;
+};
 
 const getInfoValue = (info, key) => {
   const line = info
@@ -67,6 +89,98 @@ const waitForDb = async () => {
       await sleep(1000);
     }
   }
+};
+
+const shouldLoadRootFile = (fileName) => {
+  if (ASSET_FILES.includes(fileName)) return true;
+  return ASSET_PREFIXES.some((prefix) => fileName.startsWith(prefix));
+};
+
+const collectAssets = async (assetRoot) => {
+  const assetEntries = [];
+
+  const visitDirectory = async (absoluteDir, relativeDir) => {
+    const entries = await fs.readdir(absoluteDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const relativePath = relativeDir ? path.posix.join(relativeDir, entry.name) : entry.name;
+      const absolutePath = path.join(absoluteDir, entry.name);
+
+      if (entry.isDirectory()) {
+        await visitDirectory(absolutePath, relativePath);
+        continue;
+      }
+
+      assetEntries.push({
+        key: `assets:${relativePath}`,
+        relativePath,
+        absolutePath,
+      });
+    }
+  };
+
+  const rootEntries = await fs.readdir(assetRoot, { withFileTypes: true });
+
+  for (const entry of rootEntries) {
+    const absolutePath = path.join(assetRoot, entry.name);
+
+    if (entry.isDirectory()) {
+      if (ASSET_DIRECTORIES.includes(entry.name)) {
+        await visitDirectory(absolutePath, entry.name);
+      }
+      continue;
+    }
+
+    if (shouldLoadRootFile(entry.name)) {
+      assetEntries.push({
+        key: `assets:${entry.name}`,
+        relativePath: entry.name,
+        absolutePath,
+      });
+    }
+  }
+
+  return assetEntries;
+};
+
+const loadAssetsToRedis = async () => {
+  const assetRoot = await findExistingPath(ASSET_ROOT_CANDIDATES);
+  if (!assetRoot) {
+    throw new Error("cartella assets non trovata");
+  }
+
+  const assets = await collectAssets(assetRoot);
+  if (assets.length === 0) {
+    throw new Error("nessun asset da caricare trovato");
+  }
+
+  const multi = redis.multi();
+  const manifestFiles = [];
+
+  for (const asset of assets) {
+    const data = await fs.readFile(asset.absolutePath);
+    multi.set(asset.key, data.toString("base64"));
+    manifestFiles.push({ path: asset.relativePath, size: data.length });
+  }
+
+  multi.set(
+    "assets:manifest",
+    JSON.stringify({
+      root: assetRoot,
+      loadedAt: new Date().toISOString(),
+      files: manifestFiles,
+    }),
+  );
+
+  await multi.exec();
+  console.log(`[CACHE_WARMUP] Caricati ${assets.length} asset in Redis.`);
+};
+
+const shouldRunAssetWarmup = async (runId) => {
+  const cachedRunId = await redis.get("cache_warmup:run_id");
+  const manifest = await redis.get("assets:manifest");
+
+  return cachedRunId !== runId || !manifest;
 };
 
 const buildPlayerMap = (rows) => {
@@ -134,6 +248,7 @@ const fetchJoinableMatches = async () => {
 const runWarmup = async (runId) => {
   await waitForDb();
 
+  await loadAssetsToRedis();
   const leaderboard = await loadLeaderboards();
   const joinableMatches = await fetchJoinableMatches();
 
@@ -156,9 +271,7 @@ const startLoop = async () => {
       if (!runId) {
         throw new Error("run_id Redis mancante");
       }
-      const cachedRunId = await redis.get("cache_warmup:run_id");
-
-      if (cachedRunId !== runId) {
+      if (await shouldRunAssetWarmup(runId)) {
         console.log("[CACHE_WARMUP] Avvio warmup per Redis run_id:", runId);
         await runWarmup(runId);
       }

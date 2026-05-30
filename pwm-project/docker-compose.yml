@@ -172,6 +172,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
       - MATCH_SERVICE_URL=http://match-service:3004
+    volumes:
+      - ./shared/assets:/app/assets:ro
     restart: unless-stopped
     networks:
       - pwm-net

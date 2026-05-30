@@ -1,6 +1,7 @@
 const express = require("express");
 const http = require("http");
 const net = require("net");
+const path = require("path");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const redisClient = require("./services/shared/redisClient.js");
@@ -40,6 +41,65 @@ const JWT_SECRET =
   process.env.JWT_SECRET ||
   process.env.SECRET_KEY ||
   "CHIAVE_SEGRETA_TEMPORANEA_SUPER_SICURA";
+
+const REDIS_ASSET_PATTERNS = [
+  /^\/assets\/(2Dmodels|map|profile_icons)\/.+$/,
+  /^\/assets\/game_rules\.json$/,
+  /^\/assets\/ETOPO_2022_v1_60s_N90W180_surface\.tif$/,
+  /^\/assets\/lc_mcd12q1v061\.t1_c_500m_s_20210101_20211231_go_epsg\.4326_v20230818\.tif$/,
+];
+
+const REDIS_ASSET_CONTENT_TYPES = {
+  ".json": "application/json; charset=utf-8",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
+  ".glb": "model/gltf-binary",
+  ".mp3": "audio/mpeg",
+  ".mpeg": "audio/mpeg",
+  ".mp4": "video/mp4",
+};
+
+const isRedisAssetPath = (pathname) => {
+  for (let i = 0; i < REDIS_ASSET_PATTERNS.length; i++) {
+    if (REDIS_ASSET_PATTERNS[i].test(pathname)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const getRedisAssetContentType = (pathname) => {
+  const extension = path.extname(pathname).toLowerCase();
+  return REDIS_ASSET_CONTENT_TYPES[extension] || "application/octet-stream";
+};
+
+const serveRedisAsset = async (req, res) => {
+  const rawUrlString = req.originalUrl || req.url || "/";
+  const parsedUrl = new URL(rawUrlString, "http://localhost");
+  const pathname = parsedUrl.pathname;
+
+  if (!isRedisAssetPath(pathname)) {
+    return res.status(404).json({ error: "Asset non gestito dal gateway" });
+  }
+
+  const assetKey = `assets:${pathname.replace(/^\/assets\//, "")}`;
+  const assetPayload = await redisClient.get(assetKey);
+
+  if (!assetPayload) {
+    return res.status(404).json({ error: "Asset non trovato in Redis" });
+  }
+
+  const assetBuffer = Buffer.from(assetPayload, "base64");
+  res.setHeader("Content-Type", getRedisAssetContentType(pathname));
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("X-Asset-Source", "redis");
+  return res.send(assetBuffer);
+};
 
 // 2. DEFINIZIONE ROTTE
 const PUBLIC_PATHS = [
@@ -184,6 +244,21 @@ const validateSessionToken = async (token) => {
 // --- MIDDLEWARE EXPRESS ---
 app.use(cors(corsOptions));
 
+app.use(async (req, res, next) => {
+  const rawUrlString = req.originalUrl || req.url || "/";
+  const parsedUrl = new URL(rawUrlString, "http://localhost");
+
+  if (!isRedisAssetPath(parsedUrl.pathname)) {
+    return next();
+  }
+
+  try {
+    return await serveRedisAsset(req, res);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // Parse JSON solo se non è un WebSocket (che romperebbe lo stream)
 app.use((req, res, next) => {
   const rawUrlString = req.url || "/";
@@ -226,6 +301,10 @@ const requireJwt = async (req, res, next) => {
   const rawUrlString = req.originalUrl || "/";
   const parsedUrl = new URL(rawUrlString, "http://localhost");
   const pathname = parsedUrl.pathname;
+
+  if (isRedisAssetPath(pathname)) {
+    return next();
+  }
 
   // Se la rotta è pubblica (login, register), passa oltre
   if (isPublicPath(pathname)) {
