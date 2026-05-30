@@ -28,6 +28,62 @@ from typing import Any, Iterable
 EARTH_RADIUS_METERS = 6_371_000.0
 
 
+# ==============================================================================
+# STRUTTURE DATI HARDWARE-LEVEL
+# ==============================================================================
+
+class UnionFind:
+    """Struttura dati per il tracciamento dei cluster disgiunti (Kruskal MST)."""
+    def __init__(self, size: int):
+        self.parent = list(range(size))
+        self.rank = [0] * size
+
+    def find(self, i: int) -> int:
+        if self.parent[i] == i:
+            return i
+        self.parent[i] = self.find(self.parent[i])
+        return self.parent[i]
+
+    def union(self, i: int, j: int) -> bool:
+        root_i = self.find(i)
+        root_j = self.find(j)
+        if root_i != root_j:
+            if self.rank[root_i] < self.rank[root_j]:
+                self.parent[root_i] = root_j
+            elif self.rank[root_i] > self.rank[root_j]:
+                self.parent[root_j] = root_i
+            else:
+                self.parent[root_j] = root_i
+                self.rank[root_i] += 1
+            return True
+        return False
+
+
+@dataclass(frozen=True)
+class CityNode:
+    index: int
+    name: str
+    province: str
+    country: str
+    lon: float
+    lat: float
+    population: int
+
+
+@dataclass(frozen=True)
+class RegionNode:
+    index: int
+    name: str
+    country: str
+    polygons: list[list[list[tuple[float, float]]]]
+    arc_ids: set[int]
+    bbox: tuple[float, float, float, float]
+
+
+# ==============================================================================
+# FUNZIONI GEOMETRICHE E MATEMATICHE
+# ==============================================================================
+
 def normalize_text(value: str | None) -> str:
     if not value:
         return ""
@@ -119,6 +175,10 @@ def point_in_polygon(point: tuple[float, float], polygon: list[list[tuple[float,
     return inside
 
 
+# ==============================================================================
+# DECODER TOPOLOGICO
+# ==============================================================================
+
 class TopologyDecoder:
     def __init__(self, topology: dict[str, Any]):
         self.topology = topology
@@ -168,69 +228,9 @@ class TopologyDecoder:
         return merged
 
 
-@dataclass(frozen=True)
-class CityNode:
-    index: int
-    name: str
-    province: str
-    country: str
-    lon: float
-    lat: float
-    population: int
-
-
-@dataclass(frozen=True)
-class RegionNode:
-    index: int
-    name: str
-    country: str
-    polygons: list[list[list[tuple[float, float]]]]
-    arc_ids: set[int]
-    bbox: tuple[float, float, float, float]
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate archs.json and the adjacency matrix.")
-    parser.add_argument(
-        "--map-dir",
-        type=Path,
-        default=None,
-        help="Directory containing cities.json, regions.json, map.json and roads.json.",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=None,
-        help="Directory where the generated JSON files will be written.",
-    )
-    parser.add_argument(
-        "--matrix-file",
-        type=str,
-        default="aqrchs.json",
-        help="Filename for the adjacency matrix output.",
-    )
-    parser.add_argument(
-        "--archs-file",
-        type=str,
-        default="archs.json",
-        help="Filename for the routed graph output.",
-    )
-    parser.add_argument(
-        "--use-roads-fallback",
-        action="store_true",
-        help="Decode roads.json and allow road polylines as a routing fallback.",
-    )
-    return parser.parse_args()
-
-
-def repo_root_from_script() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
-def load_json(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
-
+# ==============================================================================
+# ESTRAZIONE NODI E RETI
+# ==============================================================================
 
 def iter_geometries(node: Any) -> Iterable[dict[str, Any]]:
     if isinstance(node, dict):
@@ -238,14 +238,7 @@ def iter_geometries(node: Any) -> Iterable[dict[str, Any]]:
         if node_type == "GeometryCollection":
             for geometry in node.get("geometries", []):
                 yield from iter_geometries(geometry)
-        elif node_type in {
-            "Point",
-            "MultiPoint",
-            "LineString",
-            "MultiLineString",
-            "Polygon",
-            "MultiPolygon",
-        }:
+        elif node_type in {"Point", "MultiPoint", "LineString", "MultiLineString", "Polygon", "MultiPolygon"}:
             yield node
         else:
             for value in node.values():
@@ -258,16 +251,16 @@ def iter_geometries(node: Any) -> Iterable[dict[str, Any]]:
 def collect_arc_ids(arcs_structure: Any) -> set[int]:
     arc_ids: set[int] = set()
     if isinstance(arcs_structure, int):
-        arc_ids.add(abs(arcs_structure))
+        # PATCH HARDWARE 1: Operatore Bitwise NOT per TopoJSON, non ABS()
+        val = arcs_structure
+        arc_ids.add(val if val >= 0 else ~val)
     elif isinstance(arcs_structure, list):
         for item in arcs_structure:
             arc_ids.update(collect_arc_ids(item))
     return arc_ids
 
 
-def decode_polygon_geometry(
-    decoder: TopologyDecoder, geometry: dict[str, Any]
-) -> list[list[list[tuple[float, float]]]]:
+def decode_polygon_geometry(decoder: TopologyDecoder, geometry: dict[str, Any]) -> list[list[list[tuple[float, float]]]]:
     arcs_structure = geometry.get("arcs") or []
     if geometry.get("type") == "Polygon":
         return [[decoder.merge_arc_refs(ring) for ring in arcs_structure if ring]]
@@ -279,9 +272,7 @@ def decode_polygon_geometry(
     return []
 
 
-def decode_line_geometry(
-    decoder: TopologyDecoder, geometry: dict[str, Any]
-) -> list[list[tuple[float, float]]]:
+def decode_line_geometry(decoder: TopologyDecoder, geometry: dict[str, Any]) -> list[list[tuple[float, float]]]:
     arcs_structure = geometry.get("arcs") or []
     if geometry.get("type") == "LineString":
         return [decoder.merge_arc_refs(arcs_structure)]
@@ -351,21 +342,6 @@ def compute_polygons_bbox(polygons: list[list[list[tuple[float, float]]]]) -> tu
     return min_lon, min_lat, max_lon, max_lat
 
 
-def build_city_lookup(cities: list[CityNode]) -> dict[tuple[str, str], CityNode]:
-    grouped: dict[tuple[str, str], list[CityNode]] = defaultdict(list)
-    for city in cities:
-        country_key = normalize_text(city.country)
-        province_key = normalize_text(city.province)
-        grouped[(country_key, province_key)].append(city)
-        grouped[("", province_key)].append(city)
-
-    lookup: dict[tuple[str, str], CityNode] = {}
-    for key, candidates in grouped.items():
-        candidates.sort(key=lambda item: (-item.population, item.name))
-        lookup[key] = candidates[0]
-    return lookup
-
-
 def build_region_adjacency(regions: list[RegionNode]) -> dict[int, set[int]]:
     arc_to_regions: dict[int, list[int]] = defaultdict(list)
     for region in regions:
@@ -384,9 +360,7 @@ def build_region_adjacency(regions: list[RegionNode]) -> dict[int, set[int]]:
     return adjacency
 
 
-def assign_city_regions(
-    cities: list[CityNode], regions: list[RegionNode]
-) -> dict[int, int]:
+def assign_city_regions(cities: list[CityNode], regions: list[RegionNode]) -> dict[int, int]:
     city_to_region: dict[int, int] = {}
     for city in cities:
         point = (city.lon, city.lat)
@@ -398,18 +372,23 @@ def assign_city_regions(
                 if point_in_polygon(point, polygon):
                     containing_regions.append(region.index)
                     break
+            if containing_regions:
+                break
+        
         if containing_regions:
             city_to_region[city.index] = containing_regions[0]
             continue
 
+        # PATCH HARDWARE 2: Fallback Anti-Deriva. Calcolo distanza dai bordi del BBox, non dal centro!
+        def distance_to_bbox(bbox: tuple[float, float, float, float]) -> float:
+            min_lon, min_lat, max_lon, max_lat = bbox
+            cx = max(min_lon, min(city.lon, max_lon))
+            cy = max(min_lat, min(city.lat, max_lat))
+            return haversine_meters(city.lon, city.lat, cx, cy)
+
         closest_region_index = min(
             regions,
-            key=lambda region: haversine_meters(
-                city.lon,
-                city.lat,
-                (region.bbox[0] + region.bbox[2]) / 2.0,
-                (region.bbox[1] + region.bbox[3]) / 2.0,
-            ),
+            key=lambda region: distance_to_bbox(region.bbox),
         ).index
         city_to_region[city.index] = closest_region_index
     return city_to_region
@@ -422,9 +401,7 @@ def build_region_city_map(city_to_region: dict[int, int]) -> dict[int, list[int]
     return region_to_cities
 
 
-def collect_land_polygons(
-    map_topology: dict[str, Any],
-) -> list[list[list[tuple[float, float]]]]:
+def collect_land_polygons(map_topology: dict[str, Any]) -> list[list[list[tuple[float, float]]]]:
     polygons: list[list[list[tuple[float, float]]]] = []
     decoder = TopologyDecoder(map_topology)
     for geometry in iter_geometries(map_topology.get("objects", {})):
@@ -451,6 +428,10 @@ def point_on_land(
     return False
 
 
+# ==============================================================================
+# ALGORITMO DI ROUTING E PATHFINDING
+# ==============================================================================
+
 def route_is_valid(
     route: list[tuple[float, float]],
     polygon_index: list[tuple[tuple[float, float, float, float], list[list[tuple[float, float]]]]],
@@ -459,7 +440,7 @@ def route_is_valid(
         return False
     for start, end in zip(route, route[1:]):
         segment_distance = haversine_meters(start[0], start[1], end[0], end[1])
-        samples = max(2, min(4, int(segment_distance / 750_000) + 2))
+        samples = max(2, int(segment_distance / 2_000.0) + 1)
         for sample in interpolate_points(start, end, samples):
             if not point_on_land(sample, polygon_index):
                 return False
@@ -555,56 +536,6 @@ def city_candidates_for_region(
     return candidate_indices
 
 
-def add_city_edge(
-    city_left: CityNode,
-    city_right: CityNode,
-    city_to_region: dict[int, int],
-    regions: list[RegionNode],
-    region_decoder: TopologyDecoder,
-    polygon_index: list[tuple[tuple[float, float, float, float], list[list[tuple[float, float]]]]],
-    road_polylines: list[list[tuple[float, float]]],
-    edge_pairs: set[tuple[int, int]],
-    edges: list[dict[str, Any]],
-    degree: list[int],
-) -> bool:
-    if city_left.index == city_right.index:
-        return False
-    if normalize_text(city_left.name) == normalize_text(city_right.name):
-        return False
-    pair_key = tuple(sorted((city_left.index, city_right.index)))
-    if pair_key in edge_pairs:
-        return False
-
-    left_region = regions[city_to_region[city_left.index]]
-    right_region = regions[city_to_region[city_right.index]]
-    route = build_route(
-        city_left,
-        city_right,
-        left_region,
-        right_region,
-        region_decoder,
-        polygon_index,
-        road_polylines,
-    )
-    if route is None:
-        route = [(city_left.lon, city_left.lat), (city_right.lon, city_right.lat)]
-
-    edge_pairs.add(pair_key)
-    degree[city_left.index] += 1
-    degree[city_right.index] += 1
-    edges.append(
-        {
-            "city1": city_left.name,
-            "city2": city_right.name,
-            "distance": int(round(segment_length(route))),
-            "road_type": 1,
-            "pendenza": 1,
-            "arcs": [{"lon": lon, "lat": lat} for lon, lat in route],
-        }
-    )
-    return True
-
-
 def build_route(
     city_a: CityNode,
     city_b: CityNode,
@@ -618,11 +549,12 @@ def build_route(
     if route_is_valid(direct_route, polygon_index):
         return direct_route
 
-    border_waypoint = shared_border_waypoint(region_a, region_b, region_decoder)
-    if border_waypoint is not None:
-        border_route = [(city_a.lon, city_a.lat), border_waypoint, (city_b.lon, city_b.lat)]
-        if route_is_valid(border_route, polygon_index):
-            return border_route
+    if region_a.index != region_b.index:
+        border_waypoint = shared_border_waypoint(region_a, region_b, region_decoder)
+        if border_waypoint is not None:
+            border_route = [(city_a.lon, city_a.lat), border_waypoint, (city_b.lon, city_b.lat)]
+            if route_is_valid(border_route, polygon_index):
+                return border_route
 
     road_route = road_route_waypoint(city_a, city_b, road_polylines)
     if road_route is not None and route_is_valid(road_route, polygon_index):
@@ -640,11 +572,11 @@ def select_edges(
     polygon_index: list[tuple[tuple[float, float, float, float], list[list[tuple[float, float]]]]],
     road_polylines: list[list[tuple[float, float]]],
 ) -> list[dict[str, Any]]:
+    
     region_to_cities = build_region_city_map(city_to_region)
-    edges: list[dict[str, Any]] = []
-    degree = [0 for _ in cities]
-    edge_pairs: set[tuple[int, int]] = set()
-
+    MAX_DEGREE = 8
+    candidate_edges = []
+    
     for city in cities:
         candidate_indices = city_candidates_for_region(
             city,
@@ -652,64 +584,128 @@ def select_edges(
             region_to_cities,
             region_adjacency,
         )
-
-        best_candidate: CityNode | None = None
-        best_distance = math.inf
+        
         for candidate_index in candidate_indices:
             candidate_city = cities[candidate_index]
-            if candidate_city.index == city.index:
+            
+            if city.index >= candidate_city.index:
                 continue
-            pair_key = tuple(sorted((city.index, candidate_city.index)))
-            if pair_key in edge_pairs:
+            if normalize_text(city.name) == normalize_text(candidate_city.name):
                 continue
-            distance = haversine_meters(city.lon, city.lat, candidate_city.lon, candidate_city.lat)
-            if distance < best_distance:
-                best_distance = distance
-                best_candidate = candidate_city
 
-        if best_candidate is not None:
-            add_city_edge(
-                city,
-                best_candidate,
-                city_to_region,
-                regions,
-                region_decoder,
-                polygon_index,
-                road_polylines,
-                edge_pairs,
-                edges,
-                degree,
+            left_region_idx = city_to_region.get(city.index)
+            right_region_idx = city_to_region.get(candidate_city.index)
+            
+            if left_region_idx is None or right_region_idx is None:
+                continue
+
+            # Check robusto di adiacenza 
+            if left_region_idx != right_region_idx and right_region_idx not in region_adjacency.get(left_region_idx, set()):
+                continue
+
+            left_region = regions[left_region_idx]
+            right_region = regions[right_region_idx]
+            
+            route = build_route(
+                city, candidate_city, left_region, right_region,
+                region_decoder, polygon_index, road_polylines
             )
+            
+            if route is not None:
+                dist = segment_length(route)
+                candidate_edges.append((dist, city.index, candidate_city.index, route))
 
-    for city in cities:
-        if degree[city.index] > 0:
-            continue
+    candidate_edges.sort(key=lambda x: x[0])
 
-        fallback_candidates = [
-            candidate
-            for candidate in cities
-            if candidate.index != city.index and tuple(sorted((city.index, candidate.index))) not in edge_pairs
-        ]
-        fallback_candidates.sort(
-            key=lambda candidate: haversine_meters(city.lon, city.lat, candidate.lon, candidate.lat)
-        )
+    edges: list[dict[str, Any]] = []
+    degree = [0] * len(cities)
+    edge_pairs: set[tuple[int, int]] = set()
+    uf = UnionFind(len(cities))
 
-        for candidate_city in fallback_candidates[:50]:
-            if add_city_edge(
-                city,
-                candidate_city,
-                city_to_region,
-                regions,
-                region_decoder,
-                polygon_index,
-                road_polylines,
-                edge_pairs,
-                edges,
-                degree,
-            ):
-                break
+    for dist, u, v, route in candidate_edges:
+        if uf.union(u, v):
+            edge_pairs.add((u, v))
+            degree[u] += 1
+            degree[v] += 1
+            edges.append({
+                "city1": cities[u].name,
+                "city2": cities[v].name,
+                "distance": int(round(dist)),
+                "road_type": 1,
+                "pendenza": 1,
+                "arcs": [{"lon": lon, "lat": lat} for lon, lat in route],
+            })
+
+    for dist, u, v, route in candidate_edges:
+        if (u, v) not in edge_pairs:
+            if degree[u] < MAX_DEGREE and degree[v] < MAX_DEGREE:
+                edge_pairs.add((u, v))
+                degree[u] += 1
+                degree[v] += 1
+                edges.append({
+                    "city1": cities[u].name,
+                    "city2": cities[v].name,
+                    "distance": int(round(dist)),
+                    "road_type": 1,
+                    "pendenza": 1,
+                    "arcs": [{"lon": lon, "lat": lat} for lon, lat in route],
+                })
 
     return edges
+
+
+# ==============================================================================
+# I/O E STARTUP
+# ==============================================================================
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Generate archs.json and the adjacency matrix.")
+    parser.add_argument("--map-dir", type=Path, default=None, help="Directory containing map JSONs.")
+    parser.add_argument("--output-dir", type=Path, default=None, help="Directory for output.")
+    parser.add_argument("--matrix-file", type=str, default="aqrchs.json", help="Adjacency matrix output.")
+    parser.add_argument("--archs-file", type=str, default="archs.json", help="Routed graph output.")
+    parser.add_argument("--use-roads-fallback", action="store_true", help="Use roads.json as fallback.")
+    return parser.parse_args()
+
+
+def repo_root_from_script() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def build_geojson_archs_output(edges: list[dict[str, Any]]) -> dict[str, Any]:
+    features: list[dict[str, Any]] = []
+    for index, edge in enumerate(edges, start=1):
+        route = edge.get("arcs") or []
+        coordinates = [
+            [float(point["lon"]), float(point["lat"])]
+            for point in route
+            if isinstance(point, dict)
+            and point.get("lon") is not None
+            and point.get("lat") is not None
+        ]
+        if len(coordinates) < 2:
+            continue
+        features.append(
+            {
+                "type": "Feature",
+                "id": f"path{index}",
+                "geometry": {"type": "LineString", "coordinates": coordinates},
+                "properties": {
+                    "id": f"path{index}",
+                    "city1": edge.get("city1"),
+                    "city2": edge.get("city2"),
+                    "distance": edge.get("distance"),
+                    "road_type": edge.get("road_type"),
+                    "pendenza": edge.get("pendenza"),
+                },
+            }
+        )
+    return {"type": "FeatureCollection", "features": features}
 
 
 def extract_road_polylines(roads_topology: dict[str, Any]) -> list[list[tuple[float, float]]]:
@@ -738,6 +734,7 @@ def main() -> int:
     city_to_region = assign_city_regions(cities, regions)
     land_polygons = collect_land_polygons(map_topology)
     polygon_index = build_polygon_index(land_polygons)
+    
     road_polylines: list[list[tuple[float, float]]] = []
     if args.use_roads_fallback:
         roads_topology = load_json(map_dir / "roads.json")
@@ -778,7 +775,7 @@ def main() -> int:
         "matrix": adjacency_matrix,
     }
 
-    archs_output = {f"path{index}": edge for index, edge in enumerate(edges, start=1)}
+    archs_output = build_geojson_archs_output(edges)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     with (output_dir / args.matrix_file).open("w", encoding="utf-8") as handle:

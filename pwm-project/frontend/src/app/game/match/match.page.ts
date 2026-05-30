@@ -616,42 +616,68 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const lineFeatures: any[] = [];
         const nodeMap = new Map<string, any>();
 
-        // data è un oggetto con pathN: { arcs: [{lon,lat}, ...], ... }
-        Object.keys(data).forEach(key => {
-          const entry = data[key];
-          if (!entry || !Array.isArray(entry.arcs)) return;
-          const coords = entry.arcs.map((p: any) => [Number(p.lon), Number(p.lat)]).filter((c: any) => c && c.length === 2);
-          if (coords.length < 2) return; // serve almeno una linea
+        const features = data?.type === 'FeatureCollection' && Array.isArray(data.features)
+          ? data.features
+          : Object.keys(data || {}).map((key: string) => {
+              const entry = data[key];
+              if (!entry || !Array.isArray(entry.arcs)) return null;
+              const coords = entry.arcs
+                .map((p: any) => [Number(p.lon), Number(p.lat)])
+                .filter((c: any) => c && c.length === 2);
+              if (coords.length < 2) return null;
+              return {
+                type: 'Feature',
+                geometry: { type: 'LineString', coordinates: coords },
+                properties: {
+                  id: key,
+                  city1: entry.city1 || null,
+                  city2: entry.city2 || null,
+                  distance: entry.distance || null,
+                  road_type: entry.road_type || null,
+                  pendenza: entry.pendenza || null
+                }
+              };
+            }).filter(Boolean);
+
+        features.forEach((feature: any, index: number) => {
+          const geometry = feature?.geometry;
+          const coordinates = geometry?.type === 'LineString' && Array.isArray(geometry.coordinates)
+            ? geometry.coordinates
+            : null;
+          if (!coordinates || coordinates.length < 2) return;
+
+          const properties = feature?.properties || {};
+          const featureId = feature?.id || properties.id || `path${index + 1}`;
 
           lineFeatures.push({
             type: 'Feature',
-            geometry: { type: 'LineString', coordinates: coords },
+            geometry: { type: 'LineString', coordinates },
             properties: {
-              id: key,
-              city1: entry.city1 || null,
-              city2: entry.city2 || null,
-              distance: entry.distance || null,
-              road_type: entry.road_type || null
+              id: featureId,
+              city1: properties.city1 || null,
+              city2: properties.city2 || null,
+              distance: properties.distance || null,
+              road_type: properties.road_type || null,
+              pendenza: properties.pendenza || null
             }
           });
 
-          // endpoints — usa primo e ultimo punto come "nodi" (città)
-          const first = entry.arcs[0];
-          const last = entry.arcs[entry.arcs.length - 1];
-          if (first && first.lon != null && first.lat != null) {
-            const k = `${Number(first.lon).toFixed(6)},${Number(first.lat).toFixed(6)}`;
+          const first = coordinates[0];
+          const last = coordinates[coordinates.length - 1];
+          if (first && first.length === 2) {
+            const k = `${Number(first[0]).toFixed(6)},${Number(first[1]).toFixed(6)}`;
             if (!nodeMap.has(k)) nodeMap.set(k, {
               type: 'Feature',
-              geometry: { type: 'Point', coordinates: [Number(first.lon), Number(first.lat)] },
-              properties: { name: entry.city1 || null }
+              geometry: { type: 'Point', coordinates: [Number(first[0]), Number(first[1])] },
+              properties: { name: properties.city1 || null }
             });
           }
-          if (last && last.lon != null && last.lat != null) {
-            const k2 = `${Number(last.lon).toFixed(6)},${Number(last.lat).toFixed(6)}`;
+          if (last && last.length === 2) {
+            const k2 = `${Number(last[0]).toFixed(6)},${Number(last[1]).toFixed(6)}`;
             if (!nodeMap.has(k2)) nodeMap.set(k2, {
               type: 'Feature',
-              geometry: { type: 'Point', coordinates: [Number(last.lon), Number(last.lat)] },
-              properties: { name: entry.city2 || null }
+              geometry: { type: 'Point', coordinates: [Number(last[0]), Number(last[1])] },
+              properties: { name: properties.city2 || null }
             });
           }
         });
