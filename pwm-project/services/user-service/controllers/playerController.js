@@ -178,17 +178,15 @@ const sendFriendRequest_byUsername = async (req, res) => {
 };
 const respondToFriendRequest = async (req, res) => {
   try {
-    const username_utente = await resolveUserId(req, res);
-    const username_req = req.headers['username'];
+    const U_ID = await resolveUserId(req, res);
     const { requestId, accept } = req.body;
-    if (!username_utente) return;
-    if (!username_req) return res.status(401).json({ message: "Non autenticato" });
-    if (!requestId) return res.status(400).json({ message: "ID richiesta mancante" });
-    const result = await playerModel.respondToFriendRequest(username_utente, username_req, requestId, accept);
+    if (!U_ID) return;
+    if (!requestId) return res.status(400).json({ message: 'ID richiesta mancante' });
+    const result = await playerModel.respondToFriendRequest(U_ID, requestId, accept);
     return res.status(result.status).json(result);
   } catch (error) {
-    console.error("Errore controller respondToFriendRequest:", error);
-    return res.status(500).json({ error: "Errore interno del server" });
+    console.error('Errore controller respondToFriendRequest:', error);
+    return res.status(500).json({ error: 'Errore interno del server' });
   }
 };
 const removeFriend = async (req, res) => {

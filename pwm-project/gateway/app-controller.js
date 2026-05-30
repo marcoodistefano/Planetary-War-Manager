@@ -14,6 +14,7 @@ const MIN_PASSWORD_LENGTH = 12;
 const ROUTE_GROUPS = [
     { pattern: /^\/auth(?:\/|$)/, target: "user" },     // Gestito da user-service
     { pattern: /^\/home(?:\/|$)/, target: "user" },     // Gestito da user-service
+    { pattern: /^\/friends(?:\/|$)/, target: "user" },  // Rotte amici -> user-service
     { pattern: /^\/elo(?:\/|$)/, target: "user" },      // NUOVO: Rotte per i calcoli ELO
     { pattern: /^\/player(?:\/|$)/, target: "user" },   // NUOVO: Rotte per info profilo/statistiche
     { pattern: /^\/match(?:\/|$)/, target: "match" },

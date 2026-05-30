@@ -56,6 +56,7 @@
               <span class="f-rank">{{ friend.rank }}</span>
             </div>
             <button class="comm-btn"><ion-icon name="chatbubble-ellipses-outline"></ion-icon></button>
+            <button class="remove-btn" (click)="removeFriend(friend)"><ion-icon name="trash-outline"></ion-icon></button>
           </div>
         </ng-container>
 
@@ -67,8 +68,8 @@
               <span class="f-rank">In attesa di approvazione</span>
             </div>
             <div class="req-actions">
-              <button class="accept"><ion-icon name="checkmark-outline"></ion-icon></button>
-              <button class="reject"><ion-icon name="close-outline"></ion-icon></button>
+              <button class="accept" (click)="respondToRequest(req.requestId, true)"><ion-icon name="checkmark-outline"></ion-icon></button>
+              <button class="reject" (click)="respondToRequest(req.requestId, false)"><ion-icon name="close-outline"></ion-icon></button>
             </div>
           </div>
         </ng-container>

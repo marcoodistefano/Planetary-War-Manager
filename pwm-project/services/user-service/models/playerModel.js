@@ -185,15 +185,12 @@ const buildHome = async (U_ID) => {
 
     // 5. AMICI
     const friends_information = await db.query(
-      `SELECT 
-        u.username, 
-        u.reg, 
-        u.elo_rating, 
-        u.avatar_id, 
-        u.codice_amico
-    FROM amici a
-    INNER JOIN utenti u ON a.id_amico = u.id_user
-    WHERE a.id_user = $1;`,
+      `SELECT u.username, u.reg, u.elo_rating, u.avatar_id, u.codice_amico
+       FROM amici a
+       INNER JOIN utenti u ON (
+         (a.id_user = $1 AND a.id_amico = u.id_user) OR
+         (a.id_amico = $1 AND a.id_user = u.id_user)
+       );`,
       [U_ID],
     );
 
@@ -302,14 +299,12 @@ const updateAvatar = async (U_ID, avatarId) => {
 const getFriends = async (U_ID) => {
   try {    
     const result = await db.query(
-      `SELECT 
-        u.username,
-        u.reg,
-        u.elo_rating,
-        u.avatar_id,
-      FROM amici a
-      INNER JOIN utenti u ON a.id_amico = u.id_user
-      WHERE a.id_user = $1;`,
+      `SELECT u.username, u.reg, u.elo_rating, u.avatar_id
+       FROM amici a
+       INNER JOIN utenti u ON (
+         (a.id_user = $1 AND a.id_amico = u.id_user) OR
+         (a.id_amico = $1 AND a.id_user = u.id_user)
+       );`,
       [U_ID],
     );
     if (!result) {
@@ -329,10 +324,10 @@ const getFriendPendingRequests = async (U_ID) => {
         u.reg,
         u.elo_rating,
         u.avatar_id,
-        r.id_richiesta
+        r.id_request
       FROM richieste_amici r
-      INNER JOIN utenti u ON r.id_richiedente = u.id_user
-      WHERE r.id_destinatario = $1 AND r.stato = 'pending';`,
+      INNER JOIN utenti u ON r.id_user = u.id_user
+      WHERE r.id_target = $1 AND r.status = 'pending';`,
       [U_ID]
     );//lato frontend si contano le righe e si appende il numero di richieste in sospeso in alto nel banner amici
     if (!result) {
@@ -347,11 +342,22 @@ const getFriendPendingRequests = async (U_ID) => {
 };
 const sendFriendRequest_byCode = async (username_utente, friendId) => {
   try {
+    // username_utente is actually the authenticated user's id (id_user).
+    // Resolve destinatario id from codice_amico first and validate.
+    const destQ = await db.query(`SELECT id_user FROM utenti WHERE codice_amico = $1 LIMIT 1`, [friendId]);
+    if (!destQ || destQ.rowCount === 0) {
+      return { status: 404, error: "Codice amico non trovato" };
+    }
+    const destinatarioId = destQ.rows[0].id_user;
+    if (destinatarioId === username_utente) {
+      return { status: 400, error: "Impossibile inviare richiesta a se stessi" };
+    }
+
     const result = await db.query(
-      `INSERT INTO richieste_amici (id_richiedente, id_destinatario, stato) VALUES ((SELECT id_user FROM utenti WHERE username = $1), (SELECT id_user FROM utenti WHERE codice_amico = $2), 'pending') RETURNING id_richiesta;`,
-      [username_utente, friendId]
+      `INSERT INTO richieste_amici (id_user, id_target, status) VALUES ($1, $2, 'pending') RETURNING id_request;`,
+      [username_utente, destinatarioId]
     );
-    return { status: 200, data: { message: "Richiesta di amicizia inviata con successo", req_id : result.rows[0].id_richiesta } };
+    return { status: 200, data: { message: "Richiesta di amicizia inviata con successo", req_id: result.rows[0].id_request } };
   } catch (error) {
     console.error("Errore in sendFriendRequest_byCode:", error);
     return { status: 500, error: "Errore durante l'invio della richiesta di amicizia" };
@@ -359,11 +365,21 @@ const sendFriendRequest_byCode = async (username_utente, friendId) => {
 };
 const sendFriendRequest_byUsername = async (username_utente, username_destinatario) => {
   try {
+    // Resolve destinatario id from username and validate
+    const destQ = await db.query(`SELECT id_user FROM utenti WHERE username = $1 LIMIT 1`, [username_destinatario]);
+    if (!destQ || destQ.rowCount === 0) {
+      return { status: 404, error: "Username destinatario non trovato" };
+    }
+    const destinatarioId = destQ.rows[0].id_user;
+    if (destinatarioId === username_utente) {
+      return { status: 400, error: "Impossibile inviare richiesta a se stessi" };
+    }
+
     const result = await db.query(
-      `INSERT INTO richieste_amici (id_richiedente, id_destinatario, stato) VALUES ((SELECT id_user FROM utenti WHERE username = $1), (SELECT id_user FROM utenti WHERE username = $2), 'pending') RETURNING id_richiesta;`,
-      [username_utente, username_destinatario]
+      `INSERT INTO richieste_amici (id_user, id_target, status) VALUES ($1, $2, 'pending') RETURNING id_request;`,
+      [username_utente, destinatarioId]
     );
-    return { status: 200, data: { message: "Richiesta di amicizia inviata con successo", req_id : result.rows[0].id_richiesta } };
+    return { status: 200, data: { message: "Richiesta di amicizia inviata con successo", req_id: result.rows[0].id_request } };
   } catch (error) {
     console.error("Errore in sendFriendRequest_byUsername:", error);
     return { status: 500, error: "Errore durante l'invio della richiesta di amicizia" };
@@ -371,42 +387,61 @@ const sendFriendRequest_byUsername = async (username_utente, username_destinatar
 };
 //LE QUERY SONO GIA' IMPOSTATE PER PRENDERE DIRETTAMENTE GLI USERNAME, NON GLI ID, QUINDI NELLE FUNZIONI DEL CONTROLLER PASSIAMO DIRETTAMENTE GLI USERNAME CHE PRENDIAMO DAL TOKEN JWT, NON GLI ID. IN QUESTO MODO EVITIAMO DI FARE QUERY AGGIUNTIVE PER TRADURRE ID IN USERNAME E VICEVERSA, OTTIMIZZANDO LE PRESTAZIONI.
 //PER TANTO AD ORA NON POSSONO FUNZIONARE
-const respondToFriendRequest = async (username_utente, username_req, requestId, accept) => {
-  try {    
-    const new_accept = String.toString(accept); // Convertiamo il booleano in stringa "true" o "false"
-    const newStatus = new_accept ? 'accepted' : 'rejected';
-    if(!newStatus) {
-      return { status: 400, error: "Valore di accettazione non valido" };
+const respondToFriendRequest = async (userId, requestId, accept) => {
+  try {
+    const newStatus = accept ? 'accepted' : 'rejected';
+    if (typeof accept !== 'boolean') {
+      return { status: 400, error: 'Valore di accettazione non valido' };
     }
-    const result = await db.query(
-      `UPDATE richieste_amici SET stato = $1 WHERE id_richiesta = $2 AND id_destinatario = $3 RETURNING id_richiesta;`,
-      [newStatus, requestId, username_req]
+
+    // Fetch the requester id for the given request and target
+    const lookup = await db.query(
+      `SELECT id_user FROM richieste_amici WHERE id_request = $1 AND id_target = $2 LIMIT 1`,
+      [requestId, userId]
     );
-    if (result.rowCount === 0) {
-      return { status: 404, error: "Richiesta di amicizia non trovata o non autorizzata" };
+    if (!lookup || lookup.rowCount === 0) {
+      return { status: 404, error: 'Richiesta di amicizia non trovata o non autorizzata' };
     }
+
+    const requesterId = lookup.rows[0].id_user;
     if (newStatus === 'accepted') {
-      // Se accettata, inseriamo la relazione di amicizia
+      const idUserA = requesterId < userId ? requesterId : userId;
+      const idUserB = requesterId < userId ? userId : requesterId;
       await db.query(
-        `INSERT INTO amici (id_user, id_amico, id_richiesta) VALUES ((SELECT id_user FROM utenti WHERE username = $1), (SELECT id_user FROM utenti WHERE username = $2), $3)`,
-        [username_utente, username_req, requestId]
+        `INSERT INTO amici (id_user, id_amico) VALUES ($1, $2) ON CONFLICT DO NOTHING;`,
+        [idUserA, idUserB]
       );
     }
-    return { status: 200, data: { message: "Richiesta di amicizia risposta con successo" } };
+
+    // Remove the request record (we keep history thin for now)
+    await db.query(`DELETE FROM richieste_amici WHERE id_request = $1`, [requestId]);
+
+    return { status: 200, data: { message: 'Richiesta di amicizia risposta con successo' } };
   } catch (error) {
-    console.error("Errore in respondToFriendRequest:", error);
-    return { status: 500, error: "Errore durante la risposta alla richiesta di amicizia" };
+    console.error('Errore in respondToFriendRequest:', error);
+    return { status: 500, error: 'Errore durante la risposta alla richiesta di amicizia' };
   }
 };
-const removeFriend = async (username_utente, friendId) => {
+const removeFriend = async (userId, friendId) => {
   try {
-    const result = await db.query(
-      `DELETE FROM amici WHERE (id_user = (SELECT id_user FROM utenti WHERE username = $1) AND id_amico =  $2);`,
-      [username_utente, friendId]
-    );
-    return { status: 200, data: { message: "Amico rimosso con successo" } };
+    // Resolve friendId to UUID if it's a username
+    let friendUuid = friendId;
+    const uuidRegex = /^[0-9a-fA-F-]{36}$/;
+    if (!uuidRegex.test(String(friendId))) {
+      const q = await db.query(`SELECT id_user FROM utenti WHERE username = $1 LIMIT 1`, [friendId]);
+      if (!q || q.rowCount === 0) {
+        return { status: 404, error: 'Amico non trovato' };
+      }
+      friendUuid = q.rows[0].id_user;
+    }
+
+    const idUserA = userId < friendUuid ? userId : friendUuid;
+    const idUserB = userId < friendUuid ? friendUuid : userId;
+
+    await db.query(`DELETE FROM amici WHERE id_user = $1 AND id_amico = $2;`, [idUserA, idUserB]);
+    return { status: 200, data: { message: 'Amico rimosso con successo' } };
   } catch (error) {
-    console.error("Errore in removeFriend:", error);
+    console.error('Errore in removeFriend:', error);
     return { status: 500, error: "Errore durante la rimozione dell'amico" };
   }
 };
