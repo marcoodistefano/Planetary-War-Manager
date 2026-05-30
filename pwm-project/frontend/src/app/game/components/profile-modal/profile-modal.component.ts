@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { Router } from '@angular/router';
 
+const AVATAR_ASSET_VERSION = '20260517';
+
 @Component({
   selector: 'app-profile-modal',
   templateUrl: './profile-modal.component.html',
@@ -17,7 +19,9 @@ export class ProfileModalComponent {
     rank: 'COMANDANTE SUPREMO',
     experience: 0,
     matchesWon: 0,
-    matchesLost: 0
+    matchesLost: 0,
+    avatar: null,
+    avatar_id: null
   };
 
   @Input() audioSettings: any = { music: 50, sfx: 80 };
@@ -65,6 +69,23 @@ export class ProfileModalComponent {
 
   closeTerminal() {
     this.close.emit();
+  }
+
+  getProfileAvatarSrc(): string | null {
+    const avatarValue = this.profile?.avatar;
+
+    if (typeof avatarValue === 'string' && avatarValue.trim()) {
+      return avatarValue.trim();
+    }
+
+    const avatarId = this.profile?.avatar_id ?? this.profile?.avatarId;
+    const parsedAvatarId = Number(avatarId);
+
+    if (Number.isFinite(parsedAvatarId) && parsedAvatarId > 0) {
+      return `assets/profile_icons/id_${parsedAvatarId}.jpeg?v=${AVATAR_ASSET_VERSION}`;
+    }
+
+    return null;
   }
 
   navigateToFullProfile() {

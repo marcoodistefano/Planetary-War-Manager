@@ -120,9 +120,21 @@
       display: flex; 
       align-items: center;
       justify-content: center; 
-      font-size: 3.5rem; 
       border-radius: 12px; /* Stile card Intelligence */
       box-shadow: 0 0 20px var(--primary-glow);
+      overflow: hidden;
+    }
+
+    .avatar-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .user-icon {
+      font-size: 3.5rem;
+      line-height: 1;
     }
     .rank-tag {
       font-size: 0.6rem; 

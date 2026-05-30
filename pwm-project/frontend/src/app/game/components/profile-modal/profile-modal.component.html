@@ -34,7 +34,10 @@
           <div class="profile-header">
             <div class="avatar-wrapper">
               <div class="avatar-monitor">
-                <span class="user-icon">👤</span>
+                  <img *ngIf="getProfileAvatarSrc(); else avatarFallback" [src]="getProfileAvatarSrc()" [alt]="profile?.username" class="avatar-image">
+                  <ng-template #avatarFallback>
+                    <span class="user-icon">👤</span>
+                  </ng-template>
               </div>
               <div class="rank-tag">{{ profile?.rank }}</div>
             </div>

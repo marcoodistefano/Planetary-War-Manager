@@ -194,7 +194,20 @@
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 0 10px var(--primary-glow);
     transition: 0.3s;
+    overflow: hidden;
     &:hover { box-shadow: 0 0 20px var(--primary-blue); background: rgba(134, 215, 255, 0.25); }
+  }
+
+  .profile-avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .user-symbol {
+    font-size: 1.2em;
+    line-height: 1;
   }
 }
 

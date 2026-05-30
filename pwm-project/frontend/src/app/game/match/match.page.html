@@ -9,7 +9,10 @@
       
       <div class="profile-trigger" (click)="setOpenProfile(true); closeMobileMenu()">
         <div class="profile-avatar-circle">
-          <span class="user-symbol">👤</span>
+          <img *ngIf="userProfile.avatar; else mobileAvatarFallback" [src]="userProfile.avatar" [alt]="userProfile.username" class="profile-avatar-image">
+          <ng-template #mobileAvatarFallback>
+            <span class="user-symbol">👤</span>
+          </ng-template>
         </div>
         <div class="profile-info">
           <span class="p-rank">GEN. BRIGATA</span>
@@ -93,7 +96,10 @@
             <span class="p-name">{{ userProfile.username }}</span>
           </div>
           <div class="profile-avatar-circle">
-            <span class="user-symbol">👤</span>
+            <img *ngIf="userProfile.avatar; else desktopAvatarFallback" [src]="userProfile.avatar" [alt]="userProfile.username" class="profile-avatar-image">
+            <ng-template #desktopAvatarFallback>
+              <span class="user-symbol">👤</span>
+            </ng-template>
           </div>
         </div>
       </div>

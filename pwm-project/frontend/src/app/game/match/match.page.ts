@@ -1,10 +1,12 @@
-import { Component, OnInit, AfterViewInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController, MenuController } from '@ionic/angular'; // <--- AGGIUNTO MenuController
 import { ActivatedRoute, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { HomeService } from '../../home/home';
 import { AuthApiService } from '../../auth/auth-api.service';
+import { UserStateService } from '../../user-state.service';
 
 // Componenti
 import { ProfileModalComponent } from '../components/profile-modal/profile-modal.component';
@@ -20,6 +22,8 @@ declare var maplibregl: any;
 declare var topojson: any;
 declare var io: any;
 declare var THREE: any;
+
+const AVATAR_ASSET_VERSION = '20260517';
 
 @Component({
   selector: 'app-match',
@@ -39,7 +43,7 @@ declare var THREE: any;
     ArmyModalComponent
   ]
 })
-export class MatchPage implements OnInit, AfterViewInit {
+export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   // --- 1. PROPRIETÀ E STATO DELLA MAPPA ---
   map: any;
@@ -51,6 +55,7 @@ export class MatchPage implements OnInit, AfterViewInit {
   selectedPointCoords = '--';
   sensorSocket: any;
   private touchTimer: any;
+  private avatarSub?: Subscription;
   isTouchLayout = false;
 
   // --- 2. STATO DELL'INTERFACCIA (UI) ---
@@ -86,7 +91,8 @@ export class MatchPage implements OnInit, AfterViewInit {
   userProfile = {
     username: 'Caricamento...',
     rank: 'Generale di Brigata',
-    experience: 85, matchesWon: 24, matchesLost: 5
+    experience: 85, matchesWon: 24, matchesLost: 5,
+    avatar: this.avatarPath(1)
   };
 
   playerTroops: any = {
@@ -162,7 +168,8 @@ export class MatchPage implements OnInit, AfterViewInit {
     private menuCtrl: MenuController,
     private route: ActivatedRoute,
     private homeService: HomeService,
-    private authApi: AuthApiService
+    private authApi: AuthApiService,
+    private userState: UserStateService
   ) { }
 
   ngOnInit() {
@@ -171,6 +178,13 @@ export class MatchPage implements OnInit, AfterViewInit {
     this.loadUserProfile();
     this.loadMatchContext();
     this.isTouchLayout = this.isTouchViewport();
+    this.avatarSub = this.userState.avatarId$.subscribe((avatarId) => {
+      this.userProfile = {
+        ...this.userProfile,
+        avatar: this.avatarPath(avatarId)
+      };
+      this.cdr.detectChanges();
+    });
     // Connect Socket.IO through gateway (explicit origin + path)
     this.sensorSocket = io(window.location.origin, { path: '/socket.io', auth: { token: localStorage.getItem('jwt') || "IL_TUO_JWT_TOKEN" } });
     this.sensorSocket.on('point_data', (data: any) => this.handlePointData(data));
@@ -185,6 +199,12 @@ export class MatchPage implements OnInit, AfterViewInit {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  ngOnDestroy() {
+    if (this.avatarSub) {
+      this.avatarSub.unsubscribe();
+    }
   }
 
   ionViewWillEnter() {
@@ -331,7 +351,12 @@ export class MatchPage implements OnInit, AfterViewInit {
           username: String(profile.username),
           rank: profile.rank || profile.reg || this.userProfile.rank,
           experience: profile.experience ?? this.userProfile.experience,
+          avatar: profile.avatar_id ? this.avatarPath(profile.avatar_id) : this.userProfile.avatar,
         };
+
+        if (profile.avatar_id) {
+          this.userState.setAvatarId(Number(profile.avatar_id));
+        }
 
         this.cdr.detectChanges();
       },
@@ -342,6 +367,10 @@ export class MatchPage implements OnInit, AfterViewInit {
         }
       }
     });
+  }
+
+  private avatarPath(avatarId: number) {
+    return `assets/profile_icons/id_${avatarId}.jpeg?v=${AVATAR_ASSET_VERSION}`;
   }
 
   ngAfterViewInit() {
