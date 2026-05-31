@@ -815,4 +815,5 @@ module.exports = {
   authorizeWsConnection,
   resolveMatchId,
   ensureUserInMatch,
+  processSYSMessage,
 };
