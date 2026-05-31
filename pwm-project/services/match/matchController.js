@@ -1,5 +1,6 @@
 const model = require("./matchModel");
 const { getAuthContextFromRequest } = require("../shared/authContext.js");
+const redis = require("../shared/redisClient.js");
 
 const notImplemented = (res) =>
   res.status(501).json({ error: "Hardware o Endpoint non implementato" });

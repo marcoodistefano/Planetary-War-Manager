@@ -95,6 +95,19 @@ export class InGameChatComponent implements OnInit, OnChanges, OnDestroy, AfterV
       this.loadStoredRecentContacts();
     }
 
+    if (changes['allianceId'] || changes['allianceLabel']) {
+      this.buildChannels();
+
+      if (this.activeScope === 'alliance' && !this.hasAllianceChannel) {
+        this.selectChannel('global');
+      } else if (this.activeScope === 'alliance') {
+        this.activeChannelLoadedFor = '';
+        this.loadActiveChannelHistory();
+      }
+
+      this.cdr.detectChanges();
+    }
+
     if (changes['playersInMatch']) {
       this.cdr.detectChanges();
     }

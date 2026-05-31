@@ -271,6 +271,31 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  get currentAlliance() {
+    return this.findCurrentAlliance();
+  }
+
+  get currentAllianceId(): string | null {
+    const alliance = this.currentAlliance;
+    const allianceId = String(alliance?.id_alleanza ?? '').trim();
+    return allianceId || null;
+  }
+
+  get currentAllianceLabel(): string {
+    return String(this.currentAlliance?.nome_alleanza || 'ALLEANZA');
+  }
+
+  private findCurrentAlliance() {
+    const currentUser = String(this.userProfile.username || '').trim().toLowerCase();
+    if (!currentUser || !Array.isArray(this.matchAlliances) || this.matchAlliances.length === 0) {
+      return null;
+    }
+
+    return this.matchAlliances.find((alliance: any) =>
+      Array.isArray(alliance?.members) && alliance.members.some((member: string) => String(member || '').trim().toLowerCase() === currentUser),
+    ) || null;
+  }
+
   private findCurrentMatchEntry(info: any) {
     const allMatches = [
       ...(info?.match_attivi ? Object.values(info.match_attivi) : []),
