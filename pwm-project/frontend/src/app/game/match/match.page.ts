@@ -535,8 +535,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3.5);
         this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
-        // sovrapponi gli archi (strade/rotte) generati in shared/assets/map/archs.json
-        this.loadArchesLayer('/assets/map/archs.json');
+        this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
     });
 
     this.map.on('touchstart', (e: any) => {
@@ -901,6 +900,24 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         this.map.addLayer({
             id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
             paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': 0.5 }
+        });
+    });
+  }
+
+  loadTopoJsonArchsLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
+    fetch(url).then(res => res.json()).then(topology => {
+        const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
+        this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
+        this.map.addLayer({
+            id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+            paint: {
+                'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
+                'fill-opacity': 0.3
+            }
+        });
+        this.map.addLayer({
+            id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+            paint: { 'line-color': '#000000', 'line-width': 1, 'line-opacity': 0.5 }
         });
     });
   }
