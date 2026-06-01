@@ -31,7 +31,16 @@ const AVATAR_ASSET_VERSION = '20260517';
 export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
 
-  currentPlayer = { name: 'Caricamento...', region: '', rank: 0, score: 0, avatar: this.avatarPath(1) };
+  currentPlayer: {
+    name: string;
+    region: string;
+    rank: number;
+    rank_regionale?: number;
+    score: number;
+    avatar: string;
+    regionCode?: string;
+    regionName?: string;
+  } = { name: 'Caricamento...', region: '', rank: 0, score: 0, avatar: this.avatarPath(1) };
   currentView: 'global' | 'regional' = 'global';
   currentRegion = '';
   currentRegionCode = '';
@@ -47,6 +56,7 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
   private regionalLeaderboard: LeaderboardEntry[] = [];
   private pollingInterval: any;
   private avatarSub?: Subscription;
+  private dynamicRegionMap: Record<string, string> = {};
 
   constructor(
     private homeService: HomeService,
@@ -57,6 +67,7 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnInit() {
     this.titleService.setTitle('PWM | Leaderboard');
+    this.loadCountryFlags();
     this.loadData();
 
     this.pollingInterval = setInterval(() => {
@@ -108,12 +119,12 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
             name: info.user_profile.username,
             region: info.user_profile.reg,
             rank: info.user_position,
+            rank_regionale: info.user_position_regionale,
             score: info.user_profile.elo_rating,
-            avatar: info.user_profile.avatar_id ? this.avatarPath(info.user_profile.avatar_id) : this.avatarPath(1)
+            avatar: info.user_profile.avatar_id ? this.avatarPath(info.user_profile.avatar_id) : this.avatarPath(1),
+            regionCode: userRegionCode,
+            regionName: this.regionFullName(info.user_profile.reg || '', userRegionCode)
           };
-          // attach readable region info for the current player
-          (this.currentPlayer as any).regionCode = userRegionCode;
-          (this.currentPlayer as any).regionName = this.regionFullName(info.user_profile.reg || '', userRegionCode);
         }
 
         this.globalLeaderboard = (info.leaderboard_globale || []).map((player: any, index: number) => {
@@ -240,7 +251,25 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private syncLeaderboard() {
-    this.leaderboard = this.currentView === 'global' ? this.globalLeaderboard : this.regionalLeaderboard;
+    const list = this.currentView === 'global' ? this.globalLeaderboard : this.regionalLeaderboard;
+    const playerInList = list.some((entry) => entry.player === this.currentUsername);
+
+    if (!playerInList && this.currentUsername) {
+      const rankVal = this.currentView === 'global' ? this.currentPlayer.rank : (this.currentPlayer.rank_regionale || this.currentPlayer.rank);
+      this.leaderboard = [
+        ...list,
+        {
+          rank: rankVal,
+          region: this.currentPlayer.regionCode || this.currentPlayer.region || '',
+          regionCode: this.currentPlayer.regionCode || '',
+          regionName: this.currentPlayer.regionName || '',
+          player: this.currentUsername,
+          score: this.currentPlayer.score
+        }
+      ];
+    } else {
+      this.leaderboard = [...list];
+    }
     this.applyFilters();
   }
 
@@ -278,6 +307,7 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
       afghanistan: 'AF',
       albania: 'AL',
       algeria: 'DZ',
+      andorra: 'AD',
       argentina: 'AR',
       australia: 'AU',
       austria: 'AT',
@@ -319,7 +349,29 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
       'united states': 'US'
     };
 
-    return regionMap[normalized] || normalized.substring(0, 2).toUpperCase();
+    return this.dynamicRegionMap[normalized] || regionMap[normalized] || normalized.substring(0, 2).toUpperCase();
+  }
+
+  async loadCountryFlags() {
+    try {
+      const response = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,translations');
+      const data = await response.json();
+      const newMap: Record<string, string> = {};
+      for (const c of data) {
+        const code = (c.cca2 || '').toUpperCase();
+        if (!code) continue;
+        if (c.translations?.ita?.common) {
+          newMap[c.translations.ita.common.toLowerCase()] = code;
+        }
+        if (c.name?.common) {
+          newMap[c.name.common.toLowerCase()] = code;
+        }
+      }
+      this.dynamicRegionMap = newMap;
+      this.loadData();
+    } catch (error) {
+      console.error('Errore nel caricamento delle nazioni per la leaderboard:', error);
+    }
   }
 
   private regionFullName(region: string, code?: string): string {
@@ -328,6 +380,7 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
       AF: 'Afghanistan',
       AL: 'Albania',
       DZ: 'Algeria',
+      AD: 'Andorra',
       AR: 'Argentina',
       AU: 'Australia',
       AT: 'Austria',

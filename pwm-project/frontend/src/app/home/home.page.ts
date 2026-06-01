@@ -34,11 +34,18 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
 
-  // Stato iniziale dell'utente (sarà sovrascritto dal DB)
-  currentPlayer = { name: 'Caricamento...', region: '', rank: 0, score: 0, avatar: this.avatarPath(1) };
+  currentPlayer: {
+    name: string;
+    region: string;
+    rank: number;
+    rank_regionale?: number;
+    score: number;
+    avatar: string;
+  } = { name: 'Caricamento...', region: '', rank: 0, score: 0, avatar: this.avatarPath(1) };
   
   activeGames: any[] = [];
   leaderboardFull: any[] = [];
+  leaderboardRegional: any[] = [];
   newGames: any[] = [];
   filteredNewGames: any[] = [];
   
@@ -46,6 +53,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   leaderboardView: 'global' | 'regional' = 'global';
   quickActions = ['Profilo', 'Notifiche', 'Impostazioni', 'Amici', 'Partite attive', 'Storico Partite' ];
   lastJoinedMatchId: string | null = null;
+  private countryFlagsMap: Record<string, string> = {};
 
   private avatarSub?: Subscription;
 
@@ -64,6 +72,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     this.titleService.setTitle('PWM | Homepage');
     this.refreshLastJoinedMatch();
     this.loadDashboardData(); // Carica i dati dal backend all'avvio
+    this.loadCountryFlags();
     
     // Effettua un fetch ogni 2 minuti (120000 ms)
     this.pollingInterval = setInterval(() => {
@@ -113,6 +122,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
             score: info.user_profile.elo_rating,
             avatar: info.user_profile.avatar_id ? this.avatarPath(info.user_profile.avatar_id) : this.avatarPath(1)
           };
+          this.currentPlayer.rank_regionale = info.user_position_regionale;
         }
 
         // 2. Mappatura Partite Attive (Converte l'oggetto match1, match2... in array)
@@ -150,6 +160,16 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
         // 3. Mappatura Leaderboard Globale
         if (info.leaderboard_globale) {
           this.leaderboardFull = info.leaderboard_globale.map((u: any, i: number) => ({
+            rank: i + 1,
+            player: u.username,
+            score: u.elo_rating,
+            region: u.reg
+          }));
+        }
+
+        // Mappatura Leaderboard Regionale
+        if (info.leaderboard_regionale) {
+          this.leaderboardRegional = info.leaderboard_regionale.map((u: any, i: number) => ({
             rank: i + 1,
             player: u.username,
             score: u.elo_rating,
@@ -264,33 +284,56 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   getQuickLeaderboard() {
     const list = this.leaderboardFull;
     const top3 = list.slice(0, 3);
-    const playerIndex = list.findIndex(p => p.player === this.currentPlayer.name);
+    const inTop = top3.some(p => p.player === this.currentPlayer.name);
     
-    if (playerIndex === -1 || playerIndex < 3) return top3;
-    
-    const playerEntry = { 
-      rank: this.currentPlayer.rank, 
-      player: this.currentPlayer.name, 
-      score: this.currentPlayer.score, 
-      region: this.currentPlayer.region 
-    };
-    return [...top3, playerEntry];
+    if (!inTop) {
+      const playerEntry = { 
+        rank: this.currentPlayer.rank, 
+        player: this.currentPlayer.name, 
+        score: this.currentPlayer.score, 
+        region: this.currentPlayer.region 
+      };
+      return [...top3, playerEntry];
+    }
+    return top3;
   }
 
   getRegionalQuick() {
-    const list = this.leaderboardFull.filter(p => p.region === this.currentPlayer.region);
+    const list = this.leaderboardRegional;
     const top3 = list.slice(0, 3);
     const inTop = top3.some(p => p.player === this.currentPlayer.name);
     
     if (!inTop) {
       top3.push({ 
-        rank: this.currentPlayer.rank, // O un rango calcolato specificamente per la regione
+        rank: this.currentPlayer.rank_regionale || this.currentPlayer.rank, 
         player: this.currentPlayer.name, 
         score: this.currentPlayer.score, 
         region: this.currentPlayer.region 
       });
     }
     return top3;
+  }
+
+  async loadCountryFlags() {
+    try {
+      const response = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,translations');
+      const data = await response.json();
+      const newMap: Record<string, string> = {};
+      for (const c of data) {
+        const code = (c.cca2 || '').toLowerCase();
+        if (!code) continue;
+        newMap[code] = code;
+        if (c.translations?.ita?.common) {
+          newMap[c.translations.ita.common.toLowerCase()] = code;
+        }
+        if (c.name?.common) {
+          newMap[c.name.common.toLowerCase()] = code;
+        }
+      }
+      this.countryFlagsMap = newMap;
+    } catch (error) {
+      console.error('Errore nel caricamento delle nazioni per la homepage:', error);
+    }
   }
 
   flagEmoji(code: string) {
@@ -301,9 +344,11 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
       'francia': 'fr', 'france': 'fr',
       'germania': 'de', 'germany': 'de',
       'inghilterra': 'gb', 'england': 'gb',
-      'usa': 'us', 'stati uniti': 'us'
+      'usa': 'us', 'stati uniti': 'us',
+      'andorra': 'ad'
     };
-    const c = map[code.toLowerCase()] || code.substring(0, 2);
+    const lowerCode = code.toLowerCase().trim();
+    const c = this.countryFlagsMap[lowerCode] || map[lowerCode] || code.substring(0, 2);
     const OFFSET = 0x1f1e6 - 'A'.charCodeAt(0);
     return c.toUpperCase().split('').map(char => String.fromCodePoint(char.charCodeAt(0) + OFFSET)).join('');
   }

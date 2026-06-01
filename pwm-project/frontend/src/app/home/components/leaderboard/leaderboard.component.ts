@@ -28,6 +28,11 @@ export class LeaderboardComponent implements OnInit {
 
   private globalLeaderboard: LeaderboardEntry[] = [];
   private regionalLeaderboard: LeaderboardEntry[] = [];
+  private dynamicRegionMap: Record<string, string> = {};
+  
+  userPosition = 0;
+  userPositionRegionale = 0;
+  userElo = 1000;
 
   constructor(
     private modalCtrl: ModalController,
@@ -35,6 +40,7 @@ export class LeaderboardComponent implements OnInit {
   ) {}
 
   ngOnInit() {
+    this.loadCountryFlags();
     this.loadData();
   }
 
@@ -45,6 +51,9 @@ export class LeaderboardComponent implements OnInit {
         this.currentUsername = info.user_profile?.username || '';
         this.currentRegion = info.user_profile?.reg || '';
         this.currentRegionCode = this.normalizeRegionCode(this.currentRegion);
+        this.userPosition = info.user_position;
+        this.userPositionRegionale = info.user_position_regionale || info.user_position;
+        this.userElo = info.user_profile?.elo_rating || 1000;
 
         this.globalLeaderboard = (info.leaderboard_globale || []).map((player: any, index: number) => ({
           rank: index + 1,
@@ -85,7 +94,23 @@ export class LeaderboardComponent implements OnInit {
   }
 
   private syncLeaderboard() {
-    this.leaderboard = this.currentView === 'global' ? this.globalLeaderboard : this.regionalLeaderboard;
+    const list = this.currentView === 'global' ? this.globalLeaderboard : this.regionalLeaderboard;
+    const playerInList = list.some((entry) => entry.player === this.currentUsername);
+
+    if (!playerInList && this.currentUsername) {
+      const rankVal = this.currentView === 'global' ? this.userPosition : this.userPositionRegionale;
+      this.leaderboard = [
+        ...list,
+        {
+          rank: rankVal,
+          region: this.currentRegionCode,
+          player: this.currentUsername,
+          score: this.userElo
+        }
+      ];
+    } else {
+      this.leaderboard = [...list];
+    }
   }
 
   private normalizeRegionCode(region: string): string {
@@ -100,6 +125,7 @@ export class LeaderboardComponent implements OnInit {
       afghanistan: 'AF',
       albania: 'AL',
       algeria: 'DZ',
+      andorra: 'AD',
       argentina: 'AR',
       australia: 'AU',
       austria: 'AT',
@@ -141,7 +167,29 @@ export class LeaderboardComponent implements OnInit {
       'united states': 'US'
     };
 
-    return regionMap[normalized] || normalized.substring(0, 2).toUpperCase();
+    return this.dynamicRegionMap[normalized] || regionMap[normalized] || normalized.substring(0, 2).toUpperCase();
+  }
+
+  async loadCountryFlags() {
+    try {
+      const response = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,translations');
+      const data = await response.json();
+      const newMap: Record<string, string> = {};
+      for (const c of data) {
+        const code = (c.cca2 || '').toUpperCase();
+        if (!code) continue;
+        if (c.translations?.ita?.common) {
+          newMap[c.translations.ita.common.toLowerCase()] = code;
+        }
+        if (c.name?.common) {
+          newMap[c.name.common.toLowerCase()] = code;
+        }
+      }
+      this.dynamicRegionMap = newMap;
+      this.loadData();
+    } catch (error) {
+      console.error('Errore nel caricamento delle nazioni per la leaderboard:', error);
+    }
   }
 
   /**

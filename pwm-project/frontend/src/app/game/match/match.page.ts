@@ -31,9 +31,9 @@ const AVATAR_ASSET_VERSION = '20260517';
   styleUrls: ['./match.page.scss'],
   standalone: true,
   imports: [
-    IonicModule, 
-    CommonModule, 
-    FormsModule, 
+    IonicModule,
+    CommonModule,
+    FormsModule,
     ProfileModalComponent,
     DiplomacyModalComponent,
     IntelligenceModalComponent,
@@ -61,10 +61,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   // --- 2. STATO DELL'INTERFACCIA (UI) ---
   isProfileModalOpen = false;
   isMapSettingsOpen = false;
-  
+
   // Gestione modali sovrapposte
   isBuildPanelOpen = false;
-  isTechModalOpen = false; 
+  isTechModalOpen = false;
   isDiplomacyModalOpen = false;
   isIntelligenceModalOpen = false;
   isChatOpen = false;
@@ -86,8 +86,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   gameRules: any = null;
 
   playerResources: any = {
-    denaro: 100000, legno: 5000, piombo: 2500, acciaio: 3000, 
-    mattoni: 4000, petrolio: 1500, gas_naturale: 1200, uranio: 100, oro: 50 
+    denaro: 100000, legno: 5000, piombo: 2500, acciaio: 3000,
+    mattoni: 4000, petrolio: 1500, gas_naturale: 1200, uranio: 100, oro: 50
   };
 
   userProfile = {
@@ -130,30 +130,30 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   };
 
   modelDB: any = {
-    land: [ { label: 'Soldato', path: 'land_troops/soldier.glb' } ],
-    sea: [ { label: 'Cacciatorpediniere', path: 'sea_troops/cacciatorpediniere.glb' } ],
-    air: [ { label: 'Aereo Cargo', path: 'air_troops/aereo_cargo.glb' } ]
+    land: [{ label: 'Soldato', path: 'land_troops/soldier.glb' }],
+    sea: [{ label: 'Cacciatorpediniere', path: 'sea_troops/cacciatorpediniere.glb' }],
+    air: [{ label: 'Aereo Cargo', path: 'air_troops/aereo_cargo.glb' }]
   };
 
-    // Aggiungi queste proprietà alla classe MatchPage
+  // Aggiungi queste proprietà alla classe MatchPage
   isRadialMenuVisible = false;
   radialMenuX = 0;
   radialMenuY = 0;
 
-// All'interno di ngOnInit o in una funzione di inizializzazione
+  // All'interno di ngOnInit o in una funzione di inizializzazione
   initRadialListeners() {
     const mapEl = document.getElementById('map-container');
-    
+
     if (mapEl) {
       mapEl.addEventListener('contextmenu', (e: MouseEvent) => {
         e.preventDefault(); // Blocca il menu standard del browser
-        
+
         this.radialMenuX = e.clientX;
         this.radialMenuY = e.clientY;
         this.isRadialMenuVisible = true;
-        
+
         // Forza il refresh della UI se necessario
-        this.cdr.detectChanges(); 
+        this.cdr.detectChanges();
       });
     }
 
@@ -164,7 +164,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   constructor(
-    private router: Router, 
+    private router: Router,
     private cdr: ChangeDetectorRef,
     private modalCtrl: ModalController,
     private menuCtrl: MenuController,
@@ -457,7 +457,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
     this.closeMobileMenu();
   }
-  
+
   toggleTechModal() {
     this.isTechModalOpen = !this.isTechModalOpen;
     if (this.isTechModalOpen) {
@@ -469,27 +469,27 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
     this.closeMobileMenu();
   }
-  
+
   // Assicurati che gli altri toggle chiudano isTechModalOpen
   toggleBuildPanel() {
     this.isBuildPanelOpen = !this.isBuildPanelOpen;
-    if (this.isBuildPanelOpen) { this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; this.isIntelligenceModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false;}
+    if (this.isBuildPanelOpen) { this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; this.isIntelligenceModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false; }
     this.closeMobileMenu();
   }
 
   toggleDiplomacyModal() {
     this.isDiplomacyModalOpen = !this.isDiplomacyModalOpen;
-    if (this.isDiplomacyModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isIntelligenceModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false;}
+    if (this.isDiplomacyModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isIntelligenceModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false; }
     this.closeMobileMenu();
   }
 
   toggleIntelligenceModal() {
     this.isIntelligenceModalOpen = !this.isIntelligenceModalOpen;
-    if (this.isIntelligenceModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false;}
+    if (this.isIntelligenceModalOpen) { this.isBuildPanelOpen = false; this.isTechModalOpen = false; this.isDiplomacyModalOpen = false; this.isMarketModalOpen = false; this.isArmyModalOpen = false; }
     this.closeMobileMenu();
   }
 
-  toggleMapSettings() { this.isMapSettingsOpen = !this.isMapSettingsOpen; this.closeMobileMenu();}
+  toggleMapSettings() { this.isMapSettingsOpen = !this.isMapSettingsOpen; this.closeMobileMenu(); }
   setBuildCategory(cat: 'risorse' | 'armamenti') { this.activeBuildCategory = cat; }
   setOpenProfile(isOpen: boolean) { this.isProfileModalOpen = isOpen; }
 
@@ -519,11 +519,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   async loadGameRules() {
     try {
-        const response = await fetch('/assets/game_rules.json'); 
-        if (response.ok) {
-            this.gameRules = await response.json();
-            this.cdr.detectChanges(); 
-        }
+      const response = await fetch('/assets/game_rules.json');
+      if (response.ok) {
+        this.gameRules = await response.json();
+        this.cdr.detectChanges();
+      }
     } catch (err) { console.error("Errore Intelligence: Regole non caricate", err); }
   }
 
@@ -542,40 +542,40 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   initMap() {
     this.map = new maplibregl.Map({
-        container: 'map-container',
-        style: {
-            version: 8,
-            sources: {
-                'esri-tiles': { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256 },
-                'maptiler-tiles': { type: 'raster', tiles: [`https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=${this.MAPTILER_KEY}`], tileSize: 256 },
-                'carto-light-tiles': { type: 'raster', tiles: ['https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'], tileSize: 256 }
-            },
-            layers: [
-                { id: 'esri-sat', type: 'raster', source: 'esri-tiles', layout: { visibility: 'visible' } },
-                { id: 'maptiler-hybrid', type: 'raster', source: 'maptiler-tiles', layout: { visibility: 'none' } },
-                { id: 'carto-light', type: 'raster', source: 'carto-light-tiles', layout: { visibility: 'none' } }
-            ]
+      container: 'map-container',
+      style: {
+        version: 8,
+        sources: {
+          'esri-tiles': { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256 },
+          'maptiler-tiles': { type: 'raster', tiles: [`https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=${this.MAPTILER_KEY}`], tileSize: 256 },
+          'carto-light-tiles': { type: 'raster', tiles: ['https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'], tileSize: 256 }
         },
-        center: [12.5, 41.9], zoom: 3.5, minZoom: 1.5, renderWorldCopies: true, projection: { type: 'mercator' }
+        layers: [
+          { id: 'esri-sat', type: 'raster', source: 'esri-tiles', layout: { visibility: 'visible' } },
+          { id: 'maptiler-hybrid', type: 'raster', source: 'maptiler-tiles', layout: { visibility: 'none' } },
+          { id: 'carto-light', type: 'raster', source: 'carto-light-tiles', layout: { visibility: 'none' } }
+        ]
+      },
+      center: [12.5, 41.9], zoom: 3.5, minZoom: 1.5, renderWorldCopies: true, projection: { type: 'mercator' }
     });
 
     this.map.dragRotate.disable();
 
     this.map.on('load', () => {
-        this.map.addSource('terrain-source', { type: 'raster-dem', url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${this.MAPTILER_KEY}`, tileSize: 256 });
-        this.map.setTerrain({ source: 'terrain-source', exaggeration: 1.2 });
-        this.map.addSource('contours', { type: 'vector', url: `https://api.maptiler.com/tiles/contours-v2/tiles.json?key=${this.MAPTILER_KEY}` });
+      this.map.addSource('terrain-source', { type: 'raster-dem', url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${this.MAPTILER_KEY}`, tileSize: 256 });
+      this.map.setTerrain({ source: 'terrain-source', exaggeration: 1.2 });
+      this.map.addSource('contours', { type: 'vector', url: `https://api.maptiler.com/tiles/contours-v2/tiles.json?key=${this.MAPTILER_KEY}` });
 
-        this.map.addLayer({
-            'id': 'contour-lines', 'type': 'line', 'source': 'contours', 'source-layer': 'contour', 'minzoom': 6, 
-            'layout': { 'visibility': 'none' },
-            'paint': { 'line-color': '#f59e0b', 'line-width': ['case', ['==', ['get', 'nth_line'], 5], 1.5, 0.5], 'line-opacity': 0.8 }
-        });
+      this.map.addLayer({
+        'id': 'contour-lines', 'type': 'line', 'source': 'contours', 'source-layer': 'contour', 'minzoom': 6,
+        'layout': { 'visibility': 'none' },
+        'paint': { 'line-color': '#f59e0b', 'line-width': ['case', ['==', ['get', 'nth_line'], 5], 1.5, 0.5], 'line-opacity': 0.8 }
+      });
 
-        this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3.5);
-        this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
-        this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
-        this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 0, 24);
+      this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3.5);
+      this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
+      this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
+      this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 24);
     });
 
     this.map.on('touchstart', (e: any) => {
@@ -583,17 +583,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.touchTimer = setTimeout(() => {
         // Se il timer arriva alla fine, attiviamo il menu radiale
         this.updatePointReadout(e, true);
-        
+
         // Usiamo le coordinate del punto toccato
         this.radialMenuX = e.originalEvent.touches[0].clientX;
         this.radialMenuY = e.originalEvent.touches[0].clientY;
-        
+
         this.isRadialMenuVisible = true;
         this.cdr.detectChanges();
-        
+
         // Opzionale: un piccolo feedback di vibrazione se il dispositivo lo supporta
         if (navigator.vibrate) navigator.vibrate(50);
-        
+
       }, 500); // <--- Durata della pressione: 0.5 secondi
     });
 
@@ -648,25 +648,25 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const features = data?.type === 'FeatureCollection' && Array.isArray(data.features)
           ? data.features
           : Object.keys(data || {}).map((key: string) => {
-              const entry = data[key];
-              if (!entry || !Array.isArray(entry.arcs)) return null;
-              const coords = entry.arcs
-                .map((p: any) => [Number(p.lon), Number(p.lat)])
-                .filter((c: any) => c && c.length === 2);
-              if (coords.length < 2) return null;
-              return {
-                type: 'Feature',
-                geometry: { type: 'LineString', coordinates: coords },
-                properties: {
-                  id: key,
-                  city1: entry.city1 || null,
-                  city2: entry.city2 || null,
-                  distance: entry.distance || null,
-                  road_type: entry.road_type || null,
-                  pendenza: entry.pendenza || null
-                }
-              };
-            }).filter(Boolean);
+            const entry = data[key];
+            if (!entry || !Array.isArray(entry.arcs)) return null;
+            const coords = entry.arcs
+              .map((p: any) => [Number(p.lon), Number(p.lat)])
+              .filter((c: any) => c && c.length === 2);
+            if (coords.length < 2) return null;
+            return {
+              type: 'Feature',
+              geometry: { type: 'LineString', coordinates: coords },
+              properties: {
+                id: key,
+                city1: entry.city1 || null,
+                city2: entry.city2 || null,
+                distance: entry.distance || null,
+                road_type: entry.road_type || null,
+                pendenza: entry.pendenza || null
+              }
+            };
+          }).filter(Boolean);
 
         features.forEach((feature: any, index: number) => {
           const geometry = feature?.geometry;
@@ -816,8 +816,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   // Eseguita quando si preme un'azione nel menu radiale
   handleRadialAction(action: string) {
     console.log("Comando Tattico:", action);
-    
-    switch(action) {
+
+    switch (action) {
       case 'COSTRUISCI':
         this.toggleBuildPanel();
         break;
@@ -832,7 +832,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         // Logica combattimento
         break;
     }
-    
+
     this.isRadialMenuVisible = false;
   }
 
@@ -865,11 +865,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
 
     if (this.map.getZoom() > 6) {
-        this.clearHoverState();
-        if (!persistSelection && !this.isTouchLayout) {
-          this.selectedPointName = '';
-        }
-        return;
+      this.clearHoverState();
+      if (!persistSelection && !this.isTouchLayout) {
+        this.selectedPointName = '';
+      }
+      return;
     }
 
     if (!this.map.getLayer('nazioni-layer') || !this.map.getLayer('regioni-layer')) return;
@@ -877,27 +877,27 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const features = this.map.queryRenderedFeatures(e.point, { layers: ['nazioni-layer', 'regioni-layer'] });
 
     if (features.length > 0 && features[0].id !== undefined) {
-        const f = features[0];
-        const territoryName = f.properties.name || f.properties.ADMIN || 'SCONOSCIUTO';
-        const readableName = territoryName.toUpperCase();
-        this.currentHoveredName = readableName;
+      const f = features[0];
+      const territoryName = f.properties.name || f.properties.ADMIN || 'SCONOSCIUTO';
+      const readableName = territoryName.toUpperCase();
+      this.currentHoveredName = readableName;
 
-        if (persistSelection || this.isTouchLayout) {
-          this.selectedPointName = readableName;
-        }
+      if (persistSelection || this.isTouchLayout) {
+        this.selectedPointName = readableName;
+      }
 
-        if (this.hoveredState.id !== null && this.hoveredState.id !== f.id) {
-            this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: false });
-        }
+      if (this.hoveredState.id !== null && this.hoveredState.id !== f.id) {
+        this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: false });
+      }
 
-        this.hoveredState = { id: f.id, source: f.source };
-        this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: true });
-        this.map.getCanvas().style.cursor = 'pointer';
+      this.hoveredState = { id: f.id, source: f.source };
+      this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: true });
+      this.map.getCanvas().style.cursor = 'pointer';
     } else {
-        this.clearHoverState();
-        if (persistSelection || this.isTouchLayout) {
-          this.selectedPointName = '';
-        }
+      this.clearHoverState();
+      if (persistSelection || this.isTouchLayout) {
+        this.selectedPointName = '';
+      }
     }
   }
 
@@ -911,9 +911,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   private clearHoverState() {
     if (this.hoveredState.id !== null) {
-        this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: false });
-        this.hoveredState = { id: null, source: null };
-        this.currentHoveredName = '';
+      this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: false });
+      this.hoveredState = { id: null, source: null };
+      this.currentHoveredName = '';
     }
     this.map.getCanvas().style.cursor = '';
   }
@@ -921,113 +921,113 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   handlePointData(data: any) {
     const alt = Math.floor(data.altitude);
     const outAlt = document.getElementById('out-alt');
-    if(outAlt) outAlt.innerText = `${alt} M`;
+    if (outAlt) outAlt.innerText = `${alt} M`;
   }
 
   loadTopoJsonLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
     fetch(url).then(res => res.json()).then(topology => {
-        const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
-        this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
-        this.map.addLayer({
-            id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-            paint: {
-                'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
-                'fill-opacity': 0.3
-            }
-        });
-        this.map.addLayer({
-            id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-            paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': 0.5 }
-        });
+      const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
+      this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
+      this.map.addLayer({
+        id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+        paint: {
+          'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
+          'fill-opacity': 0.3
+        }
+      });
+      this.map.addLayer({
+        id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+        paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': 0.5 }
+      });
     });
   }
 
   loadTopoJsonArchsLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
     fetch(url).then(res => res.json()).then(topology => {
-        const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
-        this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
-        this.map.addLayer({
-            id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-            paint: {
-                'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
-                'fill-opacity': 0.3
-            }
-        });
-        this.map.addLayer({
-            id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-            paint: { 'line-color': '#000000', 'line-width': 1, 'line-opacity': 0.5 }
-        });
+      const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
+      this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
+      this.map.addLayer({
+        id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+        paint: {
+          'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
+          'fill-opacity': 0.3
+        }
+      });
+      this.map.addLayer({
+        id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+        paint: { 'line-color': '#000000', 'line-width': 1, 'line-opacity': 0.5 }
+      });
     });
   }
 
   loadTopoJsonCitiesLayer(url: string, sourceId: string, pointsLayerId: string, labelsLayerId: string, minZ: number, maxZ: number) {
     fetch(url).then(res => res.json()).then(topology => {
-        const objectName = Object.keys(topology.objects || {})[0];
-        if (!objectName) {
-          return;
+      const objectName = Object.keys(topology.objects || {})[0];
+      if (!objectName) {
+        return;
+      }
+
+      const geoData = topojson.feature(topology, topology.objects[objectName]);
+
+      if (this.map.getSource(sourceId)) {
+        (this.map.getSource(sourceId) as any).setData(geoData);
+        return;
+      }
+
+      this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
+
+      this.map.addLayer({
+        id: pointsLayerId,
+        type: 'circle',
+        source: sourceId,
+        minzoom: minZ,
+        maxzoom: maxZ,
+        paint: {
+          'circle-color': '#ffd84d',
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 1.8, 4, 2.8, 7, 4.6],
+          'circle-stroke-color': '#1a1402',
+          'circle-stroke-width': 1,
+          'circle-opacity': 0.95
         }
+      });
 
-        const geoData = topojson.feature(topology, topology.objects[objectName]);
-
-        if (this.map.getSource(sourceId)) {
-          (this.map.getSource(sourceId) as any).setData(geoData);
-          return;
+      this.map.addLayer({
+        id: labelsLayerId,
+        type: 'symbol',
+        source: sourceId,
+        minzoom: minZ,
+        maxzoom: maxZ,
+        layout: {
+          'text-field': ['coalesce', ['get', 'NAME'], ''],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 2, 9, 6, 11],
+          'text-anchor': 'top',
+          'text-offset': [0, 0.9],
+          'text-allow-overlap': false,
+          'text-ignore-placement': false,
+          'visibility': 'visible'
+        },
+        paint: {
+          'text-color': '#fff4b0',
+          'text-halo-color': '#000000',
+          'text-halo-width': 1.2,
+          'text-halo-blur': 0.5
         }
-
-        this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
-
-        this.map.addLayer({
-            id: pointsLayerId,
-            type: 'circle',
-            source: sourceId,
-            minzoom: minZ,
-            maxzoom: maxZ,
-            paint: {
-              'circle-color': '#ffd84d',
-              'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 1.8, 4, 2.8, 7, 4.6],
-              'circle-stroke-color': '#1a1402',
-              'circle-stroke-width': 1,
-              'circle-opacity': 0.95
-            }
-        });
-
-        this.map.addLayer({
-            id: labelsLayerId,
-            type: 'symbol',
-            source: sourceId,
-            minzoom: minZ,
-            maxzoom: maxZ,
-            layout: {
-              'text-field': ['coalesce', ['get', 'NAME'], ''],
-              'text-size': ['interpolate', ['linear'], ['zoom'], 2, 9, 6, 11],
-              'text-anchor': 'top',
-              'text-offset': [0, 0.9],
-              'text-allow-overlap': false,
-              'text-ignore-placement': false,
-              'visibility': 'visible'
-            },
-            paint: {
-              'text-color': '#fff4b0',
-              'text-halo-color': '#000000',
-              'text-halo-width': 1.2,
-              'text-halo-blur': 0.5
-            }
-        });
+      });
     }).catch(err => console.error('Errore fetch cities.json', err));
   }
 
   changeBasemap(event: any) {
     const selected = event.target.value;
     ['esri-sat', 'maptiler-hybrid', 'carto-light'].forEach(id => {
-        this.map.setLayoutProperty(id, 'visibility', id === selected ? 'visible' : 'none');
+      this.map.setLayoutProperty(id, 'visibility', id === selected ? 'visible' : 'none');
     });
   }
 
   toggleLayer(type: string) {
     if (type === 'contours') {
-        const ids = ['contour-lines'];
-        const vis = this.map.getLayoutProperty(ids[0], 'visibility');
-        this.map.setLayoutProperty(ids[0], 'visibility', vis === 'visible' ? 'none' : 'visible');
+      const ids = ['contour-lines'];
+      const vis = this.map.getLayoutProperty(ids[0], 'visibility');
+      this.map.setLayoutProperty(ids[0], 'visibility', vis === 'visible' ? 'none' : 'visible');
     }
   }
 
@@ -1040,7 +1040,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     try {
       // Controlla se c'è una modale attualmente in cima allo stack visivo
       const topModal = await this.modalCtrl.getTop();
-      
+
       // Se esiste una modale aperta, forzane la chiusura
       if (topModal) {
         await this.modalCtrl.dismiss();

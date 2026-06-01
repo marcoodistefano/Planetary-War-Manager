@@ -81,8 +81,8 @@ const buildHome = async (U_ID) => {
       `SELECT username, reg, elo_rating
     FROM utenti
     WHERE reg = (SELECT reg FROM utenti WHERE id_user = $1)
-    ORDER BY elo_rating DESC
-    LIMIT 10;`,
+    ORDER BY elo_rating DESC, created_at ASC, username ASC
+    LIMIT 100;`,
       [U_ID],
     );
 
@@ -90,19 +90,29 @@ const buildHome = async (U_ID) => {
     const leaderboard_globale = await db.query(
       `SELECT username, reg, elo_rating
     FROM utenti
-    ORDER BY elo_rating DESC
-    LIMIT 10;`,
+    ORDER BY elo_rating DESC, created_at ASC, username ASC
+    LIMIT 1000;`,
     );
 
     // 3. POSIZIONE UTENTE
     const user_position = await db.query(
-      `SELECT (COUNT(id_user) + 1) AS user_rank
-    FROM utenti
-    WHERE elo_rating > (
-        SELECT elo_rating 
-        FROM utenti 
-        WHERE id_user = $1
-    );`,
+      `SELECT user_rank FROM (
+        SELECT id_user,
+               CAST(ROW_NUMBER() OVER (ORDER BY elo_rating DESC, created_at ASC, username ASC) AS integer) AS user_rank
+        FROM utenti
+      ) ranked
+      WHERE id_user = $1;`,
+      [U_ID],
+    );
+
+    const user_position_regionale = await db.query(
+      `SELECT user_rank FROM (
+        SELECT id_user,
+               CAST(ROW_NUMBER() OVER (ORDER BY elo_rating DESC, created_at ASC, username ASC) AS integer) AS user_rank
+        FROM utenti
+        WHERE reg = (SELECT reg FROM utenti WHERE id_user = $1)
+      ) ranked
+      WHERE id_user = $1;`,
       [U_ID],
     );
 
@@ -203,6 +213,7 @@ const buildHome = async (U_ID) => {
       leaderboard_regionale: leaderboard_regionale.rows,
       leaderboard_globale: leaderboard_globale.rows,
       user_position: user_position.rows[0]?.user_rank,
+      user_position_regionale: user_position_regionale.rows[0]?.user_rank,
       match_attivi: decompress_match_attivi,
       last_created_match: decompress_match_unito,
       match_chiuse: decompress_match_chiuse,

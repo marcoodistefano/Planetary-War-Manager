@@ -71,7 +71,10 @@
                 <div class="row-header">
                   <span class="sector-tag">CLASSIFICA #{{ player.rank }}</span>
                 </div>
-                <p class="creator-info">Posizione globale: <strong>{{ player.rank }}</strong></p>
+                <p class="creator-info">
+                  {{ currentView === 'global' ? 'Posizione globale:' : 'Posizione regionale:' }} 
+                  <strong>{{ player.rank }}</strong>
+                </p>
               </div>
 
               <div class="col-player">

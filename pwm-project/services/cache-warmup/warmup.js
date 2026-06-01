@@ -195,14 +195,14 @@ const buildPlayerMap = (rows) => {
 };
 
 const loadLeaderboards = async () => {
-  const globalQuery = "SELECT username, elo_rating FROM utenti ORDER BY elo_rating DESC LIMIT $1";
+  const globalQuery = "SELECT username, elo_rating FROM utenti ORDER BY elo_rating DESC, created_at ASC, username ASC LIMIT $1";
   const globalRows = (await db.query(globalQuery, [GLOBAL_LIMIT])).rows;
 
   const regionalQuery = `
     SELECT reg, username, elo_rating
     FROM (
       SELECT reg, username, elo_rating,
-             ROW_NUMBER() OVER (PARTITION BY reg ORDER BY elo_rating DESC) AS rn
+             ROW_NUMBER() OVER (PARTITION BY reg ORDER BY elo_rating DESC, created_at ASC, username ASC) AS rn
       FROM utenti
       WHERE reg IS NOT NULL AND reg <> ''
     ) ranked
