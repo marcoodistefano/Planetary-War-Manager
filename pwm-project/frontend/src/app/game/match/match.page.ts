@@ -70,9 +70,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   isChatOpen = false;
   isMarketModalOpen = false;
   isArmyModalOpen = false;
+  armyModalInitialTab: 'management' | 'operations' = 'management';
   isTroopsDropdownOpen = false;
   troopsDropdownX = 0;
   troopsDropdownY = 0;
+  matchArmies: any[] = [];
   chatUnreadCount = 0;
   currentMatchId = '';
   matchPlayers: string[] = [];
@@ -423,12 +425,24 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   toggleArmyModal() {
     this.isArmyModalOpen = !this.isArmyModalOpen;
     if (this.isArmyModalOpen) {
+      this.armyModalInitialTab = 'management';
       this.isBuildPanelOpen = false;
       this.isTechModalOpen = false;
       this.isDiplomacyModalOpen = false;
       this.isIntelligenceModalOpen = false;
       this.isMarketModalOpen = false;
     }
+    this.closeMobileMenu();
+  }
+
+  openArmyModalFromRadial() {
+    this.isArmyModalOpen = true;
+    this.armyModalInitialTab = 'operations';
+    this.isBuildPanelOpen = false;
+    this.isTechModalOpen = false;
+    this.isDiplomacyModalOpen = false;
+    this.isIntelligenceModalOpen = false;
+    this.isMarketModalOpen = false;
     this.closeMobileMenu();
   }
 
@@ -561,12 +575,15 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3.5);
         this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
         this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
+        this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 0, 24);
     });
 
     this.map.on('touchstart', (e: any) => {
       // Avviamo un timer di 500ms (0.5 secondi)
       this.touchTimer = setTimeout(() => {
         // Se il timer arriva alla fine, attiviamo il menu radiale
+        this.updatePointReadout(e, true);
+        
         // Usiamo le coordinate del punto toccato
         this.radialMenuX = e.originalEvent.touches[0].clientX;
         this.radialMenuY = e.originalEvent.touches[0].clientY;
@@ -593,9 +610,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     this.map.on('click', (e: any) => this.handleMapPointSelect(e));
 
-    // Mantieni anche il vecchio listener contextmenu per il Desktop
     this.map.on('contextmenu', (e: any) => {
       e.originalEvent.preventDefault();
+      this.updatePointReadout(e, true);
       this.radialMenuX = e.originalEvent.clientX;
       this.radialMenuY = e.originalEvent.clientY;
       this.isRadialMenuVisible = true;
@@ -603,18 +620,6 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     });
 
     this.map.on('mousemove', (e: any) => this.handleMapMouseMove(e));
-
-    this.map.on('contextmenu', (e: any) => {
-      // Impedisce il menu standard
-      e.originalEvent.preventDefault();
-      
-      // Coord dello schermo per posizionare il div HTML
-      this.radialMenuX = e.originalEvent.clientX;
-      this.radialMenuY = e.originalEvent.clientY;
-      
-      this.isRadialMenuVisible = true;
-      this.cdr.detectChanges();
-    });
 
     this.map.on('dragstart', () => {
       this.closeRadialOnInteraction();
@@ -816,6 +821,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       case 'COSTRUISCI':
         this.toggleBuildPanel();
         break;
+      case 'ARMATE':
+      case 'TRUPPE':
+        this.openArmyModalFromRadial();
+        break;
       case 'INFO':
         // Logica per mostrare dettagli territorio
         break;
@@ -825,6 +834,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
     
     this.isRadialMenuVisible = false;
+  }
+
+  onArmyMissionRequested(event: any) {
+    console.log('Ordine armata emesso:', event);
   }
 
   // Chiude il menu se si clicca altrove col tasto sinistro
@@ -945,6 +958,62 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             paint: { 'line-color': '#000000', 'line-width': 1, 'line-opacity': 0.5 }
         });
     });
+  }
+
+  loadTopoJsonCitiesLayer(url: string, sourceId: string, pointsLayerId: string, labelsLayerId: string, minZ: number, maxZ: number) {
+    fetch(url).then(res => res.json()).then(topology => {
+        const objectName = Object.keys(topology.objects || {})[0];
+        if (!objectName) {
+          return;
+        }
+
+        const geoData = topojson.feature(topology, topology.objects[objectName]);
+
+        if (this.map.getSource(sourceId)) {
+          (this.map.getSource(sourceId) as any).setData(geoData);
+          return;
+        }
+
+        this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
+
+        this.map.addLayer({
+            id: pointsLayerId,
+            type: 'circle',
+            source: sourceId,
+            minzoom: minZ,
+            maxzoom: maxZ,
+            paint: {
+              'circle-color': '#ffd84d',
+              'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 1.8, 4, 2.8, 7, 4.6],
+              'circle-stroke-color': '#1a1402',
+              'circle-stroke-width': 1,
+              'circle-opacity': 0.95
+            }
+        });
+
+        this.map.addLayer({
+            id: labelsLayerId,
+            type: 'symbol',
+            source: sourceId,
+            minzoom: minZ,
+            maxzoom: maxZ,
+            layout: {
+              'text-field': ['coalesce', ['get', 'NAME'], ''],
+              'text-size': ['interpolate', ['linear'], ['zoom'], 2, 9, 6, 11],
+              'text-anchor': 'top',
+              'text-offset': [0, 0.9],
+              'text-allow-overlap': false,
+              'text-ignore-placement': false,
+              'visibility': 'visible'
+            },
+            paint: {
+              'text-color': '#fff4b0',
+              'text-halo-color': '#000000',
+              'text-halo-width': 1.2,
+              'text-halo-blur': 0.5
+            }
+        });
+    }).catch(err => console.error('Errore fetch cities.json', err));
   }
 
   changeBasemap(event: any) {

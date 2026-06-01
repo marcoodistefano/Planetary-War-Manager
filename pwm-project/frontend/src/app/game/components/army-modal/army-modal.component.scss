@@ -73,13 +73,255 @@
 
 /* 3. AREA CENTRALE E GRIGLIA RADAR */
 .army-main {
-  flex: 1; padding: 40px; overflow-y: auto; position: relative; z-index: 10;
+  flex: 1; padding: 40px; overflow-y: auto; overflow-x: hidden; position: relative; z-index: 10;
   background-image: radial-gradient(rgba(134, 215, 255, 0.15) 1px, transparent 1px); background-size: 30px 30px;
   &::-webkit-scrollbar { height: 8px; width: 8px; }
   &::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 4px; }
 }
 
-.content-container { display: flex; flex-direction: column; min-width: max-content; }
+.content-container { display: flex; flex-direction: column; width: 100%; min-width: 0; box-sizing: border-box; }
+
+.operations-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.summary-card,
+.command-panel,
+.empty-state {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.summary-label,
+.panel-chip,
+.command-field label {
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.summary-label {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+}
+
+.summary-value {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.summary-subvalue {
+  color: var(--text-accent);
+  font-size: 0.72rem;
+}
+
+.operations-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.command-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+
+  h3 {
+    margin: 2px 0 0;
+    color: #fff;
+    font-size: 0.95rem;
+  }
+}
+
+.panel-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  color: var(--primary-blue);
+  border: 1px solid rgba(134, 215, 255, 0.25);
+  background: rgba(134, 215, 255, 0.08);
+
+  &.is-danger {
+    color: var(--danger-red);
+    border-color: rgba(255, 123, 114, 0.35);
+    background: rgba(255, 123, 114, 0.08);
+  }
+}
+
+.command-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  &.two-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  label {
+    font-size: 0.62rem;
+    color: var(--text-muted);
+  }
+
+  input,
+  select {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(134, 215, 255, 0.15);
+    border-radius: 8px;
+    color: #fff;
+    padding: 10px 12px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+  }
+}
+
+.mission-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+
+  button {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(134, 215, 255, 0.18);
+    border-radius: 8px;
+    color: var(--text-muted);
+    padding: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    cursor: pointer;
+
+    &.active {
+      background: rgba(134, 215, 255, 0.15);
+      color: #fff;
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 15px var(--primary-glow);
+    }
+  }
+}
+
+.army-grid--wide {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.army-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  &.active {
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 1px rgba(134, 215, 255, 0.18), 0 0 18px rgba(134, 215, 255, 0.12);
+  }
+}
+
+.army-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mini-action,
+.ghost-action,
+.danger-action {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.mini-action,
+.ghost-action {
+  background: rgba(134, 215, 255, 0.08);
+  border-color: rgba(134, 215, 255, 0.2);
+  color: #fff;
+}
+
+.danger-action {
+  background: rgba(255, 123, 114, 0.08);
+  border-color: rgba(255, 123, 114, 0.2);
+  color: var(--danger-red);
+}
+
+.army-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary-blue);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.army-composition {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.composition-row {
+  display: flex;
+  justify-content: space-between;
+  color: #fff;
+  font-size: 0.75rem;
+}
+
+.army-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+
+  p {
+    margin: 0;
+    color: #fff;
+    font-weight: 800;
+  }
+
+  span {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+  }
+}
+
+.army-list-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
 
 /* 4. ELEMENTI SPECIFICI ARMY */
 .army-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
@@ -149,6 +391,14 @@
   
   .army-main {
     padding: 25px;
+  }
+
+  .operations-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -230,6 +480,23 @@
   .army-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 10px;
+  }
+
+  .army-grid--wide {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-summary,
+  .operations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .command-field.two-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .army-actions {
+    flex-direction: column;
   }
 
   .unit-card {

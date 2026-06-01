@@ -298,11 +298,21 @@
       (close)="isDiplomacyModalOpen = false"></app-diplomacy-modal>
     <app-intelligence-modal *ngIf="isIntelligenceModalOpen" (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
     <app-market-modal *ngIf="isMarketModalOpen" [playerResources]="playerResources" (close)="toggleMarketModal()"></app-market-modal>
-    <app-army-modal *ngIf="isArmyModalOpen" [playerTroops]="playerTroops" (close)="isArmyModalOpen = false"> </app-army-modal>
+    <app-army-modal 
+      *ngIf="isArmyModalOpen" 
+      [playerTroops]="playerTroops" 
+      [armies]="matchArmies"
+      [selectedTargetName]="selectedPointName" 
+      [selectedTargetCoords]="selectedPointCoords" 
+      [initialTab]="armyModalInitialTab"
+      (playerTroopsChange)="playerTroops = $event"
+      (armiesChange)="matchArmies = $event"
+      (close)="isArmyModalOpen = false"> 
+    </app-army-modal>
 
     <div class="radial-menu-container" *ngIf="isRadialMenuVisible" [style.left.px]="radialMenuX" [style.top.px]="radialMenuY">
       <div class="radial-menu-wrapper">
-        <div class="radial-center-trigger" (click)="handleRadialAction('ATTACCA')">
+        <div class="radial-center-trigger" (click)="$event.stopPropagation(); handleRadialAction('TRUPPE')">
           <ion-icon name="locate"></ion-icon>
         </div>
         <div class="radial-sector sector-top" (click)="handleRadialAction('INFO')">
