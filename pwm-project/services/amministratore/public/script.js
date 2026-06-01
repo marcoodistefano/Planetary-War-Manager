@@ -67,6 +67,7 @@ async function updateDashboard() {
 
             card.querySelector('.actions').innerHTML = `
                 <button class="btn btn-outline" style="font-size:0.7em" onclick="azione('${c.id}', 'restart')">REBOOT</button>
+                <button class="btn btn-outline" style="font-size:0.7em" onclick="azione('${c.id}', 'rebuild')">REBUILD</button>
                 <button class="btn btn-red" style="font-size:0.7em" onclick="azione('${c.id}', 'stop')" ${!isRunning ? 'disabled' : ''}>ABORT</button>
             `;
 
@@ -145,6 +146,20 @@ function renderChart(name, history) {
 async function azione(id, act) { 
     await fetch(`/api/containers/${id}/${act}`, { method: 'POST' }); 
     setTimeout(updateDashboard, 1500); 
+}
+
+function setButtonState(buttonId, disabled, busyText, idleText) {
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+
+    button.disabled = disabled;
+    if (disabled && busyText) {
+        button.dataset.idleText = idleText || button.textContent || '';
+        button.textContent = busyText;
+    } else if (!disabled && button.dataset.idleText) {
+        button.textContent = button.dataset.idleText;
+        delete button.dataset.idleText;
+    }
 }
 
 function setGlobalFeedback(message, kind = 'info') {
@@ -281,12 +296,7 @@ async function pollRestoreStatus() {
 }
 
 async function riavviaTutti() {
-    const button = document.getElementById('restart-all-btn');
-
-    if (button) {
-        button.disabled = true;
-        button.textContent = '⏳ Riavvio in corso...';
-    }
+    setButtonState('restart-all-btn', true, '⏳ Riavvio in corso...', '🔄 Riavvio Globale');
 
     setGlobalFeedback('Riavvio globale avviato: i container PWM verranno riavviati in sequenza.', 'info');
 
@@ -304,10 +314,30 @@ async function riavviaTutti() {
         setGlobalFeedback(error.message || 'Riavvio globale fallito.', 'error');
         throw error;
     } finally {
-        if (button) {
-            button.disabled = false;
-            button.textContent = '🔄 Riavvio Globale';
+        setButtonState('restart-all-btn', false, null, '🔄 Riavvio Globale');
+    }
+}
+
+async function rebuildTutti() {
+    setButtonState('rebuild-all-btn', true, '⏳ Rebuild in corso...', '🛠️ Rebuild Globale');
+
+    setGlobalFeedback('Rebuild globale avviato: immagini e container verranno ricreati in sequenza.', 'info');
+
+    try {
+        const response = await fetch('/api/rebuild-all', { method: 'POST' });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Rebuild globale fallito');
         }
+
+        setGlobalFeedback('Rebuild globale completato con successo.', 'success');
+        setTimeout(updateDashboard, 1500);
+    } catch (error) {
+        setGlobalFeedback(error.message || 'Rebuild globale fallito.', 'error');
+        throw error;
+    } finally {
+        setButtonState('rebuild-all-btn', false, null, '🛠️ Rebuild Globale');
     }
 }
 

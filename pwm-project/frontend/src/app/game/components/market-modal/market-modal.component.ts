@@ -1,4 +1,4 @@
-import { Component, Output, EventEmitter, Input, OnInit, HostListener } from '@angular/core';
+import { Component, Output, EventEmitter, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
@@ -26,11 +26,6 @@ export class MarketModalComponent implements OnInit {
     { id: 'uranio', label: 'URANIO', icon: '☢️', price: 550, quantity: 100 }
   ];
 
-  // Logic Drag
-  isDragging = false;
-  dragStartX = 0; dragStartY = 0;
-  transformX = 0; transformY = 0;
-
   ngOnInit() {}
 
   changeQty(item: any, amount: number) {
@@ -50,25 +45,6 @@ export class MarketModalComponent implements OnInit {
   sell(item: any) {
     console.log(`VENDITA: ${item.quantity} ${item.label}`);
   }
-
-  // --- TRASCINAMENTO ---
-  onDragStart(event: MouseEvent) {
-    const target = event.target as HTMLElement;
-    if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.closest('.nav-item')) return;
-    this.isDragging = true;
-    this.dragStartX = event.clientX - this.transformX;
-    this.dragStartY = event.clientY - this.transformY;
-  }
-
-  @HostListener('document:mousemove', ['$event'])
-  onDragMove(event: MouseEvent) {
-    if (!this.isDragging) return;
-    this.transformX = event.clientX - this.dragStartX;
-    this.transformY = event.clientY - this.dragStartY;
-  }
-
-  @HostListener('document:mouseup')
-  onDragEnd() { this.isDragging = false; }
 
   closeModal() { this.close.emit(); }
 }

@@ -1,4 +1,4 @@
-import { Component, Output, EventEmitter, Input, OnInit, HostListener } from '@angular/core';
+import { Component, Output, EventEmitter, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
@@ -26,11 +26,6 @@ export class ArmyModalComponent implements OnInit {
 
   maintenanceTotal = 4250; // Valore simulato
 
-  // Drag logic
-  isDragging = false;
-  dragStartX = 0; dragStartY = 0;
-  transformX = 0; transformY = 0;
-
   ngOnInit() {
     console.log("MILITARY OS: Protocolli di comando attivati...");
   }
@@ -44,25 +39,6 @@ export class ArmyModalComponent implements OnInit {
     console.log(`RECLUTAMENTO AVVIATO: ${unit.name}`);
     // Logica di backend qui
   }
-
-  // --- LOGICA DRAG & DROP ---
-  onDragStart(event: MouseEvent) {
-    const target = event.target as HTMLElement;
-    if (target.tagName === 'BUTTON' || target.tagName === 'ION-ICON' || target.closest('.nav-item')) return;
-    this.isDragging = true;
-    this.dragStartX = event.clientX - this.transformX;
-    this.dragStartY = event.clientY - this.transformY;
-  }
-
-  @HostListener('document:mousemove', ['$event'])
-  onDragMove(event: MouseEvent) {
-    if (!this.isDragging) return;
-    this.transformX = event.clientX - this.dragStartX;
-    this.transformY = event.clientY - this.dragStartY;
-  }
-
-  @HostListener('document:mouseup')
-  onDragEnd() { this.isDragging = false; }
 
   closeModal() { this.close.emit(); }
 }

@@ -1,4 +1,4 @@
-import { Component, Output, EventEmitter, OnInit, OnChanges, HostListener, Input, SimpleChanges } from '@angular/core';
+import { Component, Output, EventEmitter, OnInit, OnChanges, Input, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
@@ -42,12 +42,6 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
   allianceActionSuccess = '';
   isUpdatingAlliance = false;
   newAllianceName = '';
-
-  isDragging = false;
-  dragStartX = 0;
-  dragStartY = 0;
-  transformX = 0;
-  transformY = 0;
 
   constructor(private homeService: HomeService) {}
 
@@ -304,29 +298,6 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
         this.allianceActionError = backendMessage || error?.message || 'Impossibile lasciare l\'alleanza.';
       }
     });
-  }
-
-  onDragStart(event: MouseEvent) {
-    const target = event.target as HTMLElement;
-    if (target.tagName === 'BUTTON' || target.tagName === 'ION-ICON' || target.closest('.nav-item') || target.tagName === 'INPUT' || target.tagName === 'ION-SEARCHBAR') {
-      return;
-    }
-
-    this.isDragging = true;
-    this.dragStartX = event.clientX - this.transformX;
-    this.dragStartY = event.clientY - this.transformY;
-  }
-
-  @HostListener('document:mousemove', ['$event'])
-  onDragMove(event: MouseEvent) {
-    if (!this.isDragging) return;
-    this.transformX = event.clientX - this.dragStartX;
-    this.transformY = event.clientY - this.dragStartY;
-  }
-
-  @HostListener('document:mouseup')
-  onDragEnd() {
-    this.isDragging = false;
   }
 
   closeModal() {

@@ -67,16 +67,51 @@ const setMatchCacheAllIds = async ({
   }
 };
 // Invalidate alliance-related cache entries for a match
-const invalidateMatchAllianceCache = async (matchId) => {
+const invalidateMatchAllianceCache = async (matchId, allianceId = null) => {
   try {
     if (!matchId) return;
     // remove main alliances list cache
-    await redis.del(`match:${matchId}:alliances`);
-    // remove per-alliance keys (join_count, etc.)
+    const toDelete = [`match:${matchId}:alliances`];
+
+    if (allianceId) {
+      // explicit known keys for the alliance
+      toDelete.push(
+        `match:${matchId}:alliance:${allianceId}`,
+        `match:${matchId}:alliance:${allianceId}:members`,
+        `match:${matchId}:alliance:${allianceId}:join_count`,
+        `chat:match:${matchId}:alliance:${allianceId}`,
+        `chat:match:${matchId}:alliance:${allianceId}:bytes`,
+      );
+    }
+
+    // also include running participants set so membership checks refresh
+    toDelete.push(`running_match:${matchId}:participants`);
+
+    // attempt to delete all explicitly gathered keys
+    try {
+      const existing = [];
+      for (const k of toDelete) {
+        if (!k) continue;
+        const exists = await redis.exists(k);
+        if (exists) existing.push(k);
+      }
+      if (existing.length > 0) {
+        await redis.del(...existing);
+        console.log(
+          `[SYS_CACHE] invalidateMatchAllianceCache removed keys for match ${matchId}:`,
+          existing,
+        );
+      }
+    } catch (e) {
+      console.warn("[SYS_WARN] invalidateMatchAllianceCache explicit delete failed:", e.message);
+    }
+
+    // remove per-alliance pattern keys as a fallback
     try {
       const keys = await redis.keys(`match:${matchId}:alliance:*`);
       if (keys && keys.length > 0) {
         await redis.del(...keys);
+        console.log('[SYS_CACHE] invalidateMatchAllianceCache pattern removed:', keys);
       }
     } catch (e) {
       // keys may not be supported or may fail in some redis clients/environments
@@ -1078,7 +1113,7 @@ const joinAlliance = async (playerId, matchId, allianceId) => {
       const nextCount = countPlayer + 1;
       try {
         // Ensure cached alliances listing is invalidated so frontend sees update
-        await invalidateMatchAllianceCache(matchId);
+        await invalidateMatchAllianceCache(matchId, alliancePk);
       } catch (e) {
         console.warn(
           "[SYS_WARN] Failed to invalidate alliance cache after joinAlliance:",
@@ -1277,7 +1312,7 @@ const removeAllianceMember = async ({
     await client.query("COMMIT");
 
     const leaveTimestamp = Date.now();
-    await invalidateMatchAllianceCache(matchId);
+    await invalidateMatchAllianceCache(matchId, allianceState.alliance.id_alleanza);
     await cacheAllianceMembershipState({
       matchId,
       playerId: targetPlayerId,

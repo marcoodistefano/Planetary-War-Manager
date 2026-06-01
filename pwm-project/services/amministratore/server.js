@@ -3,9 +3,45 @@ const Docker = require('dockerode');
 const path = require('path');
 const axios = require('axios');
 const cors = require('cors');
+const tar = require('tar-fs');
 
 const app = express();
 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+const PROJECT_ROOT = process.env.PROJECT_ROOT || '/project';
+const PROJECT_PREFIX = 'pwm-';
+const PROJECT_SERVICE_ORDER = [
+    'redis',
+    'db',
+    'user-service',
+    'match-service',
+    'app-route',
+    'engine-move',
+    'engine-combat',
+    'engine-res',
+    'cache-warmup',
+    'gateway',
+    'chat'
+];
+
+const SERVICE_SPECS = {
+    redis: { type: 'image', image: 'redis:7-alpine' },
+    db: { type: 'image', image: 'postgres:15-alpine' },
+    'frontend-dev': { type: 'build', context: path.join(PROJECT_ROOT, 'frontend'), dockerfile: 'Dockerfile.dev', image: 'pwm-frontend-dev:latest' },
+    'user-service': { type: 'build', context: path.join(PROJECT_ROOT, 'services/user-service'), dockerfile: 'Dockerfile', image: 'pwm-user-service:latest' },
+    'app-route': { type: 'build', context: PROJECT_ROOT, dockerfile: 'gateway/Dockerfile.app-route', image: 'pwm-app-route:latest' },
+    'match-service': { type: 'build', context: path.join(PROJECT_ROOT, 'services/match'), dockerfile: 'Dockerfile', image: 'pwm-match-service:latest' },
+    'engine-move': { type: 'build', context: path.join(PROJECT_ROOT, 'services/movement'), dockerfile: 'Dockerfile', image: 'pwm-engine-move:latest' },
+    'engine-combat': { type: 'build', context: path.join(PROJECT_ROOT, 'services/combat'), dockerfile: 'Dockerfile', image: 'pwm-engine-combat:latest' },
+    'engine-res': { type: 'build', context: path.join(PROJECT_ROOT, 'services/resources'), dockerfile: 'Dockerfile', image: 'pwm-engine-res:latest' },
+    'cache-warmup': { type: 'build', context: path.join(PROJECT_ROOT, 'services/cache-warmup'), dockerfile: 'Dockerfile', image: 'pwm-cache-warmup:latest' },
+    chat: { type: 'build', context: path.join(PROJECT_ROOT, 'services/chat'), dockerfile: 'Dockerfile', image: 'pwm-chat:latest' },
+    gateway: { type: 'image', image: 'nginx:alpine' },
+    ripristina: { type: 'build', context: path.join(PROJECT_ROOT, 'services/ripristina'), dockerfile: 'Dockerfile', image: 'pwm-ripristina:latest' },
+    amministratore: { type: 'build', context: path.join(PROJECT_ROOT, 'services/amministratore'), dockerfile: 'Dockerfile', image: 'pwm-amministratore:latest' },
+    scope: { type: 'image', image: 'weaveworks/scope:latest' },
+    'pgadminer': { type: 'image', image: 'adminer' },
+    'redis-ui': { type: 'image', image: 'rediscommander/redis-commander:latest' }
+};
 
 app.use(cors());
 app.use(express.json());
@@ -56,6 +92,177 @@ function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getProjectContainerName(container) {
+    return (container.Names?.[0] || '').replace(/^\//, '');
+}
+
+function getComposeServiceName(container) {
+    return container.Labels?.['com.docker.compose.service'] || null;
+}
+
+function buildProgressHandler(resolve, reject) {
+    return (err, output) => {
+        if (err) {
+            reject(err);
+            return;
+        }
+
+        resolve(output);
+    };
+}
+
+async function pullImage(image) {
+    return new Promise((resolve, reject) => {
+        docker.pull(image, (err, stream) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+
+            docker.modem.followProgress(stream, buildProgressHandler(resolve, reject));
+        });
+    });
+}
+
+async function buildImage({ context, dockerfile, image }) {
+    return new Promise((resolve, reject) => {
+        const buildStream = tar.pack(context);
+
+        docker.buildImage(buildStream, { t: image, dockerfile, forcerm: true }, (err, stream) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+
+            docker.modem.followProgress(stream, buildProgressHandler(resolve, reject));
+        });
+    });
+}
+
+async function recreateContainerFromInspect(containerInfo, imageName) {
+    const containerName = (containerInfo.Name || '').replace(/^\//, '');
+    const config = { ...containerInfo.Config, Image: imageName };
+    const hostConfig = { ...containerInfo.HostConfig };
+    const networkMode = hostConfig.NetworkMode;
+    const endpoints = containerInfo.NetworkSettings?.Networks || {};
+    const networkNames = Object.keys(endpoints);
+
+    try {
+        const existing = docker.getContainer(containerInfo.Id);
+        try {
+            await existing.stop({ t: 5 });
+        } catch (stopError) {
+            if (!String(stopError.message || '').includes('is not running')) {
+                throw stopError;
+            }
+        }
+
+        try {
+            await existing.remove({ force: true });
+        } catch (removeError) {
+            if (!String(removeError.message || '').includes('No such container')) {
+                throw removeError;
+            }
+        }
+    } catch (cleanupError) {
+        throw cleanupError;
+    }
+
+    const createOptions = {
+        name: containerName,
+        Image: imageName,
+        Env: config.Env,
+        Cmd: config.Cmd,
+        Entrypoint: config.Entrypoint,
+        WorkingDir: config.WorkingDir,
+        User: config.User,
+        Labels: config.Labels,
+        ExposedPorts: config.ExposedPorts,
+        Hostname: config.Hostname,
+        Domainname: config.Domainname,
+        MacAddress: config.MacAddress,
+        Tty: config.Tty,
+        OpenStdin: config.OpenStdin,
+        StdinOnce: config.StdinOnce,
+        AttachStdout: false,
+        AttachStderr: false,
+        HostConfig: hostConfig
+    };
+
+    if (networkMode && networkMode !== 'default' && networkMode !== 'bridge') {
+        createOptions.HostConfig.NetworkMode = networkMode;
+    }
+
+    if (networkNames.length > 0 && networkMode !== 'host') {
+        createOptions.NetworkingConfig = {
+            EndpointsConfig: Object.fromEntries(networkNames.map((networkName) => [networkName, {
+                Aliases: endpoints[networkName]?.Aliases || undefined
+            }]))
+        };
+    }
+
+    const recreated = await docker.createContainer(createOptions);
+    await recreated.start();
+}
+
+async function rebuildServiceByName(serviceName) {
+    const spec = SERVICE_SPECS[serviceName];
+
+    if (!spec) {
+        throw new Error(`Servizio non supportato: ${serviceName}`);
+    }
+
+    if (spec.type === 'build') {
+        await buildImage(spec);
+    } else {
+        await pullImage(spec.image);
+    }
+
+    const containers = await docker.listContainers({ all: true });
+    const container = containers.find((item) => getComposeServiceName(item) === serviceName || getProjectContainerName(item).includes(serviceName));
+
+    if (!container) {
+        return { serviceName, skipped: true, message: 'Container non trovato' };
+    }
+
+    const inspect = await docker.getContainer(container.Id).inspect();
+    await recreateContainerFromInspect(inspect, spec.image);
+
+    return { serviceName, skipped: false, message: 'Rebuild completato' };
+}
+
+async function applyProjectAction(action, serviceNames) {
+    const orderedServices = serviceNames || [];
+    const results = [];
+
+    for (const serviceName of orderedServices) {
+        const containers = await docker.listContainers({ all: true });
+        const container = containers.find((item) => getComposeServiceName(item) === serviceName || getProjectContainerName(item).includes(serviceName));
+
+        if (!container) {
+            results.push({ serviceName, skipped: true });
+            continue;
+        }
+
+        const dockerContainer = docker.getContainer(container.Id);
+        if (action === 'restart') {
+            await dockerContainer.restart();
+            results.push({ serviceName, skipped: false });
+            continue;
+        }
+
+        if (action === 'rebuild') {
+            const result = await rebuildServiceByName(serviceName);
+            results.push(result);
+            continue;
+        }
+
+        throw new Error(`Azione non supportata: ${action}`);
+    }
+
+    return results;
+}
+
 function snapshotRestoreState() {
     return JSON.parse(JSON.stringify(restoreState));
 }
@@ -66,41 +273,27 @@ async function getHelperStatus() {
 }
 
 async function restartProjectContainers({ includeAdmin = false } = {}) {
-    const allContainers = await docker.listContainers();
-    const projectContainers = allContainers.filter(c => c.Names[0].replace('/', '').startsWith('pwm-'));
+    const serviceNames = [...PROJECT_SERVICE_ORDER];
 
-    let adminContainerId = null;
-
-    for (const c of projectContainers) {
-        if (c.Names[0].includes('amministratore')) {
-            adminContainerId = c.Id;
-            if (!includeAdmin) {
-                continue;
-            }
-        }
-
-        if (!includeAdmin && c.Names[0].includes('amministratore')) {
-            continue;
-        }
-
-        try {
-            const container = docker.getContainer(c.Id);
-            await container.restart();
-        } catch (error) {
-            console.error(`Errore riavvio ${c.Names[0]}:`, error.message);
-        }
+    if (includeAdmin) {
+        serviceNames.push('amministratore');
     }
 
-    if (includeAdmin && adminContainerId) {
-        try {
-            const admin = docker.getContainer(adminContainerId);
-            await admin.restart();
-        } catch (error) {
-            console.error('Errore riavvio amministratore:', error.message);
-        }
+    await applyProjectAction('restart', serviceNames);
+
+    return serviceNames.length;
+}
+
+async function rebuildProjectContainers({ includeAdmin = false } = {}) {
+    const serviceNames = [...PROJECT_SERVICE_ORDER];
+
+    if (includeAdmin) {
+        serviceNames.push('amministratore');
     }
 
-    return projectContainers.length;
+    await applyProjectAction('rebuild', serviceNames);
+
+    return serviceNames.length;
 }
 
 async function runRestoreWorkflow() {
@@ -233,8 +426,12 @@ app.post('/api/containers/:id/:action', async (req, res) => {
         if (action === 'start') await container.start();
         else if (action === 'stop') await container.stop();
         else if (action === 'restart') await container.restart();
-        else return res.status(400).json({ error: 'Azione non valida' });
-        
+        else if (action === 'rebuild') {
+            const containerInfo = await container.inspect();
+            const serviceName = getComposeServiceName(containerInfo) || getProjectContainerName(containerInfo);
+            await rebuildServiceByName(serviceName);
+        } else return res.status(400).json({ error: 'Azione non valida' });
+
         res.json({ success: true, message: `Container ${id} ${action}ed` });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -341,39 +538,17 @@ app.get('/api/restore/status', async (req, res) => {
 // Endpoint per riavviare tutti i container
 app.post('/api/restart-all', async (req, res) => {
     try {
-        // Recuperiamo tutti i container
-        const allContainers = await docker.listContainers();
-        
-        // Filtriamo solo quelli che appartengono al progetto
-        const projectContainers = allContainers.filter(c => 
-            c.Names[0].replace('/', '').startsWith('pwm-')
-        );
+        const count = await restartProjectContainers({ includeAdmin: false });
+        res.json({ success: true, message: `Riavvio di ${count} unità PWM completato in sequenza.` });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
-        res.json({ success: true, message: `Riavvio di ${projectContainers.length} unità PWM in corso...` });
-
-        setTimeout(async () => {
-            let adminContainerId = null;
-            
-            for (const c of projectContainers) {
-                if (c.Names[0].includes('amministratore')) {
-                    adminContainerId = c.Id;
-                    continue; 
-                }
-                try {
-                    const container = docker.getContainer(c.Id);
-                    await container.restart();
-                } catch (e) { 
-                    console.error(`Errore riavvio ${c.Names[0]}:`, e.message); 
-                }
-            }
-
-            if (adminContainerId) {
-                try {
-                    const admin = docker.getContainer(adminContainerId);
-                    await admin.restart();
-                } catch (e) {}
-            }
-        }, 500);
+app.post('/api/rebuild-all', async (req, res) => {
+    try {
+        const count = await rebuildProjectContainers({ includeAdmin: false });
+        res.json({ success: true, message: `Rebuild di ${count} unità PWM completato in sequenza.` });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

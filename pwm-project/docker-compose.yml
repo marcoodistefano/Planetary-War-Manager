@@ -232,8 +232,11 @@ services:
       - "8080:8080" # Pannello admin (es. http://localhost:8080)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # Necessario per controllare gli altri container
+      - .:/project:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    environment:
+      - PROJECT_ROOT=/project
     depends_on:
       - ripristina
     networks:
