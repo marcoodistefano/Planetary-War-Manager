@@ -170,6 +170,19 @@
   }
 }
 
+.troops-dropdown-float {
+  position: fixed !important;
+  display: block !important;
+  z-index: 10002 !important;
+  transform: translateX(-50%);
+  pointer-events: auto !important;
+  width: 250px;
+  max-width: calc(100vw - 40px);
+  left: auto;
+  right: auto;
+  top: auto;
+}
+
 /* ==========================================================================
    4. PROFILO (DESKTOP BAR)
    ========================================================================== */

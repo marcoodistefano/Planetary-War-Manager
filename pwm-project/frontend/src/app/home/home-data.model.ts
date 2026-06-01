@@ -16,6 +16,7 @@ export interface HomeData {
   leaderboard_regionale: any[];
   leaderboard_globale: any[];
   user_position: number;
+  user_position_regionale?: number;
   
   // Mappe degli oggetti match1, match2 ecc. creati da buildMatchMap nel backend
   match_attivi: { [key: string]: any }; 
