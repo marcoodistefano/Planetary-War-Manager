@@ -17,6 +17,10 @@ const MATCHES_JOINABLE_KEY = process.env.MATCHES_JOINABLE_KEY || "Matches:Joinab
 const GLOBAL_LIMIT = parseIntSafe(process.env.LEADERBOARD_GLOBAL_LIMIT, 1000);
 const REGIONAL_LIMIT = parseIntSafe(process.env.LEADERBOARD_REGIONAL_LIMIT, 100);
 const LOOP_DELAY_MS = parseIntSafe(process.env.WARMUP_LOOP_DELAY_MS, 15000);
+const MAX_ASSET_SIZE_BYTES = parseIntSafe(
+  process.env.MAX_CACHED_ASSET_SIZE_BYTES,
+  16 * 1024 * 1024,
+);
 const ASSET_ROOT_CANDIDATES = [
   process.env.ASSET_ROOT,
   "/app/assets",
@@ -111,10 +115,13 @@ const collectAssets = async (assetRoot) => {
         continue;
       }
 
+      const stats = await fs.stat(absolutePath);
+
       assetEntries.push({
         key: `assets:${relativePath}`,
         relativePath,
         absolutePath,
+        size: stats.size,
       });
     }
   };
@@ -132,10 +139,12 @@ const collectAssets = async (assetRoot) => {
     }
 
     if (shouldLoadRootFile(entry.name)) {
+      const stats = await fs.stat(absolutePath);
       assetEntries.push({
         key: `assets:${entry.name}`,
         relativePath: entry.name,
         absolutePath,
+        size: stats.size,
       });
     }
   }
@@ -156,8 +165,14 @@ const loadAssetsToRedis = async () => {
 
   const multi = redis.multi();
   const manifestFiles = [];
+  const skippedAssets = [];
 
   for (const asset of assets) {
+    if (asset.size > MAX_ASSET_SIZE_BYTES) {
+      skippedAssets.push(asset);
+      continue;
+    }
+
     const data = await fs.readFile(asset.absolutePath);
     multi.set(asset.key, data.toString("base64"));
     manifestFiles.push({ path: asset.relativePath, size: data.length });
@@ -173,7 +188,13 @@ const loadAssetsToRedis = async () => {
   );
 
   await multi.exec();
-  console.log(`[CACHE_WARMUP] Caricati ${assets.length} asset in Redis.`);
+  console.log(`[CACHE_WARMUP] Caricati ${manifestFiles.length} asset in Redis.`);
+  if (skippedAssets.length > 0) {
+    const skippedPreview = skippedAssets.slice(0, 5).map((asset) => asset.relativePath).join(", ");
+    console.log(
+      `[CACHE_WARMUP] Saltati ${skippedAssets.length} asset troppo grandi per Redis (${skippedPreview}${skippedAssets.length > 5 ? ", ..." : ""}).`,
+    );
+  }
 };
 
 const shouldRunAssetWarmup = async (runId) => {
@@ -245,8 +266,21 @@ const fetchJoinableMatches = async () => {
   return [];
 };
 
+const waitForMatchService = async () => {
+  while (true) {
+    try {
+      await fetchJoinableMatches();
+      return;
+    } catch (err) {
+      console.log("[CACHE_WARMUP] Match service non pronto, attendo...");
+      await sleep(1000);
+    }
+  }
+};
+
 const runWarmup = async (runId) => {
   await waitForDb();
+  await waitForMatchService();
 
   await loadAssetsToRedis();
   const leaderboard = await loadLeaderboards();
