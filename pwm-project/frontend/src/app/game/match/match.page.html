@@ -79,7 +79,7 @@
             <span class="res-val" *ngIf="res.isTrigger">STATUS</span>
           </div>
           
-          <div class="troops-dropdown" *ngIf="res.isTrigger">
+          <div class="troops-dropdown" *ngIf="res.isTrigger && !useFloatingDropdown">
             <div class="dropdown-header">ARMATA DISPIEGATA</div>
             <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
               <span class="t-key">{{ troop.key }}</span>
@@ -123,7 +123,7 @@
         <span class="icon">{{ res.icon }}</span>
         <span class="val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number: '1.0-0' }}</span>
         <span class="val" *ngIf="res.isTrigger">INFO</span>
-        <div class="troops-dropdown" *ngIf="res.isTrigger && !isTouchLayout">
+        <div class="troops-dropdown" *ngIf="res.isTrigger && !useFloatingDropdown">
           <div class="dropdown-header">ARMATA DISPIEGATA</div>
           <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
             <span class="t-key">{{ troop.key }}</span>
@@ -143,7 +143,7 @@
         <span class="icon">{{ res.icon }}</span>
         <span class="val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number: '1.0-0' }}</span>
         <span class="val" *ngIf="res.isTrigger">INFO</span>
-        <div class="troops-dropdown" *ngIf="res.isTrigger && !isTouchLayout">
+        <div class="troops-dropdown" *ngIf="res.isTrigger && !useFloatingDropdown">
           <div class="dropdown-header">ARMATA DISPIEGATA</div>
           <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
             <span class="t-key">{{ troop.key }}</span>
@@ -154,7 +154,7 @@
     </div>
 
     <div
-      *ngIf="isTroopsDropdownOpen && isTouchLayout"
+      *ngIf="isTroopsDropdownOpen && useFloatingDropdown"
       class="troops-dropdown troops-dropdown-float"
       [style.left.px]="troopsDropdownX"
       [style.top.px]="troopsDropdownY">

@@ -493,17 +493,28 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   setBuildCategory(cat: 'risorse' | 'armamenti') { this.activeBuildCategory = cat; }
   setOpenProfile(isOpen: boolean) { this.isProfileModalOpen = isOpen; }
 
+  get useFloatingDropdown(): boolean {
+    return window.innerWidth <= 1310;
+  }
+
   toggleTroopsDropdown(event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
 
-    if (this.isTouchViewport()) {
+    if (this.useFloatingDropdown) {
       const target = event.currentTarget as HTMLElement | null;
       const rect = target?.getBoundingClientRect();
 
       if (rect) {
-        this.troopsDropdownX = Math.max(12, rect.left - 12);
-        this.troopsDropdownY = rect.top + rect.height / 2;
+        if (window.innerWidth < 768) {
+          // Mobile (vertical bar on the right)
+          this.troopsDropdownX = rect.left;
+          this.troopsDropdownY = rect.top + rect.height / 2;
+        } else {
+          // Tablet (horizontal bar at the top)
+          this.troopsDropdownX = rect.left + rect.width / 2;
+          this.troopsDropdownY = rect.top + rect.height + 8; // 8px below the button
+        }
       }
     }
 
