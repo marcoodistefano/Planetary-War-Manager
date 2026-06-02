@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS partecipanti_partite (
     perc_distruzione REAL DEFAULT 0.0,
     id_alleanza UUID NULL,
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    abbandono_alleanza_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    abbandono_alleanza_at TIMESTAMP NULL DEFAULT NULL,
     utenti_alleati JSONB DEFAULT '{}'::jsonb, 
     utenti_in_guerra JSONB DEFAULT '{}'::jsonb,
     stato_risorse JSONB DEFAULT '{}'::jsonb,
@@ -205,7 +205,7 @@ CREATE TABLE IF NOT EXISTS storico_partecipanti_partite (
     perc_distruzione REAL DEFAULT 0.0,
     id_alleanza UUID DEFAULT NULL,
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    abbandono_alleanza_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    abbandono_alleanza_at TIMESTAMP NULL DEFAULT NULL,
     PRIMARY KEY (user_id, partita_id),
     CONSTRAINT fk_user_partecipante FOREIGN KEY (user_id) REFERENCES utenti(id_user) ON DELETE CASCADE,
     CONSTRAINT fk_partita_partecipante FOREIGN KEY (partita_id) REFERENCES partite(id_partita) ON DELETE CASCADE

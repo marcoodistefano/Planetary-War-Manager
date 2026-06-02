@@ -77,7 +77,7 @@ export class CreateMatchComponent {
   constructor(
     private modalCtrl: ModalController,
     private http: HttpClient
-  ) {}
+  ) { }
 
   isRegionSelected(region: string) {
     return this.matchData.regioni.includes(region);
@@ -158,6 +158,18 @@ export class CreateMatchComponent {
       );
 
       console.log('Risposta Cluster:', response);
+
+      try {
+        await firstValueFrom(
+          this.http.get('/api/match/joinable', {
+            withCredentials: true
+          })
+        );
+        console.log('Partite joinabili aggiornate con successo.');
+      } catch (joinableError) {
+        console.error('Errore durante il fetch di /joinable:', joinableError);
+      }
+
       this.modalCtrl.dismiss({
         created: true,
         matchId: response?.data?.matchId
@@ -173,6 +185,9 @@ export class CreateMatchComponent {
         });
       }
     }
+
+
+
   }
 
   close() {

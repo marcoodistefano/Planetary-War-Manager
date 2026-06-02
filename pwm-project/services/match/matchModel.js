@@ -594,7 +594,7 @@ const join_Match = async (playerId, id_partita_hash) => {
 // ============================================================================
 // 3. LISTA PARTITE JOINABILI (MINIMAL) [SOLO IN FASE DI CARICAMENTO REDIS]
 // ============================================================================
-const listJoinableMatches = async () => {
+const listJoinableMatches = async (playerId = null) => {
   //ALLA PRIMA INTERAZIONE (ALL'AVVIO) SI PRENDONO LE INFO DAL DB.
   //L'UTENTE CHIAMANTE DEVE CONTATTARE REDIS.
   //TO UPDATE
@@ -612,11 +612,15 @@ const listJoinableMatches = async () => {
       FROM partite m
       LEFT JOIN partecipanti_partite p ON p.partita_id = m.id_partita
       WHERE substring(m.struttura_partita::text from 1 for 2) IN ('00', '01')
+        AND ($1::uuid IS NULL OR NOT EXISTS (
+          SELECT 1 FROM partecipanti_partite pp 
+          WHERE pp.partita_id = m.id_partita AND pp.user_id = $1
+        ))
       GROUP BY m.id_partita
       ORDER BY m.created_at DESC;
     `;
 
-    const { rows } = await db.query(query);
+    const { rows } = await db.query(query, [playerId]);
     const matches = rows
       .map((row) => {
         const decoded = Eru.decode_match(row.struttura_partita);
@@ -701,6 +705,7 @@ const getMatchAlliance = async (matchId) => {
       SELECT 
         a.id_alleanza,
         a.id_leader,
+        leader_u.username AS leader_name,
         a.nome_alleanza,
         a.nome_logo, 
         a.id_partita,
@@ -710,10 +715,12 @@ const getMatchAlliance = async (matchId) => {
       FROM alleanze a
       LEFT JOIN partecipanti_partite pa ON a.id_alleanza = pa.id_alleanza AND pa.partita_id = a.id_partita
       LEFT JOIN utenti u ON pa.user_id = u.id_user
+      LEFT JOIN utenti leader_u ON a.id_leader = leader_u.id_user
       WHERE a.id_partita = $1
       GROUP BY 
         a.id_alleanza, 
         a.id_leader,
+        leader_u.username,
         a.nome_alleanza, 
         a.nome_logo,
         a.id_partita,
@@ -729,6 +736,7 @@ const getMatchAlliance = async (matchId) => {
       return {
         id_alleanza: row.id_alleanza,
         id_leader: row.id_leader,
+        leader_name: row.leader_name,
         nome_alleanza: row.nome_alleanza,
         nome_logo: row.nome_logo,
         numero_partecipanti: playerCount,
@@ -751,6 +759,7 @@ const getMatchAlliance = async (matchId) => {
                 nome_alleanza: row.nome_alleanza,
                 nome_logo: row.nome_logo,
                 id_leader: row.id_leader,
+                leader_name: row.leader_name,
                 id_partita: row.id_partita,
                 max_membri: row.max_membri,
               }),
@@ -955,7 +964,7 @@ const createAlliance = async (playerId, matchId, allianceName) => {
     } catch (dbError) {
       await client.query("ROLLBACK");
       if (dbError.customStatus) {
-        return dbError;
+        return { status: dbError.customStatus, message: dbError.message };
       }
       throw dbError;
     } finally {

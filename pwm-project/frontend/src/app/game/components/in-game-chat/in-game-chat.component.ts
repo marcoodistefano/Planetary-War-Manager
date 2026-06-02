@@ -780,11 +780,6 @@ export class InGameChatComponent implements OnInit, OnChanges, OnDestroy, AfterV
   }
 
   closeChat() {
-    this.shouldReconnect = false;
-    if (this.reconnectTimer) {
-      window.clearTimeout(this.reconnectTimer);
-    }
-    this.socket?.close();
     this.close.emit();
   }
 

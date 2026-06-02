@@ -72,11 +72,13 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     this.titleService.setTitle('PWM | Homepage');
     this.refreshLastJoinedMatch();
     this.loadDashboardData(); // Carica i dati dal backend all'avvio
+    this.loadJoinableMatches();
     this.loadCountryFlags();
     
     // Effettua un fetch ogni 2 minuti (120000 ms)
     this.pollingInterval = setInterval(() => {
       this.loadDashboardData();
+      this.loadJoinableMatches();
     }, 120000);
 
     // Sottoscrizione per aggiornare l'avatar non appena viene cambiato
@@ -88,6 +90,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   ionViewWillEnter() {
     this.refreshLastJoinedMatch();
     this.loadDashboardData();
+    this.loadJoinableMatches();
   }
 
   private refreshLastJoinedMatch() {
@@ -231,6 +234,17 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
       error: (err) => {
         console.error("Errore nel caricamento dei dati della dashboard:", err);
         // Opzionale: gestire il reindirizzamento al login se il JWT è scaduto
+      }
+    });
+  }
+
+  loadJoinableMatches() {
+    this.homeService.getJoinableMatches().subscribe({
+      next: (response) => {
+        console.log('Partite joinabili caricate periodicamente:', response);
+      },
+      error: (err) => {
+        console.error('Errore nel fetch periodico a /joinable:', err);
       }
     });
   }
@@ -416,6 +430,9 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
         icon: 'checkmark-circle-outline'
       });
       await toast.present();
+      
+      this.loadDashboardData();
+      this.loadJoinableMatches();
       return;
     }
 

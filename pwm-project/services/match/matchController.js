@@ -101,7 +101,10 @@ const joinable = async (req, res) => {
   //L'UTENTE CHIAMANTE DEVE CONTATTARE REDIS.
   //TO UPDATE
   try {
-    const result = await model.listJoinableMatches();
+    const auth = await getAuthContextFromRequest(req);
+    const playerId = auth.ok ? auth.userId : null;
+
+    const result = await model.listJoinableMatches(playerId);
     const statusCode = parseInt(result.status, 10) || 500;
     return res.status(statusCode).json(result);
   } catch (error) {

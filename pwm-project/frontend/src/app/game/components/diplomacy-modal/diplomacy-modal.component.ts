@@ -8,6 +8,7 @@ interface AllianceMemberView {
   name: string;
   status: 'online' | 'offline';
   rank: string;
+  isOwner?: boolean;
 }
 
 interface MatchAllianceView {
@@ -16,6 +17,7 @@ interface MatchAllianceView {
   nome_logo?: string;
   numero_partecipanti?: number;
   members?: string[];
+  leader_name?: string;
 }
 
 @Component({
@@ -35,13 +37,14 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
   @Input() currentUser = '';
   @Input() matchId = '';
 
-  activeTab: 'status' | 'manage' | 'search' | 'requests' = 'status';
+  activeTab: 'status' | 'manage' | 'search' = 'status';
 
   selectedAllianceIndex = 0;
   allianceActionError = '';
   allianceActionSuccess = '';
   isUpdatingAlliance = false;
   newAllianceName = '';
+  searchQuery = '';
 
   constructor(private homeService: HomeService) {}
 
@@ -72,11 +75,22 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
     return alliance.members
       .map((member) => String(member || '').trim())
       .filter((member) => Boolean(member))
-      .map((member) => ({
-        name: member,
-        rank: member.toLowerCase() === currentUser ? 'TU' : onlineRoster.has(member.toLowerCase()) ? 'Attivo' : 'Membro',
-        status: onlineRoster.has(member.toLowerCase()) ? 'online' : 'offline',
-      }));
+      .map((member) => {
+        const isOwner = Boolean(alliance.leader_name && member.toLowerCase() === alliance.leader_name.toLowerCase());
+        let rankStr = 'Membro';
+        if (member.toLowerCase() === currentUser) {
+          rankStr = isOwner ? 'TU (Proprietario)' : 'TU';
+        } else {
+          rankStr = isOwner ? 'Proprietario' : (onlineRoster.has(member.toLowerCase()) ? 'Attivo' : 'Membro');
+        }
+        
+        return {
+          name: member,
+          rank: rankStr,
+          isOwner: isOwner,
+          status: onlineRoster.has(member.toLowerCase()) ? 'online' : 'offline',
+        };
+      });
   }
 
   get selectedAllianceTitle(): string {
@@ -98,6 +112,24 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
       .join('')
       .slice(0, 4)
       .toUpperCase();
+  }
+  
+  get filteredAlliances(): MatchAllianceView[] {
+    const query = this.searchQuery.toLowerCase().trim();
+    if (!query) return this.alliances;
+
+    return this.alliances.filter(alliance => {
+      const name = (alliance.nome_alleanza || '').toLowerCase();
+      const tag = name
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((part) => part[0])
+        .join('')
+        .slice(0, 4)
+        .toLowerCase();
+        
+      return name.includes(query) || tag.includes(query);
+    });
   }
 
   get selectedAllianceLevel(): number {

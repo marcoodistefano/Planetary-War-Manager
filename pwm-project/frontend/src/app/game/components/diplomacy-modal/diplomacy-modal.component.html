@@ -18,9 +18,6 @@
         <div class="nav-item" [class.active]="activeTab === 'search'" (click)="activeTab = 'search'">
           <ion-icon name="search-outline"></ion-icon><span>CERCA</span>
         </div>
-        <div class="nav-item" [class.active]="activeTab === 'requests'" (click)="activeTab = 'requests'">
-          <ion-icon name="mail-unread-outline"></ion-icon><span>RICHIESTE</span>
-        </div>
       </nav>
 
       <div class="sidebar-footer">
@@ -62,7 +59,7 @@
               <div class="sensor-row" *ngFor="let member of selectedAllianceMembers">
                 <span [class.online-text]="member.status === 'online'">
                   <span class="status-dot-mini" [class.online]="member.status === 'online'"></span>
-                  {{ member.name }}
+                  {{ member.name }} <span *ngIf="member.isOwner" title="Proprietario" style="margin-left: 4px;">👑</span>
                 </span>
                 <span class="sensor-val">{{ member.rank }}</span>
               </div>
@@ -158,21 +155,42 @@
         <ng-container *ngIf="activeTab === 'search'">
           <p class="track-label">Cyber Surveillance - Database Fazioni</p>
           <div class="search-bar-container">
-            <ion-searchbar class="glass-searchbar" placeholder="Cerca Tag o Nome Alleanza"></ion-searchbar>
+            <ion-searchbar class="glass-searchbar" placeholder="Cerca Tag o Nome Alleanza" [(ngModel)]="searchQuery"></ion-searchbar>
           </div>
-          <p class="status-msg">Inserisci le coordinate o il nome del comando alleato per inviare un protocollo di unione.</p>
-        </ng-container>
+          
+          <div class="search-results scrollable-y" style="margin-top: 20px;">
+            <ng-container *ngIf="filteredAlliances.length; else noSearchResults">
+              <div class="build-card no-hover alliance-card" *ngFor="let alliance of filteredAlliances">
+                <div class="build-info">
+                  <span class="item-name">{{ alliance.nome_alleanza }}</span>
+                  <span class="item-tier">ALLEANZA</span>
+                </div>
+                <div class="build-cost">
+                  <span class="cost-unit">👥 MEMBRI: {{ alliance.numero_partecipanti || 0 }}</span>
+                  <span class="cost-unit" *ngIf="isCurrentAlliance(alliance)">TUO GRUPPO</span>
+                </div>
 
-        <ng-container *ngIf="activeTab === 'requests'">
-          <p class="track-label">Protocolli Diplomatici in Attesa</p>
-          <div class="build-card no-hover">
-            <div class="build-info">
-              <span class="item-name">Sincronizzazione operativa</span>
-              <span class="item-tier">Nessuna richiesta</span>
-            </div>
-            <div class="build-cost">
-              <span class="cost-unit">Le richieste arriveranno qui quando i protocolli saranno attivi.</span>
-            </div>
+                <div class="action-row alliance-action-row">
+                  <button
+                    class="primary-glow slim"
+                    *ngIf="canJoinAlliance(alliance)"
+                    [disabled]="isUpdatingAlliance"
+                    (click)="joinAlliance(alliance)">
+                    {{ isUpdatingAlliance ? 'AGGIORNAMENTO...' : 'UNISCITI' }}
+                  </button>
+                  <button
+                    class="primary-glow slim danger"
+                    *ngIf="isCurrentAlliance(alliance)"
+                    [disabled]="isUpdatingAlliance"
+                    (click)="leaveAlliance(alliance)">
+                    {{ isUpdatingAlliance ? 'AGGIORNAMENTO...' : 'LASCIA' }}
+                  </button>
+                </div>
+              </div>
+            </ng-container>
+            <ng-template #noSearchResults>
+              <div class="empty-state">Nessuna alleanza trovata con i criteri di ricerca.</div>
+            </ng-template>
           </div>
         </ng-container>
       </div>

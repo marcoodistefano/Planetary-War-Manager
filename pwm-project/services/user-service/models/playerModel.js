@@ -48,6 +48,10 @@ const buildActiveMatchesBrowser = async (U_ID) => {
       LEFT JOIN utenti u ON m.id_host = u.id_user
       WHERE substring(m.struttura_partita::text from 1 for 2) IN ('00', '01')
         AND m.id_host IS DISTINCT FROM $1
+        AND NOT EXISTS (
+          SELECT 1 FROM partecipanti_partite pp 
+          WHERE pp.partita_id = m.id_partita AND pp.user_id = $1
+        )
       ORDER BY m.created_at DESC;`,
       [U_ID],
     );
