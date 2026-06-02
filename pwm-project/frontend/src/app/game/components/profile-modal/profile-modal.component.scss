@@ -401,3 +401,11 @@
   .cost-unit { font-size: 0.8rem !important; padding: 6px 10px !important; }
   .primary-glow, .ghost-button.mini { font-size: 0.9rem; padding: 14px; }
 }
+
+.tactical-toggle {
+  --background: rgba(255, 255, 255, 0.1);
+  --background-checked: #86d7ff;
+  --handle-background: #fff;
+  --handle-background-checked: #051120;
+}
+

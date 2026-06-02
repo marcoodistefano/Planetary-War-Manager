@@ -1,15 +1,17 @@
-.compact-frame {
-  max-width: 1180px;
-  height: 82vh;
-  max-height: 760px;
-}
+@media (min-width: 1025px) {
+  .compact-frame {
+    max-width: 1180px;
+    height: 82vh;
+    max-height: 760px;
+  }
 
-.compact-sidebar {
-  width: 220px;
-}
+  .compact-sidebar {
+    width: 220px;
+  }
 
-.compact-main {
-  padding: 30px;
+  .compact-main {
+    padding: 30px;
+  }
 }
 
 .compact-content {

@@ -277,3 +277,16 @@ html, body {
 * {
   box-sizing: border-box;
 }
+
+/* Overrides per lo sfondo statico */
+body.static-bg {
+  .auth-background {
+    background-image: url('/assets/background/background.png') !important;
+    background-size: cover !important;
+    background-position: center !important;
+  }
+  .auth-background__video {
+    display: none !important;
+  }
+}
+

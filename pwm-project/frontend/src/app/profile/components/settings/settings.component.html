@@ -15,7 +15,7 @@
 
         <div class="sidebar-footer">
           <button class="exit-btn" (click)="close()">
-            <ion-icon name="close-outline" class="close-icon"></ion-icon>
+            <ion-icon name="power-outline" class="close-icon"></ion-icon>
             <span class="close-label">[ CHIUDI ]</span>
           </button>
         </div>
@@ -40,12 +40,13 @@
 
                   <div class="setting-item">
                     <label>VOLUME MASTER</label>
-                    <ion-range min="0" max="100" [(ngModel)]="settings.masterVol" class="tactical-range"></ion-range>
-                  </div>
-
-                  <div class="setting-item toggle-group">
-                    <label>SINTESI VOCALE AI</label>
-                    <ion-toggle [(ngModel)]="settings.voiceAssist" class="tactical-toggle"></ion-toggle>
+                    <div class="volume-slider-container">
+                      <ion-range min="0" max="100" [(ngModel)]="settings.masterVol" (ngModelChange)="onSettingChange()" class="tactical-range"></ion-range>
+                      <div class="volume-input-wrapper">
+                        <input type="number" min="0" max="100" [(ngModel)]="settings.masterVol" (ngModelChange)="onSettingChange()" class="tactical-volume-input">
+                        <span class="volume-percent-symbol">%</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -53,13 +54,8 @@
                   <p class="custom-label">VISUALIZZAZIONE OLOGRAFICA</p>
 
                   <div class="setting-item toggle-group">
-                    <label>EFFETTO SCANLINES</label>
-                    <ion-toggle [(ngModel)]="settings.scanlines" class="tactical-toggle"></ion-toggle>
-                  </div>
-
-                  <div class="setting-item toggle-group">
-                    <label>ANIMAZIONI BELLICHE</label>
-                    <ion-toggle [(ngModel)]="settings.animations" class="tactical-toggle"></ion-toggle>
+                    <label>SFONDO STATICO (IMMAGINE)</label>
+                    <ion-toggle [(ngModel)]="settings.isStaticBg" (ngModelChange)="onSettingChange()" class="tactical-toggle"></ion-toggle>
                   </div>
                 </div>
 

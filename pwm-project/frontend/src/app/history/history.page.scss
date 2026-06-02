@@ -569,19 +569,23 @@ ion-content {
 	}
 
 	.mission-card-extended {
-		grid-template-columns: 1fr;
+		display: flex !important;
+		flex-direction: column !important;
 		align-items: flex-start;
 		gap: 15px;
 		padding: 15px;
 
 		.card-main-info {
+			grid-column: auto !important;
 			width: 100%;
 			border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 			padding-bottom: 10px;
 		}
 
 		.card-stats-block {
-			grid-column: auto;
+			grid-column: auto !important;
+			display: flex !important;
+			flex-direction: row !important;
 			border-left: none;
 			padding-left: 0;
 			width: 100%;
@@ -591,10 +595,13 @@ ion-content {
 
 			.stat-unit {
 				align-items: flex-start;
+				flex: 1 1 auto;
+				min-width: 80px;
 			}
 		}
 
 		.card-actions {
+			grid-column: auto !important;
 			width: 100%;
 
 			button {

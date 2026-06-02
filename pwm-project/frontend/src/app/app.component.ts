@@ -1,9 +1,10 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { AuthApiService } from './auth/auth-api.service';
 import { isPublicAuthRoute } from './auth/auth-route.config';
 import { NavigationEnd, Router } from '@angular/router';
 import { fromEvent, merge, of, Subscription } from 'rxjs';
 import { catchError, filter, take } from 'rxjs/operators';
+import { UserStateService } from './user-state.service';
 
 @Component({
   selector: 'app-root',
@@ -15,18 +16,21 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   isGameRoute = false;
   private audioRef?: ElementRef<HTMLAudioElement>;
   private audioUnlockSub?: Subscription;
+  private settingsSub?: Subscription;
 
   @ViewChild('bgAudio')
   set bgAudioRef(ref: ElementRef<HTMLAudioElement> | undefined) {
     this.audioRef = ref;
     if (ref && !this.isGameRoute) {
       this.ensureAudioPlayback();
+      this.updateAudioVolume();
     }
   }
 
   constructor(
     private router: Router,
     private authApi: AuthApiService,
+    private userState: UserStateService,
   ) {
     this.isGameRoute = this.isGameUrl(this.router.url);
     this.router.events
@@ -38,6 +42,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
           this.pauseAudio();
         } else {
           this.ensureAudioPlayback();
+          this.updateAudioVolume();
         }
       });
 
@@ -46,19 +51,26 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       .subscribe(() => {
         this.checkSessionOnBoot();
       });
+
+    this.settingsSub = this.userState.settings$.subscribe(() => {
+      this.updateAudioVolume();
+    });
   }
 
   ngAfterViewInit() {
     this.ensureAudioPlayback();
+    this.updateAudioVolume();
   }
 
   ngOnDestroy() {
     this.audioUnlockSub?.unsubscribe();
+    this.settingsSub?.unsubscribe();
   }
 
   private isGameUrl(url: string): boolean {
     return url.startsWith('/game');
   }
+
 
   private checkSessionOnBoot() {
     if (isPublicAuthRoute(this.router.url)) {
@@ -120,5 +132,15 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       return;
     }
     audio.pause();
+  }
+
+  private updateAudioVolume() {
+    const audio = this.audioRef?.nativeElement;
+    if (!audio) {
+      return;
+    }
+    const settings = this.userState.getSettings();
+    // Music volume is calculated by multiplying Master Volume * Music Volume
+    audio.volume = (settings.masterVol / 100) * (settings.musicVol / 100);
   }
 }

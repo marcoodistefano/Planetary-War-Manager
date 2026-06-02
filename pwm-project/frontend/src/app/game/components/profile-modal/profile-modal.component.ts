@@ -1,8 +1,10 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { Router } from '@angular/router';
+import { UserStateService, AppSettings } from '../../../user-state.service';
+import { Subscription } from 'rxjs';
 
 const AVATAR_ASSET_VERSION = '20260517';
 
@@ -13,7 +15,7 @@ const AVATAR_ASSET_VERSION = '20260517';
   standalone: true,
   imports: [CommonModule, FormsModule, IonicModule]
 })
-export class ProfileModalComponent {
+export class ProfileModalComponent implements OnInit, OnDestroy {
   @Input() profile: any = {
     username: 'Caricamento...',
     rank: 'COMANDANTE SUPREMO',
@@ -28,8 +30,33 @@ export class ProfileModalComponent {
   @Output() close = new EventEmitter<void>();
 
   activeTab: 'profile' | 'settings' = 'profile';
+  settings!: AppSettings;
+  private settingsSub?: Subscription;
 
-  constructor(private router: Router) {}
+  constructor(
+    private router: Router,
+    private userState: UserStateService
+  ) {}
+
+  ngOnInit() {
+    this.settingsSub = this.userState.settings$.subscribe((settings: AppSettings) => {
+      this.settings = { ...settings };
+      // Fallback binding for audioSettings to support any legacy bindings or visual parts
+      this.audioSettings.music = this.settings.musicVol;
+      this.audioSettings.sfx = this.settings.sfxVol;
+    });
+  }
+
+  ngOnDestroy() {
+    this.settingsSub?.unsubscribe();
+  }
+
+  onSettingChange() {
+    // Sincronizza i cambiamenti delle impostazioni
+    this.settings.musicVol = this.audioSettings.music;
+    this.settings.sfxVol = this.audioSettings.sfx;
+    this.userState.updateSettings(this.settings);
+  }
 
   setTab(tab: 'profile' | 'settings') {
     this.activeTab = tab;

@@ -93,7 +93,7 @@
             <div class="control-row">
               <div class="c-label">MUSICA DI SOTTOFONDO</div>
               <div class="c-input">
-                <input type="range" [(ngModel)]="audioSettings.music" class="tactical-slider">
+                <input type="range" [(ngModel)]="audioSettings.music" (ngModelChange)="onSettingChange()" class="tactical-slider">
                 <span class="c-val">{{ audioSettings.music }}%</span>
               </div>
             </div>
@@ -101,8 +101,22 @@
             <div class="control-row">
               <div class="c-label">EFFETTI SONORI (SFX)</div>
               <div class="c-input">
-                <input type="range" [(ngModel)]="audioSettings.sfx" class="tactical-slider">
+                <input type="range" [(ngModel)]="audioSettings.sfx" (ngModelChange)="onSettingChange()" class="tactical-slider">
                 <span class="c-val">{{ audioSettings.sfx }}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-divider">
+            <span class="divider-text">VISUALIZZAZIONE OLOGRAFICA</span>
+          </div>
+
+          <div class="settings-stack">
+            <div class="control-row">
+              <div class="c-label">SFONDO STATICO (IMMAGINE)</div>
+              <div class="c-input" style="justify-content: space-between;">
+                <span class="c-val" style="text-align: left; width: auto; font-family: inherit;">ATTIVA SFONDO FISSO</span>
+                <ion-toggle [(ngModel)]="settings.isStaticBg" (ngModelChange)="onSettingChange()" class="tactical-toggle"></ion-toggle>
               </div>
             </div>
           </div>

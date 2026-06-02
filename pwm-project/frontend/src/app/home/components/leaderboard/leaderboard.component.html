@@ -10,14 +10,12 @@
         <div class="nav-item active">
           <ion-icon name="trophy-outline"></ion-icon><span>CLASSIFICHE</span>
         </div>
-        <div class="nav-item disabled">
-          <ion-icon name="globe-outline"></ion-icon><span>DATI</span>
-        </div>
       </nav>
 
       <div class="sidebar-footer">
         <button class="exit-btn" (click)="close()">
-          <ion-icon name="power-outline"></ion-icon> <span>[ CHIUDI ]</span>
+          <ion-icon name="power-outline" class="close-icon"></ion-icon>
+          <span class="close-label">[ CHIUDI ]</span>
         </button>
       </div>
     </div>
@@ -30,12 +28,14 @@
 
       <div class="leaderboard-toggle">
         <button [class.active]="currentView === 'global'" (click)="switchView('global')">GLOBALE</button>
-        <button [class.active]="currentView === 'regional'" (click)="switchView('regional')">{{ dynamicRegionalLabel }}</button>
+        <button [class.active]="currentView === 'regional'" (click)="switchView('regional')">{{ dynamicRegionalLabel
+          }}</button>
       </div>
 
       <div class="leaderboard-scroll-container">
         <div class="leaderboard-list">
-          <div class="leaderboard-entry" *ngFor="let player of leaderboard" [class.highlight]="player.player === loggedInPlayer">
+          <div class="leaderboard-entry" *ngFor="let player of leaderboard"
+            [class.highlight]="player.player === loggedInPlayer">
             <span class="rank">#{{ player.rank }}</span>
             <span class="flag">{{ flagEmoji(player.region) }}</span>
             <span class="name">{{ player.player }}</span>

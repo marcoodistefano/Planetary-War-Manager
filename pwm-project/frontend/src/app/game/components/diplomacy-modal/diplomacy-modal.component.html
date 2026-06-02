@@ -72,6 +72,8 @@
             <div class="hud-separator"></div>
 
             <p class="section-label">ALLEANZE NEL MATCH</p>
+            <div class="status-msg success" *ngIf="allianceActionSuccess" style="margin-bottom: 10px;">{{ allianceActionSuccess }}</div>
+            <div class="status-msg error" *ngIf="allianceActionError" style="margin-bottom: 10px;">{{ allianceActionError }}</div>
             <div class="build-card no-hover alliance-card" *ngFor="let alliance of alliances">
               <div class="build-info">
                 <span class="item-name">{{ alliance.nome_alleanza }}</span>
@@ -159,6 +161,8 @@
           </div>
           
           <div class="search-results scrollable-y" style="margin-top: 20px;">
+            <div class="status-msg success" *ngIf="allianceActionSuccess" style="margin-bottom: 10px;">{{ allianceActionSuccess }}</div>
+            <div class="status-msg error" *ngIf="allianceActionError" style="margin-bottom: 10px;">{{ allianceActionError }}</div>
             <ng-container *ngIf="filteredAlliances.length; else noSearchResults">
               <div class="build-card no-hover alliance-card" *ngFor="let alliance of filteredAlliances">
                 <div class="build-info">
