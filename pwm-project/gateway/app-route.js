@@ -126,11 +126,11 @@ const isPublicPath = (pathname) => {
   return false;
 };
 
-// Controlla ESATTAMENTE le 3 rotte che hai richiesto per i WebSocket
 const isWebSocketRoute = (pathname) => {
   if (pathname.startsWith("/chat")) return true;
   if (pathname.startsWith("/movement")) return true;
   if (pathname.startsWith("/combat")) return true;
+  if (pathname.startsWith("/match")) return true;
   return false;
 };
 
@@ -220,8 +220,9 @@ const validateSessionToken = async (token) => {
   // 3. Verifica esistenza nel Database Redis
   const sessionKey = "session:" + sessionId;
   const sessionDataString = await redisClient.get(sessionKey);
-
+  
   if (!sessionDataString) {
+    console.log(`[DEBUG WS AUTH] Session data string is null for sessionKey: ${sessionKey}`);
     return { ok: false, status: 401, error: "Sessione terminata o non valida" };
   }
 
@@ -525,6 +526,7 @@ server.on("upgrade", async (req, socket, head) => {
 
   // 3. Validazione Sicurezza (Il JWT deve essere valido prima di aprire il tunnel)
   const token = extractTokenFromRequest(req);
+  console.log(`[DEBUG WS UPGRADE] Path: ${pathname}, Extracted Token: ${token ? token.substring(0, 20) + '...' : 'NULL'}`);
   const validation = await validateSessionToken(token);
 
   if (validation.ok === false) {
@@ -540,10 +542,9 @@ server.on("upgrade", async (req, socket, head) => {
   // 4. Determinazione del target basato sul path
   let targetBaseUrlStr = null;
   if (pathname.startsWith("/chat")) targetBaseUrlStr = SERVICE_TARGETS.chat;
-  else if (pathname.startsWith("/movement"))
-    targetBaseUrlStr = SERVICE_TARGETS.movement;
-  else if (pathname.startsWith("/combat"))
-    targetBaseUrlStr = SERVICE_TARGETS.combat;
+  else if (pathname.startsWith("/movement")) targetBaseUrlStr = SERVICE_TARGETS.movement;
+  else if (pathname.startsWith("/combat")) targetBaseUrlStr = SERVICE_TARGETS.combat;
+  else if (pathname.startsWith("/match")) targetBaseUrlStr = SERVICE_TARGETS.match;
 
   if (!targetBaseUrlStr) {
     return rejectUpgrade(

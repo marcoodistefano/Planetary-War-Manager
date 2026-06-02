@@ -20,7 +20,6 @@ import { ArmyModalComponent } from '../components/army-modal/army-modal.componen
 // Librerie esterne caricate via CDN o definite globalmente
 declare var maplibregl: any;
 declare var topojson: any;
-declare var io: any;
 declare var THREE: any;
 
 const AVATAR_ASSET_VERSION = '20260517';
@@ -53,7 +52,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   currentHoveredName = '';
   selectedPointName = '';
   selectedPointCoords = '--';
-  sensorSocket: any;
+  
+  // WebSocket State
+  matchSocket?: WebSocket;
+  private reconnectTimer?: number;
+  private shouldReconnect = true;
+
   private touchTimer: any;
   private avatarSub?: Subscription;
   isTouchLayout = false;
@@ -75,6 +79,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   troopsDropdownX = 0;
   troopsDropdownY = 0;
   matchArmies: any[] = [];
+  armyMarkers = new Map<string, any>(); // <--- AGGIUNTO: per tenere traccia dei marker
   chatUnreadCount = 0;
   currentMatchId = '';
   matchPlayers: string[] = [];
@@ -187,9 +192,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       };
       this.cdr.detectChanges();
     });
-    // Connect Socket.IO through gateway (explicit origin + path)
-    this.sensorSocket = io(window.location.origin, { path: '/socket.io', auth: { token: localStorage.getItem('jwt') || "IL_TUO_JWT_TOKEN" } });
-    this.sensorSocket.on('point_data', (data: any) => this.handlePointData(data));
+
+    if (this.currentMatchId) {
+      this.connectMatchSocket();
+    }
+
     window.addEventListener('click', () => {
       if (this.isRadialMenuVisible) {
         this.isRadialMenuVisible = false;
@@ -204,6 +211,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.shouldReconnect = false;
+    if (this.reconnectTimer) {
+      window.clearTimeout(this.reconnectTimer);
+    }
+    this.matchSocket?.close();
+
     if (this.avatarSub) {
       this.avatarSub.unsubscribe();
     }
@@ -213,6 +226,92 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.loadGameRules();
     this.loadUserProfile();
     this.loadMatchContext();
+    this.preloadTroopImages();
+  }
+
+  private preloadTroopImages() {
+    const images = ['soldier_front.png', 'soldier_back.png', 'soldier_side.png'];
+    images.forEach(img => {
+      const i = new Image();
+      i.src = `/assets/2Dmodels/Land_troops/Soldier/${img}`;
+    });
+  }
+
+  private getGatewayWsBaseUrl(): string {
+    // Ritorna ws://localhost:4000
+    return window.location.origin.replace(/^http(s?):\/\//i, 'ws$1://');
+  }
+
+  private connectMatchSocket() {
+    if (!this.currentMatchId) return;
+
+    const wsBaseUrl = this.getGatewayWsBaseUrl();
+    const wsUrl = `${wsBaseUrl}/match/${encodeURIComponent(this.currentMatchId)}`;
+
+    try {
+      console.log(`[WS_MATCH] Tentativo di connessione a ${wsUrl}`);
+      this.matchSocket = new WebSocket(wsUrl);
+
+      this.matchSocket.onopen = () => {
+        console.log('[WS_MATCH] Connessione al server di gioco stabilita.');
+        this.matchSocket?.send(JSON.stringify({ action: 'GET_INITIAL_STATE' }));
+        this.cdr.detectChanges();
+      };
+
+      this.matchSocket.onmessage = (event) => {
+        let parsed;
+        try {
+          parsed = JSON.parse(event.data);
+        } catch (e) {
+          return;
+        }
+
+        console.log('[WS_MATCH] Evento ricevuoto:', parsed);
+
+        if (parsed.type === 'INITIAL_STATE' && parsed.payload?.armies) {
+          this.matchArmies = parsed.payload.armies;
+          this.renderArmies();
+          this.cdr.detectChanges();
+        }
+
+        if (parsed.type === 'TROOPS_MOVED') {
+          const { armyId, targetName, targetCoords, etaMs } = parsed.data;
+          const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
+          if (armyIndex !== -1) {
+            this.matchArmies[armyIndex].status = 'moving';
+            this.matchArmies[armyIndex].targetName = targetName;
+            this.matchArmies[armyIndex].targetCoords = targetCoords;
+          }
+          console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
+          this.renderArmies();
+          this.cdr.detectChanges();
+        }
+
+        if (parsed.type === 'TROOPS_SPAWNED') {
+          const { userId, army } = parsed.data;
+          // In the future, we could check if userId matches local user. 
+          // For now, we append it to matchArmies so it renders on map.
+          this.matchArmies.push(army);
+          console.log(`[WS_MATCH] Nuova truppa generata a Palermo per l'utente ${userId}!`);
+          this.renderArmies();
+          this.cdr.detectChanges();
+        }
+      };
+
+      this.matchSocket.onerror = (error) => {
+        console.error('[WS_MATCH] Errore di connessione:', error);
+      };
+
+      this.matchSocket.onclose = (event) => {
+        console.log('[WS_MATCH] Connessione chiusa', event.code, event.reason);
+        if (this.shouldReconnect) {
+          console.log('[WS_MATCH] Riconnessione in corso tra 3 secondi...');
+          this.reconnectTimer = window.setTimeout(() => this.connectMatchSocket(), 3000);
+        }
+      };
+    } catch (error) {
+      console.error('[WS_MATCH] Eccezione durante la connessione:', error);
+    }
   }
 
   private loadMatchContext() {
@@ -587,6 +686,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
       this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
       this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 24);
+      
+      // Assicuriamoci di renderizzare eventuali armate ricevute via WS prima del caricamento mappa
+      this.renderArmies();
     });
 
     this.map.on('touchstart', (e: any) => {
@@ -643,9 +745,147 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.closeTroopsDropdownOnInteraction();
     });
 
+    this.map.on('zoom', () => {
+      this.updateArmyMarkersScale();
+    });
+
     this.map.on('movestart', () => {
       this.closeRadialOnInteraction();
       this.closeTroopsDropdownOnInteraction();
+    });
+  }
+
+  // --- RENDERING ARMATE SU MAPPA ---
+  renderArmies() {
+    console.log('[DEBUG_MAP] renderArmies richiamato. Mappa pronta?', !!this.map, 'Armate in memoria:', this.matchArmies.length);
+    if (!this.map) return;
+    
+    // Rimuoviamo i marker non più presenti
+    const currentArmyIds = new Set(this.matchArmies.map(a => a.id));
+    for (const [id, marker] of this.armyMarkers.entries()) {
+      if (!currentArmyIds.has(id)) {
+        marker.remove();
+        this.armyMarkers.delete(id);
+      }
+    }
+
+    // Aggiungiamo o aggiorniamo i marker
+    this.matchArmies.forEach(army => {
+      if (!army.currentLocation) return;
+      
+      const coords = army.currentLocation.split(',').map((c: string) => parseFloat(c.trim()));
+      if (coords.length !== 2) return;
+
+      console.log(`[DEBUG_MAP] Rendering marker per armata ${army.id} a coordinate:`, coords);
+
+      if (this.armyMarkers.has(army.id)) {
+        // Aggiorna posizione se necessario
+        const marker = this.armyMarkers.get(army.id);
+        marker.setLngLat([coords[0], coords[1]]);
+        
+        // Aggiorna il numero di truppe
+        const totalTroops = (Object.values(army.composition || {}) as number[]).reduce((a, b) => a + b, 0) as number;
+        const badgeEl = marker.getElement().querySelector('.army-badge') as HTMLElement;
+        if (badgeEl) badgeEl.innerText = String(totalTroops);
+        
+      } else {
+        // Crea nuovo marker come contenitore
+        const el = document.createElement('div');
+        el.className = 'army-marker';
+        // Le dimensioni vengono impostate e aggiornate in updateArmyMarkersScale
+        el.style.display = 'flex';
+        el.style.justifyContent = 'center';
+        el.style.alignItems = 'flex-end';
+        el.style.cursor = 'pointer';
+        el.style.zIndex = '999';
+        el.style.position = 'relative'; 
+        el.title = army.name;
+        
+        const totalTroops = (Object.values(army.composition || {}) as number[]).reduce((a, b) => a + b, 0) as number;
+
+        // Div per l'immagine del soldato (visibile quando zoomato)
+        const imgDiv = document.createElement('div');
+        imgDiv.className = 'army-image';
+        imgDiv.style.width = '100%';
+        imgDiv.style.height = '100%';
+        imgDiv.style.backgroundImage = 'url(/assets/2Dmodels/Land_troops/Soldier/soldier_front.png)';
+        imgDiv.style.backgroundSize = 'contain';
+        imgDiv.style.backgroundRepeat = 'no-repeat';
+        imgDiv.style.backgroundPosition = 'center bottom';
+        
+        // Div per il badge/banner numerico (visibile quando de-zoomato, o insieme al soldato)
+        const badgeDiv = document.createElement('div');
+        badgeDiv.className = 'army-badge';
+        badgeDiv.innerText = String(totalTroops);
+        badgeDiv.style.backgroundColor = '#e5e7eb'; // Grigio chiaro
+        badgeDiv.style.color = '#1f2937'; // Testo scuro
+        badgeDiv.style.borderRadius = '4px'; // Quadrato con bordi arrotondati
+        badgeDiv.style.width = '100%';
+        badgeDiv.style.height = '100%';
+        badgeDiv.style.padding = '0';
+        badgeDiv.style.display = 'flex';
+        badgeDiv.style.alignItems = 'center';
+        badgeDiv.style.justifyContent = 'center';
+        badgeDiv.style.fontSize = '11px';
+        badgeDiv.style.fontWeight = 'bold';
+        badgeDiv.style.border = '1px solid #9ca3af'; // Bordino grigio scuro
+        badgeDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+        badgeDiv.style.position = 'absolute';
+        
+        el.appendChild(imgDiv);
+        el.appendChild(badgeDiv);
+
+        // Centriamo il marker (anchor = bottom per far coincidere la base alla coordinata)
+        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([coords[0], coords[1]])
+          .addTo(this.map);
+          
+        this.armyMarkers.set(army.id, marker);
+      }
+    });
+    
+    // Aggiorniamo la visibilità subito dopo il render
+    this.updateArmyMarkersScale();
+  }
+
+  // Modifica visibilità in base allo zoom
+  updateArmyMarkersScale() {
+    if (!this.map) return;
+    const currentZoom = this.map.getZoom();
+    const thresholdZoom = 5.5; // Sotto questo livello, mostra solo il badge
+
+    this.armyMarkers.forEach(marker => {
+      const el = marker.getElement();
+      const imgDiv = el.querySelector('.army-image') as HTMLElement;
+      const badgeDiv = el.querySelector('.army-badge') as HTMLElement;
+      
+      if (!imgDiv || !badgeDiv) return;
+
+      if (currentZoom < thresholdZoom) {
+        // Nascondi l'avatar, mostra SOLO il badge al centro
+        el.style.width = '22px';
+        el.style.height = '22px';
+        imgDiv.style.display = 'none';
+        badgeDiv.style.display = 'flex';
+        badgeDiv.style.position = 'relative';
+        badgeDiv.style.bottom = 'auto';
+        badgeDiv.style.left = 'auto';
+        badgeDiv.style.transform = 'none';
+      } else {
+        // Calcoliamo una scala dinamica per l'avatar basata sullo zoom
+        // Esempio: min size 32px (a zoom 5.5), max size 80px (a zoom 10+)
+        const minSize = 32;
+        const maxSize = 80;
+        const scaleFactor = Math.min(Math.max((currentZoom - thresholdZoom) / (10 - thresholdZoom), 0), 1);
+        const dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
+        
+        el.style.width = `${dynamicSize}px`;
+        el.style.height = `${dynamicSize}px`;
+        
+        // Mostra SOLO l'avatar, nascondi completamente il badge
+        imgDiv.style.display = 'block';
+        badgeDiv.style.display = 'none';
+      }
     });
   }
 
@@ -849,6 +1089,31 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   onArmyMissionRequested(event: any) {
     console.log('Ordine armata emesso:', event);
+    if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
+      this.matchSocket.send(JSON.stringify({
+        action: 'MOVE_TROOPS',
+        payload: {
+          armyId: event.armyId,
+          mode: event.mode,
+          targetName: event.targetName,
+          targetCoords: event.targetCoords,
+          composition: event.composition
+        }
+      }));
+    } else {
+      console.error("WebSocket non connesso");
+    }
+  }
+
+  saveArmiesToBackend() {
+    if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
+      this.matchSocket.send(JSON.stringify({
+        action: 'SAVE_ARMIES',
+        payload: {
+          armies: this.matchArmies
+        }
+      }));
+    }
   }
 
   // Chiude il menu se si clicca altrove col tasto sinistro
@@ -865,8 +1130,6 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private updatePointReadout(e: any, persistSelection: boolean) {
-    this.sensorSocket.emit('query_point', { lng: e.lngLat.lng, lat: e.lngLat.lat });
-
     const coordsText = this.formatMapCoordinates(e.lngLat.lng, e.lngLat.lat);
     const outCoords = document.getElementById('out-coords');
     if (outCoords) outCoords.innerText = coordsText;
@@ -959,11 +1222,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     fetch(fetchUrl).then(res => res.json()).then(topology => {
       let allFeatures: any[] = [];
       const featureMap = new Map<string, any>();
-      
+
       Object.keys(topology.objects).forEach(objKey => {
         const geoData: any = topojson.feature(topology, topology.objects[objKey]);
         const features = geoData?.features || (geoData?.type === 'Feature' ? [geoData] : []);
-        
+
         features.forEach((f: any) => {
           const id = f.properties?.id || f.id;
           if (id) {
@@ -973,7 +1236,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
         });
       });
-      
+
       allFeatures = allFeatures.concat(Array.from(featureMap.values()));
       const mergedGeoData = { type: 'FeatureCollection', features: allFeatures };
       this.map.addSource(sourceId, { type: 'geojson', data: mergedGeoData, generateId: true });
@@ -986,10 +1249,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       });
       this.map.addLayer({
         id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-        paint: { 
-          'line-color': '#ff6b6b', 
-          'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.6, 6, 2.0, 10, 3.6], 
-          'line-opacity': 0.9 
+        paint: {
+          'line-color': '#ff6b6b',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.6, 6, 2.0, 10, 3.6],
+          'line-opacity': 0.9
         }
       });
     });

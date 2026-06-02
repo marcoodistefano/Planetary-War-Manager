@@ -306,7 +306,8 @@
       [selectedTargetCoords]="selectedPointCoords" 
       [initialTab]="armyModalInitialTab"
       (playerTroopsChange)="playerTroops = $event"
-      (armiesChange)="matchArmies = $event"
+      (armiesChange)="matchArmies = $event; saveArmiesToBackend()"
+      (missionRequested)="onArmyMissionRequested($event)"
       (close)="isArmyModalOpen = false"> 
     </app-army-modal>
 

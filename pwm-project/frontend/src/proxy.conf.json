@@ -12,7 +12,8 @@
   "/match": {
     "target": "http://app-route:3001",
     "secure": false,
-    "changeOrigin": true
+    "changeOrigin": true,
+    "ws": true
   },
   "/chat": {
     "target": "http://app-route:3001",

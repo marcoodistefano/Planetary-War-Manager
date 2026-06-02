@@ -1508,7 +1508,37 @@ const kickAlliance = async (
   }
 };
 
+const authorizeWsConnection = async ({ userId, matchId }) => {
+  try {
+    if (!userId || !matchId) {
+      return { ok: false, status: 400, error: "Dati mancanti per l'autorizzazione" };
+    }
+
+    const resolvedMatch = await resolveMatchState(matchId);
+    if (!resolvedMatch) {
+      return { ok: false, status: 404, error: "Partita non trovata" };
+    }
+
+    const internalMatchId = resolvedMatch.state.id_partita;
+
+    const { rows } = await db.query(
+      `SELECT 1 FROM partecipanti_partite WHERE partita_id = $1 AND user_id = $2`,
+      [internalMatchId, userId]
+    );
+
+    if (rows.length === 0) {
+      return { ok: false, status: 403, error: "Utente non autorizzato ad accedere a questa partita" };
+    }
+
+    return { ok: true, matchId: resolvedMatch.state.id_partita_hash };
+  } catch (error) {
+    console.error("[SYS_ERR] authorizeWsConnection:", error);
+    return { ok: false, status: 500, error: "Errore interno autorizzazione WS" };
+  }
+};
+
 module.exports = {
+  authorizeWsConnection,
   createMatch,
   join_Match,
   listJoinableMatches,
