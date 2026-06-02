@@ -936,7 +936,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadTopoJsonLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
-    fetch(url).then(res => res.json()).then(topology => {
+    const fetchUrl = `${url}?v=${new Date().getTime()}`;
+    fetch(fetchUrl).then(res => res.json()).then(topology => {
       const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
       this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
       this.map.addLayer({
@@ -954,9 +955,28 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadTopoJsonArchsLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
-    fetch(url).then(res => res.json()).then(topology => {
-      const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
-      this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
+    const fetchUrl = `${url}?v=${new Date().getTime()}`;
+    fetch(fetchUrl).then(res => res.json()).then(topology => {
+      let allFeatures: any[] = [];
+      const featureMap = new Map<string, any>();
+      
+      Object.keys(topology.objects).forEach(objKey => {
+        const geoData: any = topojson.feature(topology, topology.objects[objKey]);
+        const features = geoData?.features || (geoData?.type === 'Feature' ? [geoData] : []);
+        
+        features.forEach((f: any) => {
+          const id = f.properties?.id || f.id;
+          if (id) {
+            featureMap.set(id, f);
+          } else {
+            allFeatures.push(f);
+          }
+        });
+      });
+      
+      allFeatures = allFeatures.concat(Array.from(featureMap.values()));
+      const mergedGeoData = { type: 'FeatureCollection', features: allFeatures };
+      this.map.addSource(sourceId, { type: 'geojson', data: mergedGeoData, generateId: true });
       this.map.addLayer({
         id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
         paint: {
@@ -966,13 +986,18 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       });
       this.map.addLayer({
         id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-        paint: { 'line-color': '#000000', 'line-width': 1, 'line-opacity': 0.5 }
+        paint: { 
+          'line-color': '#ff6b6b', 
+          'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.6, 6, 2.0, 10, 3.6], 
+          'line-opacity': 0.9 
+        }
       });
     });
   }
 
   loadTopoJsonCitiesLayer(url: string, sourceId: string, pointsLayerId: string, labelsLayerId: string, minZ: number, maxZ: number) {
-    fetch(url).then(res => res.json()).then(topology => {
+    const fetchUrl = `${url}?v=${new Date().getTime()}`;
+    fetch(fetchUrl).then(res => res.json()).then(topology => {
       const objectName = Object.keys(topology.objects || {})[0];
       if (!objectName) {
         return;

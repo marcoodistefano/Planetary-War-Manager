@@ -1,0 +1,50 @@
+path9630 - Albuquerque to Dallas
+path9631 - Sinkiang to Gov'-Altaj
+path9632 - Manaus to Amazonas
+path9633 - Billings to Sioux Falls
+path9634 - Buriazia to Kyzyl
+path9635 - Sinkiang to Kashmir
+path9636 - Albuquerque to Tulsa
+path9637 - Boise to Cheyenne
+path9638 - Kimberley to Rehoboth
+path9639 - Mongolia Interna to Ningsia
+path9640 - Santa Cruz to Porto Velho
+path9641 - Tibesti to Agadez
+path9642 - Marzuq to Arak
+path9643 - Agadez to Arak
+path9644 - Dallas to Torreón
+path9645 - Cuiabá to Palmas
+path9646 - Raleigh to Memphis
+path9647 - Mangyshlak to Aqtobe
+path9648 - Bariloche to Buenos Aires
+path9649 - Vancouver to Boise
+path9650 - Minneapolis to Toronto
+path9651 - Porto Velho to Cuiabá
+path9652 - Rio Branco to Manaus
+path9653 - Vancouver to Billings
+path9654 - Adelaide to Sydney
+path9655 - Dammam to Najran
+path9656 - Manaus to Inírida
+path9657 - Tyumen to Tomsk
+path9658 - Territorio di Krasnojarsk to degli Chanty-Mansi-Jugra
+path9659 - Dallas to Tampico
+path9660 - Portland to Las Vegas
+path9661 - Territorio della Transbajkalia to Harbin
+path9662 - Gov'-Altaj to Lanzhou
+path9663 - Manaus to Mitú
+path9664 - Calgary to Yellowknife
+path9665 - Virginia Beach to Memphis
+path9666 - Territorio di Krasnojarsk to Chakassia
+path9667 - Territorio di Krasnojarsk to Novokuznetsk
+path9668 - Manaus to dipartimento di Amazonas
+path9669 - Los Angeles to Portland
+path9670 - Adrar to Zouirat
+path9671 - Toronto to Québec
+path9672 - Manaus to Cuiabá
+path9673 - Territorio di Krasnojarsk to Irkutsk
+path9674 - Winnipeg to Toronto
+path9675 - della Čukotka to Sacha-Jacuzia
+path9676 - Blagoveshchensk to Sacha-Jacuzia
+path9677 - Sacha-Jacuzia to Territorio di Krasnojarsk
+path9678 - Winnipeg to Nunavut
+path9679 - Sacha-Jacuzia to Irkutsk
