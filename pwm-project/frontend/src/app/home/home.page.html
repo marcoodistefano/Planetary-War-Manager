@@ -206,6 +206,11 @@
               </div>
               <button type="button" class="join-button transparent-element" (click)="joinNewGame(game)">Partecipa</button>
             </article>
+            <div *ngIf="filteredNewGames.length === 0" class="no-games-state">
+              <ion-icon name="planet-outline"></ion-icon>
+              <p>Nessuna partita disponibile</p>
+              <small>Le nuove partite apparse qui non ti vedono ancora come partecipante</small>
+            </div>
           </div>
         </section>
       </div>

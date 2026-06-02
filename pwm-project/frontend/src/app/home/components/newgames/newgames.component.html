@@ -10,9 +10,6 @@
         <div class="nav-item active">
           <ion-icon name="search-outline"></ion-icon><span>RICERCA</span>
         </div>
-        <div class="nav-item disabled">
-          <ion-icon name="funnel-outline"></ion-icon><span>ORDINAMENTO</span>
-        </div>
       </nav>
 
       <div class="sidebar-footer">
@@ -30,11 +27,7 @@
       </div>
 
       <div class="search-container">
-        <input 
-          type="text" 
-          class="tactical-input" 
-          placeholder="Cerca missione o creatore..." 
-          (input)="filter($event)">
+        <input type="text" class="tactical-input" placeholder="Cerca missione o creatore..." (input)="filter($event)">
       </div>
 
       <div class="sort-bar">
@@ -54,11 +47,13 @@
           <div class="game-card" *ngFor="let game of filteredGames">
             <div class="game-info">
               <h3>{{ game.name }}</h3>
-              <div class="meta">{{ game.playersLabel || game.players }} · CREATA DA {{ (game.creatorDisplayName || game.creator) | uppercase }} · {{ game.timeCreatedFormatted || game.timeCreated }}<ng-container *ngIf="game.regionPlayable"> · REGIONI: {{ game.regionPlayable }}</ng-container></div>
+              <div class="meta">{{ game.playersLabel || game.players }} · CREATA DA {{ (game.creatorDisplayName ||
+                game.creator) | uppercase }} · {{ game.timeCreatedFormatted || game.timeCreated }}<ng-container
+                  *ngIf="game.regionPlayable"> · REGIONI: {{ game.regionPlayable }}</ng-container></div>
             </div>
             <button class="join-button">PARTECIPA</button>
           </div>
-          
+
           <div *ngIf="filteredGames.length === 0" class="no-results">
             [ NESSUN CONFLITTO TROVATO ]
           </div>

@@ -658,6 +658,40 @@ ion-content {
   .meta { color: rgba(244, 247, 251, 0.72); font-size: 0.6rem; margin-top: 2px; line-height: 1.2; }
 }
 
+.no-games-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 6px;
+  padding: 20px 12px;
+  text-align: center;
+  color: rgba(134, 215, 255, 0.5);
+
+  ion-icon {
+    font-size: 2rem;
+    opacity: 0.6;
+    filter: drop-shadow(0 0 6px rgba(134, 215, 255, 0.3));
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: rgba(244, 247, 251, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  small {
+    font-size: 0.6rem;
+    color: rgba(134, 215, 255, 0.4);
+    line-height: 1.4;
+    max-width: 200px;
+  }
+}
+
 .status-badge { 
   padding: 3px 6px; 
   font-size: 0.6rem; /* Badge più piccolo */
