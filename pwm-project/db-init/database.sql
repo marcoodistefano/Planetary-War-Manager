@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS utenti (
     two_fa_enabled BOOLEAN DEFAULT FALSE,
     is_banned BOOLEAN DEFAULT FALSE,
     is_perma_banned BOOLEAN DEFAULT FALSE,
-    codice_amico VARCHAR(10) UNIQUE DEFAULT uuid_generate_v4(),
+    codice_amico VARCHAR(10) UNIQUE DEFAULT uuid_generate_v4()
 );
 
 CREATE TABLE IF NOT EXISTS richieste_amici (
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS ban (
 );
 
 --1.3 OBBIETTIVI
-CREATE TABLE IF NOT EXISTS obbiettivi (
+CREATE TABLE IF NOT EXISTS obiettivi (
     id_obbiettivo UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nome_obbiettivo VARCHAR(32) NOT NULL,
     descrizione TEXT,
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS obbiettivi (
 );
 
 --1.4 OBBIETTIVI_UTENTE
-CREATE TABLE IF NOT EXISTS obbiettivi_utente (
+CREATE TABLE IF NOT EXISTS obiettivi_utente (
     id_obbiettivo_utente UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     id_user UUID NOT NULL,
     id_obbiettivo UUID NOT NULL,
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS obbiettivi_utente (
     progress REAL DEFAULT 0.00, --es. {"conquista": 3, "distruzione": 1}
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_user_obbiettivo FOREIGN KEY (id_user) REFERENCES utenti(id_user) ON DELETE CASCADE,
-    CONSTRAINT fk_obbiettivo FOREIGN KEY (id_obbiettivo) REFERENCES obbiettivi(id_obbiettivo) ON DELETE CASCADE
+    CONSTRAINT fk_obbiettivo FOREIGN KEY (id_obbiettivo) REFERENCES obiettivi(id_obbiettivo) ON DELETE CASCADE
 );
 -- 2. ACCESSI
 CREATE TABLE IF NOT EXISTS accessi (
@@ -129,7 +129,9 @@ CREATE TABLE IF NOT EXISTS partite (
     -- moltiplicatore VARCHAR(10),
     -- regioni_giocabili VARCHAR(16),
     -- stato VARCHAR(20),
-    struttura_partita BIT(56) DEFAULT B'00000000000000000000000000000000000000000000000000000000', 
+    struttura_partita BIT(56) DEFAULT B'00000000000000000000000000000000000000000000000000000000',
+    max_partecipants_alleances INT DEFAULT 2,
+    tempo_start TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_host FOREIGN KEY (id_host) REFERENCES utenti(id_user)
 );
 
@@ -200,7 +202,7 @@ CREATE TABLE IF NOT EXISTS storico_partecipanti_partite (
     truppe_eliminate INT DEFAULT 0,
     truppe_perse INT DEFAULT 0,
     perc_distruzione REAL DEFAULT 0.0,
-    id_alleanza UUID uuid_generate_v4() DEFAULT NULL,
+    id_alleanza UUID DEFAULT NULL,
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     abbandono_alleanza_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, partita_id),
@@ -268,6 +270,7 @@ CREATE TABLE IF NOT EXISTS alleanze (
     nome_logo VARCHAR(16),
     id_leader UUID NOT NULL,
     id_partita UUID NOT NULL,
+    max_membri INT NOT NULL DEFAULT 4,
     CONSTRAINT fk_leader FOREIGN KEY (id_leader) REFERENCES utenti(id_user),
     CONSTRAINT fk_partita_alleanza FOREIGN KEY (id_partita) REFERENCES partite(id_partita) ON DELETE CASCADE
 );

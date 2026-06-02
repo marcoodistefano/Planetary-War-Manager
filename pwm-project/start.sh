@@ -10,10 +10,6 @@ fi
 docker-compose up -d --build
 
 echo ""
-echo "Running database migrations (one-shot)..."
-docker-compose run --rm db-migrate
-
-echo ""
 echo "Container Status:"
 docker-compose ps
 
