@@ -14,6 +14,8 @@ services:
   # REDIS PER IL COMM-LINK (MESSAGGI IN TEMPO REALE, PUB/SUB, CACHE RISORSE, SESSIONI, ETC.)
   redis:
     image: redis:7-alpine
+    volumes:
+      - redis_data:/data  # Nominato: evita volumi anonimi ad ogni avvio
     networks:
       - pwm-net
 # IL DATABASE POSTGRESQL
@@ -246,6 +248,7 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:              # Dati persistenti Redis (cache, sessioni, pub/sub state)
   app_route_node_modules:
   frontend_node_modules:
 
