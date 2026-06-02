@@ -244,13 +244,13 @@
       </div>
     </div>
 
-    <ion-modal [isOpen]="isProfileModalOpen" (didDismiss)="setOpenProfile(false)" [breakpoints]="[0, 0.9]" [initialBreakpoint]="0.9">
+    <ion-modal [isOpen]="isProfileModalOpen" (didDismiss)="setOpenProfile(false)" [breakpoints]="isTouchLayout ? [0, 0.9] : undefined" [initialBreakpoint]="isTouchLayout ? 0.9 : undefined" [cssClass]="isTouchLayout ? '' : 'desktop-transparent-modal'">
       <ng-template>
         <app-profile-modal [profile]="userProfile" (close)="setOpenProfile(false)"></app-profile-modal>
       </ng-template>
     </ion-modal>
     
-    <ion-modal [isOpen]="isBuildPanelOpen" (didDismiss)="isBuildPanelOpen = false" [breakpoints]="[0, 0.9]" [initialBreakpoint]="0.9">
+    <ion-modal [isOpen]="isBuildPanelOpen" (didDismiss)="isBuildPanelOpen = false" [breakpoints]="isTouchLayout ? [0, 0.9] : undefined" [initialBreakpoint]="isTouchLayout ? 0.9 : undefined" [cssClass]="isTouchLayout ? '' : 'desktop-transparent-modal'">
       <ng-template>
         <div class="hud-panel build-panel" style="width: 100%; height: 100%; border: none;">
           <div class="title-block compact">
@@ -277,13 +277,13 @@
         </div>
       </ng-template>
     </ion-modal>
-    <ion-modal [isOpen]="isTechModalOpen" (didDismiss)="isTechModalOpen = false" [breakpoints]="[0, 0.9]" [initialBreakpoint]="0.9">
+    <ion-modal [isOpen]="isTechModalOpen" (didDismiss)="isTechModalOpen = false" [breakpoints]="isTouchLayout ? [0, 0.9] : undefined" [initialBreakpoint]="isTouchLayout ? 0.9 : undefined" [cssClass]="isTouchLayout ? '' : 'desktop-transparent-modal'">
       <ng-template>
         <app-tech-tree [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>
       </ng-template>
     </ion-modal>
 
-    <ion-modal [isOpen]="isDiplomacyModalOpen" (didDismiss)="isDiplomacyModalOpen = false" [breakpoints]="[0, 0.9]" [initialBreakpoint]="0.9">
+    <ion-modal [isOpen]="isDiplomacyModalOpen" (didDismiss)="isDiplomacyModalOpen = false" [breakpoints]="isTouchLayout ? [0, 0.9] : undefined" [initialBreakpoint]="isTouchLayout ? 0.9 : undefined" [cssClass]="isTouchLayout ? '' : 'desktop-transparent-modal'">
       <ng-template>
         <app-diplomacy-modal
           [alliances]="matchAlliances"
@@ -295,19 +295,19 @@
       </ng-template>
     </ion-modal>
 
-    <ion-modal [isOpen]="isIntelligenceModalOpen" (didDismiss)="isIntelligenceModalOpen = false" [breakpoints]="[0, 0.9]" [initialBreakpoint]="0.9">
+    <ion-modal [isOpen]="isIntelligenceModalOpen" (didDismiss)="isIntelligenceModalOpen = false" [breakpoints]="isTouchLayout ? [0, 0.9] : undefined" [initialBreakpoint]="isTouchLayout ? 0.9 : undefined" [cssClass]="isTouchLayout ? '' : 'desktop-transparent-modal'">
       <ng-template>
         <app-intelligence-modal (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
       </ng-template>
     </ion-modal>
 
-    <ion-modal [isOpen]="isMarketModalOpen" (didDismiss)="isMarketModalOpen = false" [breakpoints]="[0, 0.9]" [initialBreakpoint]="0.9">
+    <ion-modal [isOpen]="isMarketModalOpen" (didDismiss)="isMarketModalOpen = false" [breakpoints]="isTouchLayout ? [0, 0.9] : undefined" [initialBreakpoint]="isTouchLayout ? 0.9 : undefined" [cssClass]="isTouchLayout ? '' : 'desktop-transparent-modal'">
       <ng-template>
         <app-market-modal [playerResources]="playerResources" (close)="isMarketModalOpen = false"></app-market-modal>
       </ng-template>
     </ion-modal>
 
-    <ion-modal [isOpen]="isArmyModalOpen" (didDismiss)="isArmyModalOpen = false" [breakpoints]="[0, 0.9]" [initialBreakpoint]="0.9">
+    <ion-modal [isOpen]="isArmyModalOpen" (didDismiss)="isArmyModalOpen = false" [breakpoints]="isTouchLayout ? [0, 0.9] : undefined" [initialBreakpoint]="isTouchLayout ? 0.9 : undefined" [cssClass]="isTouchLayout ? '' : 'desktop-transparent-modal'">
       <ng-template>
         <app-army-modal 
           [playerTroops]="playerTroops" 

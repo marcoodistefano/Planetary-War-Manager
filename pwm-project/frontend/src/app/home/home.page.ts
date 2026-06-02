@@ -403,24 +403,26 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private async openModal(component: any, opts?: { componentProps?: any }) {
+    const isMobile = window.innerWidth <= 1024;
     const modal = await this.modalCtrl.create({
       component: component,
       cssClass: 'home-modal',
       canDismiss: true,
-      breakpoints: [0, 0.9],
-      initialBreakpoint: 0.9,
+      breakpoints: isMobile ? [0, 0.9] : undefined,
+      initialBreakpoint: isMobile ? 0.9 : undefined,
       ...(opts || {})
     });
     return await modal.present();
   }
 
   async openCreateMatch() {
+    const isMobile = window.innerWidth <= 1024;
     const modal = await this.modalCtrl.create({
       component: CreateMatchComponent,
       cssClass: 'home-modal',
       canDismiss: true,
-      breakpoints: [0, 0.9],
-      initialBreakpoint: 0.9
+      breakpoints: isMobile ? [0, 0.9] : undefined,
+      initialBreakpoint: isMobile ? 0.9 : undefined
     });
 
     await modal.present();

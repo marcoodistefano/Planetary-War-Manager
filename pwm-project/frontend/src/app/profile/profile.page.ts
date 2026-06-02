@@ -24,6 +24,7 @@ const AVATAR_ASSET_VERSION = '20260517';
   imports: [IonicModule, CommonModule, FormsModule, RouterModule]
 })
 export class ProfilePage implements OnInit, AfterViewInit {
+  get isMobile() { return window.innerWidth <= 1024; }
 
   // === RIFERIMENTO AL VIDEO DI SFONDO ===
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
@@ -133,8 +134,8 @@ export class ProfilePage implements OnInit, AfterViewInit {
     component: IconSelectorComponent,
     cssClass: 'profile-modal',
     canDismiss: true,
-    breakpoints: [0, 0.9],
-    initialBreakpoint: 0.9
+    breakpoints: this.isMobile ? [0, 0.9] : undefined,
+    initialBreakpoint: this.isMobile ? 0.9 : undefined
   });
   await modal.present();
 
@@ -171,8 +172,8 @@ async changeUsername() {
     component: ChangeNameComponent,
     cssClass: 'profile-modal',
     canDismiss: true,
-    breakpoints: [0, 0.9],
-    initialBreakpoint: 0.9
+    breakpoints: this.isMobile ? [0, 0.9] : undefined,
+    initialBreakpoint: this.isMobile ? 0.9 : undefined
   });
   return await modal.present();
 }
@@ -182,8 +183,8 @@ async changePassword() {
     component: ChangePasswordComponent,
     cssClass: 'profile-modal',
     canDismiss: true,
-    breakpoints: [0, 0.9],
-    initialBreakpoint: 0.9
+    breakpoints: this.isMobile ? [0, 0.9] : undefined,
+    initialBreakpoint: this.isMobile ? 0.9 : undefined
   });
   return await modal.present();
 }

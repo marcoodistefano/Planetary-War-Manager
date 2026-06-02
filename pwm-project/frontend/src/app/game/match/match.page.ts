@@ -536,7 +536,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   async loadGameRules() {
     try {
-      const response = await fetch('/assets/game_rules.json');
+      const response = await fetch('assets/game_rules.json');
       if (response.ok) {
         this.gameRules = await response.json();
         this.cdr.detectChanges();
@@ -593,10 +593,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         'paint': { 'line-color': '#f59e0b', 'line-width': ['case', ['==', ['get', 'nth_line'], 5], 1.5, 0.5], 'line-opacity': 0.8 }
       });
 
-      this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3.5);
-      this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
-      this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
-      this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 24);
+      this.loadTopoJsonLayer('assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3.5);
+      this.loadTopoJsonLayer('assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
+      this.loadTopoJsonArchsLayer('assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
+      this.loadTopoJsonCitiesLayer('assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 24);
     });
 
     let touchStartTime = 0;

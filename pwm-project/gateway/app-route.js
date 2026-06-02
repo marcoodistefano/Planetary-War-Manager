@@ -23,6 +23,8 @@ const allowedOrigins = new Set([
   "http://localhost:8100",
   "http://127.0.0.1:8100",
   "http://localhost",
+  "capacitor://localhost",
+  "http://10.0.2.2",
   "http://127.0.0.1",
 ]);
 
