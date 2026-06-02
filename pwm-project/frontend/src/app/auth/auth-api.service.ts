@@ -53,6 +53,10 @@ export class AuthApiService {
     return this.http.post<AuthResponse>(`${this.baseUrl}/auth/login/recovery/password`, payload, { withCredentials: true });
   }
 
+  resetPassword(token: string, newPassword: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.baseUrl}/auth/login/recovery/password/${token}`, { newPassword }, { withCredentials: true });
+  }
+
   logout(): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.baseUrl}/auth/logout`, {}, { withCredentials: true });
   }

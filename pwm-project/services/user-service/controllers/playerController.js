@@ -90,10 +90,21 @@ const updatePassword = async (req, res) => {
     const U_ID = await resolveUserId(req, res);
     if (!U_ID) return;
     const { oldPassword, newPassword } = req.body;
-    // Qui andrà la chiamata al model per aggiornare
-    return res.json({ message: "Password aggiornata in costruzione" });
+    
+    if (!newPassword || newPassword.length < 12) {
+      return res.status(400).json({ error: "La nuova password deve contenere almeno 12 caratteri" });
+    }
+
+    const result = await playerModel.updatePassword(U_ID, oldPassword, newPassword);
+    
+    if (result.status !== 200) {
+      return res.status(result.status).json({ error: result.message });
+    }
+
+    return res.json({ message: result.message });
   } catch (error) {
-    return res.status(500).json({ error: "Errore interno" });
+    console.error("Errore controller updatePassword:", error);
+    return res.status(500).json({ error: "Errore interno del server" });
   }
 };
 

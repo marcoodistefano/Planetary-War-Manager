@@ -22,6 +22,10 @@ const register = async (req, res) => {
   try {
     const { username, email, password, region } = req.body;
 
+    if (!password || password.length < 12) {
+      return res.status(400).json({ isValid: false, errors: ["La password deve contenere almeno 12 caratteri"] });
+    }
+
     const saved = await authModel.registerUser({
       username,
       email,
@@ -159,22 +163,17 @@ const recoveryPasswordToken = async (req, res) => {
     const { token } = req.params;
     const { newPassword } = req.body;
 
-    const tokenData = await redisClient.get(`password_recovery:${token}`);
-    if (!tokenData) {
-      return res.status(400).json({ isValid: false, errors: ["Token non valido o scaduto"] });
+    if (!newPassword || newPassword.length < 12) {
+      return res.status(400).json({ isValid: false, errors: ["La password deve contenere almeno 12 caratteri"] });
     }
-    
-    const { username, email } = JSON.parse(tokenData);
 
     const resetResult = await authModel.resetPasswordToken({
-      username, email, newPassword, tokenData,
+      newPassword, token,
     });
 
-    if (!resetResult.ok) {
-      return res.status(400).json({ isValid: false, errors: [resetResult.error] });
+    if (!resetResult.ok && resetResult.status !== 200) {
+      return res.status(400).json({ isValid: false, errors: [resetResult.error || "Errore nel reset della password"] });
     }
-
-    await redisClient.del(`password_recovery:${token}`);
 
     return res.json({ message: "Password reimpostata con successo" });
   } catch (error) {

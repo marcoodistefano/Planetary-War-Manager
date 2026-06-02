@@ -93,21 +93,21 @@ const recoverUsername = async ({ email, password }) => {
 
 const recoveryPassword = async ({ email }) => {
   const { rows } = await db.query(
-    "SELECT username FROM utenti WHERE email = $1 LIMIT 1",
+    "SELECT id_user, username FROM utenti WHERE email = $1 LIMIT 1",
     [email],
   );
 
   const user = rows[0];
   if (!user) return { status: 400, message: "Email non valida" };
 
-  const username = user.username;
+  const id_user = user.id_user;
   const token = await aslan.generate_secure_token(32);
   const expireTime = new Date(Date.now() + 600000);
 
   try {
     await db.query(
-      "INSERT INTO password_recovery_tokens (username, token, expire_time) VALUES ($1, $2, $3)",
-      [username, token, expireTime],
+      "INSERT INTO password_recovery_tokens (token, id_user, expire_time) VALUES ($1, $2, $3)",
+      [token, id_user, expireTime],
     );
   } catch (error) {
     console.error("Errore durante la creazione del token:", error);
@@ -122,12 +122,42 @@ const recoveryPassword = async ({ email }) => {
 
   const resetLink = `${FRONTEND_URL}/login/recovery/password?token=${token}`;
   const mailOptions = {
-    from: `"supporto" <${SMTP_FROM}>`,
+    from: `"Supporto Comando PWM" <${SMTP_FROM}>`,
     to: email,
-    subject: "Token di recupero password",
-    html: `<p>Hai richiesto il reset della password.</p>
-           <p><a href="${resetLink}">Clicca qui per reimpostare la tua password</a></p>
-           <p>Il link scade tra 10 minuti.</p>`,
+    subject: "PWM - Protocollo di Recupero Password",
+    html: `
+      <div style="font-family: 'Courier New', Courier, monospace; background-color: #0b1121; padding: 40px; color: #e2e8f0; text-align: center;">
+        <div style="max-width: 500px; margin: 0 auto; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);">
+          
+          <h1 style="color: #38bdf8; font-size: 24px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px;">
+            Planetary War<br>Manager
+          </h1>
+          <p style="font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-top: 0; margin-bottom: 30px;">
+            Strategia, alleanze, conquista
+          </p>
+
+          <div style="text-align: left; background-color: #1e293b; padding: 20px; border-radius: 6px; border-left: 4px solid #38bdf8; margin-bottom: 30px;">
+            <p style="margin-top: 0; font-size: 16px;">Comandante,</p>
+            <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+              Abbiamo ricevuto una richiesta di attivazione del protocollo di emergenza per il ripristino delle tue credenziali di accesso al network.
+            </p>
+          </div>
+
+          <a href="${resetLink}" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 4px; font-weight: bold; font-size: 15px; letter-spacing: 1px; margin-bottom: 25px; border: 1px solid #38bdf8; text-transform: uppercase;">
+            Autenticazione Rete
+          </a>
+
+          <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin-bottom: 0;">
+            Attenzione: Questo link di sicurezza ha una validità massima di <strong>10 minuti</strong>.<br>
+            Se non hai richiesto tu il ripristino, ignora questo messaggio. La tua postazione di comando rimane sicura.
+          </p>
+        </div>
+        
+        <div style="margin-top: 30px; font-size: 10px; color: #475569; text-transform: uppercase;">
+          <p>&copy; 2026 Planetary War Manager /// Strategic Command<br>SYS.VER 1.0.4 - COMM-LINK ONLINE</p>
+        </div>
+      </div>
+    `,
   };
   try {
     await transporter.sendMail(mailOptions);
@@ -152,17 +182,19 @@ const resetPassword = async ({ username, email, newPassword }) => {
   return { status: 200, message: "Password reimpostata con successo" };
 };
 
-const resetPasswordToken = async ({ username, email, newPassword, token }) => {
+const resetPasswordToken = async ({ newPassword, token }) => {
   const { rows } = await db.query(
-    "SELECT token FROM password_recovery_tokens WHERE token = $1 LIMIT 1",
+    "SELECT id_user FROM password_recovery_tokens WHERE token = $1 AND expire_time > NOW() LIMIT 1",
     [token],
   );
-  if (rows.length === 0) return { status: 404, error: "Token non trovato" };
+  if (rows.length === 0) return { status: 404, error: "Token non valido o scaduto" };
   
+  const id_user = rows[0].id_user;
   const passwordHash = await aslan.hash_password(newPassword);
+  
   const { rows: updateRows } = await db.query(
-    "UPDATE utenti SET password_hash = $1, last_password_change = NOW() WHERE username = $2 AND email = $3 RETURNING id_user",
-    [passwordHash, username, email],
+    "UPDATE utenti SET password_hash = $1, last_password_change = NOW() WHERE id_user = $2 RETURNING id_user",
+    [passwordHash, id_user],
   );
   
   const updated = updateRows[0];

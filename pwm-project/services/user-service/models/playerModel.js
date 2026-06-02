@@ -1,5 +1,6 @@
 const db = require("../../shared/postgresClient.js");
 const redisClient = require("../../shared/redisClient.js");
+const aslan = require("../middleware/Aslan.js");
 const Eru = require("../middleware/Eru_recostructor.js");
 
 const fetchToRedis = async (U_ID, Information) => {
@@ -402,6 +403,38 @@ const sendFriendRequest_byUsername = async (username_utente, username_destinatar
 };
 //LE QUERY SONO GIA' IMPOSTATE PER PRENDERE DIRETTAMENTE GLI USERNAME, NON GLI ID, QUINDI NELLE FUNZIONI DEL CONTROLLER PASSIAMO DIRETTAMENTE GLI USERNAME CHE PRENDIAMO DAL TOKEN JWT, NON GLI ID. IN QUESTO MODO EVITIAMO DI FARE QUERY AGGIUNTIVE PER TRADURRE ID IN USERNAME E VICEVERSA, OTTIMIZZANDO LE PRESTAZIONI.
 //PER TANTO AD ORA NON POSSONO FUNZIONARE
+
+const updatePassword = async (U_ID, oldPassword, newPassword) => {
+  try {
+    const { rows } = await db.query(
+      "SELECT password_hash FROM utenti WHERE id_user = $1",
+      [U_ID]
+    );
+
+    if (rows.length === 0) {
+      return { status: 404, message: "Utente non trovato" };
+    }
+
+    const currentHash = rows[0].password_hash;
+    const isMatch = await aslan.verify_password(oldPassword, currentHash);
+
+    if (!isMatch) {
+      return { status: 401, message: "La password attuale non è corretta" };
+    }
+
+    const newHash = await aslan.hash_password(newPassword);
+
+    await db.query(
+      "UPDATE utenti SET password_hash = $1, last_password_change = NOW() WHERE id_user = $2",
+      [newHash, U_ID]
+    );
+
+    return { status: 200, message: "Password aggiornata con successo" };
+  } catch (error) {
+    console.error("Errore query updatePassword:", error);
+    return { status: 500, message: "Errore interno del database" };
+  }
+};
 const respondToFriendRequest = async (userId, requestId, accept) => {
   try {
     const newStatus = accept ? 'accepted' : 'rejected';
@@ -473,5 +506,6 @@ module.exports = {
   sendFriendRequest_byCode,
   sendFriendRequest_byUsername,
   respondToFriendRequest,
+  updatePassword,
   removeFriend
 };

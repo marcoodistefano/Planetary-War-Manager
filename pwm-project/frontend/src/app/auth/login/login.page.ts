@@ -70,6 +70,8 @@ export class LoginPage implements OnInit, AfterViewInit, OnDestroy {
 
   ionViewDidEnter() {
     this.playBackgroundVideo();
+    this.loginForm?.reset();
+    this.errorMessage = '';
   }
 
   private playBackgroundVideo() {

@@ -65,6 +65,11 @@ services:
       - REDIS_URL=redis://redis:6379
       - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
       - SECRET_KEY=${SECRET_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - FRONTEND_URL=http://localhost:8100
     networks:
       - pwm-net
 

@@ -2,7 +2,7 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } fr
 import { CommonModule } from '@angular/common'; 
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';   
 import { IonicModule, IonContent } from '@ionic/angular';   
-import { Router, RouterLink } from '@angular/router';
+import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { AuthApiService } from '../auth-api.service';
 import { finalize } from 'rxjs/operators';
 import { Title } from '@angular/platform-browser';
@@ -18,9 +18,13 @@ import { Title } from '@angular/platform-browser';
 export class RecoverPasswordPage implements OnInit, AfterViewInit, OnDestroy {
 
   recoverForm!: FormGroup;
+  resetForm!: FormGroup;
   errorMessage = '';
   successMessage = '';
   isSubmitting = false;
+  token: string | null = null;
+  showNewPassword = false;
+  showConfirmPassword = false;
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
   @ViewChild(IonContent) content?: IonContent;
 
@@ -45,6 +49,7 @@ export class RecoverPasswordPage implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     private formBuilder: FormBuilder,
     private router: Router,
+    private route: ActivatedRoute,
     private authApi: AuthApiService,
     private titleService: Title
   ) { }
@@ -54,6 +59,31 @@ export class RecoverPasswordPage implements OnInit, AfterViewInit, OnDestroy {
     this.recoverForm = this.formBuilder.group({
       email: ['', [Validators.required, Validators.email]],
     });
+
+    this.resetForm = this.formBuilder.group({
+      newPassword: ['', [Validators.required, Validators.minLength(12)]],
+      confirmPassword: ['', [Validators.required]],
+    }, { validators: this.passwordMatchValidator });
+
+    this.route.queryParams.subscribe(params => {
+      this.token = params['token'] || null;
+      if (!this.token) {
+        this.resetForm?.reset();
+      }
+    });
+  }
+
+  passwordMatchValidator(g: FormGroup) {
+    return g.get('newPassword')?.value === g.get('confirmPassword')?.value
+      ? null : { mismatch: true };
+  }
+
+  toggleNewPasswordVisibility() {
+    this.showNewPassword = !this.showNewPassword;
+  }
+
+  toggleConfirmPasswordVisibility() {
+    this.showConfirmPassword = !this.showConfirmPassword;
   }
 
   // QUESTO È IL METODO CHE IL COMPILATORE NON TROVA:
@@ -91,13 +121,35 @@ export class RecoverPasswordPage implements OnInit, AfterViewInit, OnDestroy {
       .subscribe({
         next: () => {
           this.successMessage = 'Protocollo avviato. Controlla la tua email per il link di ripristino.';
-          // Opzionale: reindirizzamento dopo qualche secondo
           setTimeout(() => this.router.navigate(['/login']), 5000);
         },
         error: (error) => {
           this.errorMessage = error?.error?.error || 'Impossibile inviare il link. Verifica l\'indirizzo e riprova.';
           console.error('Errore recupero:', error);
         },
+      });
+  }
+
+  onResetSubmit() {
+    if (!this.resetForm.valid || !this.token) return;
+
+    const { newPassword } = this.resetForm.value;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.isSubmitting = true;
+
+    this.authApi
+      .resetPassword(this.token, newPassword)
+      .pipe(finalize(() => this.isSubmitting = false))
+      .subscribe({
+        next: () => {
+          this.successMessage = 'Password reimpostata con successo. Reindirizzamento in corso...';
+          setTimeout(() => this.router.navigate(['/login']), 3000);
+        },
+        error: (error) => {
+          this.errorMessage = error?.error?.errors?.[0] || 'Impossibile reimpostare la password. Il link potrebbe essere scaduto.';
+          console.error('Errore reset:', error);
+        }
       });
   }
 
