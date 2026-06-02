@@ -17,11 +17,7 @@
       </div>
     </nav>
 
-    <div class="sidebar-footer">
-      <button class="exit-btn" (click)="closeChat()">
-        <ion-icon name="power-outline"></ion-icon> <span>[ CHIUDI ]</span>
-      </button>
-    </div>
+
   </aside>
 
   <section class="chat-main">
@@ -35,9 +31,6 @@
           <span class="status-pill subtle" *ngIf="activeScope === 'direct' && !activeDirectRecipient && !recentContacts.length">NESSUNA CHAT PRIVATA</span>
         </div>
       </div>
-      <button class="mobile-close-btn" (click)="closeChat()">
-        <ion-icon name="close-outline"></ion-icon>
-      </button>
     </div>
 
     <div class="private-toolbar" *ngIf="activeScope === 'direct'">
