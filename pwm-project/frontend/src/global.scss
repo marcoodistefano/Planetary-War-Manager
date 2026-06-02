@@ -147,6 +147,28 @@ ion-modal.profile-modal {
   }
 }
 
+ion-modal.chat-modal {
+  --background: transparent;
+  --box-shadow: none;
+  --border-radius: 20px;
+  --width: 96vw;
+  --height: 86vh;
+  --max-width: 1200px;
+  --max-height: 800px;
+
+  &::part(content) {
+    width: 96vw;
+    height: 86vh;
+    max-width: 1200px;
+    max-height: 800px;
+    border-radius: 20px;
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    outline: none;
+  }
+}
+
 /* ==========================================================================
    MENU A TENDINA TATTICI (POPOVER)
    ========================================================================== */

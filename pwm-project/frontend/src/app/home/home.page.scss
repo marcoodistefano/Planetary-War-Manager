@@ -1041,8 +1041,10 @@ ion-footer {
   .desktop-only { display: none !important; }
 
   .home-page {
-    height: auto; min-height: 100vh; overflow-y: auto; overflow-x: hidden;
+    height: 100vh; min-height: 100vh; overflow: hidden;
     padding-top: 75px !important; 
+    display: flex;
+    flex-direction: column;
   }
 
   .mobile-header {
@@ -1052,6 +1054,7 @@ ion-footer {
   
   .top-row {
     flex-direction: column; perspective: none !important; gap: 20px; padding: 10px; height: auto;
+    flex: 1; justify-content: center; align-items: center;
   }
 
   .left-column, .right-column {
@@ -1064,6 +1067,7 @@ ion-footer {
   .center-column {
     order: -1; display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 30px; width: 100% !important; max-width: 500px !important; margin: 0 auto;
+    flex: 1;
   }
 
   .title-block { position: relative; top: auto; transform: none !important; }
@@ -1074,7 +1078,7 @@ ion-footer {
     position: relative; bottom: auto; width: 100%; transform: none !important;
     .games-actions {
       flex-direction: column; width: 100%; gap: 15px;
-      button { width: 100%; padding: 18px; font-size: 0.9rem; }
+      button { width: 100%; padding: 18px; font-size: 0.9rem; margin: 0; }
     }
   }
 

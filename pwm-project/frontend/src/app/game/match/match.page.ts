@@ -413,6 +413,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.menuCtrl.close('mobile-tactical-menu');
   }
 
+  openMobileMenu() {
+    this.menuCtrl.enable(true, 'mobile-tactical-menu');
+    this.menuCtrl.open('mobile-tactical-menu');
+  }
+
   toggleChat() {
     this.isChatOpen = !this.isChatOpen;
     this.closeMobileMenu();

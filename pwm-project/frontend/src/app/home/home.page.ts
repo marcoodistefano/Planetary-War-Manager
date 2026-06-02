@@ -406,6 +406,9 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     const modal = await this.modalCtrl.create({
       component: component,
       cssClass: 'home-modal',
+      canDismiss: true,
+      breakpoints: [0, 0.9],
+      initialBreakpoint: 0.9,
       ...(opts || {})
     });
     return await modal.present();
@@ -414,7 +417,10 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   async openCreateMatch() {
     const modal = await this.modalCtrl.create({
       component: CreateMatchComponent,
-      cssClass: 'home-modal'
+      cssClass: 'home-modal',
+      canDismiss: true,
+      breakpoints: [0, 0.9],
+      initialBreakpoint: 0.9
     });
 
     await modal.present();
