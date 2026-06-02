@@ -54,9 +54,19 @@ export class LoginPage implements OnInit, AfterViewInit, OnDestroy {
     this.titleService.setTitle('PWM | Login');
     // 3. Inizializza il form e i suoi controlli (es. email e password)
     this.loginForm = this.formBuilder.group({
-      username: ['', [Validators.required, Validators.minLength(3)]],
+      username: ['', [Validators.required, Validators.minLength(3), this.emailOrUsernameValidator]],
       password: ['', [Validators.required, Validators.minLength(12)]]
     });
+  }
+
+  emailOrUsernameValidator(control: any) {
+    const value = control.value;
+    if (!value) return null;
+    if (value.includes('@')) {
+      const regex = /^[^@]+@[^@.]+\.[^@.]+$/;
+      return regex.test(value) ? null : { invalidEmailFormat: true };
+    }
+    return null;
   }
 
   ngAfterViewInit() {

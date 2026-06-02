@@ -38,7 +38,7 @@ const registerUser = async ({ username, email, password, region }) => {
 
   const passwordHash = await aslan.hash_password(password);
   const normalizeReg = aslan.normalizeRegion(region);
-  
+
   if (region === null) {
     return { status: 400, error: "Regione non fornita" };
   }
@@ -63,7 +63,7 @@ const registerUser = async ({ username, email, password, region }) => {
 
 const verifyLogin = async ({ username, password }) => {
   const { rows } = await db.query(
-    "SELECT id_user, password_hash FROM utenti WHERE username = $1 LIMIT 1",
+    "SELECT id_user, password_hash FROM utenti WHERE username = $1 OR email = $1 LIMIT 1",
     [username],
   );
 
@@ -126,37 +126,46 @@ const recoveryPassword = async ({ email }) => {
     to: email,
     subject: "PWM - Protocollo di Recupero Password",
     html: `
-      <div style="font-family: 'Courier New', Courier, monospace; background-color: #0b1121; padding: 40px; color: #e2e8f0; text-align: center;">
-        <div style="max-width: 500px; margin: 0 auto; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);">
-          
-          <h1 style="color: #38bdf8; font-size: 24px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px;">
-            Planetary War<br>Manager
-          </h1>
-          <p style="font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-top: 0; margin-bottom: 30px;">
-            Strategia, alleanze, conquista
-          </p>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #0b1121;">
+        <div style="font-family: 'Courier New', Courier, monospace; background-color: #0b1121; padding: 20px 5%; color: #e2e8f0; text-align: center;">
+          <div style="width: 100%; max-width: 500px; margin: 0 auto; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 20px 5%; box-sizing: border-box; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);">
+            
+            <h1 style="color: #38bdf8; font-size: 22px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px;">
+              Planetary War<br>Manager
+            </h1>
+            <p style="font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-top: 0; margin-bottom: 25px;">
+              Strategia, alleanze, conquista
+            </p>
 
-          <div style="text-align: left; background-color: #1e293b; padding: 20px; border-radius: 6px; border-left: 4px solid #38bdf8; margin-bottom: 30px;">
-            <p style="margin-top: 0; font-size: 16px;">Comandante,</p>
-            <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
-              Abbiamo ricevuto una richiesta di attivazione del protocollo di emergenza per il ripristino delle tue credenziali di accesso al network.
+            <div style="text-align: left; background-color: #1e293b; padding: 15px; border-radius: 6px; border-left: 4px solid #38bdf8; margin-bottom: 25px;">
+              <p style="margin-top: 0; font-size: 15px; text-transform: uppercase;">Comandante ${user.username},</p>
+              <p style="font-size: 13px; line-height: 1.5; color: #cbd5e1; margin-bottom: 0;">
+                Abbiamo ricevuto una richiesta di attivazione del protocollo di emergenza per il ripristino delle tue credenziali di accesso.
+              </p>
+            </div>
+
+            <a href="${resetLink}" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 12px 20px; border-radius: 4px; font-weight: bold; font-size: 14px; letter-spacing: 1px; margin-bottom: 20px; border: 1px solid #38bdf8; text-transform: uppercase; width: 80%; max-width: 300px; box-sizing: border-box;">
+              Modifica Password
+            </a>
+
+            <p style="font-size: 11px; color: #64748b; line-height: 1.5; margin-bottom: 0;">
+              Attenzione: Questo link di sicurezza ha una validità massima di <strong>10 minuti</strong>.<br>
+              Se non hai richiesto tu il ripristino, ignora questo messaggio. La tua postazione di comando rimane sicura.
             </p>
           </div>
-
-          <a href="${resetLink}" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 4px; font-weight: bold; font-size: 15px; letter-spacing: 1px; margin-bottom: 25px; border: 1px solid #38bdf8; text-transform: uppercase;">
-            Autenticazione Rete
-          </a>
-
-          <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin-bottom: 0;">
-            Attenzione: Questo link di sicurezza ha una validità massima di <strong>10 minuti</strong>.<br>
-            Se non hai richiesto tu il ripristino, ignora questo messaggio. La tua postazione di comando rimane sicura.
-          </p>
+          
+          <div style="margin-top: 25px; font-size: 9px; color: #475569; text-transform: uppercase;">
+            <p>&copy; 2026 Planetary War Manager /// Strategic Command<br>SYS.VER 1.0.4 - COMM-LINK ONLINE</p>
+          </div>
         </div>
-        
-        <div style="margin-top: 30px; font-size: 10px; color: #475569; text-transform: uppercase;">
-          <p>&copy; 2026 Planetary War Manager /// Strategic Command<br>SYS.VER 1.0.4 - COMM-LINK ONLINE</p>
-        </div>
-      </div>
+      </body>
+      </html>
     `,
   };
   try {
@@ -178,7 +187,7 @@ const resetPassword = async ({ username, email, newPassword }) => {
 
   const updated = rows[0];
   if (!updated) return { status: 400, error: "Utente o email non validi" };
-  
+
   return { status: 200, message: "Password reimpostata con successo" };
 };
 
@@ -188,18 +197,18 @@ const resetPasswordToken = async ({ newPassword, token }) => {
     [token],
   );
   if (rows.length === 0) return { status: 404, error: "Token non valido o scaduto" };
-  
+
   const id_user = rows[0].id_user;
   const passwordHash = await aslan.hash_password(newPassword);
-  
+
   const { rows: updateRows } = await db.query(
     "UPDATE utenti SET password_hash = $1, last_password_change = NOW() WHERE id_user = $2 RETURNING id_user",
     [passwordHash, id_user],
   );
-  
+
   const updated = updateRows[0];
   if (!updated) return { status: 400, error: "Utente o email non validi" };
-  
+
   try {
     await db.query("DELETE FROM password_recovery_tokens WHERE token = $1", [token]);
   } catch (error) {

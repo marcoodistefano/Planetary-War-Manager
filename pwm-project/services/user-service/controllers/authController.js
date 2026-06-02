@@ -71,6 +71,13 @@ const login = async (req, res) => {
       return res.status(400).json({ message: "Credenziali mancanti" });
     }
 
+    if (username.includes('@')) {
+      const emailRegex = /^[^@]+@[^@.]+\.[^@.]+$/;
+      if (!emailRegex.test(username)) {
+        return res.status(400).json({ message: "Formato email non valido" });
+      }
+    }
+
     const authResult = await authModel.verifyLogin({ username, password });
 
     if (!authResult.ok) {
