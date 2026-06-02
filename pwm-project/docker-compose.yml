@@ -69,7 +69,7 @@ services:
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
-      - FRONTEND_URL=http://localhost:8100
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:8100}
     networks:
       - pwm-net
 
@@ -96,6 +96,7 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - CHAT_SERVICE_URL=http://chat:3001
       - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:8100}
     networks:
       - pwm-net
   match-service:
