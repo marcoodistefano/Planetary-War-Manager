@@ -107,33 +107,15 @@
 
     <div class="mobile-top-navbar mobile-only" [class.is-hidden]="isChatOpen">
       <div class="menu-button-wrap">
-        <ion-menu-button class="holographic-menu-btn"></ion-menu-button>
+        <button class="holographic-menu-btn" (click)="openMobileMenu()">
+          <ion-icon name="menu-outline"></ion-icon>
+        </button>
         <span class="chat-badge menu-badge" *ngIf="chatUnreadCount > 0">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
       </div>
       <div class="mobile-logo">PWM</div>
     </div>
 
-    <div class="vertical-resource-bar mobile-only scrollable-y-hidden">
-      <div *ngFor="let res of resourceConfig"
-           class="mini-res-item"
-           [class.premium]="res.id === 'oro'"
-           [class.trigger-item]="res.isTrigger"
-           [class.open]="res.isTrigger && isTroopsDropdownOpen"
-           (click)="res.isTrigger && toggleTroopsDropdown($event)">
-        <span class="icon">{{ res.icon }}</span>
-        <span class="val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number: '1.0-0' }}</span>
-        <span class="val" *ngIf="res.isTrigger">INFO</span>
-        <div class="troops-dropdown" *ngIf="res.isTrigger && !useFloatingDropdown">
-          <div class="dropdown-header">ARMATA DISPIEGATA</div>
-          <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
-            <span class="t-key">{{ troop.key }}</span>
-            <span class="t-val">{{ troop.value }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="vertical-resource-bar mobile-only scrollable-y-hidden">
+    <div class="vertical-resource-bar mobile-only scrollable-y-hidden" [class.is-hidden]="isChatOpen">
       <div *ngFor="let res of resourceConfig"
            class="mini-res-item"
            [class.premium]="res.id === 'oro'"
@@ -196,30 +178,6 @@
         </button>
       </div>
 
-      <div class="hud-panel build-panel" *ngIf="isBuildPanelOpen" style="margin-bottom: 12px;">
-        <div class="title-block compact">
-          <p class="eyebrow">Ingegneria di Campo</p>
-          <h2>COSTRUZIONE</h2>
-        </div>
-        <div class="category-toggle">
-          <button [class.active]="activeBuildCategory === 'risorse'" (click)="setBuildCategory('risorse')">RISORSE</button>
-          <button [class.active]="activeBuildCategory === 'armamenti'" (click)="setBuildCategory('armamenti')">ARMAMENTI</button>
-        </div>
-        <div class="hud-separator"></div>
-        <div class="build-grid scrollable-y">
-          <div *ngFor="let item of getFilteredBuildItems()" class="build-card" (click)="startConstruction(item)">
-            <div class="build-info">
-              <span class="item-name">{{ item.name || item.nome }}</span>
-              <span class="item-tier">TIER {{ item.tier }}</span>
-            </div>
-            <div class="build-cost">
-              <span class="cost-unit" *ngIf="item.costo_denaro > 0">💵 {{ item.costo_denaro | number }}</span>
-              <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio | number }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div class="hud-panel combined-control desktop-only">
         <div class="panel-header" (click)="toggleMapSettings()">
           <div class="title-block compact">
@@ -263,17 +221,20 @@
     </div> 
 
     <div class="hud-stack-right">
-      <div class="hud-chat-panel" [class.is-hidden]="!isChatOpen">
+      <ion-modal [isOpen]="isChatOpen" (didDismiss)="isChatOpen = false" cssClass="chat-modal centered-modal">
+      <ng-template>
         <app-in-game-chat
           [currentUser]="userProfile.username"
-          [playersInMatch]="matchPlayers"
           [matchId]="currentMatchId"
+          [playersInMatch]="matchPlayers"
           [allianceId]="currentAllianceId"
           [allianceLabel]="currentAllianceLabel"
           [panelVisible]="isChatOpen"
           (unreadCountChange)="chatUnreadCount = $event"
-          (close)="toggleChat()"></app-in-game-chat>
-      </div>
+          (close)="isChatOpen = false">
+        </app-in-game-chat>
+      </ng-template>
+    </ion-modal>
       <div class="tactical-actions-row desktop-only">
         <button class="nav-action-btn primary-glow chat-counter" [class.active]="isChatOpen" (click)="toggleChat()">
           <ion-icon name="chatbubbles-outline"></ion-icon>
@@ -283,10 +244,40 @@
       </div>
     </div>
 
-    <div class="modal-overlay-container" *ngIf="isProfileModalOpen">
-      <app-profile-modal [profile]="userProfile" (close)="setOpenProfile(false)"></app-profile-modal>
-    </div>
+    <ion-modal [isOpen]="isProfileModalOpen" (didDismiss)="setOpenProfile(false)" [breakpoints]="isTouchLayout ? [0, 0.9] : undefined" [initialBreakpoint]="isTouchLayout ? 0.9 : undefined" [cssClass]="isTouchLayout ? '' : 'desktop-transparent-modal'">
+      <ng-template>
+        <app-profile-modal [profile]="userProfile" (close)="setOpenProfile(false)"></app-profile-modal>
+      </ng-template>
+    </ion-modal>
     
+    <ion-modal [isOpen]="isBuildPanelOpen" (didDismiss)="isBuildPanelOpen = false" [breakpoints]="isTouchLayout ? [0, 0.9] : undefined" [initialBreakpoint]="isTouchLayout ? 0.9 : undefined" [cssClass]="isTouchLayout ? '' : 'desktop-transparent-modal'">
+      <ng-template>
+        <div class="hud-panel build-panel" style="width: 100%; height: 100%; border: none;">
+          <div class="title-block compact">
+            <p class="eyebrow">Ingegneria di Campo</p>
+            <h2>COSTRUZIONE</h2>
+          </div>
+          <div class="category-toggle">
+            <button [class.active]="activeBuildCategory === 'risorse'" (click)="setBuildCategory('risorse')">RISORSE</button>
+            <button [class.active]="activeBuildCategory === 'armamenti'" (click)="setBuildCategory('armamenti')">ARMAMENTI</button>
+          </div>
+          <div class="hud-separator"></div>
+          <div class="build-grid scrollable-y">
+            <div *ngFor="let item of getFilteredBuildItems()" class="build-card" (click)="startConstruction(item)">
+              <div class="build-info">
+                <span class="item-name">{{ item.name || item.nome }}</span>
+                <span class="item-tier">TIER {{ item.tier }}</span>
+              </div>
+              <div class="build-cost">
+                <span class="cost-unit" *ngIf="item.costo_denaro > 0">💵 {{ item.costo_denaro | number }}</span>
+                <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio | number }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-template>
+    </ion-modal>
+
     <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>
     <app-diplomacy-modal
       *ngIf="isDiplomacyModalOpen"

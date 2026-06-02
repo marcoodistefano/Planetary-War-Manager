@@ -144,6 +144,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   isRadialMenuVisible = false;
   radialMenuX = 0;
   radialMenuY = 0;
+  radialMenuOpenedAt = 0;
 
   // All'interno di ngOnInit o in una funzione di inizializzazione
   initRadialListeners() {
@@ -512,6 +513,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.menuCtrl.close('mobile-tactical-menu');
   }
 
+  openMobileMenu() {
+    this.menuCtrl.enable(true, 'mobile-tactical-menu');
+    this.menuCtrl.open('mobile-tactical-menu');
+  }
+
   toggleChat() {
     this.isChatOpen = !this.isChatOpen;
     this.closeMobileMenu();
@@ -629,7 +635,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   async loadGameRules() {
     try {
-      const response = await fetch('/assets/game_rules.json');
+      const response = await fetch('assets/game_rules.json');
       if (response.ok) {
         this.gameRules = await response.json();
         this.cdr.detectChanges();
@@ -666,10 +672,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           { id: 'carto-light', type: 'raster', source: 'carto-light-tiles', layout: { visibility: 'none' } }
         ]
       },
-      center: [12.5, 41.9], zoom: 3.5, minZoom: 1.5, renderWorldCopies: true, projection: { type: 'mercator' }
+      center: [12.5, 41.9], zoom: 3.5, minZoom: 1.5, maxZoom: 8, renderWorldCopies: true, projection: { type: 'mercator' }
     });
 
     this.map.dragRotate.disable();
+    this.map.touchZoomRotate.disableRotation();
+    if (this.map.touchPitch) {
+      this.map.touchPitch.disable();
+    }
 
     this.map.on('load', () => {
       this.map.addSource('terrain-source', { type: 'raster-dem', url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${this.MAPTILER_KEY}`, tileSize: 256 });
@@ -691,37 +701,32 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.renderArmies();
     });
 
+    let touchStartTime = 0;
+    let touchStartCoords = { x: 0, y: 0 };
+
     this.map.on('touchstart', (e: any) => {
-      // Avviamo un timer di 500ms (0.5 secondi)
-      this.touchTimer = setTimeout(() => {
-        // Se il timer arriva alla fine, attiviamo il menu radiale
-        this.updatePointReadout(e, true);
-
-        // Usiamo le coordinate del punto toccato
-        this.radialMenuX = e.originalEvent.touches[0].clientX;
-        this.radialMenuY = e.originalEvent.touches[0].clientY;
-
-        this.isRadialMenuVisible = true;
-        this.cdr.detectChanges();
-
-        // Opzionale: un piccolo feedback di vibrazione se il dispositivo lo supporta
-        if (navigator.vibrate) navigator.vibrate(50);
-
-      }, 500); // <--- Durata della pressione: 0.5 secondi
+      touchStartTime = Date.now();
+      touchStartCoords = { x: e.point.x, y: e.point.y };
     });
 
-    this.map.on('touchend', () => {
-      // Se l'utente alza il dito prima del secondo, annulliamo tutto
-      this.clearTouchTimer();
+    this.map.on('touchend', (e: any) => {
+      const touchDuration = Date.now() - touchStartTime;
+      if (touchDuration < 300) {
+        const dx = Math.abs(e.point.x - touchStartCoords.x);
+        const dy = Math.abs(e.point.y - touchStartCoords.y);
+        // Se il dito non si è mosso molto, è un tap!
+        if (dx < 15 && dy < 15) {
+          this.handleMapPointSelect(e);
+        }
+      }
     });
 
-    this.map.on('touchmove', () => {
-      // Se l'utente trascina la mappa, annulliamo il timer 
-      // (altrimenti il menu si aprirebbe durante lo scrolling)
-      this.clearTouchTimer();
+    // Manteniamo anche il click per il Desktop
+    this.map.on('click', (e: any) => {
+      if (e.originalEvent.pointerType === 'mouse' || !this.isTouchLayout) {
+        this.handleMapPointSelect(e);
+      }
     });
-
-    this.map.on('click', (e: any) => this.handleMapPointSelect(e));
 
     this.map.on('contextmenu', (e: any) => {
       e.originalEvent.preventDefault();
@@ -729,6 +734,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.radialMenuX = e.originalEvent.clientX;
       this.radialMenuY = e.originalEvent.clientY;
       this.isRadialMenuVisible = true;
+      this.radialMenuOpenedAt = Date.now();
       this.cdr.detectChanges();
     });
 
@@ -750,8 +756,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     });
 
     this.map.on('movestart', () => {
-      this.closeRadialOnInteraction();
-      this.closeTroopsDropdownOnInteraction();
+      // this.closeRadialOnInteraction();
+      // this.closeTroopsDropdownOnInteraction();
     });
   }
 
@@ -1057,15 +1063,15 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private clearTouchTimer() {
-    if (this.touchTimer) {
-      clearTimeout(this.touchTimer);
-      this.touchTimer = null;
-    }
-  }
+
 
   // Eseguita quando si preme un'azione nel menu radiale
   handleRadialAction(action: string) {
+    if (Date.now() - this.radialMenuOpenedAt < 400) {
+      console.log("Ignorato click sintetico/immediato sul menu radiale");
+      return;
+    }
+
     console.log("Comando Tattico:", action);
 
     switch (action) {
@@ -1126,7 +1132,26 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   handleMapPointSelect(e: any) {
+    console.log("Map clicked!", e.point);
+    if (this.isRadialMenuVisible) {
+      // Se è già aperto, il click lo chiude.
+      this.isRadialMenuVisible = false;
+      this.cdr.detectChanges();
+      return;
+    }
+
+    // Seleziona il punto e apri il menu radiale
     this.updatePointReadout(e, true);
+
+    // Usa e.point (pixel relativi al contenitore della mappa) garantiti da MapLibre
+    this.radialMenuX = e.point ? e.point.x : window.innerWidth / 2;
+    this.radialMenuY = e.point ? e.point.y : window.innerHeight / 2;
+
+    this.radialMenuOpenedAt = Date.now();
+    this.isRadialMenuVisible = true;
+    this.cdr.detectChanges();
+
+    if (navigator.vibrate) navigator.vibrate(50);
   }
 
   private updatePointReadout(e: any, persistSelection: boolean) {
@@ -1138,13 +1163,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.selectedPointCoords = coordsText;
     }
 
-    if (this.map.getZoom() > 6) {
-      this.clearHoverState();
-      if (!persistSelection && !this.isTouchLayout) {
-        this.selectedPointName = '';
-      }
-      return;
-    }
+
 
     if (!this.map.getLayer('nazioni-layer') || !this.map.getLayer('regioni-layer')) return;
 

@@ -24,6 +24,7 @@ const AVATAR_ASSET_VERSION = '20260517';
   imports: [IonicModule, CommonModule, FormsModule, RouterModule]
 })
 export class ProfilePage implements OnInit, AfterViewInit {
+  get isMobile() { return window.innerWidth <= 1024; }
 
   // === RIFERIMENTO AL VIDEO DI SFONDO ===
   @ViewChild('backgroundVideo') backgroundVideo?: ElementRef<HTMLVideoElement>;
@@ -131,7 +132,10 @@ export class ProfilePage implements OnInit, AfterViewInit {
   async changeAvatar() {
   const modal = await this.modalCtrl.create({
     component: IconSelectorComponent,
-    cssClass: 'profile-modal'
+    cssClass: 'profile-modal',
+    canDismiss: true,
+    breakpoints: this.isMobile ? [0, 0.9] : undefined,
+    initialBreakpoint: this.isMobile ? 0.9 : undefined
   });
   await modal.present();
 
@@ -166,7 +170,10 @@ export class ProfilePage implements OnInit, AfterViewInit {
 async changeUsername() {
   const modal = await this.modalCtrl.create({
     component: ChangeNameComponent,
-    cssClass: 'profile-modal'
+    cssClass: 'profile-modal',
+    canDismiss: true,
+    breakpoints: this.isMobile ? [0, 0.9] : undefined,
+    initialBreakpoint: this.isMobile ? 0.9 : undefined
   });
   return await modal.present();
 }
@@ -174,7 +181,10 @@ async changeUsername() {
 async changePassword() {
   const modal = await this.modalCtrl.create({
     component: ChangePasswordComponent,
-    cssClass: 'profile-modal'
+    cssClass: 'profile-modal',
+    canDismiss: true,
+    breakpoints: this.isMobile ? [0, 0.9] : undefined,
+    initialBreakpoint: this.isMobile ? 0.9 : undefined
   });
   return await modal.present();
 }
@@ -210,7 +220,10 @@ async changePassword() {
   async openSettings() {
     const modal = await this.modalCtrl.create({
       component: SettingsComponent,
-      cssClass: 'profile-modal'
+      cssClass: 'profile-modal',
+      canDismiss: true,
+      breakpoints: [0, 0.9],
+      initialBreakpoint: 0.9
     });
     await modal.present();
 
@@ -230,6 +243,9 @@ async changePassword() {
     const modal = await this.modalCtrl.create({
       component,
       cssClass: 'profile-modal',
+      canDismiss: true,
+      breakpoints: [0, 0.9],
+      initialBreakpoint: 0.9,
       ...(opts || {})
     });
     await modal.present();

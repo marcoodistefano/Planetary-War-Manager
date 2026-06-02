@@ -124,6 +124,27 @@ ion-modal.tactical-modal {
   }
 }
 
+ion-modal.desktop-transparent-modal {
+  --background: transparent;
+  --box-shadow: none;
+  --border-radius: 0;
+  --width: 100vw;
+  --height: 100vh;
+  --max-width: 100vw;
+  --max-height: 100vh;
+
+  &::part(content) {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    outline: none;
+  }
+}
+
 ion-modal.home-modal,
 ion-modal.create-match-modal,
 ion-modal.profile-modal {
@@ -140,6 +161,28 @@ ion-modal.profile-modal {
     height: 100vh;
     max-width: 100vw;
     max-height: 100vh;
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    outline: none;
+  }
+}
+
+ion-modal.chat-modal {
+  --background: transparent;
+  --box-shadow: none;
+  --border-radius: 20px;
+  --width: 96vw;
+  --height: 86vh;
+  --max-width: 1200px;
+  --max-height: 800px;
+
+  &::part(content) {
+    width: 96vw;
+    height: 86vh;
+    max-width: 1200px;
+    max-height: 800px;
+    border-radius: 20px;
     background: transparent;
     box-shadow: none;
     border: none;

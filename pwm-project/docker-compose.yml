@@ -73,6 +73,15 @@ services:
     networks:
       - pwm-net
 
+  # CLOUDFLARE TUNNEL (Alternativa a Ngrok)
+  cloudflare-tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --url http://frontend-dev:8100
+    networks:
+      - pwm-net
+    depends_on:
+      - frontend-dev
+
   # APP ROUTE (API router)
   app-route:
     build:

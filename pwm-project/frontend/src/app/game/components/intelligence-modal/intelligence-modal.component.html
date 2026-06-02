@@ -21,12 +21,13 @@
           <ion-icon name="cash-outline"></ion-icon><span>OPERATIVI</span>
         </div>
       </nav>
-      
-      <div class="sidebar-footer">
-        <button class="exit-btn" (click)="closeModal()">
-          <ion-icon name="power-outline"></ion-icon> <span>[ CHIUDI ]</span>
+      <div class="sidebar-footer ion-hide-md-down">
+        <button class="exit-btn" (click)="close.emit()">
+          <ion-icon name="close-circle-outline"></ion-icon> <span>CHIUDI</span>
         </button>
       </div>
+      
+
     </div>
 
     <div class="intel-main scrollable-y">
