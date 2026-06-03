@@ -19,8 +19,6 @@ const ROUTE_GROUPS = [
     { pattern: /^\/player(?:\/|$)/, target: "user" },   // NUOVO: Rotte per info profilo/statistiche
     { pattern: /^\/match(?:\/|$)/, target: "match" },
     { pattern: /^\/chat(?:\/|$)/, target: "chat" },
-    { pattern: /^\/movement(?:\/|$)/, target: "movement" },
-    { pattern: /^\/combat(?:\/|$)/, target: "combat" },
 ];
 
 // 3. FUNZIONI DI ISPEZIONE E SANITIZZAZIONE

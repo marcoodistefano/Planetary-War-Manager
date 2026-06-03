@@ -1,6 +1,8 @@
 const { createClient } = require("redis");
 const { Pool } = require("pg");
 const fs = require("fs/promises");
+const { createReadStream } = require("fs");
+const readline = require("readline");
 const path = require("path");
 
 const parseIntSafe = (value, fallback) => {
@@ -278,11 +280,95 @@ const waitForMatchService = async () => {
   }
 };
 
+const loadMapDataForBackend = async () => {
+  const assetRoot = await findExistingPath(ASSET_ROOT_CANDIDATES);
+  if (!assetRoot) {
+    console.log("[CACHE_WARMUP] Impossibile caricare dati backend mappa: cartella assets non trovata.");
+    return;
+  }
+
+  const mapDir = path.join(assetRoot, "map");
+  try {
+    const entries = await fs.readdir(mapDir, { withFileTypes: true });
+    
+    let multi = redis.multi();
+    let batchedCommands = 0;
+    
+    // File attualmente abilitati per il caricamento in cache backend
+    const ENABLED_MAP_FILES = [
+      "archs.json",
+      "map.json",
+      "minimum_path.json",
+      "regions.json",
+      "nations.json"
+    ];
+    
+    for (const entry of entries) {
+      if (entry.isDirectory() || !entry.name.endsWith(".json")) continue;
+      
+      if (!ENABLED_MAP_FILES.includes(entry.name)) {
+        console.log(`[CACHE_WARMUP] Salto il caricamento backend di ${entry.name} (attualmente disabilitato).`);
+        continue;
+      }
+      
+      const absolutePath = path.join(mapDir, entry.name);
+      const baseName = path.basename(entry.name, ".json");
+      
+      if (entry.name === "minimum_path.json") {
+        console.log(`[CACHE_WARMUP] Caricamento in stream di ${entry.name} per il backend...`);
+        const rl = readline.createInterface({
+          input: createReadStream(absolutePath),
+          crlfDelay: Infinity
+        });
+        
+        for await (const line of rl) {
+          const trimmed = line.trim();
+          if (trimmed === "{" || trimmed === "}") continue;
+          
+          let jsonStr = trimmed;
+          if (jsonStr.endsWith(",")) jsonStr = jsonStr.slice(0, -1);
+          if (!jsonStr) continue;
+          
+          try {
+            const obj = JSON.parse(`{${jsonStr}}`);
+            const city = Object.keys(obj)[0];
+            const paths = obj[city];
+            
+            multi.set(`map_data:minimum_path:${city}`, JSON.stringify(paths));
+            batchedCommands++;
+            
+            if (batchedCommands > 1000) {
+              await multi.exec();
+              multi = redis.multi();
+              batchedCommands = 0;
+            }
+          } catch (e) {
+            console.error(`[CACHE_WARMUP] Errore parsing riga in minimum_path:`, e.message);
+          }
+        }
+      } else {
+        const content = await fs.readFile(absolutePath, "utf-8");
+        multi.set(`map_data:${baseName}`, content);
+        batchedCommands++;
+      }
+    }
+    
+    if (batchedCommands > 0) {
+      await multi.exec();
+    }
+    
+    console.log("[CACHE_WARMUP] Dati della mappa per il backend caricati su Redis con successo.");
+  } catch (err) {
+    console.error("[CACHE_WARMUP] Errore durante il caricamento dei dati mappa per il backend:", err.message);
+  }
+};
+
 const runWarmup = async (runId) => {
   await waitForDb();
   await waitForMatchService();
 
   await loadAssetsToRedis();
+  await loadMapDataForBackend();
   const leaderboard = await loadLeaderboards();
   const joinableMatches = await fetchJoinableMatches();
 

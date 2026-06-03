@@ -1,6 +1,9 @@
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
+const fs = require("fs");
+const path = require("path");
+const { execSync } = require("child_process");
 const { WebSocketServer } = require("ws");
 const matchRoutes = require("./matchRoute.js");
 const matchModel = require("./matchModel.js");
@@ -169,6 +172,20 @@ server.on("upgrade", async (request, socket, head) => {
 });
 
 const PORT = parseInt(process.env.PORT || "3004", 10);
+
+const MINIMUM_PATH_FILE = path.join(__dirname, "../../shared/assets/map/minimum_path.json");
+if (!fs.existsSync(MINIMUM_PATH_FILE)) {
+  console.log("[SYSTEM] File minimum_path.json non trovato. Generazione in corso (potrebbe richiedere 15s)...");
+  try {
+    execSync("node calculate_minimum_paths.js", { stdio: "inherit", cwd: __dirname });
+    console.log("[SYSTEM] Generazione minimum_path.json completata con successo.");
+  } catch (err) {
+    console.error("[SYS_ERR] Errore durante la generazione dei cammini minimi:", err.message);
+    process.exit(1);
+  }
+} else {
+  console.log("[SYSTEM] File minimum_path.json trovato. Salto la generazione.");
+}
 
 server.listen(PORT, () => {
   console.log(`[SYSTEM] Microservizio MATCH operativo su porta ${PORT} (HTTP + WS)`);

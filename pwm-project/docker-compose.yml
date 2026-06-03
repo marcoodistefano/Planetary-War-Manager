@@ -125,29 +125,6 @@ services:
       - SECRET_KEY=${SECRET_KEY}
     networks:
       - pwm-net
-  # ENGINE SPOSTAMENTI
-  engine-move:
-    build: ./services/movement
-    depends_on:
-      - redis
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - SECRET_KEY=${SECRET_KEY}
-    volumes:
-      - ./shared/assets:/app/assets:ro
-    networks:
-      - pwm-net
-
-  # ENGINE COMBATTIMENTI
-  engine-combat:
-    build: ./services/combat
-    depends_on:
-      - redis
-    environment:
-      - REDIS_URL=redis://redis:6379
-    networks:
-      - pwm-net
-
   # ENGINE RISORSE
   engine-res:
     build: ./services/resources
@@ -205,8 +182,6 @@ services:
     depends_on:
       - app-route
       - user-service
-      - engine-move
-      - engine-combat
       - engine-res
       - chat
     networks:

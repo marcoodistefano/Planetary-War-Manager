@@ -14,8 +14,6 @@ const SERVICE_TARGETS = {
   user: process.env.AUTH_SERVICE_URL || "http://user-service:3000",
   match: process.env.MATCH_SERVICE_URL || "http://match-service:3004",
   chat: process.env.CHAT_SERVICE_URL || "http://chat-service:3001",
-  movement: process.env.MOVEMENT_SERVICE_URL || "http://movement-service:3002",
-  combat: process.env.COMBAT_SERVICE_URL || "http://combat-service:3003",
 };
 
 const allowedOrigins = new Set([
@@ -130,8 +128,6 @@ const isPublicPath = (pathname) => {
 
 const isWebSocketRoute = (pathname) => {
   if (pathname.startsWith("/chat")) return true;
-  if (pathname.startsWith("/movement")) return true;
-  if (pathname.startsWith("/combat")) return true;
   if (pathname.startsWith("/match")) return true;
   return false;
 };
@@ -522,7 +518,7 @@ server.on("upgrade", async (req, socket, head) => {
   if (!isWebSocketRoute(pathname)) {
     return rejectUpgrade(
       socket,
-      "Route non autorizzata per WebSocket. Usa /chat, /movement o /combat",
+      "Route non autorizzata per WebSocket. Usa /chat o /match",
     );
   }
 
@@ -544,8 +540,6 @@ server.on("upgrade", async (req, socket, head) => {
   // 4. Determinazione del target basato sul path
   let targetBaseUrlStr = null;
   if (pathname.startsWith("/chat")) targetBaseUrlStr = SERVICE_TARGETS.chat;
-  else if (pathname.startsWith("/movement")) targetBaseUrlStr = SERVICE_TARGETS.movement;
-  else if (pathname.startsWith("/combat")) targetBaseUrlStr = SERVICE_TARGETS.combat;
   else if (pathname.startsWith("/match")) targetBaseUrlStr = SERVICE_TARGETS.match;
 
   if (!targetBaseUrlStr) {
