@@ -47,9 +47,10 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
     }
 
     ws.userId = userId;
+    ws.username = authResult.username;
     ws.matchId = authResult.matchId;
 
-    console.log(`[WS_MATCH] Link TCP stabilito per l'utente: ${userId} (match ${ws.matchId})`);
+    console.log(`[WS_MATCH] Link TCP stabilito per l'utente: ${ws.username} (match ${ws.matchId})`);
 
     if (!clientSockets.has(userId)) {
       clientSockets.set(userId, new Set());
@@ -73,8 +74,9 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
       console.log(`[WS_MATCH] Ricevuto messaggio da ${userId}:`, payload);
       
       if (payload.action === 'GET_INITIAL_STATE') {
-         const armiesStr = await redis.get(`match:${ws.matchId}:player:${userId}:armies`);
-         const armies = armiesStr ? JSON.parse(armiesStr) : [];
+         const armateStr = await redis.get(`match:${ws.matchId}:player:${ws.username}:armate`);
+         const armateObj = armateStr ? JSON.parse(armateStr) : {};
+         const armies = Object.values(armateObj);
 
          const nationsStr = await redis.get(`match:${ws.matchId}:nations`);
          const nations = nationsStr ? JSON.parse(nationsStr) : [];
@@ -84,34 +86,38 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
       }
 
       if (payload.action === 'SAVE_ARMIES') {
-         // Sincronizza lo stato armate dal frontend (es. creazione armata)
-         await redis.set(`match:${ws.matchId}:player:${userId}:armies`, JSON.stringify(payload.payload.armies));
+         // Sincronizza lo stato armate dal frontend (che invia un array)
+         const dict = {};
+         (payload.payload.armies || []).forEach(a => dict[a.id] = a);
+         await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(dict));
          return;
       }
 
       if (payload.action === 'MOVE_TROOPS') {
          const { armyId, targetName, targetCoords } = payload.payload;
-         const armiesStr = await redis.get(`match:${ws.matchId}:player:${userId}:armies`);
-         let armies = armiesStr ? JSON.parse(armiesStr) : [];
+         const armateStr = await redis.get(`match:${ws.matchId}:player:${ws.username}:armate`);
+         let armateObj = armateStr ? JSON.parse(armateStr) : {};
          
-         const armyIndex = armies.findIndex((a) => a.id === armyId);
-         if (armyIndex === -1) {
+         if (!armateObj[armyId]) {
              ws.send(JSON.stringify({ type: 'ERROR', error: 'Armata non trovata' }));
              return;
          }
          
          // TODO: Leggere dal file ETOPO reale in futuro
-         let startCoords = armies[armyIndex].currentLocation || '12.000, 41.000'; 
+         let loc = armateObj[armyId].currentLocation;
+         let startCoords = '12.000, 41.000';
+         if (loc && typeof loc === 'string') startCoords = loc;
+         else if (loc && loc.x !== undefined && loc.y !== undefined) startCoords = `${loc.x}, ${loc.y}`;
          
          const pathInfo = calculatePath(startCoords, targetCoords);
          
-         armies[armyIndex].status = 'moving';
-         armies[armyIndex].targetCoords = targetCoords;
-         armies[armyIndex].targetName = targetName;
-         armies[armyIndex].missionMode = payload.payload.mode;
+         armateObj[armyId].status = 'moving';
+         armateObj[armyId].targetCoords = targetCoords;
+         armateObj[armyId].targetName = targetName;
+         armateObj[armyId].missionMode = payload.payload.mode;
          
          // Salva su Redis
-         await redis.set(`match:${ws.matchId}:player:${userId}:armies`, JSON.stringify(armies));
+         await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(armateObj));
          
          // Notifica a tutti i giocatori del match (Broadcast)
          const broadcastPayload = {

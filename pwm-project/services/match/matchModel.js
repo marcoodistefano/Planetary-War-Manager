@@ -3,6 +3,8 @@ const db = require("../shared/postgresClient.js");
 const redis = require("../shared/redisClient.js"); // Client Redis collegato
 const Eru = require("./middleware/Eru.js");
 const territoryGenerator = require("./middleware/territoryGenerator.js");
+const troopGenerator = require("./middleware/troopGenerator.js");
+const { randomUUID } = require("crypto");
 
 let hasAbbandonoAlleanzaAtColumnCache = null;
 let hasJoinedAtColumnCache = null;
@@ -520,6 +522,15 @@ const createMatch = async ({ playerId, gameMode }) => {
           console.error("[SYS_WARN] Errore assegnazione territorio host:", err);
       }
 
+      // GENERAZIONE INIZIALE TRUPPE
+      try {
+          const userResHost = await client.query(`SELECT username FROM utenti WHERE id_user = $1`, [playerId]);
+          const hostUsername = userResHost.rows.length > 0 ? userResHost.rows[0].username : playerId;
+          await troopGenerator.generateInitialTroopsForMatch(id_partita_hash, partitaId, playerId, hostUsername);
+      } catch (err) {
+          console.error("[SYS_WARN] Errore generazione truppe iniziali:", err);
+      }
+
       return {
         status: "200",
         message: "Partita creata e istanziata correttamente.",
@@ -616,6 +627,46 @@ const join_Match = async (playerId, id_partita_hash) => {
         `INSERT INTO partecipanti_partite (partita_id, user_id, stato_territori) VALUES ($1, $2, $3::jsonb);`,
         [partitaId, playerId, JSON.stringify(statoTerritori)],
       );
+
+      // TRASFERIMENTO ARMATE DEL BOT AL NUOVO UTENTE (DB e Redis)
+      if (selectedNation) {
+          const botId = selectedNation.name + "_bot";
+          
+          // A. Spostamento in Redis
+          const botRedisKey = `match:${id_partita_hash}:player:${botId}:armate`;
+          const userRedisKey = `match:${id_partita_hash}:player:${sessionUsername}:armate`;
+          const botArmiesData = await redis.get(botRedisKey);
+          
+          let armiesObj = {};
+          if (botArmiesData) {
+              armiesObj = JSON.parse(botArmiesData);
+              await redis.set(userRedisKey, JSON.stringify(armiesObj));
+              await redis.del(botRedisKey);
+          }
+
+          // B. Inserimento nel Database (i bot esistono solo in Redis, quindi ora inseriamo per l'utente)
+          for (const armataId in armiesObj) {
+              const armata = armiesObj[armataId];
+              const { x, y } = armata.currentLocation;
+              
+              await client.query(
+                  `INSERT INTO armata (id_istanza_armata, partita_id, user_id, x, y, hp_tot, are_they_in_the_same_position, dmg_tot, max_range_atck, speed) 
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                  [armataId, partitaId, playerId, x, y, 1000, true, 10, 1, 1] 
+              );
+
+              let idTruppa = armata.truppeIds && armata.truppeIds.length > 0 ? armata.truppeIds[0] : null;
+              if (!idTruppa) {
+                  idTruppa = randomUUID();
+              }
+              
+              await client.query(
+                  `INSERT INTO truppe (id_istanza_truppa, partita_id, user_id, id_modello, id_armata, x, y, hp) 
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                  [idTruppa, partitaId, playerId, 'fante', armataId, x, y, 1000]
+              );
+          }
+      }
       const countRes = await client.query(
         `SELECT count(*) FROM partecipanti_partite WHERE partita_id = $1;`,
         [partitaId],
@@ -1607,7 +1658,10 @@ const authorizeWsConnection = async ({ userId, matchId }) => {
     const internalMatchId = resolvedMatch.state.id_partita;
 
     const { rows } = await db.query(
-      `SELECT 1 FROM partecipanti_partite WHERE partita_id = $1 AND user_id = $2`,
+      `SELECT p.user_id, u.username 
+       FROM partecipanti_partite p
+       JOIN utenti u ON p.user_id = u.id_user
+       WHERE p.partita_id = $1 AND p.user_id = $2`,
       [internalMatchId, userId]
     );
 
@@ -1615,7 +1669,7 @@ const authorizeWsConnection = async ({ userId, matchId }) => {
       return { ok: false, status: 403, error: "Utente non autorizzato ad accedere a questa partita" };
     }
 
-    return { ok: true, matchId: resolvedMatch.state.id_partita_hash };
+    return { ok: true, matchId: resolvedMatch.state.id_partita_hash, username: rows[0].username };
   } catch (error) {
     console.error("[SYS_ERR] authorizeWsConnection:", error);
     return { ok: false, status: 500, error: "Errore interno autorizzazione WS" };

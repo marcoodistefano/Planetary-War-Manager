@@ -82,7 +82,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   troopsDropdownX = 0;
   troopsDropdownY = 0;
   matchArmies: any[] = [];
-  armyMarkers = new Map<string, any>(); // <--- AGGIUNTO: per tenere traccia dei marker
+  armyMarkers = new Map<string, any>(); // Ripristinato per i marker HTML
+  isFirstArmyRender = true;
   matchNations: any[] = [];
   regionsGeoData: any = null;
   nationMarkers: any[] = [];
@@ -738,8 +739,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 8);
       this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 8);
 
-      // Assicuriamoci di renderizzare eventuali armate ricevute via WS prima del caricamento mappa
-      this.renderArmies();
+      // Eliminato il setup nativo GeoJSON perché causava offset grafico ingestibile con le immagini grandi.
+      // Torniamo al caricamento DOM che adatta il background-size al div in pixel.
+      setTimeout(() => {
+          this.renderArmies();
+      }, 500);
     });
 
     let touchStartTime = 0;
@@ -817,41 +821,67 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
+    let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90;
+    let hasArmies = false;
+
     // Aggiungiamo o aggiorniamo i marker
     this.matchArmies.forEach(army => {
       if (!army.currentLocation) return;
 
-      const coords = army.currentLocation.split(',').map((c: string) => parseFloat(c.trim()));
-      if (coords.length !== 2) return;
+      let coords: [number, number];
+      if (typeof army.currentLocation === 'string') {
+          const parts = army.currentLocation.split(',').map((c: string) => parseFloat(c.trim()));
+          if (parts.length !== 2) return;
+          coords = [parts[0], parts[1]];
+      } else if (army.currentLocation && army.currentLocation.x !== undefined && army.currentLocation.y !== undefined) {
+          coords = [army.currentLocation.x, army.currentLocation.y];
+      } else {
+          return;
+      }
 
-      console.log(`[DEBUG_MAP] Rendering marker per armata ${army.id} a coordinate:`, coords);
+      hasArmies = true;
+      if (coords[0] < minLng) minLng = coords[0];
+      if (coords[0] > maxLng) maxLng = coords[0];
+      if (coords[1] < minLat) minLat = coords[1];
+      if (coords[1] > maxLat) maxLat = coords[1];
+
+      const totalTroops = (Object.values(army.composition || {}) as number[]).reduce((a, b) => a + b, 0) as number;
 
       if (this.armyMarkers.has(army.id)) {
         // Aggiorna posizione se necessario
         const marker = this.armyMarkers.get(army.id);
         marker.setLngLat([coords[0], coords[1]]);
-
-        // Aggiorna il numero di truppe
-        const totalTroops = (Object.values(army.composition || {}) as number[]).reduce((a, b) => a + b, 0) as number;
         const badgeEl = marker.getElement().querySelector('.army-badge') as HTMLElement;
         if (badgeEl) badgeEl.innerText = String(totalTroops);
-
+        // Salviamo info per il clustering
+        marker.troopsData = { total: totalTroops, id: army.id };
       } else {
-        // Crea nuovo marker come contenitore
+        // Il root element fornito a MapLibre deve essere 0x0 pixel senza anchor automatico,
+        // altrimenti cambiando la dimensione del figlio, MapLibre si sfasa dal nodo.
         const el = document.createElement('div');
         el.className = 'army-marker';
-        // Le dimensioni vengono impostate e aggiornate in updateArmyMarkersScale
-        el.style.display = 'flex';
-        el.style.justifyContent = 'center';
-        el.style.alignItems = 'flex-end';
-        el.style.cursor = 'pointer';
-        el.style.zIndex = '999';
+        el.style.width = '0px';
+        el.style.height = '0px';
         el.style.position = 'relative';
-        el.title = army.name;
+        el.style.zIndex = '999';
 
-        const totalTroops = (Object.values(army.composition || {}) as number[]).reduce((a, b) => a + b, 0) as number;
+        // Il vero contenitore che scala e si allinea al centro in basso
+        const container = document.createElement('div');
+        container.className = 'army-container';
+        container.style.position = 'absolute';
+        container.style.bottom = '0';
+        container.style.left = '50%';
+        container.style.transform = 'translateX(-50%)';
+        container.style.display = 'flex';
+        container.style.justifyContent = 'center';
+        container.style.alignItems = 'flex-end';
+        container.style.cursor = 'pointer';
+        container.title = army.name;
 
-        // Div per l'immagine del soldato (visibile quando zoomato)
+        // Inizializziamo a 32x32 per sicurezza
+        container.style.width = '32px';
+        container.style.height = '32px';
+
         const imgDiv = document.createElement('div');
         imgDiv.className = 'army-image';
         imgDiv.style.width = '100%';
@@ -861,79 +891,134 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         imgDiv.style.backgroundRepeat = 'no-repeat';
         imgDiv.style.backgroundPosition = 'center bottom';
 
-        // Div per il badge/banner numerico (visibile quando de-zoomato, o insieme al soldato)
         const badgeDiv = document.createElement('div');
         badgeDiv.className = 'army-badge';
         badgeDiv.innerText = String(totalTroops);
-        badgeDiv.style.backgroundColor = '#e5e7eb'; // Grigio chiaro
-        badgeDiv.style.color = '#1f2937'; // Testo scuro
-        badgeDiv.style.borderRadius = '4px'; // Quadrato con bordi arrotondati
-        badgeDiv.style.width = '100%';
-        badgeDiv.style.height = '100%';
-        badgeDiv.style.padding = '0';
+        badgeDiv.style.backgroundColor = '#e5e7eb';
+        badgeDiv.style.color = '#1f2937';
+        badgeDiv.style.borderRadius = '4px';
+        badgeDiv.style.width = 'max-content'; // Si adatta al testo
+        badgeDiv.style.height = 'fit-content';
+        badgeDiv.style.padding = '1px 4px';
         badgeDiv.style.display = 'flex';
         badgeDiv.style.alignItems = 'center';
         badgeDiv.style.justifyContent = 'center';
         badgeDiv.style.fontSize = '11px';
         badgeDiv.style.fontWeight = 'bold';
-        badgeDiv.style.border = '1px solid #9ca3af'; // Bordino grigio scuro
+        badgeDiv.style.border = '1px solid #9ca3af';
         badgeDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
         badgeDiv.style.position = 'absolute';
 
-        el.appendChild(imgDiv);
-        el.appendChild(badgeDiv);
+        container.appendChild(imgDiv);
+        container.appendChild(badgeDiv);
+        el.appendChild(container);
 
-        // Centriamo il marker (anchor = bottom per far coincidere la base alla coordinata)
-        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([coords[0], coords[1]])
           .addTo(this.map);
-
+        
+        // Salviamo dati utili sul marker stesso
+        (marker as any).troopsData = { total: totalTroops, id: army.id };
         this.armyMarkers.set(army.id, marker);
       }
     });
+
+    if (this.isFirstArmyRender && hasArmies) {
+        this.isFirstArmyRender = false;
+        if (minLng <= maxLng && minLat <= maxLat) {
+            this.map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 50, maxZoom: 6, duration: 2000 });
+        }
+    }
 
     // Aggiorniamo la visibilità subito dopo il render
     this.updateArmyMarkersScale();
   }
 
-  // Modifica visibilità in base allo zoom
+  // Modifica visibilità in base allo zoom e accorpa vicini
   updateArmyMarkersScale() {
     if (!this.map) return;
     const currentZoom = this.map.getZoom();
-    const thresholdZoom = 5.5; // Sotto questo livello, mostra solo il badge
+    const thresholdZoom = 5.5; // Sotto questo livello si accorpano e nascondono i numeri
 
+    // Raccogliamo la proiezione a schermo di tutti i marker
+    const screenMarkers: any[] = [];
     this.armyMarkers.forEach(marker => {
-      const el = marker.getElement();
-      const imgDiv = el.querySelector('.army-image') as HTMLElement;
-      const badgeDiv = el.querySelector('.army-badge') as HTMLElement;
+        const coords = marker.getLngLat();
+        const screenPt = this.map.project(coords);
+        screenMarkers.push({ marker, pt: screenPt, x: screenPt.x, y: screenPt.y });
+    });
 
-      if (!imgDiv || !badgeDiv) return;
+    // Distanza in pixel sotto la quale i marker vengono "clusterizzati"
+    const clusterPixelRadius = 40; 
+    const clusters: any[] = [];
 
-      if (currentZoom < thresholdZoom) {
-        // Nascondi l'avatar, mostra SOLO il badge al centro
-        el.style.width = '22px';
-        el.style.height = '22px';
-        imgDiv.style.display = 'none';
-        badgeDiv.style.display = 'flex';
-        badgeDiv.style.position = 'relative';
-        badgeDiv.style.bottom = 'auto';
-        badgeDiv.style.left = 'auto';
-        badgeDiv.style.transform = 'none';
-      } else {
-        // Calcoliamo una scala dinamica per l'avatar basata sullo zoom
-        // Esempio: min size 32px (a zoom 5.5), max size 80px (a zoom 10+)
-        const minSize = 32;
-        const maxSize = 80;
-        const scaleFactor = Math.min(Math.max((currentZoom - thresholdZoom) / (10 - thresholdZoom), 0), 1);
-        const dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
+    // Algoritmo greedy di clustering su schermo
+    for (const item of screenMarkers) {
+        let addedToCluster = false;
+        for (const cluster of clusters) {
+            const dx = item.x - cluster.x;
+            const dy = item.y - cluster.y;
+            if (Math.sqrt(dx*dx + dy*dy) < clusterPixelRadius) {
+                cluster.items.push(item);
+                addedToCluster = true;
+                break;
+            }
+        }
+        if (!addedToCluster) {
+            clusters.push({ x: item.x, y: item.y, items: [item] });
+        }
+    }
 
-        el.style.width = `${dynamicSize}px`;
-        el.style.height = `${dynamicSize}px`;
+    // Adesso applichiamo le classi e le scale
+    clusters.forEach(cluster => {
+        // Il marker principale è quello con più truppe o il primo
+        cluster.items.sort((a: any, b: any) => b.marker.troopsData.total - a.marker.troopsData.total);
+        const mainItem = cluster.items[0];
+        
+        cluster.items.forEach((item: any, index: number) => {
+            const el = item.marker.getElement();
+            const container = el.querySelector('.army-container') as HTMLElement;
+            const imgDiv = el.querySelector('.army-image') as HTMLElement;
+            const badgeDiv = el.querySelector('.army-badge') as HTMLElement;
+            if (!container || !imgDiv || !badgeDiv) return;
 
-        // Mostra SOLO l'avatar, nascondi completamente il badge
-        imgDiv.style.display = 'block';
-        badgeDiv.style.display = 'none';
-      }
+            // Nascondiamo i marker secondari del cluster
+            if (index > 0 && currentZoom < thresholdZoom) {
+                el.style.display = 'none';
+                return;
+            }
+            
+            el.style.display = 'block';
+
+            // Scala di base del marker principale
+            const minSize = 32;
+            const maxSize = 80;
+            const scaleFactor = Math.min(Math.max((currentZoom - 3) / (10 - 3), 0), 1);
+            let dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
+
+            // Se siamo in dezoom e ci sono marker accorpati, aumentiamo la dimensione grafica
+            if (currentZoom < thresholdZoom && cluster.items.length > 1) {
+                dynamicSize = dynamicSize * 1.5; // Facciamo la pedina più grande per indicare il cluster
+            }
+
+            container.style.width = `${dynamicSize}px`;
+            container.style.height = `${dynamicSize}px`;
+
+            if (currentZoom < thresholdZoom) {
+                // In fase di dezoom: Mostra SOLO l'avatar (scalato), nascondi completamente il numero
+                imgDiv.style.display = 'block';
+                badgeDiv.style.display = 'none';
+            } else {
+                // Zoom ravvicinato: Mostra l'avatar e anche il numero
+                imgDiv.style.display = 'block';
+                badgeDiv.style.display = 'flex';
+                // Posiziona il badge
+                badgeDiv.style.position = 'absolute';
+                badgeDiv.style.bottom = 'auto';
+                badgeDiv.style.top = '100%'; // Sotto i piedi del soldato
+                badgeDiv.style.marginTop = '2px';
+            }
+        });
     });
   }
 
