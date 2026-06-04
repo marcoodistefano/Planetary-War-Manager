@@ -10,8 +10,8 @@ const matchModel = require("./matchModel.js");
 const { getAuthContextFromRequest } = require("../shared/authContext.js");
 const { initDispatcher } = require("./Dispatcher/webDispatcher.js");
 const redis = require("../shared/redisClient.js");
-const { calculatePath } = require("./movementLogic.js");
-const { startTroopGenerator } = require("./troopGenerator.js");
+const { calculatePath } = require("./middleware/movementLogic.js");
+const { startTroopGenerator } = require("./middleware/troopGenerator.js");
 
 const app = express();
 

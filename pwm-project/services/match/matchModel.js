@@ -2,6 +2,7 @@ const aslan = require("./middleware/Aslan.js");
 const db = require("../shared/postgresClient.js");
 const redis = require("../shared/redisClient.js"); // Client Redis collegato
 const Eru = require("./middleware/Eru.js");
+const territoryGenerator = require("./middleware/territoryGenerator.js");
 
 let hasAbbandonoAlleanzaAtColumnCache = null;
 let hasJoinedAtColumnCache = null;
@@ -475,6 +476,9 @@ const createMatch = async ({ playerId, gameMode }) => {
         `[SYS_OK] Partita istanziata su Postgres e caricata in cache Redis: ${id_partita_hash}`,
       );
 
+      // Generazione dei territori e nazioni
+      await territoryGenerator.generateNations(id_partita_hash, gameMode.maxPlayers);
+
       return {
         status: "200",
         message: "Partita creata e istanziata correttamente.",
@@ -526,10 +530,47 @@ const join_Match = async (playerId, id_partita_hash) => {
       if (checkUser.rows.length > 0)
         throw { customStatus: "400", message: "Sei già in questa partita." };
 
+      // 2.5 Selezione Nazione e Preparazione stato_territori
+      const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
+      let selectedNation = null;
+      let statoTerritori = {};
+      const isBot = String(playerId).toUpperCase().includes("BOT");
+
+      if (nationsCache) {
+          const nations = JSON.parse(nationsCache);
+          const freeNations = nations.filter(n => !n.isOccupied && !n.inWar);
+          if (freeNations.length > 0) {
+              const randomIndex = Math.floor(Math.random() * freeNations.length);
+              selectedNation = freeNations[randomIndex];
+
+              // Aggiornamento occupazione in Redis
+              selectedNation.isOccupied = true;
+              selectedNation.playerId = playerId;
+              const indexToUpdate = nations.findIndex(n => n.nationId === selectedNation.nationId);
+              nations[indexToUpdate] = selectedNation;
+              await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
+
+              // Compilazione JSON per Postgres (Solo per i player reali)
+              if (!isBot) {
+                  const blankTemplateRaw = await redis.get(`map_data:regions_blank_template`);
+                  if (blankTemplateRaw) {
+                      statoTerritori = JSON.parse(blankTemplateRaw);
+                      for (const [admin, provs] of Object.entries(selectedNation.territories)) {
+                          if (statoTerritori[admin]) {
+                              for (const prov of provs) {
+                                  statoTerritori[admin][prov] = true;
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      }
+
       // 3. Inserimento e conteggio
       await client.query(
-        `INSERT INTO partecipanti_partite (partita_id, user_id) VALUES ($1, $2);`,
-        [partitaId, playerId],
+        `INSERT INTO partecipanti_partite (partita_id, user_id, stato_territori) VALUES ($1, $2, $3::jsonb);`,
+        [partitaId, playerId, JSON.stringify(statoTerritori)],
       );
       const countRes = await client.query(
         `SELECT count(*) FROM partecipanti_partite WHERE partita_id = $1;`,

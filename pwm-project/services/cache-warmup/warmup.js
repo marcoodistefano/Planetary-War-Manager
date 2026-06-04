@@ -290,10 +290,10 @@ const loadMapDataForBackend = async () => {
   const mapDir = path.join(assetRoot, "map");
   try {
     const entries = await fs.readdir(mapDir, { withFileTypes: true });
-    
+
     let multi = redis.multi();
     let batchedCommands = 0;
-    
+
     // File attualmente abilitati per il caricamento in cache backend
     const ENABLED_MAP_FILES = [
       "archs.json",
@@ -302,41 +302,41 @@ const loadMapDataForBackend = async () => {
       "regions.json",
       "nations.json"
     ];
-    
+
     for (const entry of entries) {
       if (entry.isDirectory() || !entry.name.endsWith(".json")) continue;
-      
+
       if (!ENABLED_MAP_FILES.includes(entry.name)) {
         console.log(`[CACHE_WARMUP] Salto il caricamento backend di ${entry.name} (attualmente disabilitato).`);
         continue;
       }
-      
+
       const absolutePath = path.join(mapDir, entry.name);
       const baseName = path.basename(entry.name, ".json");
-      
+
       if (entry.name === "minimum_path.json") {
         console.log(`[CACHE_WARMUP] Caricamento in stream di ${entry.name} per il backend...`);
         const rl = readline.createInterface({
           input: createReadStream(absolutePath),
           crlfDelay: Infinity
         });
-        
+
         for await (const line of rl) {
           const trimmed = line.trim();
           if (trimmed === "{" || trimmed === "}") continue;
-          
+
           let jsonStr = trimmed;
           if (jsonStr.endsWith(",")) jsonStr = jsonStr.slice(0, -1);
           if (!jsonStr) continue;
-          
+
           try {
             const obj = JSON.parse(`{${jsonStr}}`);
             const city = Object.keys(obj)[0];
             const paths = obj[city];
-            
+
             multi.set(`map_data:minimum_path:${city}`, JSON.stringify(paths));
             batchedCommands++;
-            
+
             if (batchedCommands > 1000) {
               await multi.exec();
               multi = redis.multi();
@@ -350,14 +350,76 @@ const loadMapDataForBackend = async () => {
         const content = await fs.readFile(absolutePath, "utf-8");
         multi.set(`map_data:${baseName}`, content);
         batchedCommands++;
+
+        if (baseName === "regions") {
+          console.log(`[CACHE_WARMUP] Calcolo adiacenze topologiche e template DB per regions...`);
+          try {
+            const r = JSON.parse(content);
+            const objKey = Object.keys(r.objects)[0];
+            const obj = r.objects[objKey];
+            const arcsToPolygons = {};
+            const adj = {};
+            const blankTemplate = {};
+
+            obj.geometries.forEach((geom, i) => {
+              const provCode = geom.properties.adm1_code || String(i);
+              const admin = geom.properties.admin || "World";
+
+              adj[i] = {
+                id: provCode,
+                index: i,
+                admin: admin,
+                name: geom.properties.name || provCode,
+                neighbors: new Set()
+              };
+
+              if (!blankTemplate[admin]) blankTemplate[admin] = {};
+              blankTemplate[admin][provCode] = false;
+
+              const addArc = (arc) => {
+                const absoluteArc = arc < 0 ? ~arc : arc;
+                if (!arcsToPolygons[absoluteArc]) arcsToPolygons[absoluteArc] = [];
+                arcsToPolygons[absoluteArc].push(i);
+              };
+
+              if (geom.type === "Polygon") {
+                (geom.arcs || []).forEach(ring => ring.forEach(addArc));
+              } else if (geom.type === "MultiPolygon") {
+                (geom.arcs || []).forEach(poly => poly.forEach(ring => ring.forEach(addArc)));
+              }
+            });
+
+            for (const pols of Object.values(arcsToPolygons)) {
+              if (pols.length > 1) {
+                for (let x = 0; x < pols.length; x++) {
+                  for (let y = x + 1; y < pols.length; y++) {
+                    adj[pols[x]].neighbors.add(adj[pols[y]].index);
+                    adj[pols[y]].neighbors.add(adj[pols[x]].index);
+                  }
+                }
+              }
+            }
+
+            for (const key of Object.keys(adj)) {
+              adj[key].neighbors = Array.from(adj[key].neighbors);
+            }
+
+            multi.set(`map_data:regions_adjacency`, JSON.stringify(adj));
+            multi.set(`map_data:regions_blank_template`, JSON.stringify(blankTemplate));
+            batchedCommands += 2;
+            console.log(`[CACHE_WARMUP] Adiacenze e template calcolati per ${Object.keys(adj).length} regioni.`);
+          } catch (parseError) {
+            console.error(`[CACHE_WARMUP] Errore nel parsing di regions.json:`, parseError.message);
+          }
+        }
       }
+
+      if (batchedCommands > 0) {
+        await multi.exec();
+      }
+
+      console.log("[CACHE_WARMUP] Dati della mappa per il backend caricati su Redis con successo.");
     }
-    
-    if (batchedCommands > 0) {
-      await multi.exec();
-    }
-    
-    console.log("[CACHE_WARMUP] Dati della mappa per il backend caricati su Redis con successo.");
   } catch (err) {
     console.error("[CACHE_WARMUP] Errore durante il caricamento dei dati mappa per il backend:", err.message);
   }

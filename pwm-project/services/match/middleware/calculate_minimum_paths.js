@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const ARCHS_FILE = path.join(__dirname, '../../shared/assets/map/archs.json');
-const OUTPUT_FILE = path.join(__dirname, '../../shared/assets/map/minimum_path.json');
+const ARCHS_FILE = path.join(__dirname, '../../../shared/assets/map/archs.json');
+const OUTPUT_FILE = path.join(__dirname, '../../../shared/assets/map/minimum_path.json');
 
 function main() {
     console.log('Lettura del file archs.json...');

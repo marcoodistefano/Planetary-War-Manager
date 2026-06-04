@@ -1,5 +1,5 @@
-const db = require('../shared/postgresClient');
-const redis = require('../shared/redisClient');
+const db = require('../../shared/postgresClient');
+const redis = require('../../shared/redisClient');
 const { randomUUID } = require('crypto');
 
 const PALERMO_COORDS = { x: 13.348081, y: 38.126969 };
