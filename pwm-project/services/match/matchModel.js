@@ -479,6 +479,47 @@ const createMatch = async ({ playerId, gameMode }) => {
       // Generazione dei territori e nazioni
       await territoryGenerator.generateNations(id_partita_hash, gameMode.maxPlayers);
 
+      // ASSEGNAZIONE TERRITORIO ALL'HOST
+      try {
+          const userRes = await client.query(`SELECT username FROM utenti WHERE id_user = $1`, [playerId]);
+          const sessionUsername = userRes.rows.length > 0 ? userRes.rows[0].username : playerId;
+
+          const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
+          if (nationsCache) {
+              const nations = JSON.parse(nationsCache);
+              const freeNations = nations.filter(n => String(n.playerId).includes('_bot') && !n.inWar);
+              if (freeNations.length > 0) {
+                  const randomIndex = Math.floor(Math.random() * freeNations.length);
+                  let selectedNation = freeNations[randomIndex];
+                  
+                  selectedNation.isOccupied = true;
+                  selectedNation.playerId = sessionUsername;
+                  const indexToUpdate = nations.findIndex(n => n.nationId === selectedNation.nationId);
+                  nations[indexToUpdate] = selectedNation;
+                  await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
+
+                  let statoTerritori = {};
+                  const blankTemplateRaw = await redis.get(`map_data:regions_blank_template`);
+                  if (blankTemplateRaw) {
+                      statoTerritori = JSON.parse(blankTemplateRaw);
+                      for (const [admin, provs] of Object.entries(selectedNation.territories)) {
+                          if (statoTerritori[admin]) {
+                              for (const prov of provs) {
+                                  statoTerritori[admin][prov] = true;
+                              }
+                          }
+                      }
+                  }
+                  await client.query(
+                    `UPDATE partecipanti_partite SET stato_territori = $1::jsonb WHERE partita_id = $2 AND user_id = $3`,
+                    [JSON.stringify(statoTerritori), partitaId, playerId]
+                  );
+              }
+          }
+      } catch (err) {
+          console.error("[SYS_WARN] Errore assegnazione territorio host:", err);
+      }
+
       return {
         status: "200",
         message: "Partita creata e istanziata correttamente.",
@@ -524,11 +565,14 @@ const join_Match = async (playerId, id_partita_hash) => {
 
       // 2. Verifica se utente già presente
       const checkUser = await client.query(
-        `SELECT 1 FROM partecipanti_partite WHERE partita_id = $1 AND user_id = $2`,
+        `SELECT u.username FROM partecipanti_partite p JOIN utenti u ON p.user_id = u.id_user WHERE p.partita_id = $1 AND p.user_id = $2`,
         [partitaId, playerId],
       );
       if (checkUser.rows.length > 0)
         throw { customStatus: "400", message: "Sei già in questa partita." };
+
+      const userRes = await client.query(`SELECT username FROM utenti WHERE id_user = $1`, [playerId]);
+      const sessionUsername = userRes.rows.length > 0 ? userRes.rows[0].username : playerId;
 
       // 2.5 Selezione Nazione e Preparazione stato_territori
       const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
@@ -538,14 +582,14 @@ const join_Match = async (playerId, id_partita_hash) => {
 
       if (nationsCache) {
           const nations = JSON.parse(nationsCache);
-          const freeNations = nations.filter(n => !n.isOccupied && !n.inWar);
+          const freeNations = nations.filter(n => String(n.playerId).includes('_bot') && !n.inWar);
           if (freeNations.length > 0) {
               const randomIndex = Math.floor(Math.random() * freeNations.length);
               selectedNation = freeNations[randomIndex];
 
               // Aggiornamento occupazione in Redis
               selectedNation.isOccupied = true;
-              selectedNation.playerId = playerId;
+              selectedNation.playerId = sessionUsername;
               const indexToUpdate = nations.findIndex(n => n.nationId === selectedNation.nationId);
               nations[indexToUpdate] = selectedNation;
               await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
@@ -600,7 +644,7 @@ const join_Match = async (playerId, id_partita_hash) => {
         await setMatchCacheAllIds({
           id_partita: partitaId,
           id_partita_hash: id_partita_hash,
-          id_partita_visualizzato: id_partita_visualizzato,
+          id_partita_visualizzato: matchQuery.rows[0].id_partita_visualizzato,
           stateObj: matchCache,
         });
 

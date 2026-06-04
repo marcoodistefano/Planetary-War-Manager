@@ -18,6 +18,9 @@
         <div class="nav-item" [class.active]="activeTab === 'search'" (click)="activeTab = 'search'">
           <ion-icon name="search-outline"></ion-icon><span>CERCA</span>
         </div>
+        <div class="nav-item" [class.active]="activeTab === 'players'" (click)="activeTab = 'players'">
+          <ion-icon name="globe-outline"></ion-icon><span>PARTECIPANTI</span>
+        </div>
       </nav>
       <div class="sidebar-footer ion-hide-md-down">
         <button class="exit-btn" (click)="close.emit()">
@@ -197,6 +200,25 @@
               <div class="empty-state">Nessuna alleanza trovata con i criteri di ricerca.</div>
             </ng-template>
           </div>
+        </ng-container>
+
+        <ng-container *ngIf="activeTab === 'players'">
+          <p class="track-label">Fazioni e Partecipanti Globali</p>
+          <div class="sensor-grid" *ngIf="allNations.length; else noNations">
+            <div class="sensor-row" *ngFor="let nation of allNations">
+              <span style="display: flex; flex-direction: column;">
+                <span style="font-weight: bold; color: #fff;">{{ nation.name }}</span>
+                <span style="font-size: 10px; opacity: 0.7;">Occupato da:</span>
+              </span>
+              <span class="sensor-val" [style.color]="nation.owner.toLowerCase() === currentUser.toLowerCase() ? 'var(--success-green)' : 'var(--gold-accent)'">
+                {{ nation.owner }}
+                <span *ngIf="nation.isBot" style="font-size: 10px; vertical-align: top; margin-left: 3px; color: var(--danger-red);">(BOT)</span>
+              </span>
+            </div>
+          </div>
+          <ng-template #noNations>
+            <div class="empty-state">Nessuna nazione attualmente occupata sulla mappa globale.</div>
+          </ng-template>
         </ng-container>
       </div>
     </div>

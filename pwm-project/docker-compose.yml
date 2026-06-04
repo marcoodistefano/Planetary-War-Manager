@@ -116,6 +116,7 @@ services:
     volumes:
       - ./services/match:/app/services/match
       - ./services/shared:/app/services/shared
+      - ./shared:/app/shared
     depends_on:
       - db
       - redis

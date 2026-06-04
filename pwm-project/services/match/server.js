@@ -75,7 +75,11 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
       if (payload.action === 'GET_INITIAL_STATE') {
          const armiesStr = await redis.get(`match:${ws.matchId}:player:${userId}:armies`);
          const armies = armiesStr ? JSON.parse(armiesStr) : [];
-         ws.send(JSON.stringify({ type: 'INITIAL_STATE', payload: { armies } }));
+
+         const nationsStr = await redis.get(`match:${ws.matchId}:nations`);
+         const nations = nationsStr ? JSON.parse(nationsStr) : [];
+
+         ws.send(JSON.stringify({ type: 'INITIAL_STATE', payload: { armies, nations } }));
          return;
       }
 
@@ -177,7 +181,7 @@ const MINIMUM_PATH_FILE = path.join(__dirname, "../../shared/assets/map/minimum_
 if (!fs.existsSync(MINIMUM_PATH_FILE)) {
   console.log("[SYSTEM] File minimum_path.json non trovato. Generazione in corso (potrebbe richiedere 15s)...");
   try {
-    execSync("node calculate_minimum_paths.js", { stdio: "inherit", cwd: __dirname });
+    execSync("node middleware/calculate_minimum_paths.js", { stdio: "inherit", cwd: __dirname });
     console.log("[SYSTEM] Generazione minimum_path.json completata con successo.");
   } catch (err) {
     console.error("[SYS_ERR] Errore durante la generazione dei cammini minimi:", err.message);

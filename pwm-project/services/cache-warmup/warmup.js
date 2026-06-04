@@ -370,6 +370,8 @@ const loadMapDataForBackend = async () => {
                 index: i,
                 admin: admin,
                 name: geom.properties.name || provCode,
+                lat: geom.properties.latitude || 0,
+                lng: geom.properties.longitude || 0,
                 neighbors: new Set()
               };
 

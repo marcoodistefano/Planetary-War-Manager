@@ -59,17 +59,44 @@ const generateNations = async (matchId, maxPlayers) => {
                         queue.push(...newNeighbors);
                     }
                 } else {
+                    const toRad = x => x * Math.PI / 180;
+                    const haversineDistance = (lat1, lon1, lat2, lon2) => {
+                        if (!lat1 || !lon1 || !lat2 || !lon2) return 99999;
+                        const R = 6371; 
+                        const dLat = toRad(lat2 - lat1);
+                        const dLon = toRad(lon2 - lon1);
+                        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                                  Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    };
+
                     let jumped = false;
+                    let bestCandidate = null;
+                    let minDistance = Infinity;
+                    const lastRegionIdx = currentNationRegions[currentNationRegions.length - 1];
+                    const lastRegion = adj[lastRegionIdx];
+
                     for (const regIdx of unassigned) {
-                        if (adj[regIdx].admin === targetAdmin) {
-                            const jumpRegion = adj[regIdx];
-                            currentNationRegions.push(jumpRegion.index);
-                            unassigned.delete(String(jumpRegion.index));
-                            queue.push(...jumpRegion.neighbors.filter(n => unassigned.has(String(n))));
-                            jumped = true;
-                            break;
+                        const candidate = adj[regIdx];
+                        let dist = 0;
+                        if (lastRegion && candidate) {
+                            dist = haversineDistance(lastRegion.lat, lastRegion.lng, candidate.lat, candidate.lng);
+                        }
+                        const penalty = candidate.admin === targetAdmin ? 0 : 5000;
+                        if (dist + penalty < minDistance) {
+                            minDistance = dist + penalty;
+                            bestCandidate = candidate;
                         }
                     }
+
+                    if (bestCandidate !== null) {
+                        currentNationRegions.push(bestCandidate.index);
+                        unassigned.delete(String(bestCandidate.index));
+                        queue.push(...bestCandidate.neighbors.filter(n => unassigned.has(String(n))));
+                        jumped = true;
+                    }
+
                     if (!jumped) {
                         break; 
                     }
@@ -113,9 +140,9 @@ const generateNations = async (matchId, maxPlayers) => {
             nations.push({
                 nationId: nationIdCounter++,
                 name: finalNationName,
-                isOccupied: false,
+                isOccupied: true,
                 inWar: false,
-                playerId: null,
+                playerId: finalNationName + "_bot",
                 territories_flat: provCodesFlat,
                 territories: provCodesByAdmin
             });

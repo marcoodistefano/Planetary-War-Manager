@@ -34,10 +34,11 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
   @Output() alliancesChanged = new EventEmitter<void>();
   @Input() alliances: MatchAllianceView[] = [];
   @Input() matchPlayers: string[] = [];
+  @Input() matchNations: any[] = [];
   @Input() currentUser = '';
   @Input() matchId = '';
 
-  activeTab: 'status' | 'manage' | 'search' = 'status';
+  activeTab: 'status' | 'manage' | 'search' | 'players' = 'status';
 
   selectedAllianceIndex = 0;
   allianceActionError = '';
@@ -61,6 +62,24 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
 
   get selectedAlliance(): MatchAllianceView | null {
     return this.alliances[this.selectedAllianceIndex] || null;
+  }
+
+  get allNations(): any[] {
+    if (!this.matchNations || !this.matchNations.length) return [];
+    return this.matchNations
+      .filter(n => n.isOccupied)
+      .map(n => {
+        const name = String(n.name || 'NAZIONE SCONOSCIUTA').toUpperCase();
+        const rawOwner = String(n.playerId || '');
+        const isBot = rawOwner.toLowerCase().includes('bot');
+        const owner = isBot ? rawOwner.replace(/_bot/gi, '') : rawOwner;
+        return {
+          name,
+          owner: owner.toUpperCase(),
+          isBot
+        };
+      })
+      .sort((a, b) => a.owner.localeCompare(b.owner));
   }
 
   get selectedAllianceMembers(): AllianceMemberView[] {
