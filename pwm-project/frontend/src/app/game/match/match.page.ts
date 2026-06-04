@@ -1,7 +1,7 @@
 import { Component, OnInit, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController, MenuController } from '@ionic/angular'; // <--- AGGIUNTO MenuController
+import { IonicModule, ModalController, MenuController, ToastController } from '@ionic/angular'; // <--- AGGIUNTO MenuController
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { HomeService } from '../../home/home';
@@ -52,7 +52,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   currentHoveredName = '';
   selectedPointName = '';
   selectedPointCoords = '--';
-  
+  selectedPointLngLat: [number, number] | null = null;
+  activePopup: any = null;
+  popupTimer: any = null;
+
   // WebSocket State
   matchSocket?: WebSocket;
   private reconnectTimer?: number;
@@ -177,6 +180,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     private modalCtrl: ModalController,
     private menuCtrl: MenuController,
+    private toastCtrl: ToastController,
     private route: ActivatedRoute,
     private homeService: HomeService,
     private authApi: AuthApiService,
@@ -223,6 +227,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     if (this.avatarSub) {
       this.avatarSub.unsubscribe();
+    }
+
+    // Fix: Previeni Memory Leak del WebGL Context
+    if (this.map) {
+      this.map.remove();
     }
   }
 
@@ -516,10 +525,29 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit() {
-    setTimeout(() => {
-      this.initMap();
-      setTimeout(() => { if (this.map) this.map.resize(); }, 300);
-    }, 150);
+    // Lasciamo vuoto, l'inizializzazione passa a ionViewDidEnter per attendere il CSS
+  }
+
+  ionViewDidEnter() {
+    // Chiudiamo menu se rimasti aperti
+    this.menuCtrl.close('mobile-tactical-menu').catch(() => { });
+
+    // Inizializza la mappa SOLO se non esiste già
+    if (!this.map) {
+      setTimeout(() => {
+        this.initMap();
+
+        // Un singolo resize assicurativo post-rendering
+        setTimeout(() => {
+          if (this.map) {
+            this.map.resize();
+          }
+        }, 200);
+      }, 50);
+    } else {
+      // Se esisteva già (es. da cache del router), forza il resize
+      this.map.resize();
+    }
   }
 
   // --- AZIONI HUD E CONTROLLI UI ---
@@ -687,7 +715,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           { id: 'carto-light', type: 'raster', source: 'carto-light-tiles', layout: { visibility: 'none' } }
         ]
       },
-      center: [12.5, 41.9], zoom: 3.5, minZoom: 1.5, maxZoom: 8, renderWorldCopies: true, projection: { type: 'mercator' }
+      center: [12.5, 41.9], zoom: 3, minZoom: 3, maxZoom: 8, renderWorldCopies: true, projection: { type: 'mercator' }
     });
 
     this.map.dragRotate.disable();
@@ -697,8 +725,6 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.map.on('load', () => {
-      this.map.addSource('terrain-source', { type: 'raster-dem', url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${this.MAPTILER_KEY}`, tileSize: 256 });
-      this.map.setTerrain({ source: 'terrain-source', exaggeration: 1.2 });
       this.map.addSource('contours', { type: 'vector', url: `https://api.maptiler.com/tiles/contours-v2/tiles.json?key=${this.MAPTILER_KEY}` });
 
       this.map.addLayer({
@@ -707,11 +733,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         'paint': { 'line-color': '#f59e0b', 'line-width': ['case', ['==', ['get', 'nth_line'], 5], 1.5, 0.5], 'line-opacity': 0.8 }
       });
 
-      this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3.5);
-      this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3.5, 24);
-      this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
-      this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 24);
-      
+      this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3);
+      this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3, 8);
+      this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 8);
+      this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 8);
+
       // Assicuriamoci di renderizzare eventuali armate ricevute via WS prima del caricamento mappa
       this.renderArmies();
     });
@@ -781,7 +807,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   renderArmies() {
     console.log('[DEBUG_MAP] renderArmies richiamato. Mappa pronta?', !!this.map, 'Armate in memoria:', this.matchArmies.length);
     if (!this.map) return;
-    
+
     // Rimuoviamo i marker non più presenti
     const currentArmyIds = new Set(this.matchArmies.map(a => a.id));
     for (const [id, marker] of this.armyMarkers.entries()) {
@@ -794,7 +820,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     // Aggiungiamo o aggiorniamo i marker
     this.matchArmies.forEach(army => {
       if (!army.currentLocation) return;
-      
+
       const coords = army.currentLocation.split(',').map((c: string) => parseFloat(c.trim()));
       if (coords.length !== 2) return;
 
@@ -804,12 +830,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         // Aggiorna posizione se necessario
         const marker = this.armyMarkers.get(army.id);
         marker.setLngLat([coords[0], coords[1]]);
-        
+
         // Aggiorna il numero di truppe
         const totalTroops = (Object.values(army.composition || {}) as number[]).reduce((a, b) => a + b, 0) as number;
         const badgeEl = marker.getElement().querySelector('.army-badge') as HTMLElement;
         if (badgeEl) badgeEl.innerText = String(totalTroops);
-        
+
       } else {
         // Crea nuovo marker come contenitore
         const el = document.createElement('div');
@@ -820,9 +846,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         el.style.alignItems = 'flex-end';
         el.style.cursor = 'pointer';
         el.style.zIndex = '999';
-        el.style.position = 'relative'; 
+        el.style.position = 'relative';
         el.title = army.name;
-        
+
         const totalTroops = (Object.values(army.composition || {}) as number[]).reduce((a, b) => a + b, 0) as number;
 
         // Div per l'immagine del soldato (visibile quando zoomato)
@@ -834,7 +860,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         imgDiv.style.backgroundSize = 'contain';
         imgDiv.style.backgroundRepeat = 'no-repeat';
         imgDiv.style.backgroundPosition = 'center bottom';
-        
+
         // Div per il badge/banner numerico (visibile quando de-zoomato, o insieme al soldato)
         const badgeDiv = document.createElement('div');
         badgeDiv.className = 'army-badge';
@@ -853,7 +879,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         badgeDiv.style.border = '1px solid #9ca3af'; // Bordino grigio scuro
         badgeDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
         badgeDiv.style.position = 'absolute';
-        
+
         el.appendChild(imgDiv);
         el.appendChild(badgeDiv);
 
@@ -861,11 +887,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([coords[0], coords[1]])
           .addTo(this.map);
-          
+
         this.armyMarkers.set(army.id, marker);
       }
     });
-    
+
     // Aggiorniamo la visibilità subito dopo il render
     this.updateArmyMarkersScale();
   }
@@ -880,7 +906,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       const el = marker.getElement();
       const imgDiv = el.querySelector('.army-image') as HTMLElement;
       const badgeDiv = el.querySelector('.army-badge') as HTMLElement;
-      
+
       if (!imgDiv || !badgeDiv) return;
 
       if (currentZoom < thresholdZoom) {
@@ -900,10 +926,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const maxSize = 80;
         const scaleFactor = Math.min(Math.max((currentZoom - thresholdZoom) / (10 - thresholdZoom), 0), 1);
         const dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
-        
+
         el.style.width = `${dynamicSize}px`;
         el.style.height = `${dynamicSize}px`;
-        
+
         // Mostra SOLO l'avatar, nascondi completamente il badge
         imgDiv.style.display = 'block';
         badgeDiv.style.display = 'none';
@@ -1099,7 +1125,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         this.openArmyModalFromRadial();
         break;
       case 'INFO':
-        // Logica per mostrare dettagli territorio
+        this.showTerritoryInfoBanner();
         break;
       case 'ATTACCA':
         // Logica combattimento
@@ -1107,6 +1133,66 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.isRadialMenuVisible = false;
+  }
+
+  async showTerritoryInfoBanner() {
+    if (!this.selectedPointName || !this.selectedPointLngLat) return;
+    
+    let owner = 'NESSUNO';
+    
+    const feature = this.regionsGeoData?.features?.find((f: any) => 
+      (f.properties.name?.toUpperCase() === this.selectedPointName) || 
+      (f.properties.ADMIN?.toUpperCase() === this.selectedPointName) || 
+      (f.properties.adm1_code?.toUpperCase() === this.selectedPointName) || 
+      (f.id === this.selectedPointName)
+    );
+    
+    const provId = feature ? (feature.properties.adm1_code || feature.properties.name || feature.id) : this.selectedPointName;
+
+    const nation = this.matchNations?.find((n: any) => n.territories_flat && n.territories_flat.includes(provId));
+    
+    if (nation && nation.isOccupied) {
+      if (nation.playerId.includes('bot')) {
+        owner = '🤖 BOT';
+      } else {
+        owner = nation.playerId.toUpperCase();
+      }
+    }
+
+    if (this.popupTimer) {
+      clearTimeout(this.popupTimer);
+      this.popupTimer = null;
+    }
+
+    if (this.activePopup) {
+      this.activePopup.remove();
+    }
+
+    const popupHtml = `
+      <div class="tactical-popup-container">
+        <span style="font-size: 0.65rem; color: #86d7ff; font-weight: 900; letter-spacing: 1px; margin-bottom: 4px; text-transform: uppercase;">Dominio</span>
+        <span style="font-size: 1.1rem; color: #fff; font-weight: 700; font-family: 'JetBrains Mono', monospace;">${owner}</span>
+      </div>
+    `;
+
+    this.activePopup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: true,
+      anchor: 'bottom',
+      offset: 15,
+      className: 'tactical-popup'
+    })
+    .setLngLat(this.selectedPointLngLat)
+    .setHTML(popupHtml)
+    .addTo(this.map);
+
+    // Chiusura automatica dopo 5 secondi
+    this.popupTimer = setTimeout(() => {
+      if (this.activePopup) {
+        this.activePopup.remove();
+        this.activePopup = null;
+      }
+    }, 5000);
   }
 
   onArmyMissionRequested(event: any) {
@@ -1177,6 +1263,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     if (persistSelection) {
       this.selectedPointCoords = coordsText;
+      this.selectedPointLngLat = [e.lngLat.lng, e.lngLat.lat];
     }
 
 
@@ -1237,25 +1324,25 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const fetchUrl = `${url}?v=${new Date().getTime()}`;
     fetch(fetchUrl).then(res => res.json()).then(topology => {
       const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
-      
+
       if (layerId === 'regioni-layer') {
         this.regionsGeoData = geoData;
       }
 
       this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
-      
+
       const paintConfig = layerId === 'regioni-layer' ? {
-          'fill-color': [
-            'case', 
-            ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 
-            ['has', 'fillColor'], ['get', 'fillColor'],
-            'rgba(150, 150, 150, 0.2)' 
-          ],
-          'fill-opacity': ['case', ['has', 'fillColor'], 0.5, 0.3]
-        } : {
-          'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
-          'fill-opacity': 0.3
-        };
+        'fill-color': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false], '#00f2ff',
+          ['has', 'fillColor'], ['get', 'fillColor'],
+          'rgba(150, 150, 150, 0.2)'
+        ],
+        'fill-opacity': ['case', ['has', 'fillColor'], 0.5, 0.3]
+      } : {
+        'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
+        'fill-opacity': 0.3
+      };
 
       this.map.addLayer({
         id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
@@ -1387,7 +1474,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   applyTerritoryColors() {
     if (!this.regionsGeoData || !this.matchNations || !this.map || !this.map.getSource('regioni')) return;
-    
+
     if (this.nationMarkers) {
       this.nationMarkers.forEach((m: any) => m.remove());
     }
@@ -1398,93 +1485,93 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const currentAllianceId = this.currentAllianceId;
 
     this.matchNations.forEach((nation: any) => {
-        if (!nation.isOccupied) return;
+      if (!nation.isOccupied) return;
 
-        let statusColor = '#eab308'; // Default non neutral (enemy)
-        const occupier = String(nation.playerId || '').trim().toLowerCase();
+      let statusColor = '#eab308'; // Default non neutral (enemy)
+      const occupier = String(nation.playerId || '').trim().toLowerCase();
 
-        if (occupier === currentUser) {
-            statusColor = '#22c55e'; // Verde per il player
-        } else if (nation.inWar) {
-            statusColor = '#ef4444'; // Rosso per in guerra
-        } else if (occupier.includes('bot')) {
-            statusColor = '#d1d5db'; // Grigio chiaro per i bot
-        } else {
-            let isAlly = false;
-            if (currentAllianceId) {
-                const allyGrp = this.matchAlliances?.find((a: any) => String(a.id_alleanza) === currentAllianceId);
-                if (allyGrp && Array.isArray(allyGrp.members)) {
-                    isAlly = allyGrp.members.some((m: string) => String(m).trim().toLowerCase() === occupier);
-                }
-            }
-            statusColor = isAlly ? '#3b82f6' : '#eab308';
+      if (occupier === currentUser) {
+        statusColor = '#22c55e'; // Verde per il player
+      } else if (nation.inWar) {
+        statusColor = '#ef4444'; // Rosso per in guerra
+      } else if (occupier.includes('bot')) {
+        statusColor = '#d1d5db'; // Grigio chiaro per i bot
+      } else {
+        let isAlly = false;
+        if (currentAllianceId) {
+          const allyGrp = this.matchAlliances?.find((a: any) => String(a.id_alleanza) === currentAllianceId);
+          if (allyGrp && Array.isArray(allyGrp.members)) {
+            isAlly = allyGrp.members.some((m: string) => String(m).trim().toLowerCase() === occupier);
+          }
         }
-        
-        if (Array.isArray(nation.territories_flat)) {
-            nation.territories_flat.forEach((provId: string) => {
-                colorMap[provId] = statusColor;
-            });
-        }
+        statusColor = isAlly ? '#3b82f6' : '#eab308';
+      }
 
-        if (Array.isArray(nation.territories_flat) && nation.territories_flat.length > 0) {
-            const firstProvId = nation.territories_flat[0];
-            const feature = this.regionsGeoData.features.find((f: any) => 
-                (f.properties.adm1_code === firstProvId) || (f.id === firstProvId) || (f.properties.name === firstProvId)
-            );
-            if (feature && feature.geometry && feature.geometry.coordinates) {
-                let coords = feature.geometry.coordinates;
-                while (coords.length && Array.isArray(coords[0][0])) {
-                    coords = coords[0];
-                }
-                if (coords.length > 0 && coords[0].length === 2) {
-                    const centerPoint = coords[Math.floor(coords.length / 2)]; 
-                    
-                    const el = document.createElement('div');
-                    el.className = 'nation-banner-marker';
-                    el.style.backgroundColor = 'rgba(0,0,0,0.8)';
-                    el.style.color = '#fff';
-                    el.style.border = `2px solid ${statusColor}`;
-                    el.style.borderRadius = '4px';
-                    el.style.padding = '3px 8px';
-                    el.style.fontSize = '11px';
-                    el.style.fontWeight = 'bold';
-                    el.style.whiteSpace = 'nowrap';
-                    el.style.display = 'none'; 
-                    el.innerText = occupier.includes('bot') ? '🤖 BOT' : nation.playerId.toUpperCase();
-                    
-                    const marker = new maplibregl.Marker({ element: el })
-                        .setLngLat(centerPoint)
-                        .addTo(this.map);
-                    this.nationMarkers.push(marker);
-                }
-            }
+      if (Array.isArray(nation.territories_flat)) {
+        nation.territories_flat.forEach((provId: string) => {
+          colorMap[provId] = statusColor;
+        });
+      }
+
+      if (Array.isArray(nation.territories_flat) && nation.territories_flat.length > 0) {
+        const firstProvId = nation.territories_flat[0];
+        const feature = this.regionsGeoData.features.find((f: any) =>
+          (f.properties.adm1_code === firstProvId) || (f.id === firstProvId) || (f.properties.name === firstProvId)
+        );
+        if (feature && feature.geometry && feature.geometry.coordinates) {
+          let coords = feature.geometry.coordinates;
+          while (coords.length && Array.isArray(coords[0][0])) {
+            coords = coords[0];
+          }
+          if (coords.length > 0 && coords[0].length === 2) {
+            const centerPoint = coords[Math.floor(coords.length / 2)];
+
+            const el = document.createElement('div');
+            el.className = 'nation-banner-marker';
+            el.style.backgroundColor = 'rgba(0,0,0,0.8)';
+            el.style.color = '#fff';
+            el.style.border = `2px solid ${statusColor}`;
+            el.style.borderRadius = '4px';
+            el.style.padding = '3px 8px';
+            el.style.fontSize = '11px';
+            el.style.fontWeight = 'bold';
+            el.style.whiteSpace = 'nowrap';
+            el.style.display = 'none';
+            el.innerText = occupier.includes('bot') ? '🤖 BOT' : nation.playerId.toUpperCase();
+
+            const marker = new maplibregl.Marker({ element: el })
+              .setLngLat(centerPoint)
+              .addTo(this.map);
+            this.nationMarkers.push(marker);
+          }
         }
+      }
     });
 
     this.regionsGeoData.features.forEach((f: any) => {
-        const pId = f.properties.adm1_code || f.properties.name || f.id;
-        if (colorMap[pId]) {
-            f.properties.fillColor = colorMap[pId];
-        } else {
-            delete f.properties.fillColor; 
-        }
+      const pId = f.properties.adm1_code || f.properties.name || f.id;
+      if (colorMap[pId]) {
+        f.properties.fillColor = colorMap[pId];
+      } else {
+        delete f.properties.fillColor;
+      }
     });
 
     const source = this.map.getSource('regioni') as any;
     if (source) {
-        source.setData(this.regionsGeoData);
+      source.setData(this.regionsGeoData);
     }
-    
+
     this.updateNationBannersVisibility();
   }
 
   updateNationBannersVisibility() {
-      if (!this.map || !this.nationMarkers) return;
-      const zoom = this.map.getZoom();
-      const show = zoom >= 5.5;
-      this.nationMarkers.forEach((m: any) => {
-          m.getElement().style.display = show ? 'block' : 'none';
-      });
+    if (!this.map || !this.nationMarkers) return;
+    const zoom = this.map.getZoom();
+    const show = zoom >= 5.5;
+    this.nationMarkers.forEach((m: any) => {
+      m.getElement().style.display = show ? 'block' : 'none';
+    });
   }
 
   switchGlobe() {
