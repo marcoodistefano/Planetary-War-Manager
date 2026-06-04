@@ -24,3 +24,4 @@ npm-debug.log*
 # --- SPAZZATURA DI SISTEMA ---
 .DS_Store
 Thumbs.db
+**/minimum_path.json

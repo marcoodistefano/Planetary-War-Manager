@@ -50,7 +50,7 @@ function main() {
     const edgeU = new Int32Array(nEdges);
     const edgeV = new Int32Array(nEdges);
     const edgeCost = new Float64Array(nEdges);
-    
+
     for (let i = 0; i < nEdges; i++) {
         edgeU[i] = edgesRaw[i].u;
         edgeV[i] = edgesRaw[i].v;
@@ -60,7 +60,7 @@ function main() {
     const routingTable = {};
 
     console.log('Calcolo dei cammini minimi (Bellman-Ford)...');
-    
+
     // Allocate reuseable arrays per source
     const distance = new Float64Array(nNodes);
     const previous = new Int32Array(nNodes);
@@ -69,7 +69,7 @@ function main() {
         // Inizializzazione Bellman-Ford
         distance.fill(Infinity);
         previous.fill(-1);
-        
+
         distance[source] = 0;
 
         // Rilassamento degli archi
@@ -79,7 +79,7 @@ function main() {
                 const u = edgeU[e];
                 const v = edgeV[e];
                 const cost = edgeCost[e];
-                
+
                 if (distance[u] !== Infinity && distance[u] + cost < distance[v]) {
                     distance[v] = distance[u] + cost;
                     previous[v] = u;
@@ -95,7 +95,7 @@ function main() {
         // Costruzione della tabella di routing
         for (let dest = 0; dest < nNodes; dest++) {
             if (source === dest) continue;
-            
+
             if (distance[dest] === Infinity) {
                 continue;
             }
