@@ -83,6 +83,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   troopsDropdownY = 0;
   matchArmies: any[] = [];
   armyMarkers = new Map<string, any>(); // Ripristinato per i marker HTML
+  nodesGeoData: any = null; // Per i tether
+  armyHoverPopup: any = null; // Per l'hover di 3 secondi
   isFirstArmyRender = true;
   matchNations: any[] = [];
   regionsGeoData: any = null;
@@ -595,6 +597,53 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.closeMobileMenu();
   }
 
+  showArmyHoverBanner(army: any, coordinates: [number, number]) {
+      if (this.armyHoverPopup) {
+          this.armyHoverPopup.remove();
+      }
+      
+      const dmg = army.damage || army.dmg_tot || 0;
+      const hp = army.hp || army.hp_tot || 100;
+      const stato = String(army.status || 'Standby').toUpperCase();
+
+      const popupHtml = `
+      <div style="background: rgba(15, 23, 42, 0.9); color: #e2e8f0; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155; font-family: 'JetBrains Mono', monospace; font-size: 11px; backdrop-filter: blur(4px); box-shadow: 0 4px 6px rgba(0,0,0,0.5); width: max-content;">
+          <div style="color: #60a5fa; font-weight: bold; margin-bottom: 6px; font-size: 12px; text-transform: uppercase;">${army.name}</div>
+          <div style="display: flex; gap: 12px; font-weight: 600;">
+              <span><span style="color: #ef4444;">⚔️</span> ATK: ${dmg}</span>
+              <span><span style="color: #22c55e;">❤️</span> PV: ${hp}</span>
+              <span><span style="color: #f59e0b;">⚡</span> ${stato}</span>
+          </div>
+      </div>
+      `;
+
+      this.armyHoverPopup = new maplibregl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          anchor: 'bottom',
+          offset: [0, -40], // Shift up to appear ABOVE the marker
+          className: 'tactical-hover-popup'
+      })
+      .setLngLat(coordinates)
+      .setHTML(popupHtml)
+      .addTo(this.map);
+
+      // Rimuoviamo il padding bianco default di maplibre
+      const popupContent = this.armyHoverPopup.getElement().querySelector('.maplibregl-popup-content');
+      if (popupContent) {
+          popupContent.style.padding = '0';
+          popupContent.style.background = 'transparent';
+          popupContent.style.boxShadow = 'none';
+      }
+  }
+
+  hideArmyHoverBanner() {
+      if (this.armyHoverPopup) {
+          this.armyHoverPopup.remove();
+          this.armyHoverPopup = null;
+      }
+  }
+
   toggleMarketModal() {
     this.isMarketModalOpen = !this.isMarketModalOpen;
     if (this.isMarketModalOpen) {
@@ -716,7 +765,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           { id: 'carto-light', type: 'raster', source: 'carto-light-tiles', layout: { visibility: 'none' } }
         ]
       },
-      center: [12.5, 41.9], zoom: 3, minZoom: 3, maxZoom: 8, renderWorldCopies: true, projection: { type: 'mercator' }
+      center: [12.5, 41.9], zoom: 3, minZoom: 1.5, maxZoom: 14, renderWorldCopies: true, projection: { type: 'mercator' }
     });
 
     this.map.dragRotate.disable();
@@ -735,9 +784,27 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       });
 
       this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3);
-      this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3, 8);
-      this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 8);
-      this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 8);
+      this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3, 24);
+      this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
+      this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 24);
+
+      // --- SETUP TETHERS SOURCE & LAYER ---
+      this.map.addSource('tethers-source', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+      });
+
+      this.map.addLayer({
+          id: 'tethers-layer',
+          type: 'line',
+          source: 'tethers-source',
+          paint: {
+              'line-color': '#1d4ed8', // Blu scuro
+              'line-width': 2,
+              'line-dasharray': [2, 2],
+              'line-opacity': 0.8
+          }
+      });
 
       // Eliminato il setup nativo GeoJSON perché causava offset grafico ingestibile con le immagini grandi.
       // Torniamo al caricamento DOM che adatta il background-size al div in pixel.
@@ -823,6 +890,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90;
     let hasArmies = false;
+    const tetherFeatures: any[] = [];
 
     // Aggiungiamo o aggiorniamo i marker
     this.matchArmies.forEach(army => {
@@ -847,6 +915,49 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
       const totalTroops = (Object.values(army.composition || {}) as number[]).reduce((a, b) => a + b, 0) as number;
 
+      // Trova il nodo target per la linea (tether)
+      let targetNodeCoords = [...coords];
+      if (this.nodesGeoData && this.nodesGeoData.features) {
+          let cityName = '';
+          if (army.name && army.name.toLowerCase().startsWith('guarnigione ')) {
+              cityName = army.name.substring(12).trim().toLowerCase();
+          } else {
+              cityName = String(army.name || '').trim().toLowerCase();
+          }
+
+          let matchingNode = this.nodesGeoData.features.find((f: any) => 
+              f.properties.name && f.properties.name.toLowerCase() === cityName
+          );
+          
+          if (!matchingNode) {
+              let minDist = Infinity;
+              this.nodesGeoData.features.forEach((f: any) => {
+                  const nx = f.geometry.coordinates[0];
+                  const ny = f.geometry.coordinates[1];
+                  const dist = Math.pow(nx - coords[0], 2) + Math.pow(ny - coords[1], 2);
+                  if (dist < minDist) {
+                      minDist = dist;
+                      matchingNode = f;
+                  }
+              });
+          }
+
+          if (matchingNode && matchingNode.geometry && matchingNode.geometry.coordinates) {
+              targetNodeCoords = matchingNode.geometry.coordinates;
+          }
+      }
+
+      const distSq = Math.pow(targetNodeCoords[0] - coords[0], 2) + Math.pow(targetNodeCoords[1] - coords[1], 2);
+      if (distSq > 0.000001) {
+          tetherFeatures.push({
+              type: 'Feature',
+              geometry: {
+                  type: 'LineString',
+                  coordinates: [coords, targetNodeCoords]
+              }
+          });
+      }
+
       if (this.armyMarkers.has(army.id)) {
         // Aggiorna posizione se necessario
         const marker = this.armyMarkers.get(army.id);
@@ -855,6 +966,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         if (badgeEl) badgeEl.innerText = String(totalTroops);
         // Salviamo info per il clustering
         marker.troopsData = { total: totalTroops, id: army.id };
+
+        // Aggiorniamo i listener esistenti? MapLibre riutilizza il DOM, 
+        // quindi gli event listener precedentemente agganciati continuano a funzionare.
       } else {
         // Il root element fornito a MapLibre deve essere 0x0 pixel senza anchor automatico,
         // altrimenti cambiando la dimensione del figlio, MapLibre si sfasa dal nodo.
@@ -865,16 +979,16 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         el.style.position = 'relative';
         el.style.zIndex = '999';
 
-        // Il vero contenitore che scala e si allinea al centro in basso
+        // Il vero contenitore che scala e si allinea esattamente al centro del nodo
         const container = document.createElement('div');
         container.className = 'army-container';
         container.style.position = 'absolute';
-        container.style.bottom = '0';
+        container.style.top = '50%';
         container.style.left = '50%';
-        container.style.transform = 'translateX(-50%)';
+        container.style.transform = 'translate(-50%, -50%)';
         container.style.display = 'flex';
         container.style.justifyContent = 'center';
-        container.style.alignItems = 'flex-end';
+        container.style.alignItems = 'center'; // Modificato per centrare il contenuto
         container.style.cursor = 'pointer';
         container.title = army.name;
 
@@ -913,6 +1027,27 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         container.appendChild(badgeDiv);
         el.appendChild(container);
 
+        // --- INTERAZIONI CLICK & HOVER ---
+        let hoverTimer: any = null;
+
+        container.addEventListener('mouseenter', () => {
+            hoverTimer = setTimeout(() => {
+                this.showArmyHoverBanner(army, [coords[0], coords[1]]);
+            }, 3000); // Mostra dopo 3 secondi
+        });
+
+        container.addEventListener('mouseleave', () => {
+            if (hoverTimer) clearTimeout(hoverTimer);
+            this.hideArmyHoverBanner();
+        });
+
+        container.addEventListener('click', (e) => {
+            e.stopPropagation(); // Evita che il click passi alla mappa sottostante
+            if (hoverTimer) clearTimeout(hoverTimer);
+            this.hideArmyHoverBanner();
+            this.openArmyModalFromRadial();
+        });
+
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([coords[0], coords[1]])
           .addTo(this.map);
@@ -922,6 +1057,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         this.armyMarkers.set(army.id, marker);
       }
     });
+
+    if (this.map.getSource('tethers-source')) {
+        (this.map.getSource('tethers-source') as any).setData({
+            type: 'FeatureCollection',
+            features: tetherFeatures
+        });
+    }
 
     if (this.isFirstArmyRender && hasArmies) {
         this.isFirstArmyRender = false;
@@ -973,7 +1115,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     clusters.forEach(cluster => {
         // Il marker principale è quello con più truppe o il primo
         cluster.items.sort((a: any, b: any) => b.marker.troopsData.total - a.marker.troopsData.total);
-        const mainItem = cluster.items[0];
+        
+        // Calcoliamo la somma totale delle truppe per questo cluster
+        const clusterTotalTroops = cluster.items.reduce((sum: number, item: any) => sum + item.marker.troopsData.total, 0);
         
         cluster.items.forEach((item: any, index: number) => {
             const el = item.marker.getElement();
@@ -996,27 +1140,34 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             const scaleFactor = Math.min(Math.max((currentZoom - 3) / (10 - 3), 0), 1);
             let dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
 
-            // Se siamo in dezoom e ci sono marker accorpati, aumentiamo la dimensione grafica
-            if (currentZoom < thresholdZoom && cluster.items.length > 1) {
-                dynamicSize = dynamicSize * 1.5; // Facciamo la pedina più grande per indicare il cluster
-            }
-
-            container.style.width = `${dynamicSize}px`;
-            container.style.height = `${dynamicSize}px`;
-
             if (currentZoom < thresholdZoom) {
-                // In fase di dezoom: Mostra SOLO l'avatar (scalato), nascondi completamente il numero
-                imgDiv.style.display = 'block';
-                badgeDiv.style.display = 'none';
-            } else {
-                // Zoom ravvicinato: Mostra l'avatar e anche il numero
+                // In fase di dezoom: Mostra l'avatar e MOSTRA il badge numerico!
+                if (cluster.items.length > 1) {
+                    dynamicSize = dynamicSize * 1.5; // Facciamo la pedina più grande per indicare il cluster
+                }
+
+                container.style.width = `${dynamicSize}px`;
+                container.style.height = `${dynamicSize}px`;
+
                 imgDiv.style.display = 'block';
                 badgeDiv.style.display = 'flex';
-                // Posiziona il badge
+                // Mostra il numero aggregato di tutto il cluster
+                badgeDiv.innerText = String(clusterTotalTroops);
+                
                 badgeDiv.style.position = 'absolute';
                 badgeDiv.style.bottom = 'auto';
-                badgeDiv.style.top = '100%'; // Sotto i piedi del soldato
+                badgeDiv.style.top = '100%'; 
                 badgeDiv.style.marginTop = '2px';
+            } else {
+                // Zoom ravvicinato: Mostra l'avatar, NASCONDI il numero
+                container.style.width = `${dynamicSize}px`;
+                container.style.height = `${dynamicSize}px`;
+
+                imgDiv.style.display = 'block';
+                badgeDiv.style.display = 'none';
+                
+                // Ripristina il numero corretto della singola armata nel caso serva
+                badgeDiv.innerText = String(item.marker.troopsData.total);
             }
         });
     });
@@ -1097,6 +1248,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         const linesGeo = { type: 'FeatureCollection', features: lineFeatures };
         const nodesGeo = { type: 'FeatureCollection', features: Array.from(nodeMap.values()) };
+        this.nodesGeoData = nodesGeo;
 
         // aggiorna o crea source + layer per le linee
         if (this.map.getSource('archs')) {
