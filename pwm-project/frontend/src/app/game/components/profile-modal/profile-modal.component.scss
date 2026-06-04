@@ -9,6 +9,13 @@
   --text-muted: #a0a0b0;
 }
 
+.profile-modal-backdrop {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);
+  font-family: 'Inter', sans-serif;
+}
+
 .profile-frame {
   position: relative; 
   width: 90vw; 

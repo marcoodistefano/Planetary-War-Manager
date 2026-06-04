@@ -101,7 +101,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   userProfile = {
     username: 'Caricamento...',
     rank: 'Generale di Brigata',
-    experience: 85, matchesWon: 24, matchesLost: 5,
+    experience: 85, matchesWon: 24, matchesLost: 5, kdRatio: '4.8',
     avatar: this.avatarPath(1)
   };
 
@@ -482,12 +482,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           return;
         }
 
+        const combatStats = response?.data?.combat_stats;
+
         this.userProfile = {
           ...this.userProfile,
           username: String(profile.username),
           rank: profile.rank || profile.reg || this.userProfile.rank,
           experience: profile.experience ?? this.userProfile.experience,
           avatar: profile.avatar_id ? this.avatarPath(profile.avatar_id) : this.userProfile.avatar,
+          matchesWon: combatStats ? Math.round((combatStats.win_rate / 100) * 100) : this.userProfile.matchesWon,
+          matchesLost: combatStats ? 100 - Math.round((combatStats.win_rate / 100) * 100) : this.userProfile.matchesLost,
+          kdRatio: combatStats && combatStats.deaths ? (combatStats.kills / combatStats.deaths).toFixed(1) : this.userProfile.kdRatio
         };
 
         if (profile.avatar_id) {
