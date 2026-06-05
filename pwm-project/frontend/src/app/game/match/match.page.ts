@@ -327,6 +327,20 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
           this.cdr.detectChanges();
         }
+
+        if (parsed.type === 'TERRITORY_CONQUERED' || parsed.type === 'DIPLOMACY_UPDATED') {
+          console.log(`[WS_MATCH] Aggiornamento mappa (${parsed.type})`);
+          if (parsed.payload?.nations) {
+            this.matchNations = parsed.payload.nations;
+            this.applyTerritoryColors();
+          }
+          this.cdr.detectChanges();
+        }
+
+        if (parsed.type === 'ALLIANCE_UPDATED') {
+          console.log(`[WS_MATCH] Aggiornamento alleanze (${parsed.type})`);
+          this.reloadMatchAlliances();
+        }
       };
 
       this.matchSocket.onerror = (error) => {
@@ -388,16 +402,19 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   reloadMatchAlliances() {
     if (!this.currentMatchId) {
       this.matchAlliances = [];
+      this.applyTerritoryColors();
       return;
     }
 
     this.homeService.getMatchAlliance(this.currentMatchId).subscribe({
       next: (response: any) => {
         this.matchAlliances = Array.isArray(response?.alliances) ? response.alliances : [];
+        this.applyTerritoryColors();
         this.cdr.detectChanges();
       },
       error: () => {
         this.matchAlliances = [];
+        this.applyTerritoryColors();
         this.cdr.detectChanges();
       }
     });
@@ -792,8 +809,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         'paint': { 'line-color': '#f59e0b', 'line-width': ['case', ['==', ['get', 'nth_line'], 5], 1.5, 0.5], 'line-opacity': 0.8 }
       });
 
-      this.loadTopoJsonLayer('/assets/map/nations.json', 'nazioni', 'nazioni-layer', 0, 3);
-      this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 3, 24);
+      this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 0, 24);
       this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
       this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 24);
 
@@ -1514,9 +1530,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
 
 
-    if (!this.map.getLayer('nazioni-layer') || !this.map.getLayer('regioni-layer')) return;
+    if (!this.map.getLayer('regioni-layer')) return;
 
-    const features = this.map.queryRenderedFeatures(e.point, { layers: ['nazioni-layer', 'regioni-layer'] });
+    const features = this.map.queryRenderedFeatures(e.point, { layers: ['regioni-layer'] });
 
     if (features.length > 0 && features[0].id !== undefined) {
       const f = features[0];
@@ -1580,11 +1596,16 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       const paintConfig = layerId === 'regioni-layer' ? {
         'fill-color': [
           'case',
-          ['boolean', ['feature-state', 'hover'], false], '#00f2ff',
+          ['boolean', ['feature-state', 'hover'], false], '#00ccffff',
           ['has', 'fillColor'], ['get', 'fillColor'],
           'rgba(150, 150, 150, 0.2)'
         ],
-        'fill-opacity': ['case', ['has', 'fillColor'], 0.5, 0.3]
+        'fill-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false], 0.25,
+          ['has', 'fillColor'], 0.45,
+          0.1
+        ]
       } : {
         'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
         'fill-opacity': 0.3
@@ -1594,12 +1615,16 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
         paint: paintConfig
       });
-      this.map.addLayer({
-        id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-        paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': 0.5 }
-      });
 
       if (layerId === 'regioni-layer') {
+        this.map.addLayer({
+          id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+          paint: {
+            'line-color': '#000000',
+            'line-width': 0.2,
+            'line-opacity': 0.4
+          }
+        });
         this.applyTerritoryColors();
       }
     });
@@ -1741,7 +1766,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       } else if (nation.inWar) {
         statusColor = '#ef4444'; // Rosso per in guerra
       } else if (occupier.includes('bot')) {
-        statusColor = '#d1d5db'; // Grigio chiaro per i bot
+        statusColor = '#cececeff'; // Grigio chiaro per i bot
       } else {
         let isAlly = false;
         if (currentAllianceId) {
