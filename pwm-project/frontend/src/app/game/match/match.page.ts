@@ -318,6 +318,15 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           this.renderArmies();
           this.cdr.detectChanges();
         }
+
+        if (parsed.type === 'PLAYER_JOINED') {
+          console.log(`[WS_MATCH] Un nuovo giocatore si è unito: ${parsed.payload.newPlayer}`);
+          if (parsed.payload?.nations) {
+            this.matchNations = parsed.payload.nations;
+            this.applyTerritoryColors();
+          }
+          this.cdr.detectChanges();
+        }
       };
 
       this.matchSocket.onerror = (error) => {
@@ -598,15 +607,15 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   showArmyHoverBanner(army: any, coordinates: [number, number]) {
-      if (this.armyHoverPopup) {
-          this.armyHoverPopup.remove();
-      }
-      
-      const dmg = army.damage || army.dmg_tot || 0;
-      const hp = army.hp || army.hp_tot || 100;
-      const stato = String(army.status || 'Standby').toUpperCase();
+    if (this.armyHoverPopup) {
+      this.armyHoverPopup.remove();
+    }
 
-      const popupHtml = `
+    const dmg = army.damage || army.dmg_tot || 0;
+    const hp = army.hp || army.hp_tot || 100;
+    const stato = String(army.status || 'Standby').toUpperCase();
+
+    const popupHtml = `
       <div style="background: rgba(15, 23, 42, 0.9); color: #e2e8f0; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155; font-family: 'JetBrains Mono', monospace; font-size: 11px; backdrop-filter: blur(4px); box-shadow: 0 4px 6px rgba(0,0,0,0.5); width: max-content;">
           <div style="color: #60a5fa; font-weight: bold; margin-bottom: 6px; font-size: 12px; text-transform: uppercase;">${army.name}</div>
           <div style="display: flex; gap: 12px; font-weight: 600;">
@@ -617,31 +626,31 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       </div>
       `;
 
-      this.armyHoverPopup = new maplibregl.Popup({
-          closeButton: false,
-          closeOnClick: false,
-          anchor: 'bottom',
-          offset: [0, -40], // Shift up to appear ABOVE the marker
-          className: 'tactical-hover-popup'
-      })
+    this.armyHoverPopup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      anchor: 'bottom',
+      offset: [0, -40], // Shift up to appear ABOVE the marker
+      className: 'tactical-hover-popup'
+    })
       .setLngLat(coordinates)
       .setHTML(popupHtml)
       .addTo(this.map);
 
-      // Rimuoviamo il padding bianco default di maplibre
-      const popupContent = this.armyHoverPopup.getElement().querySelector('.maplibregl-popup-content');
-      if (popupContent) {
-          popupContent.style.padding = '0';
-          popupContent.style.background = 'transparent';
-          popupContent.style.boxShadow = 'none';
-      }
+    // Rimuoviamo il padding bianco default di maplibre
+    const popupContent = this.armyHoverPopup.getElement().querySelector('.maplibregl-popup-content');
+    if (popupContent) {
+      popupContent.style.padding = '0';
+      popupContent.style.background = 'transparent';
+      popupContent.style.boxShadow = 'none';
+    }
   }
 
   hideArmyHoverBanner() {
-      if (this.armyHoverPopup) {
-          this.armyHoverPopup.remove();
-          this.armyHoverPopup = null;
-      }
+    if (this.armyHoverPopup) {
+      this.armyHoverPopup.remove();
+      this.armyHoverPopup = null;
+    }
   }
 
   toggleMarketModal() {
@@ -790,26 +799,26 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
       // --- SETUP TETHERS SOURCE & LAYER ---
       this.map.addSource('tethers-source', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] }
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
       });
 
       this.map.addLayer({
-          id: 'tethers-layer',
-          type: 'line',
-          source: 'tethers-source',
-          paint: {
-              'line-color': '#1d4ed8', // Blu scuro
-              'line-width': 2,
-              'line-dasharray': [2, 2],
-              'line-opacity': 0.8
-          }
+        id: 'tethers-layer',
+        type: 'line',
+        source: 'tethers-source',
+        paint: {
+          'line-color': '#1d4ed8', // Blu scuro
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.8
+        }
       });
 
       // Eliminato il setup nativo GeoJSON perché causava offset grafico ingestibile con le immagini grandi.
       // Torniamo al caricamento DOM che adatta il background-size al div in pixel.
       setTimeout(() => {
-          this.renderArmies();
+        this.renderArmies();
       }, 500);
     });
 
@@ -898,13 +907,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
       let coords: [number, number];
       if (typeof army.currentLocation === 'string') {
-          const parts = army.currentLocation.split(',').map((c: string) => parseFloat(c.trim()));
-          if (parts.length !== 2) return;
-          coords = [parts[0], parts[1]];
+        const parts = army.currentLocation.split(',').map((c: string) => parseFloat(c.trim()));
+        if (parts.length !== 2) return;
+        coords = [parts[0], parts[1]];
       } else if (army.currentLocation && army.currentLocation.x !== undefined && army.currentLocation.y !== undefined) {
-          coords = [army.currentLocation.x, army.currentLocation.y];
+        coords = [army.currentLocation.x, army.currentLocation.y];
       } else {
-          return;
+        return;
       }
 
       hasArmies = true;
@@ -918,44 +927,44 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       // Trova il nodo target per la linea (tether)
       let targetNodeCoords = [...coords];
       if (this.nodesGeoData && this.nodesGeoData.features) {
-          let cityName = '';
-          if (army.name && army.name.toLowerCase().startsWith('guarnigione ')) {
-              cityName = army.name.substring(12).trim().toLowerCase();
-          } else {
-              cityName = String(army.name || '').trim().toLowerCase();
-          }
+        let cityName = '';
+        if (army.name && army.name.toLowerCase().startsWith('guarnigione ')) {
+          cityName = army.name.substring(12).trim().toLowerCase();
+        } else {
+          cityName = String(army.name || '').trim().toLowerCase();
+        }
 
-          let matchingNode = this.nodesGeoData.features.find((f: any) => 
-              f.properties.name && f.properties.name.toLowerCase() === cityName
-          );
-          
-          if (!matchingNode) {
-              let minDist = Infinity;
-              this.nodesGeoData.features.forEach((f: any) => {
-                  const nx = f.geometry.coordinates[0];
-                  const ny = f.geometry.coordinates[1];
-                  const dist = Math.pow(nx - coords[0], 2) + Math.pow(ny - coords[1], 2);
-                  if (dist < minDist) {
-                      minDist = dist;
-                      matchingNode = f;
-                  }
-              });
-          }
+        let matchingNode = this.nodesGeoData.features.find((f: any) =>
+          f.properties.name && f.properties.name.toLowerCase() === cityName
+        );
 
-          if (matchingNode && matchingNode.geometry && matchingNode.geometry.coordinates) {
-              targetNodeCoords = matchingNode.geometry.coordinates;
-          }
+        if (!matchingNode) {
+          let minDist = Infinity;
+          this.nodesGeoData.features.forEach((f: any) => {
+            const nx = f.geometry.coordinates[0];
+            const ny = f.geometry.coordinates[1];
+            const dist = Math.pow(nx - coords[0], 2) + Math.pow(ny - coords[1], 2);
+            if (dist < minDist) {
+              minDist = dist;
+              matchingNode = f;
+            }
+          });
+        }
+
+        if (matchingNode && matchingNode.geometry && matchingNode.geometry.coordinates) {
+          targetNodeCoords = matchingNode.geometry.coordinates;
+        }
       }
 
       const distSq = Math.pow(targetNodeCoords[0] - coords[0], 2) + Math.pow(targetNodeCoords[1] - coords[1], 2);
       if (distSq > 0.000001) {
-          tetherFeatures.push({
-              type: 'Feature',
-              geometry: {
-                  type: 'LineString',
-                  coordinates: [coords, targetNodeCoords]
-              }
-          });
+        tetherFeatures.push({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [coords, targetNodeCoords]
+          }
+        });
       }
 
       if (this.armyMarkers.has(army.id)) {
@@ -1031,27 +1040,27 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         let hoverTimer: any = null;
 
         container.addEventListener('mouseenter', () => {
-            hoverTimer = setTimeout(() => {
-                this.showArmyHoverBanner(army, [coords[0], coords[1]]);
-            }, 3000); // Mostra dopo 3 secondi
+          hoverTimer = setTimeout(() => {
+            this.showArmyHoverBanner(army, [coords[0], coords[1]]);
+          }, 3000); // Mostra dopo 3 secondi
         });
 
         container.addEventListener('mouseleave', () => {
-            if (hoverTimer) clearTimeout(hoverTimer);
-            this.hideArmyHoverBanner();
+          if (hoverTimer) clearTimeout(hoverTimer);
+          this.hideArmyHoverBanner();
         });
 
         container.addEventListener('click', (e) => {
-            e.stopPropagation(); // Evita che il click passi alla mappa sottostante
-            if (hoverTimer) clearTimeout(hoverTimer);
-            this.hideArmyHoverBanner();
-            this.openArmyModalFromRadial();
+          e.stopPropagation(); // Evita che il click passi alla mappa sottostante
+          if (hoverTimer) clearTimeout(hoverTimer);
+          this.hideArmyHoverBanner();
+          this.openArmyModalFromRadial();
         });
 
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([coords[0], coords[1]])
           .addTo(this.map);
-        
+
         // Salviamo dati utili sul marker stesso
         (marker as any).troopsData = { total: totalTroops, id: army.id };
         this.armyMarkers.set(army.id, marker);
@@ -1059,17 +1068,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     });
 
     if (this.map.getSource('tethers-source')) {
-        (this.map.getSource('tethers-source') as any).setData({
-            type: 'FeatureCollection',
-            features: tetherFeatures
-        });
+      (this.map.getSource('tethers-source') as any).setData({
+        type: 'FeatureCollection',
+        features: tetherFeatures
+      });
     }
 
     if (this.isFirstArmyRender && hasArmies) {
-        this.isFirstArmyRender = false;
-        if (minLng <= maxLng && minLat <= maxLat) {
-            this.map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 50, maxZoom: 6, duration: 2000 });
-        }
+      this.isFirstArmyRender = false;
+      if (minLng <= maxLng && minLat <= maxLat) {
+        this.map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 50, maxZoom: 6, duration: 2000 });
+      }
     }
 
     // Aggiorniamo la visibilità subito dopo il render
@@ -1085,91 +1094,91 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     // Raccogliamo la proiezione a schermo di tutti i marker
     const screenMarkers: any[] = [];
     this.armyMarkers.forEach(marker => {
-        const coords = marker.getLngLat();
-        const screenPt = this.map.project(coords);
-        screenMarkers.push({ marker, pt: screenPt, x: screenPt.x, y: screenPt.y });
+      const coords = marker.getLngLat();
+      const screenPt = this.map.project(coords);
+      screenMarkers.push({ marker, pt: screenPt, x: screenPt.x, y: screenPt.y });
     });
 
     // Distanza in pixel sotto la quale i marker vengono "clusterizzati"
-    const clusterPixelRadius = 40; 
+    const clusterPixelRadius = 40;
     const clusters: any[] = [];
 
     // Algoritmo greedy di clustering su schermo
     for (const item of screenMarkers) {
-        let addedToCluster = false;
-        for (const cluster of clusters) {
-            const dx = item.x - cluster.x;
-            const dy = item.y - cluster.y;
-            if (Math.sqrt(dx*dx + dy*dy) < clusterPixelRadius) {
-                cluster.items.push(item);
-                addedToCluster = true;
-                break;
-            }
+      let addedToCluster = false;
+      for (const cluster of clusters) {
+        const dx = item.x - cluster.x;
+        const dy = item.y - cluster.y;
+        if (Math.sqrt(dx * dx + dy * dy) < clusterPixelRadius) {
+          cluster.items.push(item);
+          addedToCluster = true;
+          break;
         }
-        if (!addedToCluster) {
-            clusters.push({ x: item.x, y: item.y, items: [item] });
-        }
+      }
+      if (!addedToCluster) {
+        clusters.push({ x: item.x, y: item.y, items: [item] });
+      }
     }
 
     // Adesso applichiamo le classi e le scale
     clusters.forEach(cluster => {
-        // Il marker principale è quello con più truppe o il primo
-        cluster.items.sort((a: any, b: any) => b.marker.troopsData.total - a.marker.troopsData.total);
-        
-        // Calcoliamo la somma totale delle truppe per questo cluster
-        const clusterTotalTroops = cluster.items.reduce((sum: number, item: any) => sum + item.marker.troopsData.total, 0);
-        
-        cluster.items.forEach((item: any, index: number) => {
-            const el = item.marker.getElement();
-            const container = el.querySelector('.army-container') as HTMLElement;
-            const imgDiv = el.querySelector('.army-image') as HTMLElement;
-            const badgeDiv = el.querySelector('.army-badge') as HTMLElement;
-            if (!container || !imgDiv || !badgeDiv) return;
+      // Il marker principale è quello con più truppe o il primo
+      cluster.items.sort((a: any, b: any) => b.marker.troopsData.total - a.marker.troopsData.total);
 
-            // Nascondiamo i marker secondari del cluster
-            if (index > 0 && currentZoom < thresholdZoom) {
-                el.style.display = 'none';
-                return;
-            }
-            
-            el.style.display = 'block';
+      // Calcoliamo la somma totale delle truppe per questo cluster
+      const clusterTotalTroops = cluster.items.reduce((sum: number, item: any) => sum + item.marker.troopsData.total, 0);
 
-            // Scala di base del marker principale
-            const minSize = 32;
-            const maxSize = 80;
-            const scaleFactor = Math.min(Math.max((currentZoom - 3) / (10 - 3), 0), 1);
-            let dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
+      cluster.items.forEach((item: any, index: number) => {
+        const el = item.marker.getElement();
+        const container = el.querySelector('.army-container') as HTMLElement;
+        const imgDiv = el.querySelector('.army-image') as HTMLElement;
+        const badgeDiv = el.querySelector('.army-badge') as HTMLElement;
+        if (!container || !imgDiv || !badgeDiv) return;
 
-            if (currentZoom < thresholdZoom) {
-                // In fase di dezoom: Mostra l'avatar e MOSTRA il badge numerico!
-                if (cluster.items.length > 1) {
-                    dynamicSize = dynamicSize * 1.5; // Facciamo la pedina più grande per indicare il cluster
-                }
+        // Nascondiamo i marker secondari del cluster
+        if (index > 0 && currentZoom < thresholdZoom) {
+          el.style.display = 'none';
+          return;
+        }
 
-                container.style.width = `${dynamicSize}px`;
-                container.style.height = `${dynamicSize}px`;
+        el.style.display = 'block';
 
-                imgDiv.style.display = 'block';
-                badgeDiv.style.display = 'flex';
-                // Mostra il numero aggregato di tutto il cluster
-                badgeDiv.innerText = String(clusterTotalTroops);
-                
-                badgeDiv.style.position = 'absolute';
-                badgeDiv.style.bottom = 'auto';
-                badgeDiv.style.top = '100%'; 
-                badgeDiv.style.marginTop = '2px';
-            } else {
-                // Zoom ravvicinato: Mostra l'avatar, NASCONDI il numero
-                container.style.width = `${dynamicSize}px`;
-                container.style.height = `${dynamicSize}px`;
+        // Scala di base del marker principale
+        const minSize = 32;
+        const maxSize = 80;
+        const scaleFactor = Math.min(Math.max((currentZoom - 3) / (10 - 3), 0), 1);
+        let dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
 
-                imgDiv.style.display = 'block';
-                badgeDiv.style.display = 'none';
-                
-                // Ripristina il numero corretto della singola armata nel caso serva
-                badgeDiv.innerText = String(item.marker.troopsData.total);
-            }
-        });
+        if (currentZoom < thresholdZoom) {
+          // In fase di dezoom: Mostra l'avatar e MOSTRA il badge numerico!
+          if (cluster.items.length > 1) {
+            dynamicSize = dynamicSize * 1.5; // Facciamo la pedina più grande per indicare il cluster
+          }
+
+          container.style.width = `${dynamicSize}px`;
+          container.style.height = `${dynamicSize}px`;
+
+          imgDiv.style.display = 'block';
+          badgeDiv.style.display = 'flex';
+          // Mostra il numero aggregato di tutto il cluster
+          badgeDiv.innerText = String(clusterTotalTroops);
+
+          badgeDiv.style.position = 'absolute';
+          badgeDiv.style.bottom = 'auto';
+          badgeDiv.style.top = '100%';
+          badgeDiv.style.marginTop = '2px';
+        } else {
+          // Zoom ravvicinato: Mostra l'avatar, NASCONDI il numero
+          container.style.width = `${dynamicSize}px`;
+          container.style.height = `${dynamicSize}px`;
+
+          imgDiv.style.display = 'block';
+          badgeDiv.style.display = 'none';
+
+          // Ripristina il numero corretto della singola armata nel caso serva
+          badgeDiv.innerText = String(item.marker.troopsData.total);
+        }
+      });
     });
   }
 
@@ -1374,20 +1383,20 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   async showTerritoryInfoBanner() {
     if (!this.selectedPointName || !this.selectedPointLngLat) return;
-    
+
     let owner = 'NESSUNO';
-    
-    const feature = this.regionsGeoData?.features?.find((f: any) => 
-      (f.properties.name?.toUpperCase() === this.selectedPointName) || 
-      (f.properties.ADMIN?.toUpperCase() === this.selectedPointName) || 
-      (f.properties.adm1_code?.toUpperCase() === this.selectedPointName) || 
+
+    const feature = this.regionsGeoData?.features?.find((f: any) =>
+      (f.properties.name?.toUpperCase() === this.selectedPointName) ||
+      (f.properties.ADMIN?.toUpperCase() === this.selectedPointName) ||
+      (f.properties.adm1_code?.toUpperCase() === this.selectedPointName) ||
       (f.id === this.selectedPointName)
     );
-    
+
     const provId = feature ? (feature.properties.adm1_code || feature.properties.name || feature.id) : this.selectedPointName;
 
     const nation = this.matchNations?.find((n: any) => n.territories_flat && n.territories_flat.includes(provId));
-    
+
     if (nation && nation.isOccupied) {
       if (nation.playerId.includes('bot')) {
         owner = '🤖 BOT';
@@ -1419,9 +1428,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       offset: 15,
       className: 'tactical-popup'
     })
-    .setLngLat(this.selectedPointLngLat)
-    .setHTML(popupHtml)
-    .addTo(this.map);
+      .setLngLat(this.selectedPointLngLat)
+      .setHTML(popupHtml)
+      .addTo(this.map);
 
     // Chiusura automatica dopo 5 secondi
     this.popupTimer = setTimeout(() => {

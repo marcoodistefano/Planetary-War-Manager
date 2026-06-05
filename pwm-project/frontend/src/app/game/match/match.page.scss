@@ -7,14 +7,14 @@
    ========================================================================== */
 :host {
   --primary-blue: #86d7ff;
-  --primary-glow: rgba(134, 215, 255, 0.3);
+  --primary-glow: rgba(134, 215, 255, 0.4);
   --danger-red: #ff7b72;
   --success-green: #a3e635;
   --gold-accent: #fde047;
   
-  --glass-bg: rgba(7, 15, 28, 0.85);
-  --glass-border: rgba(134, 215, 255, 0.25);
-  --panel-blur: blur(20px);
+  --glass-bg: rgba(12, 24, 42, 0.65);
+  --glass-border: rgba(134, 215, 255, 0.35);
+  --panel-blur: blur(24px);
   
   --text-muted: #a0a0b0;
   --text-accent: #b6cee9;
@@ -45,12 +45,12 @@
     content: "";
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), 
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.05) 50%), 
                 linear-gradient(90deg, rgba(134, 215, 255, 0.02), rgba(255, 255, 255, 0.01), rgba(134, 215, 255, 0.02));
     background-size: 100% 3px, 3px 100%;
     pointer-events: none;
     z-index: 5;
-    opacity: 0.4;
+    opacity: 0.15;
   }
 }
 
@@ -152,9 +152,9 @@
   padding: calc(1.2 * var(--unit));
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(7, 15, 28, 0.95);
+  background: rgba(12, 24, 42, 0.85);
   border: 1px solid var(--primary-blue);
-  backdrop-filter: blur(20px);
+  backdrop-filter: var(--panel-blur);
   border-radius: 8px;
   box-shadow: 0 15px 40px rgba(0,0,0,0.8);
   z-index: 9999;
@@ -341,8 +341,9 @@
     margin-top: 0; 
     padding: 14px 5px; 
     font-size: 0.75rem;
-    background: rgba(7, 15, 28, 0.85);
-    backdrop-filter: blur(20px);
+    background: var(--glass-bg);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--glass-border);
     box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
   }
 
@@ -680,10 +681,11 @@ app-tactical-terminal {
    9. SIDEBAR TATTICA MOBILE (75% WIDTH E NO BLUR)
    ========================================================================== */
 ion-menu {
-  /* Sfondo semi-trasparente scuro, senza effetto blur per vedere la mappa nitida */
-  --background: rgba(7, 15, 28, 0.92) !important;
+  /* Sfondo semi-trasparente scuro, con un po' di blur per coerenza */
+  --background: rgba(12, 24, 42, 0.85) !important;
   --width: 75vw; /* Esattamente il 75% della larghezza dello schermo */
   border-right: 1px solid var(--glass-border);
+  backdrop-filter: var(--panel-blur);
 }
 
 .mobile-sidebar-content {
@@ -842,11 +844,11 @@ ion-menu {
     padding: 0 8px;
     
     /* AGGIUNTO: Sfondo Vetro Tattico */
-    background: rgba(7, 15, 28, 0.85);
-    border: 1px solid rgba(134, 215, 255, 0.3);
+    background: rgba(12, 24, 42, 0.70);
+    border: 1px solid rgba(134, 215, 255, 0.4);
     border-radius: 12px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     
     pointer-events: auto; /* Riattivato per intercettare i tocchi sulla barra */
@@ -910,13 +912,13 @@ ion-menu {
     padding-right: 0;
 
     .mini-res-item {
-      background: rgba(7, 15, 28, 0.85);
-      border: 1px solid rgba(134, 215, 255, 0.3); 
+      background: rgba(12, 24, 42, 0.70);
+      border: 1px solid rgba(134, 215, 255, 0.4); 
       border-radius: 6px;
       padding: 4px 2px; 
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       position: relative;
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(16px);
       min-width: 46px; 
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
 
@@ -1220,12 +1222,12 @@ ion-menu {
 }
 
 ::ng-deep .tactical-popup-container {
-  background: rgba(7, 15, 28, 0.95);
+  background: rgba(12, 24, 42, 0.85);
   border: 1px solid #86d7ff;
   box-shadow: 0 5px 15px rgba(0,0,0,0.6);
   padding: 10px 15px;
   border-radius: 8px;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1256,7 +1258,7 @@ ion-menu {
     transform: translateX(-50%);
     border-width: 7px 7px 0;
     border-style: solid;
-    border-color: rgba(7, 15, 28, 0.95) transparent transparent transparent;
+    border-color: rgba(12, 24, 42, 0.85) transparent transparent transparent;
     display: block;
     width: 0;
     z-index: 1;

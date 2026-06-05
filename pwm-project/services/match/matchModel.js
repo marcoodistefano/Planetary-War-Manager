@@ -708,6 +708,27 @@ const join_Match = async (playerId, id_partita_hash) => {
 
       // Anche il join cambia la home dell'utente: rimuoviamo il cache snapshot
       await redis.del(`home_info:${playerId}`);
+
+      // Notifica agli altri giocatori l'ingresso (Broadcast)
+      try {
+        const updatedNationsCache = await redis.get(`match:${id_partita_hash}:nations`);
+        if (updatedNationsCache) {
+          const broadcastPayload = {
+            matchId: id_partita_hash,
+            payload: {
+              type: 'PLAYER_JOINED',
+              payload: {
+                nations: JSON.parse(updatedNationsCache),
+                newPlayer: sessionUsername
+              }
+            }
+          };
+          await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+        }
+      } catch (broadcastErr) {
+        console.error("[SYS_WARN] Errore broadcast PLAYER_JOINED:", broadcastErr);
+      }
+
       return {
         status: "200",
         message: "Join completato.",
