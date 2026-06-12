@@ -250,6 +250,7 @@ CREATE TABLE IF NOT EXISTS spostamenti (
     numero_coda INT,
     x_dest REAL,
     y_dest REAL,
+    target_node VARCHAR(128),
     time_to_arrive TIMESTAMP,
     CONSTRAINT fk_spostamento_mossa FOREIGN KEY (id_mossa) REFERENCES mosse(id_mossa) ON DELETE CASCADE
 );

@@ -58,8 +58,36 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   // WebSocket State
   matchSocket?: WebSocket;
-  private reconnectTimer?: number;
-  private shouldReconnect = true;
+  private reconnectTimer: number | null = null;
+  private shouldReconnect: boolean = true;
+
+  // Layer ordering function to guarantee correct visualization
+  private reorderMapLayers() {
+    if (!this.map) return;
+    const order = [
+      'regioni-layer',
+      'regioni-layer-borders',
+      'archi-layer',
+      'archi-layer-borders',
+      'archs-lines-outline',
+      'archs-lines',
+      'archs-nodes-circle',
+      'archs-nodes-label',
+      'tethers-layer',
+      'moving-troops-paths-layer',
+      'hovered-troop-path-layer'
+    ];
+
+    try {
+      for (const layerId of order) {
+        if (this.map.getLayer(layerId)) {
+          this.map.moveLayer(layerId);
+        }
+      }
+    } catch (err) {
+      console.warn('[Mapbox] Errore riordino layer:', err);
+    }
+  }
 
   private touchTimer: any;
   private avatarSub?: Subscription;
@@ -1182,7 +1210,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         type: 'FeatureCollection',
         features: tetherFeatures
       });
-      if (this.map.getLayer('tethers-layer')) this.map.moveLayer('tethers-layer');
+      try {
+        if (this.map.getLayer('tethers-layer')) this.map.moveLayer('tethers-layer');
+      } catch (err) { console.warn(err); }
     }
 
     if (this.map.getSource('moving-troops-paths-source')) {
@@ -1190,8 +1220,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         type: 'FeatureCollection',
         features: movingPathsFeatures
       });
-      if (this.map.getLayer('moving-troops-paths-layer')) this.map.moveLayer('moving-troops-paths-layer');
-      if (this.map.getLayer('hovered-troop-path-layer')) this.map.moveLayer('hovered-troop-path-layer');
+      try {
+        if (this.map.getLayer('moving-troops-paths-layer')) this.map.moveLayer('moving-troops-paths-layer');
+        if (this.map.getLayer('hovered-troop-path-layer')) this.map.moveLayer('hovered-troop-path-layer');
+      } catch (err) { console.warn(err); }
     }
 
     if (this.isFirstArmyRender && hasArmies) {
@@ -1203,6 +1235,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     // Aggiorniamo la visibilità subito dopo il render
     this.updateArmyMarkersScale();
+    this.reorderMapLayers();
   }
 
   // Modifica visibilità in base allo zoom e accorpa vicini
@@ -1797,6 +1830,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           'line-opacity': 0.9
         }
       });
+      
+      this.reorderMapLayers();
     });
   }
 
@@ -1963,6 +1998,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.updateNationBannersVisibility();
+    this.reorderMapLayers();
   }
 
   updateNationBannersVisibility() {

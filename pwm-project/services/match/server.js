@@ -159,9 +159,10 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                  const id_mossa = mossaRes.rows[0].id_mossa;
                  // Aggiorna lo spostamento in db (cancella i vecchi e ricrea o aggiorna)
                  await db.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [id_mossa]);
+                 await db.query(`UPDATE mosse SET ttl = $1 WHERE id_mossa = $2`, [etaDate, id_mossa]);
                  await db.query(
-                     `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, time_to_arrive) VALUES ($1, 1, $2, $3, $4)`,
-                     [id_mossa, targetLng, targetLat, etaDate]
+                     `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`,
+                     [id_mossa, targetLng, targetLat, targetName, etaDate]
                  );
              } else {
                  // Estrai la partita id associata al matchId visualizzato
@@ -169,13 +170,13 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                  if (partitaRes.rows.length > 0) {
                      const partitaId = partitaRes.rows[0].id_partita;
                      const insertMossa = await db.query(
-                         `INSERT INTO mosse (user_id, partita_id, type_action, id_armata) VALUES ((SELECT id_user FROM utenti WHERE username=$1), $2, 'mov', $3) RETURNING id_mossa`,
-                         [ws.username, partitaId, armyId]
+                         `INSERT INTO mosse (user_id, partita_id, type_action, id_armata, ttl) VALUES ((SELECT id_user FROM utenti WHERE username=$1), $2, 'mov', $3, $4) RETURNING id_mossa`,
+                         [ws.username, partitaId, armyId, etaDate]
                      );
                      const newIdMossa = insertMossa.rows[0].id_mossa;
                      await db.query(
-                         `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, time_to_arrive) VALUES ($1, 1, $2, $3, $4)`,
-                         [newIdMossa, targetLng, targetLat, etaDate]
+                         `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`,
+                         [newIdMossa, targetLng, targetLat, targetName, etaDate]
                      );
                  }
              }
@@ -263,7 +264,68 @@ if (!fs.existsSync(MINIMUM_PATH_FILE)) {
 }
 
 // Caricamento in Redis
-loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(() => {
+const restoreActiveMoves = async () => {
+  console.log("[SYSTEM] Avvio ripristino mosse attive da DB a Redis...");
+  try {
+    const db = require("../shared/postgresClient.js");
+    // Aggiungi colonna target_node se non esiste per retrocompatibilità
+    await db.query(`ALTER TABLE spostamenti ADD COLUMN IF NOT EXISTS target_node VARCHAR(128)`);
+
+    const query = `
+      SELECT m.id_armata, m.user_id, p.id_partita_hash, u.username, s.target_node, s.x_dest, s.y_dest, m.ttl
+      FROM mosse m
+      JOIN spostamenti s ON m.id_mossa = s.id_mossa
+      JOIN partite p ON m.partita_id = p.id_partita
+      JOIN utenti u ON m.user_id = u.id_user
+      WHERE m.type_action = 'mov' AND m.ttl > NOW()
+    `;
+    const res = await db.query(query);
+    console.log(`[SYSTEM] Trovati ${res.rows.length} spostamenti attivi da ripristinare.`);
+
+    for (const row of res.rows) {
+      if (!row.target_node) continue;
+      
+      const redisKey = `match:${row.id_partita_hash}:player:${row.username}:armate`;
+      const armateStr = await redis.get(redisKey);
+      if (!armateStr) continue;
+
+      let armateObj = JSON.parse(armateStr);
+      if (!armateObj[row.id_armata]) continue;
+
+      let army = armateObj[row.id_armata];
+      let startLng = 12.0, startLat = 41.0;
+      if (typeof army.currentLocation === 'string') {
+        const pts = army.currentLocation.split(',').map(s => parseFloat(s.trim()));
+        if (pts.length === 2) { startLng = pts[0]; startLat = pts[1]; }
+      } else if (army.currentLocation && army.currentLocation.x !== undefined) {
+        startLng = army.currentLocation.x;
+        startLat = army.currentLocation.y;
+      }
+
+      // Ricalcola il percorso
+      try {
+        const pathInfo = await calculatePath(startLng, startLat, row.target_node, row.x_dest, row.y_dest);
+        
+        army.status = 'moving';
+        army.targetCoords = `${row.x_dest},${row.y_dest}`;
+        army.targetName = row.target_node;
+        army.path = pathInfo.path;
+        // missionMode potrebbe essere perso se non storicizzato in mosse, assumiamo 'move'
+        army.missionMode = 'move';
+        
+        await redis.set(redisKey, JSON.stringify(armateObj));
+        console.log(`[SYSTEM] Ripristinata mossa armata ${row.id_armata} verso ${row.target_node}`);
+      } catch (err) {
+        console.error(`[SYS_ERR] Impossibile ricalcolare path ripristino armata ${row.id_armata}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("[SYS_ERR] Errore durante il ripristino delle mosse attive:", err);
+  }
+};
+
+loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(async () => {
+  await restoreActiveMoves();
   server.listen(PORT, () => {
     console.log(`[SYSTEM] Microservizio MATCH operativo su porta ${PORT} (HTTP + WS)`);
     // Avvio generatore automatico di truppe (differito)
