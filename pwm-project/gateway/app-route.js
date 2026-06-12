@@ -28,7 +28,7 @@ const allowedOrigins = new Set([
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.has(origin)) {
+    if (!origin || allowedOrigins.has(origin) || origin.endsWith('.trycloudflare.com')) {
       return callback(null, true);
     }
 
@@ -218,7 +218,7 @@ const validateSessionToken = async (token) => {
   // 3. Verifica esistenza nel Database Redis
   const sessionKey = "session:" + sessionId;
   const sessionDataString = await redisClient.get(sessionKey);
-  
+
   if (!sessionDataString) {
     console.log(`[DEBUG WS AUTH] Session data string is null for sessionKey: ${sessionKey}`);
     return { ok: false, status: 401, error: "Sessione terminata o non valida" };
@@ -608,7 +608,7 @@ const shutdown = (signal) => {
     try {
       socket.end();
       socket.destroy();
-    } catch (e) {}
+    } catch (e) { }
   }
 
   redisClient.quit();

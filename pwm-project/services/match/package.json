@@ -16,6 +16,7 @@
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.11.3",
     "redis": "^5.12.1",
+    "topojson-client": "^3.1.0",
     "ws": "^8.21.0"
   }
 }

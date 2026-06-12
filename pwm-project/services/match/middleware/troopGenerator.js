@@ -104,6 +104,32 @@ const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, ho
 
             await client.query('COMMIT');
             console.log(`[TROOP_GEN] Generazione iniziale truppe completata per la partita ${matchHashId}`);
+            
+            // BROADCAST INITIAL TROOPS ALLA FINE DELLA GENERAZIONE
+            try {
+                const keys = await redis.keys(`match:${matchHashId}:player:*:armate`);
+                let allArmies = [];
+                for (const key of keys) {
+                    const armateStr = await redis.get(key);
+                    if (armateStr) {
+                       const playerId = key.split(':')[3];
+                       const armateObj = JSON.parse(armateStr);
+                       const playerArmies = Object.values(armateObj).map(a => ({...a, owner: playerId}));
+                       allArmies = allArmies.concat(playerArmies);
+                    }
+                }
+                const broadcastPayload = {
+                   matchId: matchHashId,
+                   payload: {
+                       type: 'INITIAL_STATE',
+                       payload: { armies: allArmies, nations }
+                   }
+                };
+                await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+            } catch(bcastErr) {
+                console.error(`[TROOP_GEN] Errore broadcast:`, bcastErr);
+            }
+            
         } catch (err) {
             await client.query('ROLLBACK');
             console.error(`[TROOP_GEN] Errore DB durante generazione iniziale truppe:`, err);
@@ -202,6 +228,33 @@ const generateTroopsPeriodic = async () => {
                     await client.query('ROLLBACK');
                     console.error(`[TROOP_GEN] Errore DB durante update periodico per match ${matchHashId}:`, err);
                 }
+            }
+
+            // BROADCAST ALLA FINE DEL CICLO PARTITA
+            try {
+                let allArmies = [];
+                for (const key of keys) {
+                    const armateStr = await redis.get(key);
+                    if (armateStr) {
+                       const playerId = key.split(':')[3];
+                       const armateObj = JSON.parse(armateStr);
+                       const playerArmies = Object.values(armateObj).map(a => ({...a, owner: playerId}));
+                       allArmies = allArmies.concat(playerArmies);
+                    }
+                }
+                const nationsStr = await redis.get(`match:${matchHashId}:nations`);
+                const nations = nationsStr ? JSON.parse(nationsStr) : [];
+                
+                const broadcastPayload = {
+                   matchId: matchHashId,
+                   payload: {
+                       type: 'INITIAL_STATE',
+                       payload: { armies: allArmies, nations }
+                   }
+                };
+                await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+            } catch(bcastErr) {
+                console.error(`[TROOP_GEN] Errore broadcast:`, bcastErr);
             }
         }
     } catch (e) {

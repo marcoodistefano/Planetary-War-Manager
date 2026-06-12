@@ -93,6 +93,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   currentMatchId = '';
   matchPlayers: string[] = [];
   matchAlliances: any[] = [];
+  selectedArmyId = '';
+  selectedArmyForMovement: string | null = null;
 
   activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
 
@@ -286,7 +288,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         if (parsed.type === 'INITIAL_STATE') {
           if (parsed.payload?.armies) {
-            this.matchArmies = parsed.payload.armies;
+            this.matchArmies = parsed.payload.armies.filter((a: any) => a.owner === this.userProfile.username);
             this.renderArmies();
           }
           if (parsed.payload?.nations) {
@@ -303,6 +305,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.matchArmies[armyIndex].status = 'moving';
             this.matchArmies[armyIndex].targetName = targetName;
             this.matchArmies[armyIndex].targetCoords = targetCoords;
+            this.matchArmies[armyIndex].path = parsed.data.path;
           }
           console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
           this.renderArmies();
@@ -311,10 +314,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         if (parsed.type === 'TROOPS_SPAWNED') {
           const { userId, army } = parsed.data;
-          // In the future, we could check if userId matches local user. 
-          // For now, we append it to matchArmies so it renders on map.
-          this.matchArmies.push(army);
-          console.log(`[WS_MATCH] Nuova truppa generata a Palermo per l'utente ${userId}!`);
+          if (userId === this.userProfile.username) {
+            this.matchArmies.push(army);
+            console.log(`[WS_MATCH] Nuova truppa generata a Palermo per l'utente ${userId}!`);
+          }
           this.renderArmies();
           this.cdr.detectChanges();
         }
@@ -831,6 +834,38 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         }
       });
 
+      // --- PERCORSI TRUPPE IN MOVIMENTO ---
+      this.map.addSource('moving-troops-paths-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+      this.map.addLayer({
+        id: 'moving-troops-paths-layer',
+        type: 'line',
+        source: 'moving-troops-paths-source',
+        paint: {
+          'line-color': '#22c55e', // Verde smeraldo
+          'line-width': 3,
+          'line-opacity': 0.8
+        }
+      });
+
+      // --- PERCORSO TRUPPA IN HOVER ---
+      this.map.addSource('hovered-troop-path-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+      this.map.addLayer({
+        id: 'hovered-troop-path-layer',
+        type: 'line',
+        source: 'hovered-troop-path-source',
+        paint: {
+          'line-color': '#eab308', // Giallo
+          'line-width': 4,
+          'line-opacity': 1.0
+        }
+      });
+
       // Eliminato il setup nativo GeoJSON perché causava offset grafico ingestibile con le immagini grandi.
       // Torniamo al caricamento DOM che adatta il background-size al div in pixel.
       setTimeout(() => {
@@ -916,6 +951,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90;
     let hasArmies = false;
     const tetherFeatures: any[] = [];
+    const movingPathsFeatures: any[] = [];
 
     // Aggiungiamo o aggiorniamo i marker
     this.matchArmies.forEach(army => {
@@ -939,6 +975,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       if (coords[1] > maxLat) maxLat = coords[1];
 
       const totalTroops = (Object.values(army.composition || {}) as number[]).reduce((a, b) => a + b, 0) as number;
+
+      if (army.status === 'moving' && army.path && army.path.length > 0) {
+        movingPathsFeatures.push({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: army.path
+          },
+          properties: { armyId: army.id }
+        });
+      }
 
       // Trova il nodo target per la linea (tether)
       let targetNodeCoords = [...coords];
@@ -1054,14 +1101,32 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         // --- INTERAZIONI CLICK & HOVER ---
         let hoverTimer: any = null;
+        let clickTimer: any = null;
 
         container.addEventListener('mouseenter', () => {
+          if (army.status === 'moving' && army.path && army.path.length > 0) {
+            const hoverSource: any = this.map.getSource('hovered-troop-path-source');
+            if (hoverSource) {
+              hoverSource.setData({
+                type: 'FeatureCollection',
+                features: [{
+                  type: 'Feature',
+                  geometry: { type: 'LineString', coordinates: army.path },
+                  properties: { armyId: army.id }
+                }]
+              });
+            }
+          }
           hoverTimer = setTimeout(() => {
             this.showArmyHoverBanner(army, [coords[0], coords[1]]);
           }, 3000); // Mostra dopo 3 secondi
         });
 
         container.addEventListener('mouseleave', () => {
+          const hoverSource: any = this.map.getSource('hovered-troop-path-source');
+          if (hoverSource) {
+            hoverSource.setData({ type: 'FeatureCollection', features: [] });
+          }
           if (hoverTimer) clearTimeout(hoverTimer);
           this.hideArmyHoverBanner();
         });
@@ -1070,7 +1135,36 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           e.stopPropagation(); // Evita che il click passi alla mappa sottostante
           if (hoverTimer) clearTimeout(hoverTimer);
           this.hideArmyHoverBanner();
-          this.openArmyModalFromRadial();
+          
+          if (clickTimer) {
+             clearTimeout(clickTimer);
+             clickTimer = null;
+             
+             // Doppio click -> Gestione armata
+             this.selectedArmyId = army.id;
+             this.isArmyModalOpen = true;
+             this.armyModalInitialTab = 'management';
+             this.isBuildPanelOpen = false;
+             this.isTechModalOpen = false;
+             this.isDiplomacyModalOpen = false;
+             this.isIntelligenceModalOpen = false;
+             this.isMarketModalOpen = false;
+             this.closeMobileMenu();
+             this.cdr.detectChanges();
+          } else {
+             clickTimer = setTimeout(() => {
+                clickTimer = null;
+                
+                // Singolo click -> Spostamento
+                this.selectedArmyForMovement = army.id;
+                this.toastCtrl.create({
+                  message: 'Armata selezionata per lo spostamento. Clicca sulla mappa per confermare.',
+                  duration: 3000,
+                  position: 'top',
+                  color: 'primary'
+                }).then(t => t.present());
+             }, 250);
+          }
         });
 
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
@@ -1088,6 +1182,16 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         type: 'FeatureCollection',
         features: tetherFeatures
       });
+      if (this.map.getLayer('tethers-layer')) this.map.moveLayer('tethers-layer');
+    }
+
+    if (this.map.getSource('moving-troops-paths-source')) {
+      (this.map.getSource('moving-troops-paths-source') as any).setData({
+        type: 'FeatureCollection',
+        features: movingPathsFeatures
+      });
+      if (this.map.getLayer('moving-troops-paths-layer')) this.map.moveLayer('moving-troops-paths-layer');
+      if (this.map.getLayer('hovered-troop-path-layer')) this.map.moveLayer('hovered-troop-path-layer');
     }
 
     if (this.isFirstArmyRender && hasArmies) {
@@ -1497,6 +1601,31 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   handleMapPointSelect(e: any) {
     console.log("Map clicked!", e.point);
+    
+    if (this.selectedArmyForMovement) {
+       this.updatePointReadout(e, true);
+       const targetCoords = this.formatMapCoordinates(e.lngLat.lng, e.lngLat.lat);
+       
+       const army = this.matchArmies.find(a => a.id === this.selectedArmyForMovement);
+       if (army) {
+         this.onArmyMissionRequested({
+           armyId: army.id,
+           mode: 'move',
+           targetName: this.selectedPointName || 'OBIETTIVO',
+           targetCoords: targetCoords,
+           composition: army.composition
+         });
+         this.toastCtrl.create({
+            message: 'Ordine di movimento inviato.',
+            duration: 2000,
+            position: 'top',
+            color: 'success'
+         }).then(t => t.present());
+       }
+       this.selectedArmyForMovement = null;
+       return;
+    }
+
     if (this.isRadialMenuVisible) {
       // Se è già aperto, il click lo chiude.
       this.isRadialMenuVisible = false;

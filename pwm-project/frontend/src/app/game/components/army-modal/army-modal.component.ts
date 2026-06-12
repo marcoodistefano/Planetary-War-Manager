@@ -40,6 +40,7 @@ export class ArmyModalComponent implements OnInit {
   @Input() armies: ArmyGroup[] = [];
   @Input() selectedTargetName = '';
   @Input() selectedTargetCoords = '--';
+  @Input() selectedArmyId = '';
   @Input() initialTab: ArmyTab = 'management';
 
   activeTab: ArmyTab = 'management';
@@ -106,7 +107,9 @@ export class ArmyModalComponent implements OnInit {
       this.selectedTroopKey = this.availableTroopEntries[0]?.[0] || '';
     }
 
-    if (!this.activeArmyId && this.armies.length > 0) {
+    if (this.selectedArmyId) {
+      this.activeArmyId = this.selectedArmyId;
+    } else if (!this.activeArmyId && this.armies.length > 0) {
       this.activeArmyId = this.armies[0].id;
     }
   }

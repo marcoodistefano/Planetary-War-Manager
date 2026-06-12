@@ -12,6 +12,7 @@ const { initDispatcher } = require("./Dispatcher/webDispatcher.js");
 const redis = require("../shared/redisClient.js");
 const { calculatePath } = require("./middleware/movementLogic.js");
 const { startTroopGenerator } = require("./middleware/troopGenerator.js");
+const { loadMinimumPathToRedis } = require("./middleware/loadPathToRedis.js");
 
 const app = express();
 
@@ -74,9 +75,17 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
       console.log(`[WS_MATCH] Ricevuto messaggio da ${userId}:`, payload);
       
       if (payload.action === 'GET_INITIAL_STATE') {
-         const armateStr = await redis.get(`match:${ws.matchId}:player:${ws.username}:armate`);
-         const armateObj = armateStr ? JSON.parse(armateStr) : {};
-         const armies = Object.values(armateObj);
+         const keys = await redis.keys(`match:${ws.matchId}:player:*:armate`);
+         let armies = [];
+         for (const key of keys) {
+            const armateStr = await redis.get(key);
+            if (armateStr) {
+               const playerId = key.split(':')[3];
+               const armateObj = JSON.parse(armateStr);
+               const playerArmies = Object.values(armateObj).map(a => ({...a, owner: playerId}));
+               armies = armies.concat(playerArmies);
+            }
+         }
 
          const nationsStr = await redis.get(`match:${ws.matchId}:nations`);
          const nations = nationsStr ? JSON.parse(nationsStr) : [];
@@ -103,22 +112,77 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
              return;
          }
          
-         // TODO: Leggere dal file ETOPO reale in futuro
+         // --- Parsing Coordinate ---
          let loc = armateObj[armyId].currentLocation;
-         let startCoords = '12.000, 41.000';
-         if (loc && typeof loc === 'string') startCoords = loc;
-         else if (loc && loc.x !== undefined && loc.y !== undefined) startCoords = `${loc.x}, ${loc.y}`;
+         let startLng = 12.0, startLat = 41.0;
+         if (loc && typeof loc === 'string') {
+             const pts = loc.split(',').map(s => parseFloat(s.trim()));
+             if (pts.length === 2) { startLng = pts[0]; startLat = pts[1]; }
+         } else if (loc && loc.x !== undefined && loc.y !== undefined) {
+             startLng = loc.x; startLat = loc.y;
+         }
          
-         const pathInfo = calculatePath(startCoords, targetCoords);
+         let targetLng = 12.0, targetLat = 41.0;
+         if (typeof targetCoords === 'string') {
+             const pts = targetCoords.split(',').map(s => parseFloat(s.trim()));
+             if (pts.length === 2) { targetLng = pts[0]; targetLat = pts[1]; }
+         }
+
+          let pathInfo = { isValid: false, distance: 0, etaMs: 0, path: [] };
+          try {
+              pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat);
+          } catch (e) {
+              console.error("Errore durante calculatePath:", e);
+          }
+          
+          armateObj[armyId].status = 'moving';
+          armateObj[armyId].targetCoords = targetCoords;
+          armateObj[armyId].targetName = targetName;
+          armateObj[armyId].missionMode = payload.payload.mode;
+          armateObj[armyId].path = pathInfo.path;
+          
+          // Salva su Redis sovrascrivendo l'eventuale mossa vecchia
+          await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(armateObj));
          
-         armateObj[armyId].status = 'moving';
-         armateObj[armyId].targetCoords = targetCoords;
-         armateObj[armyId].targetName = targetName;
-         armateObj[armyId].missionMode = payload.payload.mode;
-         
-         // Salva su Redis
-         await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(armateObj));
-         
+         // Inserimento o aggiornamento in DB (PostgreSQL)
+         try {
+             const db = require('../shared/postgresClient.js');
+             // Cerca mossa esistente
+             const mossaRes = await db.query(
+                `SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, 
+                [armyId]
+             );
+
+             const etaDate = new Date(Date.now() + pathInfo.etaMs);
+
+             if (mossaRes.rows.length > 0) {
+                 const id_mossa = mossaRes.rows[0].id_mossa;
+                 // Aggiorna lo spostamento in db (cancella i vecchi e ricrea o aggiorna)
+                 await db.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [id_mossa]);
+                 await db.query(
+                     `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, time_to_arrive) VALUES ($1, 1, $2, $3, $4)`,
+                     [id_mossa, targetLng, targetLat, etaDate]
+                 );
+             } else {
+                 // Estrai la partita id associata al matchId visualizzato
+                 const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1`, [ws.matchId]);
+                 if (partitaRes.rows.length > 0) {
+                     const partitaId = partitaRes.rows[0].id_partita;
+                     const insertMossa = await db.query(
+                         `INSERT INTO mosse (user_id, partita_id, type_action, id_armata) VALUES ((SELECT id_user FROM utenti WHERE username=$1), $2, 'mov', $3) RETURNING id_mossa`,
+                         [ws.username, partitaId, armyId]
+                     );
+                     const newIdMossa = insertMossa.rows[0].id_mossa;
+                     await db.query(
+                         `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, time_to_arrive) VALUES ($1, 1, $2, $3, $4)`,
+                         [newIdMossa, targetLng, targetLat, etaDate]
+                     );
+                 }
+             }
+         } catch(dbErr) {
+             console.error("[SYS_ERR] Errore salvataggio movimento in DB:", dbErr);
+         }
+
          // Notifica a tutti i giocatori del match (Broadcast)
          const broadcastPayload = {
            matchId: ws.matchId,
@@ -129,7 +193,8 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                armyId,
                targetName,
                targetCoords,
-               etaMs: pathInfo.etaMs
+               etaMs: pathInfo.etaMs,
+               path: pathInfo.path
              }
            }
          };
@@ -197,10 +262,16 @@ if (!fs.existsSync(MINIMUM_PATH_FILE)) {
   console.log("[SYSTEM] File minimum_path.json trovato. Salto la generazione.");
 }
 
-server.listen(PORT, () => {
-  console.log(`[SYSTEM] Microservizio MATCH operativo su porta ${PORT} (HTTP + WS)`);
-  // Avvio generatore automatico di truppe (differito)
-  startTroopGenerator();
+// Caricamento in Redis
+loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(() => {
+  server.listen(PORT, () => {
+    console.log(`[SYSTEM] Microservizio MATCH operativo su porta ${PORT} (HTTP + WS)`);
+    // Avvio generatore automatico di truppe (differito)
+    startTroopGenerator();
+  });
+}).catch(err => {
+  console.error("[SYS_ERR] Errore caricamento routing in Redis:", err);
+  process.exit(1);
 });
 
 initDispatcher(clientSockets).catch((error) => {
