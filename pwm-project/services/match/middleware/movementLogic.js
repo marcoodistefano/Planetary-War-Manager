@@ -74,7 +74,7 @@ function getEdgeGeometry(cityA, cityB) {
 }
 
 // Main calculate function
-const calculatePath = async (startLng, startLat, targetName, targetLng, targetLat) => {
+const calculatePath = async (startLng, startLat, targetName, targetLng, targetLat, multiplier = 1) => {
     loadGeometries();
 
     let destNode = targetName;
@@ -138,12 +138,17 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
     }
 
     const baseSpeed = 50; // km/h
-    const etaHours = routeInfo.cost / baseSpeed;
+    // La distanza di routeInfo.cost è in METRI. Convertiamo in KM:
+    const costInKm = routeInfo.cost / 1000;
+    
+    // Il tempo di percorrenza scala diviso per il moltiplicatore
+    const etaHours = costInKm / (baseSpeed * multiplier);
     const etaMs = Math.floor(etaHours * 60 * 60 * 1000);
 
     return {
         isValid: true,
-        distance: routeInfo.cost,
+        distance: costInKm, // Restituiamo i km effettivi invece dei metri
+
         etaMs: etaMs,
         path: fullPath
     };

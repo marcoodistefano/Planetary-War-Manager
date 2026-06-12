@@ -350,17 +350,41 @@ const Eru = {
     return map[Number(bits)] || 0;
   },
 
+  decode_moltiplicatore_temporale_value: (bits) => {
+    switch (bits) {
+      case MOLTIPLICATORE_TEMPORALE.x1: return 1;
+      case MOLTIPLICATORE_TEMPORALE.x2: return 2;
+      case MOLTIPLICATORE_TEMPORALE.x3: return 3;
+      case MOLTIPLICATORE_TEMPORALE.x4: return 4;
+      case MOLTIPLICATORE_TEMPORALE.x5: return 5;
+      case MOLTIPLICATORE_TEMPORALE.x10: return 10;
+      case MOLTIPLICATORE_TEMPORALE.x20: return 20;
+      case MOLTIPLICATORE_TEMPORALE.x30: return 30;
+      case MOLTIPLICATORE_TEMPORALE.x40: return 40;
+      case MOLTIPLICATORE_TEMPORALE.x50: return 50;
+      case MOLTIPLICATORE_TEMPORALE.x60: return 60;
+      case MOLTIPLICATORE_TEMPORALE.x100: return 100;
+      case MOLTIPLICATORE_TEMPORALE.x200: return 200;
+      case MOLTIPLICATORE_TEMPORALE.x500: return 500;
+      case MOLTIPLICATORE_TEMPORALE.x1000: return 1000;
+      case MOLTIPLICATORE_TEMPORALE.UNLIMITED: return 999999;
+      default: return 1;
+    }
+  },
+
   decode_match: (binaryString) => {
     const matchReg = typeof binaryString === "string" ? BigInt("0b" + binaryString) : BigInt(binaryString);
     const statoBits = (matchReg >> 54n) & 0b11n;
     const isSquadBits = (matchReg >> 53n) & 0b1n;
     const maxPlayersBits = (matchReg >> 46n) & 0b111n;
+    const multiplierBits = (matchReg >> 38n) & 0b1111n;
 
     return {
       stato: Eru.decode_stato(statoBits),
       is_squad: isSquadBits === SQUAD.SQUAD,
       maxPlayers: Eru.decode_max_players(maxPlayersBits, isSquadBits),
       maxPlayersCount: Eru.decode_max_players_count(maxPlayersBits, isSquadBits),
+      multiplierValue: Eru.decode_moltiplicatore_temporale_value(multiplierBits)
     };
   },
 

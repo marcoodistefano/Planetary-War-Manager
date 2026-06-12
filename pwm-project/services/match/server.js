@@ -128,9 +128,23 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
              if (pts.length === 2) { targetLng = pts[0]; targetLat = pts[1]; }
          }
 
+          let multiplier = 1;
+          try {
+              const matchDataRaw = await redis.get(`match:${ws.matchId}`);
+              if (matchDataRaw) {
+                  const matchObj = JSON.parse(matchDataRaw);
+                  if (matchObj.struttura_partita) {
+                      const decodedMatch = Eru.decode_match(matchObj.struttura_partita);
+                      multiplier = decodedMatch.multiplierValue || 1;
+                  }
+              }
+          } catch(err) {
+              console.error("[SYS_WARN] Impossibile ottenere il moltiplicatore:", err);
+          }
+
           let pathInfo = { isValid: false, distance: 0, etaMs: 0, path: [] };
           try {
-              pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat);
+              pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, multiplier);
           } catch (e) {
               console.error("Errore durante calculatePath:", e);
           }
@@ -272,7 +286,10 @@ const restoreActiveMoves = async () => {
     await db.query(`ALTER TABLE spostamenti ADD COLUMN IF NOT EXISTS target_node VARCHAR(128)`);
 
     const query = `
-      SELECT m.id_armata, m.user_id, p.id_partita_hash, u.username, s.target_node, s.x_dest, s.y_dest, m.ttl
+      SELECT m.id_mossa, m.id_armata, m.user_id, m.partita_id, m.ttl,
+             s.x_dest, s.y_dest, s.target_node,
+             p.id_partita_hash, p.struttura_partita,
+             u.username
       FROM mosse m
       JOIN spostamenti s ON m.id_mossa = s.id_mossa
       JOIN partite p ON m.partita_id = p.id_partita
@@ -302,9 +319,17 @@ const restoreActiveMoves = async () => {
         startLat = army.currentLocation.y;
       }
 
+      let multiplier = 1;
+      if (row.struttura_partita) {
+          try {
+              const decodedMatch = Eru.decode_match(row.struttura_partita);
+              multiplier = decodedMatch.multiplierValue || 1;
+          } catch(err) {}
+      }
+
       // Ricalcola il percorso
       try {
-        const pathInfo = await calculatePath(startLng, startLat, row.target_node, row.x_dest, row.y_dest);
+        const pathInfo = await calculatePath(startLng, startLat, row.target_node, row.x_dest, row.y_dest, multiplier);
         
         army.status = 'moving';
         army.targetCoords = `${row.x_dest},${row.y_dest}`;
