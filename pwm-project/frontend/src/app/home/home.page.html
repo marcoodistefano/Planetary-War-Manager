@@ -50,7 +50,7 @@
           <span class="user-name">{{ currentPlayer.name }}</span>
           <span class="user-level">ELO {{ currentPlayer.score }}</span>
         </div>
-        <button type="button" class="logout-btn" aria-label="Esci">
+        <button type="button" class="logout-btn" aria-label="Esci" (click)="logout()">
           <ion-icon name="log-out-outline"></ion-icon>
         </button>
       </div>

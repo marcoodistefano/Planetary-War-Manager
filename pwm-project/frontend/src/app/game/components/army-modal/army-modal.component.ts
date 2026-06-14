@@ -219,6 +219,7 @@ export class ArmyModalComponent implements OnInit {
       targetCoords,
       composition: updatedArmy.composition
     });
+    this.closeModal();
   }
 
   getArmyTotal(army: ArmyGroup) {

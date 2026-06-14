@@ -51,7 +51,7 @@
                 game.creator) | uppercase }} · {{ game.timeCreatedFormatted || game.timeCreated }}<ng-container
                   *ngIf="game.regionPlayable"> · REGIONI: {{ game.regionPlayable }}</ng-container></div>
             </div>
-            <button class="join-button">PARTECIPA</button>
+            <button class="join-button" (click)="joinGame(game)">PARTECIPA</button>
           </div>
 
           <div *ngIf="filteredGames.length === 0" class="no-results">

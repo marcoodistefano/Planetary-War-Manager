@@ -133,9 +133,7 @@ export class ProfilePage implements OnInit, AfterViewInit {
   const modal = await this.modalCtrl.create({
     component: IconSelectorComponent,
     cssClass: 'profile-modal',
-    canDismiss: true,
-    breakpoints: this.isMobile ? [0, 0.9] : undefined,
-    initialBreakpoint: this.isMobile ? 0.9 : undefined
+    canDismiss: true
   });
   await modal.present();
 
@@ -171,9 +169,7 @@ async changeUsername() {
   const modal = await this.modalCtrl.create({
     component: ChangeNameComponent,
     cssClass: 'profile-modal',
-    canDismiss: true,
-    breakpoints: this.isMobile ? [0, 0.9] : undefined,
-    initialBreakpoint: this.isMobile ? 0.9 : undefined
+    canDismiss: true
   });
   return await modal.present();
 }
@@ -182,9 +178,7 @@ async changePassword() {
   const modal = await this.modalCtrl.create({
     component: ChangePasswordComponent,
     cssClass: 'profile-modal',
-    canDismiss: true,
-    breakpoints: this.isMobile ? [0, 0.9] : undefined,
-    initialBreakpoint: this.isMobile ? 0.9 : undefined
+    canDismiss: true
   });
   return await modal.present();
 }
@@ -221,9 +215,7 @@ async changePassword() {
     const modal = await this.modalCtrl.create({
       component: SettingsComponent,
       cssClass: 'profile-modal',
-      canDismiss: true,
-      breakpoints: [0, 0.9],
-      initialBreakpoint: 0.9
+      canDismiss: true
     });
     await modal.present();
 
@@ -244,8 +236,6 @@ async changePassword() {
       component,
       cssClass: 'profile-modal',
       canDismiss: true,
-      breakpoints: [0, 0.9],
-      initialBreakpoint: 0.9,
       ...(opts || {})
     });
     await modal.present();

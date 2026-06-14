@@ -12,7 +12,9 @@
   --panel-blur: blur(20px);
   --text-muted: #a0a0b0;
   --text-accent: #b6cee9;
-  
+}
+
+.tech-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 10000;
@@ -289,8 +291,8 @@
 /* RESPONSIVE DESIGN - TABLET & MOBILE */
 @media (max-width: 1024px) {
   .tech-frame {
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     max-width: none;
     max-height: none;
     border-radius: 0;

@@ -73,4 +73,8 @@ export class NewgamesComponent implements OnInit {
   close() {
     this.modalCtrl.dismiss();
   }
+
+  joinGame(game: any) {
+    this.modalCtrl.dismiss(game);
+  }
 }

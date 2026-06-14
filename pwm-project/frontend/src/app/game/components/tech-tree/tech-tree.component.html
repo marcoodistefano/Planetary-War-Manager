@@ -1,12 +1,9 @@
 <div class="tech-modal-backdrop" (click)="closeModal()">
   
   <div class="tech-frame" 
-       (click)="$event.stopPropagation()"
-       [style.transform]="'translate(' + transformX + 'px, ' + transformY + 'px)'">
+       (click)="$event.stopPropagation()">
     
-    <div class="tech-sidebar" 
-         (mousedown)="onDragStart($event)"
-         [style.cursor]="isDragging ? 'grabbing' : 'grab'">
+    <div class="tech-sidebar">
       
       <div class="brand">
         <span class="system-name">TECH_TREE</span>
@@ -29,9 +26,10 @@
           <ion-icon name="list-outline"></ion-icon><span>TUTTI</span>
         </div>
       </nav>
-      <div class="sidebar-footer ion-hide-md-down">
+      <div class="sidebar-footer">
         <button class="exit-btn" (click)="close.emit()">
-          <ion-icon name="close-circle-outline"></ion-icon> <span>CHIUDI</span>
+          <ion-icon name="power-outline" class="close-icon"></ion-icon>
+          <span class="close-label">[ CHIUDI ]</span>
         </button>
       </div>
       

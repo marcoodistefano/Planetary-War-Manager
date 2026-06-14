@@ -18,12 +18,7 @@ export class TechTreeComponent implements OnInit {
   activeBranch = 'hq';
   selectedNode: any = null;
 
-  // --- VARIABILI PER IL TRASCINAMENTO (DRAG) ---
-  isDragging = false;
-  dragStartX = 0;
-  dragStartY = 0;
-  transformX = 0;
-  transformY = 0;
+  // --- VARIABILI PER IL PANNING (SCROLL ORIZZONTALE/VERTICALE INTERNO) ---
 
   isPanning = false;
   panStartX = 0;
@@ -68,30 +63,7 @@ export class TechTreeComponent implements OnInit {
     console.log("Academy OS: Analisi database game_rules...");
   }
 
-  // --- LOGICA DRAG & DROP ---
-  onDragStart(event: MouseEvent) {
-    // Evitiamo che il drag parta se clicchi su un bottone o un'icona nella sidebar
-    const target = event.target as HTMLElement;
-    if (target.tagName === 'BUTTON' || target.tagName === 'ION-ICON' || target.closest('.nav-item')) {
-      return;
-    }
 
-    this.isDragging = true;
-    this.dragStartX = event.clientX - this.transformX;
-    this.dragStartY = event.clientY - this.transformY;
-  }
-
-  @HostListener('document:mousemove', ['$event'])
-  onDragMove(event: MouseEvent) {
-    if (!this.isDragging) return;
-    this.transformX = event.clientX - this.dragStartX;
-    this.transformY = event.clientY - this.dragStartY;
-  }
-
-  @HostListener('document:mouseup')
-  onDragEnd() {
-    this.isDragging = false;
-  }
 
   setBranch(branch: string) {
     this.activeBranch = branch;

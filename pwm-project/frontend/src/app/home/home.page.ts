@@ -10,6 +10,7 @@ import { ModalController, ToastController } from '@ionic/angular';
 import { HomeService } from './home'; 
 import { UserStateService } from '../user-state.service';
 import { Subscription } from 'rxjs';
+import { AuthApiService } from '../auth/auth-api.service';
 import { HomeData } from './home-data.model';
 
 import { SettingsComponent } from '../profile/components/settings/settings.component';
@@ -63,7 +64,8 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     private modalCtrl: ModalController,
     private toastCtrl: ToastController,
     private homeService: HomeService, // Iniezione del Service creato
-    private userState: UserStateService
+    private userState: UserStateService,
+    private authService: AuthApiService
   ) { }
 
   private pollingInterval: any;
@@ -330,18 +332,15 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
 
   async loadCountryFlags() {
     try {
-      const response = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,translations');
+      const response = await fetch('https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/index.json');
       const data = await response.json();
       const newMap: Record<string, string> = {};
       for (const c of data) {
-        const code = (c.cca2 || '').toLowerCase();
+        const code = (c.code || '').toLowerCase();
         if (!code) continue;
         newMap[code] = code;
-        if (c.translations?.ita?.common) {
-          newMap[c.translations.ita.common.toLowerCase()] = code;
-        }
-        if (c.name?.common) {
-          newMap[c.name.common.toLowerCase()] = code;
+        if (c.name) {
+          newMap[c.name.toLowerCase()] = code;
         }
       }
       this.countryFlagsMap = newMap;
@@ -398,7 +397,19 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
       case 'storico partite':
         this.router.navigate(['/history'], { queryParams: { tab: 'finished' } });
         break;
-      case 'nuove partite': await this.openModal(NewgamesComponent, { componentProps: { games: this.filteredNewGames } }); break;
+      case 'nuove partite': 
+        const modal = await this.modalCtrl.create({
+          component: NewgamesComponent,
+          cssClass: 'home-modal',
+          canDismiss: true,
+          componentProps: { games: this.filteredNewGames }
+        });
+        await modal.present();
+        const { data } = await modal.onDidDismiss();
+        if (data) {
+          this.joinNewGame(data);
+        }
+        break;
     }
   }
 
@@ -408,8 +419,6 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
       component: component,
       cssClass: 'home-modal',
       canDismiss: true,
-      breakpoints: isMobile ? [0, 0.9] : undefined,
-      initialBreakpoint: isMobile ? 0.9 : undefined,
       ...(opts || {})
     });
     return await modal.present();
@@ -420,9 +429,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     const modal = await this.modalCtrl.create({
       component: CreateMatchComponent,
       cssClass: 'home-modal',
-      canDismiss: true,
-      breakpoints: isMobile ? [0, 0.9] : undefined,
-      initialBreakpoint: isMobile ? 0.9 : undefined
+      canDismiss: true
     });
 
     await modal.present();
@@ -505,5 +512,12 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   async ionViewWillLeave() {
     const topModal = await this.modalCtrl.getTop();
     if (topModal) await this.modalCtrl.dismiss();
+  }
+
+  logout() { 
+    this.authService.logout().subscribe({
+      next: () => this.router.navigate(['/login']),
+      error: () => this.router.navigate(['/login'])
+    });
   }
 }

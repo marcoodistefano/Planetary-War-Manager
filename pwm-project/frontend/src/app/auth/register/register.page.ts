@@ -106,14 +106,14 @@ export class RegisterPage implements OnInit, AfterViewInit, OnDestroy {
 
   async loadCountries() {
     try {
-      // Recupero nazioni con traduzioni in italiano
-      const response = await fetch('https://restcountries.com/v3.1/all?fields=name,flag,cca2,translations');
+      // Utilizziamo un CDN pubblico per evitare i problemi di deprecazione di restcountries
+      const response = await fetch('https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/index.json');
       const data = await response.json();
 
       this.countries = data.map((c: any) => ({
-        name: c.translations?.ita?.common || c.name.common,
-        flag: c.flag,
-        code: c.cca2
+        name: c.name,
+        flag: c.emoji,
+        code: c.code
       })).sort((a: any, b: any) => a.name.localeCompare(b.name));
 
       // Inizializza la lista filtrata per il modale

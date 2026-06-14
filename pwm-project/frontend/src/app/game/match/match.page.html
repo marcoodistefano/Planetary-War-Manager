@@ -276,31 +276,55 @@
     
 
 
-    <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>
-    <app-diplomacy-modal
-      *ngIf="isDiplomacyModalOpen"
-      [alliances]="matchAlliances"
-      [matchPlayers]="matchPlayers"
-      [matchNations]="matchNations"
-      [matchId]="currentMatchId"
-      [currentUser]="userProfile.username"
-      (alliancesChanged)="reloadMatchAlliances()"
-      (close)="isDiplomacyModalOpen = false"></app-diplomacy-modal>
-    <app-intelligence-modal *ngIf="isIntelligenceModalOpen" (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
-    <app-market-modal *ngIf="isMarketModalOpen" [playerResources]="playerResources" (close)="toggleMarketModal()"></app-market-modal>
-    <app-army-modal 
-      *ngIf="isArmyModalOpen" 
-      [playerTroops]="playerTroops" 
-      [armies]="matchArmies"
-      [selectedTargetName]="selectedPointName" 
-      [selectedTargetCoords]="selectedPointCoords" 
-      [selectedArmyId]="selectedArmyId"
-      [initialTab]="armyModalInitialTab"
-      (playerTroopsChange)="playerTroops = $event"
-      (armiesChange)="matchArmies = $event; saveArmiesToBackend()"
-      (missionRequested)="onArmyMissionRequested($event)"
-      (close)="isArmyModalOpen = false"> 
-    </app-army-modal>
+    <ion-modal [isOpen]="isTechModalOpen" (didDismiss)="isTechModalOpen = false" cssClass="desktop-transparent-modal">
+      <ng-template>
+        <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>
+      </ng-template>
+    </ion-modal>
+
+    <ion-modal [isOpen]="isDiplomacyModalOpen" (didDismiss)="isDiplomacyModalOpen = false" cssClass="desktop-transparent-modal">
+      <ng-template>
+        <app-diplomacy-modal
+          *ngIf="isDiplomacyModalOpen"
+          [alliances]="matchAlliances"
+          [matchPlayers]="matchPlayers"
+          [matchNations]="matchNations"
+          [matchId]="currentMatchId"
+          [currentUser]="userProfile.username"
+          (alliancesChanged)="reloadMatchAlliances()"
+          (close)="isDiplomacyModalOpen = false"></app-diplomacy-modal>
+      </ng-template>
+    </ion-modal>
+
+    <ion-modal [isOpen]="isIntelligenceModalOpen" (didDismiss)="isIntelligenceModalOpen = false" cssClass="desktop-transparent-modal">
+      <ng-template>
+        <app-intelligence-modal *ngIf="isIntelligenceModalOpen" (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
+      </ng-template>
+    </ion-modal>
+
+    <ion-modal [isOpen]="isMarketModalOpen" (didDismiss)="isMarketModalOpen = false" cssClass="desktop-transparent-modal">
+      <ng-template>
+        <app-market-modal *ngIf="isMarketModalOpen" [playerResources]="playerResources" (close)="isMarketModalOpen = false"></app-market-modal>
+      </ng-template>
+    </ion-modal>
+
+    <ion-modal [isOpen]="isArmyModalOpen" (didDismiss)="isArmyModalOpen = false" cssClass="desktop-transparent-modal">
+      <ng-template>
+        <app-army-modal 
+          *ngIf="isArmyModalOpen" 
+          [playerTroops]="playerTroops" 
+          [armies]="matchArmies"
+          [selectedTargetName]="selectedPointName" 
+          [selectedTargetCoords]="selectedPointCoords" 
+          [selectedArmyId]="selectedArmyId"
+          [initialTab]="armyModalInitialTab"
+          (playerTroopsChange)="playerTroops = $event"
+          (armiesChange)="matchArmies = $event; saveArmiesToBackend()"
+          (missionRequested)="onArmyMissionRequested($event)"
+          (close)="isArmyModalOpen = false"> 
+        </app-army-modal>
+      </ng-template>
+    </ion-modal>
 
     <div class="radial-menu-container" *ngIf="isRadialMenuVisible" [style.left.px]="radialMenuX" [style.top.px]="radialMenuY">
       <div class="radial-menu-wrapper">

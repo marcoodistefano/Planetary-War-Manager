@@ -246,17 +246,42 @@ ion-content {
 
   /* Impila la Card della missione in verticale */
   .mission-card-extended {
-    grid-template-columns: 1fr;
-    align-items: flex-start; gap: 15px; padding: 15px;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 15px;
     
-    .card-main-info { width: 100%; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; }
-    
-    .card-stats-block { 
-      flex-direction: row; border-left: none; padding-left: 0; width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 10px;
-      .stat-unit { align-items: flex-start; }
+    .card-main-info {
+      grid-column: auto !important;
+      width: 100%;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 10px;
     }
     
-    .card-actions { width: 100%; button { width: 100%; padding: 12px; font-size: 0.85rem; } }
+    .card-stats-block { 
+      grid-column: auto !important;
+      display: flex !important;
+      flex-direction: row !important;
+      border-left: none;
+      padding-left: 0;
+      width: 100%;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      
+      .stat-unit {
+        align-items: flex-start;
+        flex: 1 1 auto;
+        min-width: 80px;
+      }
+    }
+    
+    .card-actions {
+      grid-column: auto !important;
+      width: 100%;
+      button { width: 100%; padding: 12px; font-size: 0.85rem; }
+    }
   }
 
   /* Footer Mobile */
