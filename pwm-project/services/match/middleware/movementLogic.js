@@ -242,4 +242,26 @@ function getNodeCoords(name) {
     return nodesMap.get(name) || null;
 }
 
-module.exports = { calculatePath, getBorderIntersection, getNodeCoords };
+// Aggiunto per mappare una città alla sua regione
+const getRegionForNode = (nodeName) => {
+    loadGeometries();
+    if (!regionsFeatures) return null;
+    const coords = nodesMap.get(nodeName);
+    if (!coords) return null;
+
+    try {
+        const pt = turf.point(coords);
+        for (const f of regionsFeatures) {
+            if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
+                if (turf.booleanPointInPolygon(pt, f)) {
+                    return f.properties.adm1_code || f.id;
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Errore getRegionForNode:", e);
+    }
+    return null;
+};
+
+module.exports = { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode };

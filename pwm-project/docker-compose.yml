@@ -117,7 +117,6 @@ services:
       - ./services/match:/app/services/match
       - ./services/shared:/app/services/shared
       - ./shared:/app/shared
-      - ./game_rules.cdb:/game_rules.cdb
     depends_on:
       - db
       - redis

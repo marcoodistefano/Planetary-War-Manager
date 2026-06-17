@@ -108,6 +108,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
       if (payload.action === 'MOVE_TROOPS') {
          const { armyId, targetName, targetCoords } = payload.payload;
+         console.log(`[MOVE_TROOPS] payload received: ${JSON.stringify(payload.payload)}`);
          const armateStr = await redis.get(`match:${ws.matchId}:player:${ws.username}:armate`);
          let armateObj = armateStr ? JSON.parse(armateStr) : {};
          
@@ -345,7 +346,43 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
          let army = armateObj[armyId];
          console.log(`[WS_MATCH] Stato armata da annullare: ${army.status}`);
-         if (army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") {
+         
+         if (army.status === 'in combattimento') {
+             try {
+                 const db = require('../shared/postgresClient.js');
+                 const mossaRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'atk'`, [armyId]);
+                 if (mossaRes.rows.length > 0) {
+                     const id_mossa = mossaRes.rows[0].id_mossa;
+                     await db.query(`DELETE FROM attacco WHERE id_mossa = $1`, [id_mossa]);
+                     await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
+                 }
+                 
+                 army.status = 'standby';
+                 delete army.targetName;
+                 delete army.targetCoords;
+                 delete army.missionMode;
+                 delete army.next_round_time;
+                 
+                 await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(armateObj));
+                 ws.send(JSON.stringify({ type: 'MISSION_CANCELLED', payload: { armyId, newLocation: army.currentLocation } }));
+                 
+                 const broadcastPayload = {
+                     matchId: ws.matchId,
+                     targetUsers: [ws.userId],
+                     payload: {
+                         type: 'COMBAT_CANCELLED',
+                         data: {
+                             userId: ws.username,
+                             armyId: armyId,
+                         }
+                     }
+                 };
+                 await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+                 return;
+             } catch(dbErr) {
+                 console.error("[SYS_ERR] Errore annullamento combattimento in DB:", dbErr);
+             }
+         } else if (army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") {
              const now = Date.now();
              let elapsed = 0;
              let returnPath = [];
@@ -540,7 +577,22 @@ const startArrivalEngine = () => {
           let armateObj = JSON.parse(armateData);
           if (armateObj[row.id_armata]) {
             let army = armateObj[row.id_armata];
-            if (army.missionMode === 'attack') {
+            
+            // Controlla se il territorio di destinazione appartiene a un nemico
+            let isEnemyTerritory = false;
+            const nationsCache = await redis.get(`match:${row.match_id}:nations`);
+            if (nationsCache) {
+                const { getRegionForNode } = require('./middleware/movementLogic.js');
+                const regionId = getRegionForNode(row.target_node) || row.target_node;
+                
+                const nations = JSON.parse(nationsCache);
+                let targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(regionId));
+                if (targetNation && targetNation.playerId && targetNation.playerId !== row.username) {
+                    isEnemyTerritory = true;
+                }
+            }
+
+            if (army.missionMode === 'attack' || isEnemyTerritory) {
                 const { setupCombatFromArrival } = require('./middleware/combatLogic.js');
                 // Chiamata all'inizializzazione del combattimento
                 const mossaObj = {

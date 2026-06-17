@@ -3,7 +3,7 @@ const redis = require('../../shared/redisClient.js');
 const fs = require('fs');
 const path = require('path');
 
-// Carica le regole dal cdb
+// Carica le regole dal json
 let gameRules = null;
 const loadGameRules = () => {
     if (gameRules) return gameRules;
@@ -98,8 +98,10 @@ const addToGraveyard = async (id_partita_hash, playerUsername, armyData, destroy
             destroyedAt: new Date().toISOString(),
             destroyedBy: destroyedBy || 'Sconosciuto'
         };
-        await redis.lpush(graveyardKey, JSON.stringify(record));
-        await redis.ltrim(graveyardKey, 0, 99);
+        // redis client node-redis doesn't have lpush directly sometimes, let's use sendCommand if needed, but wait:
+        // node-redis has lPush!
+        await redis.lPush(graveyardKey, JSON.stringify(record));
+        await redis.lTrim(graveyardKey, 0, 99);
     } catch (e) {
         console.error("Errore salvataggio nel cimitero:", e);
     }
@@ -189,17 +191,14 @@ const processActiveCombats = async () => {
             }
 
             if (id_target_armata && defenderArmy) {
-                 if (id_target_citta) {
-                     damageToArmy = Math.floor(totalDmg * 0.66);
-                     damageToCity = totalDmg - damageToArmy;
-                 } else {
-                     damageToArmy = totalDmg;
-                 }
+                 damageToArmy = totalDmg;
+                 damageToCity = 0;
             } else if (id_target_citta) {
                  damageToCity = totalDmg;
             }
 
             if (damageToArmy > 0 && defenderArmy) {
+                const oldDefenderComposition = JSON.parse(JSON.stringify(defenderArmy.composition));
                 const defenderDied = applyDamageToArmy(defenderArmy, damageToArmy);
                 
                 const defenderPlayer = defenderRedisKey.split(':')[3];
@@ -234,7 +233,22 @@ const processActiveCombats = async () => {
                     defObj[id_target_armata].next_round_time = newNextRoundDate.toISOString();
                     await redis.set(defenderRedisKey, JSON.stringify(defObj));
                     
+                    // Aggiungi perdite parziali al cimitero
+                    const deadDefenderTroops = {};
+                    for (const troop in oldDefenderComposition) {
+                        const diff = oldDefenderComposition[troop] - (defenderArmy.composition[troop] || 0);
+                        if (diff > 0) deadDefenderTroops[troop] = diff;
+                    }
+                    if (Object.keys(deadDefenderTroops).length > 0) {
+                        await addToGraveyard(id_partita_hash, defenderPlayer, {
+                            name: defenderArmy.name,
+                            composition: deadDefenderTroops,
+                            currentLocation: defenderArmy.currentLocation
+                        }, attackerPlayer);
+                    }
+                    
                     // FASE 2: CONTRATTACCO DEL DIFENSORE
+                    const oldAttackerComposition = JSON.parse(JSON.stringify(attackerArmy.composition));
                     let counterDmg = calculateArmyDamage(defenderArmy);
                     attackerDied = applyDamageToArmy(attackerArmy, counterDmg);
                     
@@ -247,7 +261,22 @@ const processActiveCombats = async () => {
                         combatEnded = true; // L'attaccante è morto
                         await emitCombatEvent(id_partita_hash, defenderName, attackerName, counterDmg, 'distrutta', [attackerPlayer, defenderPlayer]);
                     } else {
+                        // Aggiungi perdite parziali al cimitero
+                        const deadAttackerTroops = {};
+                        for (const troop in oldAttackerComposition) {
+                            const diff = oldAttackerComposition[troop] - (attackerArmy.composition[troop] || 0);
+                            if (diff > 0) deadAttackerTroops[troop] = diff;
+                        }
+                        if (Object.keys(deadAttackerTroops).length > 0) {
+                            await addToGraveyard(id_partita_hash, attackerPlayer, {
+                                name: attackerArmy.name,
+                                composition: deadAttackerTroops,
+                                currentLocation: attackerArmy.currentLocation
+                            }, defenderPlayer);
+                        }
+
                         attObj[id_attaccante] = attackerArmy;
+                        attObj[id_attaccante].next_round_time = newNextRoundDate.toISOString();
                         await emitCombatEvent(id_partita_hash, attackerName, defenderName, damageToArmy, 'sopravvissuta', [attackerPlayer, defenderPlayer]);
                     }
                     await redis.set(attackerRedisKey, JSON.stringify(attObj));
@@ -271,9 +300,12 @@ const processActiveCombats = async () => {
                     const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
                     let updatedNations = [];
                     if (nationsCache) {
+                        const { getRegionForNode } = require('./movementLogic.js');
+                        const regionId = getRegionForNode(id_target_citta) || id_target_citta;
+
                         const nations = JSON.parse(nationsCache);
                         for (let n of nations) {
-                            if (n.territories_flat && n.territories_flat.includes(id_target_citta)) {
+                            if (n.territories_flat && n.territories_flat.includes(regionId)) {
                                 n.playerId = attackerPlayer;
                                 n.isOccupied = true;
                                 break;
@@ -365,8 +397,11 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
         let isArmyTarget = false;
         
         if (nationsCache) {
+            const { getRegionForNode } = require('./movementLogic.js');
+            const regionId = getRegionForNode(target_node) || target_node;
+
             const nations = JSON.parse(nationsCache);
-            let targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(target_node));
+            let targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(regionId));
             
             if (targetNation && targetNation.playerId) {
                 defenderId = targetNation.playerId;
@@ -430,15 +465,41 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
             if (isArmyTarget) {
                 defendingArmyId = target_node;
             } else {
-                const defenderArmiesStr = await redis.get(`match:${id_partita_hash}:player:${defenderId}:armate`);
-                if (defenderArmiesStr) {
-                    const defArmies = JSON.parse(defenderArmiesStr);
-                    for (const [defId, defArmy] of Object.entries(defArmies)) {
-                        if (defArmy.currentLocation === target_node || defArmy.targetName === target_node) {
-                            defendingArmyId = defId;
-                            break;
+                const { getNodeCoords } = require('./movementLogic.js');
+                const cityCoords = getNodeCoords(target_node);
+                const allArmiesKeys = await redis.keys(`match:${id_partita_hash}:player:*:armate`);
+                for (const k of allArmiesKeys) {
+                    const ownerUsername = k.split(':')[3];
+                    if (ownerUsername === attackerUsername) continue;
+                    
+                    const data = await redis.get(k);
+                    if (data) {
+                        const defArmies = JSON.parse(data);
+                        for (const [defId, defArmy] of Object.entries(defArmies)) {
+                            let isAtCity = false;
+                            if (defArmy.currentLocation === target_node || defArmy.targetName === target_node) {
+                                isAtCity = true;
+                            } else if (cityCoords && defArmy.currentLocation && defArmy.status !== 'moving') {
+                                let ax, ay;
+                                if (typeof defArmy.currentLocation === 'string') {
+                                    const parts = defArmy.currentLocation.split(',');
+                                    ax = parseFloat(parts[0]); ay = parseFloat(parts[1]);
+                                } else if (typeof defArmy.currentLocation === 'object') {
+                                    ax = defArmy.currentLocation.x; ay = defArmy.currentLocation.y;
+                                }
+                                if (ax !== undefined && ay !== undefined) {
+                                    const dx = ax - cityCoords[0];
+                                    const dy = ay - cityCoords[1];
+                                    if (dx*dx + dy*dy < 0.0001) isAtCity = true;
+                                }
+                            }
+                            if (isAtCity) {
+                                defendingArmyId = defId;
+                                break;
+                            }
                         }
                     }
+                    if (defendingArmyId) break;
                 }
             }
 
@@ -453,6 +514,9 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
                 await db.query(`UPDATE mosse SET type_action = 'atk', ttl = $1 WHERE id_mossa = $2`, [newNextRoundDate, id_mossa]);
 
                 // Inserisci in attacco
+            // Se il target è un'armata specificata ESPLICITAMENTE dall'utente, NON bersagliamo la città.
+            // Altrimenti (assedio a una nazione), bersagliamo SEMPRE la città, ma grazie alla logica in processActiveCombats, 
+            // il danno alla città sarà 0 finché defendingArmyId è in vita.
             let cityTarget = isArmyTarget ? null : target_node;
             await db.query(`
                 INSERT INTO attacco (id_mossa, partita_id, id_attaccante, id_target_citta, id_target_armata, next_round_time)

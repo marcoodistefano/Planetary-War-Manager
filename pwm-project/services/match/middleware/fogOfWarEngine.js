@@ -19,17 +19,17 @@ let defaultVisionRadius = 15;
 try {
     const rulesPath = path.join(__dirname, '../../../../shared/assets/game_rules.json');
     if (fs.existsSync(rulesPath)) {
-        const cdb = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
-        const truppeSheet = cdb.sheets.find(s => s.name === 'Truppe');
-        if (truppeSheet) {
+        const gameRules = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
+        const truppeSheet = gameRules.sheets.find(s => s.name === 'Truppe');
+        if (truppeSheet && truppeSheet.lines) {
             truppeSheet.lines.forEach(l => {
                 troopsVisionMap[l.id_truppa] = l.raggio_visivo || defaultVisionRadius;
             });
-            console.log(`[FOG_OF_WAR] Caricati ${Object.keys(troopsVisionMap).length} raggi visivi dal CDB.`);
+            console.log(`[FOG_OF_WAR] Caricati ${Object.keys(troopsVisionMap).length} raggi visivi dal JSON.`);
         }
     }
 } catch (e) {
-    console.error("[FOG_OF_WAR] Errore caricamento game_rules.cdb:", e);
+    console.error("[FOG_OF_WAR] Errore caricamento game_rules.json:", e);
 }
 
 // Funzione per calcolare il raggio visivo di un'armata

@@ -517,6 +517,25 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           this.cdr.detectChanges();
         }
 
+        if (parsed.type === 'COMBAT_CANCELLED') {
+          const { armyId } = parsed.data;
+          const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
+          if (armyIndex !== -1) {
+            const newArmies = [...this.matchArmies];
+            newArmies[armyIndex] = { ...newArmies[armyIndex] };
+            newArmies[armyIndex].status = 'standby';
+            delete newArmies[armyIndex].targetName;
+            delete newArmies[armyIndex].missionMode;
+            delete newArmies[armyIndex].path;
+            delete newArmies[armyIndex].etaMs;
+            delete newArmies[armyIndex].startTime;
+            delete newArmies[armyIndex].next_round_time;
+            this.matchArmies = newArmies;
+            this.renderArmies();
+            this.cdr.detectChanges();
+          }
+        }
+
         if (parsed.type === 'TROOPS_SPAWNED') {
           const { userId, army } = parsed.data;
           if (userId === this.userProfile.username) {
@@ -1279,6 +1298,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     let hasArmies = false;
     const tetherFeatures: any[] = [];
     const movingPathsFeatures: any[] = [];
+    
+    // Mappa per tenere traccia delle armate sulle stesse coordinate per evitare sovrapposizioni
+    const coordinateCounts = new Map<string, number>();
 
     // --- FOG OF WAR LOGIC ---
     const currentUser = String(this.userProfile?.username || '').trim().toLowerCase();
@@ -1312,6 +1334,22 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       if (coords[0] > maxLng) maxLng = coords[0];
       if (coords[1] < minLat) minLat = coords[1];
       if (coords[1] > maxLat) maxLat = coords[1];
+
+      const coordKey = `${coords[0].toFixed(5)},${coords[1].toFixed(5)}`;
+      const countAtCoord = coordinateCounts.get(coordKey) || 0;
+      coordinateCounts.set(coordKey, countAtCoord + 1);
+
+      // Calculate an offset if multiple armies are on the exact same coordinate
+      let markerCoords = [...coords];
+      if (countAtCoord > 0) {
+        // Offset di ~2km (0.02 gradi) a spirale per evitare sovrapposizioni
+        const offsetRadius = 0.02 + (0.01 * Math.floor((countAtCoord - 1) / 8));
+        const angle = countAtCoord * (Math.PI / 4); // 45 gradi di step
+        markerCoords = [
+          coords[0] + Math.cos(angle) * offsetRadius,
+          coords[1] + Math.sin(angle) * offsetRadius
+        ];
+      }
 
       const totalTroops = (Object.values(army.composition || {}) as number[]).reduce((a, b) => a + b, 0) as number;
 
@@ -1380,7 +1418,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         // Aggiorna posizione se necessario
         const marker = this.armyMarkers.get(army.id);
         if (army.status !== 'moving' && army.status !== 'moving_to_border' && army.status !== "Pronto all'attacco") {
-          marker.setLngLat([coords[0], coords[1]]);
+          marker.setLngLat([markerCoords[0], markerCoords[1]]);
         }
         const badgeEl = marker.getElement().querySelector('.army-badge') as HTMLElement;
         if (badgeEl) badgeEl.innerText = String(totalTroops);
@@ -1615,7 +1653,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         });
 
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([coords[0], coords[1]])
+          .setLngLat([markerCoords[0], markerCoords[1]])
           .addTo(this.map);
 
         // Salviamo dati utili sul marker stesso

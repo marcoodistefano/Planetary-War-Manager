@@ -319,7 +319,7 @@
           [selectedArmyId]="selectedArmyId"
           [initialTab]="armyModalInitialTab"
           [currentMatchId]="currentMatchId"
-          [currentUsername]="userProfile?.username"
+          [currentUsername]="userProfile.username"
           (playerTroopsChange)="playerTroops = $event"
           (armiesChange)="matchArmies = $event; saveArmiesToBackend()"
           (missionRequested)="onArmyMissionRequested($event)"

@@ -58,7 +58,7 @@ Una delle colonne portanti è il volume shared/assets. Questo volume è montato 
 
 engine-move: Lo usa per leggere i file .tif e calcolare l'altitudine.
 
-gateway: Lo usa per servire i modelli .glb e il database .cdb direttamente al browser dell'utente.
+gateway: Lo usa per servire i modelli .glb e il database .json direttamente al browser dell'utente.
 
 2. Analisi dei Nodi
 Core Data & Persistence

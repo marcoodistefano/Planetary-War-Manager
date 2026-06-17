@@ -9,8 +9,8 @@ let defaultVisionRadius = 15;
 try {
     const rulesPath = path.join(__dirname, '../../../shared/assets/game_rules.json');
     if (fs.existsSync(rulesPath)) {
-        const cdb = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
-        const truppeSheet = cdb.sheets.find(s => s.name === 'Truppe');
+        const gameRules = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
+        const truppeSheet = gameRules.sheets.find(s => s.name === 'Truppe');
         if (truppeSheet) {
             truppeSheet.lines.forEach(l => { troopsVisionMap[l.id_truppa] = l.raggio_visivo || defaultVisionRadius; });
         }
@@ -108,11 +108,13 @@ const checkCombatTriggers = async () => {
                     let targetCoords = null;
                     const targetName = army.targetName;
                     
+                    console.log(`[COMBAT_TRIGGER] Army ${army.id} is Pronto all'attacco. targetName: ${targetName}, myCoords: ${myCoords}`);
+                    
                     // Controlla se targetName è un'armata nemica
                     const enemyArmy = allArmies.find(a => a.id === targetName);
                     if (enemyArmy) {
                         targetCoords = getEstimatedCoords(enemyArmy);
-                    } else {
+                    } else if (targetName) {
                         // Controlla se targetName è una città
                         const cityFeature = nodesFeatures.find(f => (f.properties.name || f.properties.ADMIN || f.id).toLowerCase() === targetName.toLowerCase());
                         if (cityFeature && cityFeature.geometry && cityFeature.geometry.coordinates) {
@@ -122,6 +124,7 @@ const checkCombatTriggers = async () => {
 
                     if (targetCoords) {
                         const dist = haversineDist(myCoords[0], myCoords[1], targetCoords[0], targetCoords[1]);
+                        console.log(`[COMBAT_TRIGGER] dist: ${dist}, radius: ${radius}, targetCoords: ${targetCoords}`);
                         if (dist <= radius) {
                             // Innesca il combattimento!
                             // Dobbiamo recuperare la mossa dal DB
@@ -140,6 +143,7 @@ const checkCombatTriggers = async () => {
                                     mossa.y_dest = targetCoords[1];
                                 }
                                 
+                                console.log(`[COMBAT_TRIGGER] Triggering setupCombatFromArrival per army ${army.id}`);
                                 await setupCombatFromArrival(army, mossa, matchId, army.owner);
                                 
                                 // Aggiorna redis con lo stato 'in combattimento'

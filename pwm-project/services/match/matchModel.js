@@ -1707,13 +1707,37 @@ const getGraveyard = async (matchId, username) => {
     const id_partita_hash = resolvedMatch.state.id_partita_hash;
     const graveyardKey = `match:${id_partita_hash}:player:${username}:graveyard`;
     
-    // Fetch top 100 entries from Redis
-    const entries = await redis.lrange(graveyardKey, 0, 99);
+    // Fetch my losses
+    const entries = await redis.lRange(graveyardKey, 0, 99);
     const parsedEntries = entries.map(entry => JSON.parse(entry));
+    
+    // Fetch my kills
+    const allGraveyardKeys = await redis.keys(`match:${id_partita_hash}:player:*:graveyard`);
+    let myKills = [];
+    for (const key of allGraveyardKeys) {
+      if (key === graveyardKey) continue; // Skip my own graveyard
+      
+      const otherEntries = await redis.lRange(key, 0, 199);
+      for (const entryStr of otherEntries) {
+        const entry = JSON.parse(entryStr);
+        if (entry.destroyedBy === username) {
+          const owner = key.split(':')[3];
+          entry.owner = owner; // Add owner information so we know who we killed
+          myKills.push(entry);
+        }
+      }
+    }
+    
+    // Sort kills by destroyedAt descending
+    myKills.sort((a, b) => new Date(b.destroyedAt) - new Date(a.destroyedAt));
+    myKills = myKills.slice(0, 100);
     
     return {
       status: "200",
-      data: parsedEntries
+      data: {
+        losses: parsedEntries,
+        kills: myKills
+      }
     };
   } catch (error) {
     console.error("[SYS_ERR] getGraveyard:", error);

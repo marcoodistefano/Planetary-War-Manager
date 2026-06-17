@@ -48,7 +48,8 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
   @Input() currentUsername = '';
 
   activeTab: ArmyTab = 'management';
-  graveyardData: any[] = [];
+  graveyardLosses: any[] = [];
+  graveyardKills: any[] = [];
   availableTroops: { [key: string]: number } = {};
   activeArmyId = '';
   armyName = '';
@@ -60,10 +61,10 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
 
   // Catalogo reclutamento
   recruitmentCatalog = [
-    { id: 'fante', name: 'Fante', tier: 1, icon: '🪖', costMoney: 150, costSteel: 0, description: 'Unità di fanteria base. Versatile e poco costosa.' },
-    { id: 'veicolo_leggero', name: 'Veicolo Leggero', tier: 1, icon: '🏎️', costMoney: 800, costSteel: 200, description: 'Mezzo veloce per ricognizione e attacchi rapidi.' },
-    { id: 'carro_armato', name: 'Carro Armato', tier: 2, icon: '🚜', costMoney: 2500, costSteel: 1200, description: 'Forza d\'urto pesante. Indispensabile per gli assedi.' },
-    { id: 'caccia', name: 'Caccia', tier: 3, icon: '✈️', costMoney: 5000, costSteel: 800, description: 'Dominio aereo. Colpisce bersagli di terra e aria.' }
+    { id: 'fante', name: 'Fante', tier: 1, icon: '🪖', costMoney: 150, costSteel: 0, description: 'Unità di fanteria base. Versatile e poco costosa.', hp: 100, damage: 50 },
+    { id: 'lmv', name: 'Veicolo Leggero', tier: 1, icon: '🏎️', costMoney: 800, costSteel: 200, description: 'Mezzo veloce per ricognizione e attacchi rapidi.', hp: 300, damage: 0 },
+    { id: 'carro_armato', name: 'Carro Armato', tier: 2, icon: '🚜', costMoney: 2500, costSteel: 1200, description: 'Forza d\'urto pesante. Indispensabile per gli assedi.', hp: 2500, damage: 500 },
+    { id: 'caccia', name: 'Caccia', tier: 3, icon: '✈️', costMoney: 5000, costSteel: 800, description: 'Dominio aereo. Colpisce bersagli di terra e aria.', hp: 1200, damage: 1000 }
   ];
 
   maintenanceTotal = 4250; // Valore simulato
@@ -147,6 +148,31 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
     return this.selectedArmy ? Object.values(this.selectedArmy.composition).reduce((total, value) => total + Number(value || 0), 0) : 0;
   }
 
+  getArmyHp(army: any): { current: number, max: number } {
+    if (!army || !army.composition) return { current: 0, max: 0 };
+    let maxHp = 0;
+    for (const [troopId, count] of Object.entries(army.composition)) {
+      const unit = this.recruitmentCatalog.find(u => u.id === troopId);
+      if (unit && Number(count) > 0) {
+        maxHp += unit.hp * Number(count);
+      }
+    }
+    const currentHp = army.hp !== undefined ? army.hp : maxHp;
+    return { current: Math.round(currentHp), max: maxHp };
+  }
+
+  getArmyDamage(army: any): number {
+    if (!army || !army.composition) return 0;
+    let dmg = 0;
+    for (const [troopId, count] of Object.entries(army.composition)) {
+      const unit = this.recruitmentCatalog.find(u => u.id === troopId);
+      if (unit && Number(count) > 0) {
+        dmg += unit.damage * Number(count);
+      }
+    }
+    return dmg;
+  }
+
   private syncFromInputs(resetTab: boolean) {
     this.availableTroops = { ...(this.playerTroops || {}) };
     this.missionTargetName = this.selectedTargetName;
@@ -196,8 +222,15 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
     if (!this.currentMatchId || !this.currentUsername) return;
     this.homeService.getGraveyard(this.currentMatchId, this.currentUsername).subscribe({
       next: (res) => {
-        if (res.status === '200' || res.data) {
-          this.graveyardData = res.data || [];
+        if (res.status === '200' && res.data) {
+          if (Array.isArray(res.data)) {
+            // Backward compatibility
+            this.graveyardLosses = res.data;
+            this.graveyardKills = [];
+          } else {
+            this.graveyardLosses = res.data.losses || [];
+            this.graveyardKills = res.data.kills || [];
+          }
         }
       },
       error: (err) => console.error("Errore caricamento storico:", err)
@@ -210,7 +243,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
   }
 
   isArmyMoving(army: any): boolean {
-    return army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco";
+    return army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco" || army.status === 'in combattimento';
   }
 
   cancelMovement(armyId: string) {
