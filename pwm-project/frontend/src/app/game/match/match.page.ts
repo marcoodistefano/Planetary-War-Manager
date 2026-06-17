@@ -527,8 +527,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         }
 
         if (parsed.type === 'FOG_OF_WAR_UPDATE') {
-          const visibleEnemies = parsed.payload || [];
-          const myArmies = this.matchArmies.filter(a => a.owner === this.userProfile.username);
+          let visibleEnemies = [];
+          let myArmies = [];
+          
+          if (Array.isArray(parsed.payload)) {
+             visibleEnemies = parsed.payload;
+             myArmies = this.matchArmies.filter(a => a.owner === this.userProfile.username);
+          } else if (parsed.payload && typeof parsed.payload === 'object') {
+             visibleEnemies = parsed.payload.visibleEnemies || [];
+             myArmies = parsed.payload.myArmies || this.matchArmies.filter(a => a.owner === this.userProfile.username);
+          }
+          
           this.matchArmies = [...myArmies, ...visibleEnemies];
           this.renderArmies();
           this.cdr.detectChanges();
@@ -847,6 +856,33 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const hp = army.hp || army.hp_tot || 100;
     const stato = String(army.status || 'Standby').toUpperCase();
 
+    let timeInfo = '';
+    const now = Date.now();
+    
+    if (army.status === 'in combattimento' && army.next_round_time) {
+        const nextRoundDate = new Date(army.next_round_time).getTime();
+        const diff = nextRoundDate - now;
+        if (diff > 0) {
+            const mins = Math.floor(diff / 60000);
+            const secs = Math.floor((diff % 60000) / 1000);
+            timeInfo = `<div style="margin-top: 6px; color: #f87171; font-weight: bold;">Prossimo Attacco in: ${mins}:${secs.toString().padStart(2, '0')}</div>`;
+        } else {
+            timeInfo = `<div style="margin-top: 6px; color: #f87171; font-weight: bold;">Attacco in corso...</div>`;
+        }
+    } else if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.startTime && army.etaMs) {
+        const endMovementTime = army.startTime + army.etaMs;
+        const diff = endMovementTime - now;
+        if (diff > 0) {
+            const hours = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+            const secs = Math.floor((diff % 60000) / 1000);
+            const timeStr = hours > 0 
+                ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+                : `${mins}:${secs.toString().padStart(2, '0')}`;
+            timeInfo = `<div style="margin-top: 6px; color: #eab308; font-weight: bold;">Arrivo tra: ${timeStr}</div>`;
+        }
+    }
+
     const popupHtml = `
       <div style="background: rgba(15, 23, 42, 0.9); color: #e2e8f0; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155; font-family: 'JetBrains Mono', monospace; font-size: 11px; backdrop-filter: blur(4px); box-shadow: 0 4px 6px rgba(0,0,0,0.5); width: max-content;">
           <div style="color: #60a5fa; font-weight: bold; margin-bottom: 6px; font-size: 12px; text-transform: uppercase;">${army.name}</div>
@@ -855,6 +891,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               <span><span style="color: #22c55e;">❤️</span> PV: ${hp}</span>
               <span><span style="color: #f59e0b;">⚡</span> ${stato}</span>
           </div>
+          ${timeInfo}
       </div>
       `;
 

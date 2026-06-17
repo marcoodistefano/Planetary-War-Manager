@@ -193,7 +193,10 @@ const runFogOfWarCycle = async () => {
                     targetUsers: [userId],
                     payload: {
                         type: 'FOG_OF_WAR_UPDATE',
-                        payload: visibleEnemies
+                        payload: {
+                            visibleEnemies: visibleEnemies,
+                            myArmies: myArmies
+                        }
                     }
                 };
                 await redis.publish('match_ws_broadcast_channel', JSON.stringify(payload));

@@ -113,8 +113,11 @@
                   <div class="army-status-row">
                     <ion-icon [name]="getArmyStatusIcon(army)"></ion-icon>
                     <span>{{ getArmyStatusLabel(army) }}</span>
-                    <span *ngIf="combatTimers[army.id]" class="combat-timer">
-                      ⏳ {{ combatTimers[army.id] }}
+                    <span *ngIf="combatTimers[army.id]" class="combat-timer" style="color: #f87171;">
+                      ⚔️ {{ combatTimers[army.id] }}
+                    </span>
+                    <span *ngIf="movementTimers[army.id]" class="combat-timer" style="color: #eab308;">
+                      🏃 {{ movementTimers[army.id] }}
                     </span>
                   </div>
 

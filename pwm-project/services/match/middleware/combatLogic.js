@@ -71,6 +71,24 @@ const applyDamageToArmy = (army, damage) => {
     return false; // survived
 };
 
+const getMatchMultiplier = async (id_partita_hash) => {
+    let multiplier = 1;
+    try {
+        const matchDataRaw = await redis.get(`match:${id_partita_hash}`);
+        if (matchDataRaw) {
+            const matchObj = JSON.parse(matchDataRaw);
+            if (matchObj.struttura_partita) {
+                const Eru = require('./Eru.js');
+                const decodedMatch = Eru.decode_match(matchObj.struttura_partita);
+                multiplier = decodedMatch.multiplierValue || 1;
+            }
+        }
+    } catch(err) {
+        console.error("[SYS_WARN] Impossibile ottenere il moltiplicatore nel combat:", err);
+    }
+    return multiplier;
+};
+
 const processActiveCombats = async () => {
     try {
         // Prendi tutti i combattimenti attivi dove il next_round è passato
@@ -254,7 +272,12 @@ const processActiveCombats = async () => {
                     }
                 }
             } else {
-                await db.query(`UPDATE attacco SET next_round_time = NOW() + INTERVAL '15 minutes' WHERE id_attacco = $1`, [id_attacco]);
+                const multiplier = await getMatchMultiplier(id_partita_hash);
+                const intervalMs = Math.max(1000, Math.floor((15 * 60000) / multiplier));
+                const newNextRoundDate = new Date(Date.now() + intervalMs);
+                const newNextRound = newNextRoundDate.toISOString();
+
+                await db.query(`UPDATE attacco SET next_round_time = $1 WHERE id_attacco = $2`, [newNextRoundDate, id_attacco]);
                 
                 // Aggiorna next_round_time su Redis
                 if (!attackerDied) {
@@ -262,7 +285,6 @@ const processActiveCombats = async () => {
                     if (attStr) {
                         const attObj = JSON.parse(attStr);
                         if (attObj[id_attaccante]) {
-                            const newNextRound = new Date(Date.now() + 15 * 60000).toISOString();
                             attObj[id_attaccante].next_round_time = newNextRound;
                             await redis.set(attackerRedisKey, JSON.stringify(attObj));
                         }
@@ -369,28 +391,34 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
 
             // Controlla se l'attacco esiste già
             const checkAttacco = await db.query(`SELECT id_attacco FROM attacco WHERE id_mossa = $1`, [id_mossa]);
+            const multiplier = await getMatchMultiplier(id_partita_hash);
+            const intervalMs = Math.max(1000, Math.floor((15 * 60000) / multiplier));
+            const newNextRoundDate = new Date(Date.now() + intervalMs);
+
             if (checkAttacco.rows.length === 0) {
                 // Aggiorna la mossa originale
-                await db.query(`UPDATE mosse SET type_action = 'atk', ttl = NOW() + INTERVAL '15 minutes' WHERE id_mossa = $1`, [id_mossa]);
+                await db.query(`UPDATE mosse SET type_action = 'atk', ttl = $1 WHERE id_mossa = $2`, [newNextRoundDate, id_mossa]);
 
                 // Inserisci in attacco
             let cityTarget = isArmyTarget ? null : target_node;
             await db.query(`
                 INSERT INTO attacco (id_mossa, partita_id, id_attaccante, id_target_citta, id_target_armata, next_round_time)
-                VALUES ($1, $2, $3, $4, $5, NOW())
-            `, [id_mossa, mossa.partita_id, id_armata, cityTarget, defendingArmyId]);
+                VALUES ($1, $2, $3, $4, $5, $6)
+            `, [id_mossa, mossa.partita_id, id_armata, cityTarget, defendingArmyId, newNextRoundDate]);
                 
                 army.status = 'in combattimento';
                 army.currentLocation = `${x_dest},${y_dest}`;
-                army.next_round_time = new Date(Date.now() + 15 * 60000).toISOString();
+                army.next_round_time = newNextRoundDate.toISOString();
             } else {
                 army.status = 'in combattimento';
                 // La data del prossimo round è già nel DB, quindi potremmo caricarla o semplicemente aspettare che il loop lo aggiorni
             }
         } else {
+            const multiplier = await getMatchMultiplier(id_partita_hash);
+            const intervalMs = Math.max(1000, Math.floor((15 * 60000) / multiplier));
             army.status = 'in combattimento';
             army.currentLocation = `${x_dest},${y_dest}`;
-            army.next_round_time = new Date(Date.now() + 15 * 60000).toISOString();
+            army.next_round_time = new Date(Date.now() + intervalMs).toISOString();
         }
     } catch (e) {
         console.error("Errore in setupCombatFromArrival:", e);

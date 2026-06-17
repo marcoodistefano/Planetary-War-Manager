@@ -65,6 +65,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
   maintenanceTotal = 4250; // Valore simulato
 
   combatTimers: { [armyId: string]: string } = {};
+  movementTimers: { [armyId: string]: string } = {};
   private timerInterval: any;
 
   ngOnInit() {
@@ -88,12 +89,30 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
         if (diff > 0) {
           const minutes = Math.floor(diff / 60000);
           const seconds = Math.floor((diff % 60000) / 1000);
-          this.combatTimers[army.id] = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+          this.combatTimers[army.id] = `${minutes}:${seconds.toString().padStart(2, '0')}`;
         } else {
           this.combatTimers[army.id] = 'Attacco in corso...';
         }
       } else {
         delete this.combatTimers[army.id];
+      }
+
+      if ((army.status === 'moving' || (army as any).status === 'moving_to_border' || (army as any).status === "Pronto all'attacco") && (army as any).startTime && (army as any).etaMs) {
+        const endMovementTime = (army as any).startTime + (army as any).etaMs;
+        const diff = endMovementTime - now;
+        if (diff > 0) {
+          const hours = Math.floor(diff / 3600000);
+          const minutes = Math.floor((diff % 3600000) / 60000);
+          const seconds = Math.floor((diff % 60000) / 1000);
+          const timeStr = hours > 0 
+              ? `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+              : `${minutes}:${seconds.toString().padStart(2, '0')}`;
+          this.movementTimers[army.id] = timeStr;
+        } else {
+          delete this.movementTimers[army.id];
+        }
+      } else {
+        delete this.movementTimers[army.id];
       }
     }
   }
