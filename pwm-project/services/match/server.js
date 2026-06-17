@@ -10,9 +10,11 @@ const matchModel = require("./matchModel.js");
 const { getAuthContextFromRequest } = require("../shared/authContext.js");
 const { initDispatcher } = require("./Dispatcher/webDispatcher.js");
 const redis = require("../shared/redisClient.js");
-const { calculatePath } = require("./middleware/movementLogic.js");
+const { calculatePath, getBorderIntersection } = require("./middleware/movementLogic.js");
 const { startTroopGenerator } = require("./middleware/troopGenerator.js");
 const { loadMinimumPathToRedis } = require("./middleware/loadPathToRedis.js");
+const { startCombatLoop } = require("./middleware/combatLogic.js");
+const Eru = require('./middleware/Eru.js');
 
 const app = express();
 
@@ -149,11 +151,51 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
               console.error("Errore durante calculatePath:", e);
           }
           
-          armateObj[armyId].status = 'moving';
+          let targetPlayerId = null;
+          let isInWar = false;
+          let isAttack = false;
+          let borderEtaMs = pathInfo.etaMs;
+
+          // Check war status / attack
+          try {
+              const nationsCache = await redis.get(`match:${ws.matchId}:nations`);
+              if (nationsCache) {
+                  const nations = JSON.parse(nationsCache);
+                  const targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(targetName));
+                  if (targetNation && targetNation.isOccupied && targetNation.playerId && targetNation.playerId !== ws.username && !targetNation.playerId.includes('bot')) {
+                      isAttack = true;
+                      targetPlayerId = targetNation.playerId;
+                      // Controllo se sono già in guerra (MVP assume boolean globale o check basico)
+                      // Idealmente qui andrebbe un check su `relazioni_diplomatiche`
+                      isInWar = targetNation.inWar === true;
+                  }
+              }
+          } catch (e) {
+              console.error("Errore in validazione attacco:", e);
+          }
+
+          if (isAttack && !isInWar && pathInfo.path.length > 0) {
+              const borderInfo = getBorderIntersection(pathInfo.path, targetName);
+              if (borderInfo) {
+                  // Calcola ETA parziale al confine
+                  const speedMultiplier = pathInfo.etaMs / pathInfo.distance;
+                  borderEtaMs = Math.floor(borderInfo.distanceToBorder * speedMultiplier);
+                  armateObj[armyId].status = 'moving_to_border';
+              } else {
+                  armateObj[armyId].status = "Pronto all'attacco";
+              }
+          } else if (isAttack && isInWar) {
+              armateObj[armyId].status = "Pronto all'attacco";
+          } else {
+              armateObj[armyId].status = 'moving';
+          }
+
           armateObj[armyId].targetCoords = targetCoords;
           armateObj[armyId].targetName = targetName;
           armateObj[armyId].missionMode = payload.payload.mode;
           armateObj[armyId].path = pathInfo.path;
+          armateObj[armyId].startTime = Date.now();
+          armateObj[armyId].etaMs = pathInfo.etaMs;
           
           // Salva su Redis sovrascrivendo l'eventuale mossa vecchia
           await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(armateObj));
@@ -167,7 +209,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                 [armyId]
              );
 
-             const etaDate = new Date(Date.now() + pathInfo.etaMs);
+             const etaDate = new Date(Date.now() + borderEtaMs);
 
              if (mossaRes.rows.length > 0) {
                  const id_mossa = mossaRes.rows[0].id_mossa;
@@ -209,7 +251,8 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                targetName,
                targetCoords,
                etaMs: pathInfo.etaMs,
-               path: pathInfo.path
+               path: pathInfo.path,
+               startTime: armateObj[armyId].startTime
              }
            }
          };
@@ -337,6 +380,8 @@ const restoreActiveMoves = async () => {
         army.path = pathInfo.path;
         // missionMode potrebbe essere perso se non storicizzato in mosse, assumiamo 'move'
         army.missionMode = 'move';
+        army.etaMs = pathInfo.etaMs;
+        army.startTime = new Date(row.time_to_arrive).getTime() - pathInfo.etaMs;
         
         await redis.set(redisKey, JSON.stringify(armateObj));
         console.log(`[SYSTEM] Ripristinata mossa armata ${row.id_armata} verso ${row.target_node}`);
@@ -355,6 +400,7 @@ loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(async () => {
     console.log(`[SYSTEM] Microservizio MATCH operativo su porta ${PORT} (HTTP + WS)`);
     // Avvio generatore automatico di truppe (differito)
     startTroopGenerator();
+    startCombatLoop();
   });
 }).catch(err => {
   console.error("[SYS_ERR] Errore caricamento routing in Redis:", err);

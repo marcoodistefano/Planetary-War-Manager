@@ -123,6 +123,91 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   matchAlliances: any[] = [];
   selectedArmyId = '';
   selectedArmyForMovement: string | null = null;
+  animationFrameId: any;
+
+  getArmyModelAssetUrl(army: any, direction: 'front' | 'back' | 'side' | 'side-flip'): string {
+    let modelName = 'Soldier';
+    let folder = 'Land_troops';
+    if (army.composition) {
+      if (army.composition['Carro Armato']) { modelName = 'Tank'; folder = 'Land_troops'; }
+      else if (army.composition['Veicolo Leggero']) { modelName = 'LMV'; folder = 'Land_troops'; }
+      else if (army.composition['APC']) { modelName = 'APC'; folder = 'Land_troops'; }
+      else if (army.composition['Caccia']) { modelName = 'Aircraft'; folder = 'Sea_troops'; }
+    }
+    if (army.id_modello) {
+      if (army.id_modello.includes('Tank')) { modelName = 'Tank'; folder = 'Land_troops'; }
+      else if (army.id_modello.includes('Aircraft')) { modelName = 'Aircraft'; folder = 'Sea_troops'; }
+    }
+    const suffix = '_' + direction.replace('-flip', '') + '.png';
+    if (modelName === 'Soldier') {
+      return `/assets/2Dmodels/Land_troops/Soldier/soldier${suffix}`;
+    }
+    return `/assets/2Dmodels/${folder}/${modelName}/${modelName}${suffix}`;
+  }
+
+  startAnimationLoop() {
+    const animate = () => {
+      this.updateMovingArmies();
+      this.animationFrameId = requestAnimationFrame(animate);
+    };
+    this.animationFrameId = requestAnimationFrame(animate);
+  }
+
+  updateMovingArmies() {
+    if (!this.map || this.matchArmies.length === 0) return;
+    const now = Date.now();
+    this.matchArmies.forEach(army => {
+      if ((army.status === 'moving' || army.status === 'moving_to_border') && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
+        const elapsed = now - army.startTime;
+        let progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
+
+        let currentLngLat = army.path[army.path.length - 1];
+        let prevLngLat = army.path[0];
+        let direction: 'front' | 'back' | 'side' | 'side-flip' = 'front';
+
+        if (progress < 1) {
+          const totalSegments = army.path.length - 1;
+          const exactIndex = progress * totalSegments;
+          const currentIndex = Math.floor(exactIndex);
+          const segmentProgress = exactIndex - currentIndex;
+          const p1 = army.path[currentIndex];
+          const p2 = army.path[currentIndex + 1] || p1;
+          prevLngLat = p1;
+          const lng = p1[0] + (p2[0] - p1[0]) * segmentProgress;
+          const lat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
+          currentLngLat = [lng, lat];
+        } else {
+          prevLngLat = army.path[Math.max(0, army.path.length - 2)];
+        }
+
+        const dx = currentLngLat[0] - prevLngLat[0];
+        const dy = currentLngLat[1] - prevLngLat[1];
+        if (Math.abs(dx) > Math.abs(dy)) {
+          if (dx > 0) direction = 'side-flip';
+          else direction = 'side';
+        } else {
+          if (dy > 0) direction = 'back';
+          else direction = 'front';
+        }
+
+        const marker = this.armyMarkers.get(army.id);
+        if (marker) {
+          marker.setLngLat(currentLngLat);
+          const el = marker.getElement();
+          const imgDiv = el.querySelector('.army-image') as HTMLElement;
+          if (imgDiv) {
+            const assetUrl = this.getArmyModelAssetUrl(army, direction);
+            imgDiv.style.backgroundImage = `url(${assetUrl})`;
+            if (direction === 'side-flip') {
+              imgDiv.style.transform = 'scaleX(-1)';
+            } else {
+              imgDiv.style.transform = 'scaleX(1)';
+            }
+          }
+        }
+      }
+    });
+  }
 
   activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
 
@@ -221,6 +306,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   ) { }
 
   ngOnInit() {
+    this.startAnimationLoop();
     this.currentMatchId = this.route.snapshot.paramMap.get('id') || localStorage.getItem('pwm_last_joined_match') || '';
     this.loadGameRules();
     this.loadUserProfile();
@@ -252,6 +338,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     this.shouldReconnect = false;
     if (this.reconnectTimer) {
       window.clearTimeout(this.reconnectTimer);
@@ -327,13 +414,15 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         }
 
         if (parsed.type === 'TROOPS_MOVED') {
-          const { armyId, targetName, targetCoords, etaMs } = parsed.data;
+          const { armyId, targetName, targetCoords, etaMs, startTime, path } = parsed.data;
           const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
           if (armyIndex !== -1) {
             this.matchArmies[armyIndex].status = 'moving';
             this.matchArmies[armyIndex].targetName = targetName;
             this.matchArmies[armyIndex].targetCoords = targetCoords;
-            this.matchArmies[armyIndex].path = parsed.data.path;
+            this.matchArmies[armyIndex].path = path;
+            this.matchArmies[armyIndex].etaMs = etaMs;
+            this.matchArmies[armyIndex].startTime = startTime || Date.now();
           }
           console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
           this.renderArmies();
@@ -359,7 +448,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           this.cdr.detectChanges();
         }
 
-        if (parsed.type === 'TERRITORY_CONQUERED' || parsed.type === 'DIPLOMACY_UPDATED') {
+        if (parsed.type === 'WAR_DECLARED' || parsed.type === 'TERRITORY_CONQUERED' || parsed.type === 'DIPLOMACY_UPDATED') {
           console.log(`[WS_MATCH] Aggiornamento mappa (${parsed.type})`);
           if (parsed.payload?.nations) {
             this.matchNations = parsed.payload.nations;
@@ -981,6 +1070,21 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const tetherFeatures: any[] = [];
     const movingPathsFeatures: any[] = [];
 
+    // --- FOG OF WAR LOGIC ---
+    const currentUser = String(this.userProfile?.username || '').trim().toLowerCase();
+    const alliedArmies = this.matchArmies.filter(a => String(a.owner || '').trim().toLowerCase() === currentUser);
+    
+    // Funzione helper Haversine
+    const haversineDist = (lon1: number, lat1: number, lon2: number, lat2: number) => {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    };
+
     // Aggiungiamo o aggiorniamo i marker
     this.matchArmies.forEach(army => {
       if (!army.currentLocation) return;
@@ -995,6 +1099,57 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       } else {
         return;
       }
+
+      // Check visibilità (Fog of War)
+      let isVisible = false;
+      const armyOwner = String(army.owner || '').trim().toLowerCase();
+      
+      if (armyOwner === currentUser) {
+          isVisible = true;
+      } else {
+          // Controlla se è vicina a un'armata alleata
+          for (const ally of alliedArmies) {
+              let allyCoords: [number, number] | null = null;
+              if (typeof ally.currentLocation === 'string') {
+                  const p = ally.currentLocation.split(',').map((c: string) => parseFloat(c.trim()));
+                  if (p.length === 2) allyCoords = [p[0], p[1]];
+              } else if (ally.currentLocation && ally.currentLocation.x !== undefined) {
+                  allyCoords = [ally.currentLocation.x, ally.currentLocation.y];
+              }
+              if (allyCoords) {
+                  const dist = haversineDist(coords[0], coords[1], allyCoords[0], allyCoords[1]);
+                  // Valore di default 50km se non estratto da gameRules
+                  let visionRadius = 50; 
+                  // Potremmo estrarlo da this.gameRules iterando le truppe
+                  if (dist <= visionRadius) {
+                      isVisible = true;
+                      break;
+                  }
+              }
+          }
+          
+          // Controlla se è all'interno di un territorio alleato
+          if (!isVisible && this.matchNations) {
+              // Siccome non abbiamo point-in-polygon nel frontend in modo veloce, 
+              // controlliamo se il nodo di destinazione/vicino è alleato
+              let closestNodeStr = army.targetName || '';
+              if (!closestNodeStr && this.nodesGeoData) {
+                   let minDist = Infinity;
+                   this.nodesGeoData.features.forEach((f: any) => {
+                       const nx = f.geometry.coordinates[0];
+                       const ny = f.geometry.coordinates[1];
+                       const d = Math.pow(nx - coords[0], 2) + Math.pow(ny - coords[1], 2);
+                       if (d < minDist) { minDist = d; closestNodeStr = f.properties.name || f.properties.ADMIN || f.id; }
+                   });
+              }
+              const nodeNation = this.matchNations.find(n => n.territories_flat && n.territories_flat.includes(closestNodeStr));
+              if (nodeNation && String(nodeNation.playerId).trim().toLowerCase() === currentUser) {
+                  isVisible = true;
+              }
+          }
+      }
+
+      if (!isVisible) return; // Non renderizzare l'armata se non è visibile
 
       hasArmies = true;
       if (coords[0] < minLng) minLng = coords[0];
@@ -1061,7 +1216,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       if (this.armyMarkers.has(army.id)) {
         // Aggiorna posizione se necessario
         const marker = this.armyMarkers.get(army.id);
-        marker.setLngLat([coords[0], coords[1]]);
+        if (army.status !== 'moving' && army.status !== 'moving_to_border') {
+          marker.setLngLat([coords[0], coords[1]]);
+        }
         const badgeEl = marker.getElement().querySelector('.army-badge') as HTMLElement;
         if (badgeEl) badgeEl.innerText = String(totalTroops);
         // Salviamo info per il clustering

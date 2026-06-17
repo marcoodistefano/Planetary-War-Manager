@@ -2,8 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const topojson = require('topojson-client');
 const redis = require('../../shared/redisClient.js');
+const turf = require('@turf/turf');
 
 let archsFeatures = null;
+let regionsFeatures = null;
 let nodesMap = new Map(); // city_name -> { point: [lng, lat] }
 
 // Load map topologies
@@ -26,6 +28,16 @@ function loadGeometries() {
             if (props.city2 && coords.length > 0) {
                 nodesMap.set(props.city2, coords[coords.length - 1]);
             }
+        }
+    }
+    
+    if (!regionsFeatures) {
+        const regionsFile = path.join(__dirname, '../../../shared/assets/map/regions.json');
+        if (fs.existsSync(regionsFile)) {
+            const topo = JSON.parse(fs.readFileSync(regionsFile, 'utf-8'));
+            const objectKey = Object.keys(topo.objects)[0];
+            const geojson = topojson.feature(topo, topo.objects[objectKey]);
+            regionsFeatures = geojson.features;
         }
     }
 }
@@ -154,6 +166,49 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
     };
 };
 
+// Funzione per calcolare il punto di intersezione con il confine del target
+const getBorderIntersection = (pathCoords, targetName) => {
+    loadGeometries();
+    if (!regionsFeatures || pathCoords.length < 2) return null;
+
+    const targetRegion = regionsFeatures.find(f => 
+        (f.properties && (f.properties.name === targetName || f.properties.ADMIN === targetName || f.properties.adm1_code === targetName)) ||
+        f.id === targetName
+    );
+
+    if (!targetRegion) return null;
+
+    try {
+        const pathLine = turf.lineString(pathCoords);
+        let intersection = null;
+        
+        // Se il territorio è un Polygon/MultiPolygon, ne prendiamo i bordi
+        if (targetRegion.geometry.type === 'Polygon' || targetRegion.geometry.type === 'MultiPolygon') {
+            const lines = turf.polygonToLine(targetRegion);
+            const intersections = turf.lineIntersect(pathLine, lines);
+            if (intersections.features.length > 0) {
+                intersection = intersections.features[0].geometry.coordinates;
+            }
+        }
+        
+        // Calcola il tempo necessario per raggiungere l'intersezione
+        if (intersection) {
+            // Tronca il path all'intersezione per calcolare l'ETA parziale
+            const sliced = turf.lineSlice(turf.point(pathCoords[0]), turf.point(intersection), pathLine);
+            const distToBorder = turf.length(sliced, {units: 'kilometers'});
+            return {
+                point: intersection,
+                distanceToBorder: distToBorder
+            };
+        }
+    } catch (e) {
+        console.error("Errore nel calcolo del confine:", e);
+    }
+    
+    return null;
+};
+
 module.exports = {
-  calculatePath
+  calculatePath,
+  getBorderIntersection
 };

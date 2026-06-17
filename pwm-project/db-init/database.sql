@@ -255,15 +255,6 @@ CREATE TABLE IF NOT EXISTS spostamenti (
     CONSTRAINT fk_spostamento_mossa FOREIGN KEY (id_mossa) REFERENCES mosse(id_mossa) ON DELETE CASCADE
 );
 
---6.1 ATTACCHI
-CREATE TABLE IF NOT EXISTS attacco (
-    id_attacco UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    id_mossa UUID NOT NULL,
-    id_target_truppa UUID DEFAULT NULL,
-    id_target_armata UUID DEFAULT NULL,
-    time_stamp TIMESTAMP DEFAULT now(),
-    CONSTRAINT fk_attacco_mossa FOREIGN KEY (id_mossa) REFERENCES mosse(id_mossa) ON DELETE CASCADE
-);
 -- 7. ALLEANZE
 CREATE TABLE IF NOT EXISTS alleanze (
     id_alleanza UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -335,6 +326,25 @@ CREATE TABLE IF NOT EXISTS armata (
     are_they_in_the_same_position BOOLEAN DEFAULT TRUE,
     last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_armata_owner FOREIGN KEY (user_id, partita_id) REFERENCES partecipanti_partite(user_id, partita_id) ON DELETE CASCADE
+);
+
+--12. ATTACCHI
+CREATE TABLE IF NOT EXISTS attacco (
+    id_attacco UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id_mossa UUID NOT NULL,
+    partita_id UUID NOT NULL,
+    id_attaccante UUID NOT NULL,
+    id_target_truppa UUID DEFAULT NULL,
+    id_target_armata UUID DEFAULT NULL,
+    id_target_citta VARCHAR(128) DEFAULT NULL,
+    time_stamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    next_round_time TIMESTAMP NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
+    CONSTRAINT fk_attacco_mossa FOREIGN KEY (id_mossa) REFERENCES mosse(id_mossa) ON DELETE CASCADE,
+    CONSTRAINT fk_attacco_partita FOREIGN KEY (partita_id) REFERENCES partite(id_partita) ON DELETE CASCADE,
+    CONSTRAINT fk_attacco_attaccante FOREIGN KEY (id_attaccante) REFERENCES armata(id_istanza_armata) ON DELETE CASCADE,
+    CONSTRAINT fk_attacco_target_truppa FOREIGN KEY (id_target_truppa) REFERENCES truppe(id_istanza_truppa) ON DELETE CASCADE,
+    CONSTRAINT fk_attacco_target_armata FOREIGN KEY (id_target_armata) REFERENCES armata(id_istanza_armata) ON DELETE CASCADE
 );
 
 
