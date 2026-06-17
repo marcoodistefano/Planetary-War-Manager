@@ -124,7 +124,9 @@
 
                   <div class="army-actions">
                     <button class="ghost-action" (click)="selectArmy(army.id)">APRI</button>
-                    <button class="danger-action" (click)="disbandArmy(army.id)">SCIOGLI</button>
+                    <button class="ghost-action" (click)="centerOnArmyMap(army)">MAPPA</button>
+                    <button class="danger-action" *ngIf="isArmyMoving(army)" (click)="cancelMovement(army.id)">ANNULLA</button>
+                    <button class="danger-action" *ngIf="!isArmyMoving(army)" (click)="disbandArmy(army.id)">SCIOGLI</button>
                   </div>
                 </div>
               </div>

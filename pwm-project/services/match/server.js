@@ -299,6 +299,133 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
           };
          await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
       }
+
+      if (payload.action === 'CANCEL_MISSION') {
+         console.log(`[WS_MATCH] CANCEL_MISSION ricevuto per armata:`, payload.payload);
+         const { armyId } = payload.payload;
+         const armateStr = await redis.get(`match:${ws.matchId}:player:${ws.username}:armate`);
+         if (!armateStr) {
+             console.log(`[WS_MATCH] Nessuna armata trovata per l'utente in redis`);
+             return;
+         }
+         let armateObj = JSON.parse(armateStr);
+         if (!armateObj[armyId]) {
+             console.log(`[WS_MATCH] Armata ${armyId} non trovata per l'utente`);
+             return;
+         }
+
+         let army = armateObj[armyId];
+         console.log(`[WS_MATCH] Stato armata da annullare: ${army.status}`);
+         if (army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") {
+             const now = Date.now();
+             let elapsed = 0;
+             let returnPath = [];
+             let currentLng, currentLat;
+
+             if (army.path && army.path.length > 1 && army.startTime && army.etaMs) {
+                 elapsed = now - army.startTime;
+                 let progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
+                 if (progress < 1) {
+                     const totalSegments = army.path.length - 1;
+                     const exactIndex = progress * totalSegments;
+                     const currentIndex = Math.floor(exactIndex);
+                     const segmentProgress = exactIndex - currentIndex;
+                     const p1 = army.path[currentIndex];
+                     const p2 = army.path[currentIndex + 1] || p1;
+                     currentLng = p1[0] + (p2[0] - p1[0]) * segmentProgress;
+                     currentLat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
+                     
+                     returnPath.push([currentLng, currentLat]);
+                     for (let i = currentIndex; i >= 0; i--) {
+                         returnPath.push(army.path[i]);
+                     }
+                 } else {
+                     currentLng = army.path[army.path.length - 1][0];
+                     currentLat = army.path[army.path.length - 1][1];
+                     returnPath = [...army.path].reverse();
+                 }
+             } else {
+                 console.log("[WS_MATCH] Impossibile calcolare il ritorno, dati path mancanti. Interrompo e basta.");
+                 army.status = 'standby';
+                 delete army.path;
+                 delete army.startTime;
+                 delete army.etaMs;
+                 delete army.targetCoords;
+                 delete army.targetName;
+                 delete army.missionMode;
+                 await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(armateObj));
+                 ws.send(JSON.stringify({ type: 'MISSION_CANCELLED', payload: { armyId, newLocation: army.currentLocation } }));
+                 return;
+             }
+
+             // Aggiorna l'oggetto armata per il viaggio di ritorno
+             const returnEtaMs = Math.floor(elapsed);
+             army.currentLocation = `${currentLng},${currentLat}`;
+             army.path = returnPath;
+             army.startTime = now;
+             army.etaMs = returnEtaMs;
+             army.targetCoords = returnPath[returnPath.length - 1];
+             army.targetName = "Ritorno";
+             army.status = 'moving'; // Mantiene lo stato moving
+
+             await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(armateObj));
+
+             // Aggiorna il database
+             const etaDate = new Date(now + returnEtaMs);
+             try {
+                 const db = require('../shared/postgresClient.js');
+                 const mossaRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, [armyId]);
+                 if (mossaRes.rows.length > 0) {
+                     const id_mossa = mossaRes.rows[0].id_mossa;
+                     await db.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [id_mossa]);
+                     await db.query(`UPDATE mosse SET ttl = $1 WHERE id_mossa = $2`, [etaDate, id_mossa]);
+                     await db.query(
+                         `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`,
+                         [id_mossa, army.targetCoords[0], army.targetCoords[1], army.targetName, etaDate]
+                     );
+                 } else {
+                     // Fallback se non c'era una mossa (non dovrebbe succedere)
+                     const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1`, [ws.matchId]);
+                     if (partitaRes.rows.length > 0) {
+                         const partitaId = partitaRes.rows[0].id_partita;
+                         const insertMossa = await db.query(
+                             `INSERT INTO mosse (user_id, partita_id, type_action, id_armata, ttl) VALUES ((SELECT id_user FROM utenti WHERE username=$1), $2, 'mov', $3, $4) RETURNING id_mossa`,
+                             [ws.username, partitaId, armyId, etaDate]
+                         );
+                         const newIdMossa = insertMossa.rows[0].id_mossa;
+                         await db.query(
+                             `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`,
+                             [newIdMossa, army.targetCoords[0], army.targetCoords[1], army.targetName, etaDate]
+                         );
+                     }
+                 }
+             } catch(dbErr) {
+                 console.error("[SYS_ERR] Errore aggiornamento movimento di ritorno in DB:", dbErr);
+             }
+
+             // Notifica al client che la truppa sta tornando (Usa TROOPS_MOVED anziché MISSION_CANCELLED)
+             const userId = ws.userId;
+             const broadcastPayload = {
+                 matchId: ws.matchId,
+                 targetUsers: [userId],
+                 payload: {
+                     type: 'TROOPS_MOVED',
+                     data: {
+                         userId,
+                         armyId,
+                         targetName: army.targetName,
+                         targetCoords: army.targetCoords,
+                         etaMs: returnEtaMs,
+                         path: returnPath,
+                         startTime: now
+                     }
+                 }
+             };
+             await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+         } else {
+             console.log("[WS_MATCH] Impossibile annullare, l'armata NON e' in movimento");
+         }
+      }
     });
 
     ws.on("close", () => {

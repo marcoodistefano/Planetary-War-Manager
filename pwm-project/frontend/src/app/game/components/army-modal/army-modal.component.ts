@@ -4,7 +4,7 @@ import { IonicModule } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
 
 type ArmyTab = 'management' | 'operations' | 'garrison' | 'recruitment' | 'logistics';
-type MissionMode = 'move' | 'attack';
+type MissionMode = 'move' | 'attack' | 'cancel';
 
 interface ArmyGroup {
   id: string;
@@ -19,9 +19,9 @@ interface ArmyGroup {
 interface ArmyMissionRequest {
   armyId: string;
   mode: MissionMode;
-  targetName: string;
-  targetCoords: string;
-  composition: { [key: string]: number };
+  targetName?: string;
+  targetCoords?: string;
+  composition?: { [key: string]: number };
 }
 
 @Component({
@@ -36,6 +36,7 @@ export class ArmyModalComponent implements OnInit {
   @Output() playerTroopsChange = new EventEmitter<{ [key: string]: number }>();
   @Output() armiesChange = new EventEmitter<ArmyGroup[]>();
   @Output() missionRequested = new EventEmitter<ArmyMissionRequest>();
+  @Output() centerOnArmy = new EventEmitter<string>();
   @Input() playerTroops: { [key: string]: number } = {};
   @Input() armies: ArmyGroup[] = [];
   @Input() selectedTargetName = '';
@@ -138,6 +139,14 @@ export class ArmyModalComponent implements OnInit {
     this.activeTab = 'operations';
   }
 
+  isArmyMoving(army: any): boolean {
+    return army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco";
+  }
+
+  cancelMovement(armyId: string) {
+    this.missionRequested.emit({ armyId, mode: 'cancel' });
+  }
+
   createArmy() {
     const troopKey = String(this.selectedTroopKey || '').trim();
     const troopCount = Math.max(1, Math.floor(Number(this.selectedTroopCount) || 0));
@@ -227,15 +236,15 @@ export class ArmyModalComponent implements OnInit {
   }
 
   getArmyStatusLabel(army: ArmyGroup) {
-    if (army.status === 'moving') {
+    if (army.status === 'moving' || (army as any).status === 'moving_to_border') {
       return 'IN MOVIMENTO';
     }
 
-    if (army.status === 'attacking') {
-      return 'IN ATTACCO';
+    if (army.status === 'attacking' || (army as any).status === 'in_battaglia' || (army as any).status === "Pronto all'attacco") {
+      return 'IN COMBATTIMENTO';
     }
 
-    return 'IN ATTESA';
+    return 'IN STANDBY';
   }
 
   getArmyStatusIcon(army: ArmyGroup) {
@@ -253,6 +262,11 @@ export class ArmyModalComponent implements OnInit {
   recruitUnit(unit: any) {
     console.log(`RECLUTAMENTO AVVIATO: ${unit.name}`);
     // Logica di backend qui
+  }
+
+  centerOnArmyMap(army: ArmyGroup) {
+    this.centerOnArmy.emit(army.id);
+    this.closeModal();
   }
 
   closeModal() { this.close.emit(); }

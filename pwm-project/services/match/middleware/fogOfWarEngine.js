@@ -54,6 +54,8 @@ function getEstimatedCoords(army) {
         if (pts.length === 2 && !isNaN(pts[0])) coords = [pts[0], pts[1]];
     } else if (loc && loc.x !== undefined) {
         coords = [loc.x, loc.y];
+    } else if (Array.isArray(loc) && loc.length >= 2) {
+        coords = [loc[0], loc[1]];
     }
     
     if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 0 && army.startTime && army.etaMs) {
@@ -186,17 +188,15 @@ const runFogOfWarCycle = async () => {
                     }
                 }
 
-                if (visibleEnemies.length > 0) {
-                    const payload = {
-                        matchId: matchId,
-                        targetUsers: [userId],
-                        payload: {
-                            type: 'FOG_OF_WAR_UPDATE',
-                            payload: visibleEnemies
-                        }
-                    };
-                    await redis.publish('match_ws_broadcast_channel', JSON.stringify(payload));
-                }
+                const payload = {
+                    matchId: matchId,
+                    targetUsers: [userId],
+                    payload: {
+                        type: 'FOG_OF_WAR_UPDATE',
+                        payload: visibleEnemies
+                    }
+                };
+                await redis.publish('match_ws_broadcast_channel', JSON.stringify(payload));
             }
         }
     } catch (e) {

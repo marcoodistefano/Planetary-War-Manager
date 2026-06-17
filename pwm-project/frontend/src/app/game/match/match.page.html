@@ -321,6 +321,7 @@
           (playerTroopsChange)="playerTroops = $event"
           (armiesChange)="matchArmies = $event; saveArmiesToBackend()"
           (missionRequested)="onArmyMissionRequested($event)"
+          (centerOnArmy)="centerMapOnArmy($event)"
           (close)="isArmyModalOpen = false"> 
         </app-army-modal>
       </ng-template>
