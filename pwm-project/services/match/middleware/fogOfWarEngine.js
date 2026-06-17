@@ -46,12 +46,27 @@ function getArmyVisionRadius(army) {
 }
 
 // Funzione per ricavare coordinate correnti stimate (se in movimento)
-function getEstimatedCoords(army) {
+function getEstimatedCoords(army, nodesFeatures = []) {
     let coords = null;
     let loc = army.currentLocation;
     if (typeof loc === 'string') {
         const pts = loc.split(',').map(s => parseFloat(s.trim()));
-        if (pts.length === 2 && !isNaN(pts[0])) coords = [pts[0], pts[1]];
+        if (pts.length === 2 && !isNaN(pts[0])) {
+            coords = [pts[0], pts[1]];
+        } else {
+            // Risolvi il nome del territorio
+            const locLower = loc.trim().toLowerCase();
+            const feature = nodesFeatures.find(f => {
+                const name = f.properties.name || f.properties.ADMIN || f.id;
+                return name && String(name).toLowerCase() === locLower;
+            });
+            if (feature && feature.geometry && feature.geometry.coordinates) {
+                let c = feature.geometry.coordinates;
+                while (c.length && Array.isArray(c[0][0])) c = c[0];
+                if (c.length > 0 && c[0].length === 2) coords = [c[0][0], c[0][1]];
+                else if (c.length === 2 && typeof c[0] === 'number') coords = [c[0], c[1]];
+            }
+        }
     } else if (loc && loc.x !== undefined) {
         coords = [loc.x, loc.y];
     } else if (Array.isArray(loc) && loc.length >= 2) {
@@ -152,7 +167,7 @@ const runFogOfWarCycle = async () => {
 
                 // Mappo le mie armate con il loro raggio di visione
                 const myArmiesVision = myArmies.map(a => {
-                    return { coords: getEstimatedCoords(a), radius: getArmyVisionRadius(a) };
+                    return { coords: getEstimatedCoords(a, nodesFeatures), radius: getArmyVisionRadius(a) };
                 }).filter(a => a.coords !== null);
 
                 const visibleEnemies = [];
@@ -160,7 +175,7 @@ const runFogOfWarCycle = async () => {
                 for (const army of allArmies) {
                     if (army.owner === username) continue;
 
-                    const coords = getEstimatedCoords(army);
+                    const coords = getEstimatedCoords(army, nodesFeatures);
                     if (!coords) continue;
 
                     let isVisible = false;

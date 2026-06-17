@@ -206,15 +206,15 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
               if (nationsCache) {
                   const nations = JSON.parse(nationsCache);
                   targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(targetName));
-                  if (targetNation && targetNation.isOccupied && targetNation.playerId && targetNation.playerId !== ws.username && !targetNation.playerId.includes('bot')) {
+                  if (targetNation && targetNation.isOccupied && targetNation.playerId && targetNation.playerId !== ws.username) {
                       isAttack = true;
                       targetPlayerId = targetNation.playerId;
-                      isInWar = targetNation.inWar === true;
+                      isInWar = targetNation.inWarWith && targetNation.inWarWith.includes(ws.username);
                   }
               }
               
               // Se targetName non è un territorio, controlliamo se è un'armata
-              if (!isAttack && payload.payload.isAttack) {
+              if (!isAttack && payload.payload.mode === 'attack') {
                   // Cerca a chi appartiene l'armata
                   const allArmiesKeys = await redis.keys(`match:${ws.matchId}:player:*:armate`);
                   for (const k of allArmiesKeys) {
@@ -231,7 +231,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                                   const nations = JSON.parse(nationsCache);
                                   const enemyNation = nations.find(n => n.playerId === ownerUsername);
                                   if (enemyNation) {
-                                      isInWar = enemyNation.inWar === true;
+                                      isInWar = enemyNation.inWarWith && enemyNation.inWarWith.includes(ws.username);
                                   }
                               }
                               break;
