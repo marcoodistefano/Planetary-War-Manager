@@ -26,6 +26,9 @@
         <div class="nav-item" [class.active]="activeTab === 'logistics'" (click)="setTab('logistics')">
           <ion-icon name="stats-chart-outline"></ion-icon><span>LOGISTICA</span>
         </div>
+        <div class="nav-item" [class.active]="activeTab === 'storico'" (click)="setTab('storico')">
+          <ion-icon name="skull-outline"></ion-icon><span>STORICO</span>
+        </div>
       </nav>
       <div class="sidebar-footer">
         <button class="exit-btn" (click)="close.emit()">
@@ -322,6 +325,37 @@
                    <span class="cost-unit" *ngIf="unit.costSteel">🏗️ {{ unit.costSteel | number }}</span>
                 </div>
                 <button class="primary-glow slim" (click)="recruitUnit(unit)">ADDESTRA</button>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="activeTab === 'storico'">
+          <p class="track-label">Storico Caduti in Combattimento</p>
+          
+          <div *ngIf="graveyardData.length === 0" style="padding: 20px; text-align: center; color: #94a3b8; font-family: monospace;">
+            Nessuna registrazione nel cimitero di guerra.
+          </div>
+
+          <div class="graveyard-list" *ngIf="graveyardData.length > 0">
+            <div class="build-card no-hover" *ngFor="let record of graveyardData" style="border-left: 3px solid var(--danger-red);">
+              <div class="build-info">
+                <span class="item-name" style="color: var(--danger-red);">💀 {{ record.name || 'Unità non identificata' }}</span>
+                <span class="item-tier" style="color: #64748b;">{{ record.destroyedAt | date:'short' }}</span>
+              </div>
+              <p class="unit-description">
+                Distrutta da: <strong style="color: #e2e8f0;">{{ record.destroyedBy }}</strong><br>
+                Ultima posizione nota: 
+                <span *ngIf="record.currentLocation">[{{ record.currentLocation.x | number:'1.0-2' }}, {{ record.currentLocation.y | number:'1.0-2' }}]</span>
+                <span *ngIf="!record.currentLocation">Sconosciuta</span>
+              </p>
+
+              <div class="recruitment-actions" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+                <div class="cost-row" style="flex-wrap: wrap;">
+                  <span class="cost-unit" style="font-size: 11px;" *ngFor="let entry of (record.composition | keyvalue)">
+                    {{ entry.key | uppercase }}: {{ entry.value }} perse
+                  </span>
+                </div>
               </div>
             </div>
           </div>

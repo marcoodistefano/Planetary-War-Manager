@@ -516,13 +516,12 @@ if (!fs.existsSync(MINIMUM_PATH_FILE)) {
 } else {
   console.log("[SYSTEM] File minimum_path.json trovato. Salto la generazione.");
 }
-
 const startArrivalEngine = () => {
   setInterval(async () => {
     try {
       const db = require('../shared/postgresClient.js');
       const query = `
-        SELECT s.id_spostamento, s.id_mossa, m.id_armata, u.username, u.id_user, p.id_partita_hash as match_id, s.target_node
+        SELECT s.id_spostamento, s.id_mossa, m.id_armata, m.partita_id, u.username, u.id_user, p.id_partita_hash as match_id, s.target_node
         FROM spostamenti s 
         JOIN mosse m ON s.id_mossa = m.id_mossa 
         JOIN utenti u ON m.user_id = u.id_user 

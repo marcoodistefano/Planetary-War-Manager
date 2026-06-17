@@ -321,6 +321,24 @@ const KickAlliance = async (req, res) => {
   }
 };
 
+const getGraveyard = async (req, res) => {
+  try {
+    const matchId = req.params.id;
+    const username = req.params.username;
+    
+    if (!matchId || !username) {
+      return res.status(400).json({ error: "Match id o username mancante." });
+    }
+    
+    const result = await model.getGraveyard(matchId, username);
+    const statusCode = parseInt(result.status, 10) || 500;
+    return res.status(statusCode).json(result);
+  } catch (error) {
+    console.error("[SYS_ERR] Cortocircuito getGraveyard:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
+  }
+};
+
 module.exports = {
   create,
   join,
@@ -335,5 +353,6 @@ module.exports = {
   CreateAlliance,
   JoinAlliance,
   LeaveAlliance,
-  KickAlliance
+  KickAlliance,
+  getGraveyard
 };

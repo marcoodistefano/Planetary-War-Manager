@@ -7,7 +7,7 @@ const path = require('path');
 let gameRules = null;
 const loadGameRules = () => {
     if (gameRules) return gameRules;
-    const rulesPath = path.join(__dirname, '../../../../game_rules.cdb');
+    const rulesPath = path.join(__dirname, '../../../shared/assets/game_rules.json');
     if (fs.existsSync(rulesPath)) {
         gameRules = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
     }
@@ -89,6 +89,41 @@ const getMatchMultiplier = async (id_partita_hash) => {
     return multiplier;
 };
 
+const addToGraveyard = async (id_partita_hash, playerUsername, armyData, destroyedBy) => {
+    if (!playerUsername || !armyData) return;
+    try {
+        const graveyardKey = `match:${id_partita_hash}:player:${playerUsername}:graveyard`;
+        const record = {
+            ...armyData,
+            destroyedAt: new Date().toISOString(),
+            destroyedBy: destroyedBy || 'Sconosciuto'
+        };
+        await redis.lpush(graveyardKey, JSON.stringify(record));
+        await redis.ltrim(graveyardKey, 0, 99);
+    } catch (e) {
+        console.error("Errore salvataggio nel cimitero:", e);
+    }
+};
+
+const emitCombatEvent = async (id_partita_hash, attackerName, defenderName, damage, result, playersInvolved) => {
+    try {
+        const broadcastPayload = {
+            matchId: id_partita_hash,
+            payload: {
+                type: 'COMBAT_EVENT',
+                attacker: attackerName,
+                defender: defenderName,
+                damage: damage,
+                result: result,
+                players: playersInvolved
+            }
+        };
+        await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+    } catch (e) {
+        console.error("Errore emitCombatEvent:", e);
+    }
+};
+
 const processActiveCombats = async () => {
     try {
         // Prendi tutti i combattimenti attivi dove il next_round è passato
@@ -167,13 +202,22 @@ const processActiveCombats = async () => {
             if (damageToArmy > 0 && defenderArmy) {
                 const defenderDied = applyDamageToArmy(defenderArmy, damageToArmy);
                 
+                const defenderPlayer = defenderRedisKey.split(':')[3];
+                const defenderName = defenderArmy.name || 'Armata nemica';
+                const attackerName = attackerArmy.name || 'La tua armata';
+
                 if (defenderDied) {
                     // Distruggi armata difensore
                     const defStr = await redis.get(defenderRedisKey);
                     const defObj = JSON.parse(defStr);
+                    
+                    await addToGraveyard(id_partita_hash, defenderPlayer, defObj[id_target_armata], attackerPlayer);
+                    
                     delete defObj[id_target_armata];
                     await redis.set(defenderRedisKey, JSON.stringify(defObj));
                     await db.query(`DELETE FROM mosse WHERE id_armata = $1`, [id_target_armata]);
+                    
+                    await emitCombatEvent(id_partita_hash, attackerName, defenderName, damageToArmy, 'distrutta', [attackerPlayer, defenderPlayer]);
                     
                     // Se c'è solo l'armata, il combattimento finisce. Se c'è anche la città, prosegue solo contro la città.
                     if (!id_target_citta) combatEnded = true;
@@ -181,7 +225,13 @@ const processActiveCombats = async () => {
                     // Difensore sopravvive, aggiorniamo il suo stato
                     const defStr = await redis.get(defenderRedisKey);
                     const defObj = JSON.parse(defStr);
+                    
+                    const multiplier = await getMatchMultiplier(id_partita_hash);
+                    const intervalMs = Math.max(1000, Math.floor((15 * 60000) / multiplier));
+                    const newNextRoundDate = new Date(Date.now() + intervalMs);
+                    
                     defObj[id_target_armata] = defenderArmy;
+                    defObj[id_target_armata].next_round_time = newNextRoundDate.toISOString();
                     await redis.set(defenderRedisKey, JSON.stringify(defObj));
                     
                     // FASE 2: CONTRATTACCO DEL DIFENSORE
@@ -191,11 +241,14 @@ const processActiveCombats = async () => {
                     const attStr = await redis.get(attackerRedisKey);
                     const attObj = JSON.parse(attStr);
                     if (attackerDied) {
+                        await addToGraveyard(id_partita_hash, attackerPlayer, attObj[id_attaccante], defenderPlayer);
                         delete attObj[id_attaccante];
                         await db.query(`DELETE FROM mosse WHERE id_armata = $1`, [id_attaccante]);
                         combatEnded = true; // L'attaccante è morto
+                        await emitCombatEvent(id_partita_hash, defenderName, attackerName, counterDmg, 'distrutta', [attackerPlayer, defenderPlayer]);
                     } else {
                         attObj[id_attaccante] = attackerArmy;
+                        await emitCombatEvent(id_partita_hash, attackerName, defenderName, damageToArmy, 'sopravvissuta', [attackerPlayer, defenderPlayer]);
                     }
                     await redis.set(attackerRedisKey, JSON.stringify(attObj));
                 }
@@ -298,8 +351,8 @@ const processActiveCombats = async () => {
 };
 
 const startCombatLoop = () => {
-    console.log("[SYSTEM] Avvio Combat Loop (interval 1m)");
-    setInterval(processActiveCombats, 60000); // Esegue il check ogni minuto
+    console.log("[SYSTEM] Avvio Combat Loop (interval 3s)");
+    setInterval(processActiveCombats, 3000); // Esegue il check ogni 3 secondi
 };
 
 const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUsername) => {

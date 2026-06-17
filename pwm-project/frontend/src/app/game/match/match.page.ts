@@ -113,6 +113,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   armyMarkers = new Map<string, any>(); // Ripristinato per i marker HTML
   nodesGeoData: any = null; // Per i tether
   armyHoverPopup: any = null; // Per l'hover di 3 secondi
+  armyHoverInterval: any = null;
   isFirstArmyRender = true;
   matchNations: any[] = [];
   regionsGeoData: any = null;
@@ -565,6 +566,31 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           console.log(`[WS_MATCH] Aggiornamento alleanze (${parsed.type})`);
           this.reloadMatchAlliances();
         }
+
+        if (parsed.type === 'COMBAT_EVENT') {
+          const { attacker, defender, damage, result, players } = parsed.payload;
+          if (players && players.includes(this.userProfile.username)) {
+            let color = 'primary';
+            let icon = 'information-circle-outline';
+            if (result === 'distrutta') {
+              color = 'danger';
+              icon = 'skull-outline';
+            }
+            if (result === 'sopravvissuta') {
+              color = 'warning';
+              icon = 'shield-half-outline';
+            }
+            
+            const message = `Scontro: ${attacker} vs ${defender} (Danno: ${damage}). Esito: ${result}.`;
+            this.toastCtrl.create({
+              message: message,
+              duration: 4000,
+              position: 'top',
+              color: color,
+              icon: icon
+            }).then(t => t.present());
+          }
+        }
       };
 
       this.matchSocket.onerror = (error) => {
@@ -848,77 +874,104 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   showArmyHoverBanner(army: any, coordinates: [number, number]) {
-    if (this.armyHoverPopup) {
-      this.armyHoverPopup.remove();
-    }
+    this.hideArmyHoverBanner();
 
-    const dmg = army.damage || army.dmg_tot || 0;
-    const hp = army.hp || army.hp_tot || 100;
-    const stato = String(army.status || 'Standby').toUpperCase();
-
-    let timeInfo = '';
-    const now = Date.now();
-    
-    if (army.status === 'in combattimento' && army.next_round_time) {
-        const nextRoundDate = new Date(army.next_round_time).getTime();
-        const diff = nextRoundDate - now;
-        if (diff > 0) {
-            const mins = Math.floor(diff / 60000);
-            const secs = Math.floor((diff % 60000) / 1000);
-            timeInfo = `<div style="margin-top: 6px; color: #f87171; font-weight: bold;">Prossimo Attacco in: ${mins}:${secs.toString().padStart(2, '0')}</div>`;
-        } else {
-            timeInfo = `<div style="margin-top: 6px; color: #f87171; font-weight: bold;">Attacco in corso...</div>`;
+    const updateBanner = () => {
+        const currentArmy = this.matchArmies.find(a => a.id === army.id) || army;
+        
+        let calculatedDmg = 0;
+        let calculatedMaxHp = 0;
+        if (this.gameRules?.sheets) {
+            const truppeSheet = this.gameRules.sheets.find((s: any) => s.name === 'Truppe');
+            if (truppeSheet && currentArmy.composition) {
+                for (const [troopId, count] of Object.entries(currentArmy.composition)) {
+                    const stats = truppeSheet.lines.find((l: any) => l.id_truppa === troopId);
+                    if (stats && Number(count) > 0) {
+                        calculatedDmg += (stats.danno_base || 0) * Number(count);
+                        calculatedMaxHp += (stats.HP || 10) * Number(count);
+                    }
+                }
+            }
         }
-    } else if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.startTime && army.etaMs) {
-        const endMovementTime = army.startTime + army.etaMs;
-        const diff = endMovementTime - now;
-        if (diff > 0) {
-            const hours = Math.floor(diff / 3600000);
-            const mins = Math.floor((diff % 3600000) / 60000);
-            const secs = Math.floor((diff % 60000) / 1000);
-            const timeStr = hours > 0 
-                ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-                : `${mins}:${secs.toString().padStart(2, '0')}`;
-            timeInfo = `<div style="margin-top: 6px; color: #eab308; font-weight: bold;">Arrivo tra: ${timeStr}</div>`;
-        }
-    }
 
-    const popupHtml = `
-      <div style="background: rgba(15, 23, 42, 0.9); color: #e2e8f0; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155; font-family: 'JetBrains Mono', monospace; font-size: 11px; backdrop-filter: blur(4px); box-shadow: 0 4px 6px rgba(0,0,0,0.5); width: max-content;">
-          <div style="color: #60a5fa; font-weight: bold; margin-bottom: 6px; font-size: 12px; text-transform: uppercase;">${army.name}</div>
-          <div style="display: flex; gap: 12px; font-weight: 600;">
-              <span><span style="color: #ef4444;">⚔️</span> ATK: ${dmg}</span>
-              <span><span style="color: #22c55e;">❤️</span> PV: ${hp}</span>
-              <span><span style="color: #f59e0b;">⚡</span> ${stato}</span>
+        const dmg = calculatedDmg > 0 ? calculatedDmg : (currentArmy.damage || currentArmy.dmg_tot || 0);
+        const hp = currentArmy.hp !== undefined ? currentArmy.hp : (calculatedMaxHp > 0 ? calculatedMaxHp : 100);
+        const stato = String(currentArmy.status || 'Standby').toUpperCase();
+
+        let timeInfo = '';
+        const now = Date.now();
+        
+        if (currentArmy.status === 'in combattimento' && currentArmy.next_round_time) {
+            const nextRoundDate = new Date(currentArmy.next_round_time).getTime();
+            const diff = nextRoundDate - now;
+            if (diff > 0) {
+                const mins = Math.floor(diff / 60000);
+                const secs = Math.floor((diff % 60000) / 1000);
+                timeInfo = `<div style="margin-top: 6px; color: #f87171; font-weight: bold;">Prossimo Attacco in: ${mins}:${secs.toString().padStart(2, '0')}</div>`;
+            } else {
+                timeInfo = `<div style="margin-top: 6px; color: #f87171; font-weight: bold;">Attacco in corso...</div>`;
+            }
+        } else if ((currentArmy.status === 'moving' || currentArmy.status === 'moving_to_border' || currentArmy.status === "Pronto all'attacco") && currentArmy.startTime && currentArmy.etaMs) {
+            const endMovementTime = currentArmy.startTime + currentArmy.etaMs;
+            const diff = endMovementTime - now;
+            if (diff > 0) {
+                const hours = Math.floor(diff / 3600000);
+                const mins = Math.floor((diff % 3600000) / 60000);
+                const secs = Math.floor((diff % 60000) / 1000);
+                const timeStr = hours > 0 
+                    ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+                    : `${mins}:${secs.toString().padStart(2, '0')}`;
+                timeInfo = `<div style="margin-top: 6px; color: #eab308; font-weight: bold;">Arrivo tra: ${timeStr}</div>`;
+            }
+        }
+
+        const popupHtml = `
+          <div style="background: rgba(15, 23, 42, 0.9); color: #e2e8f0; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155; font-family: 'JetBrains Mono', monospace; font-size: 11px; backdrop-filter: blur(4px); box-shadow: 0 4px 6px rgba(0,0,0,0.5); width: max-content;">
+              <div style="color: #60a5fa; font-weight: bold; margin-bottom: 6px; font-size: 12px; text-transform: uppercase;">${currentArmy.name}</div>
+              <div style="display: flex; gap: 12px; font-weight: 600;">
+                  <span><span style="color: #ef4444;">⚔️</span> ATK: ${dmg}</span>
+                  <span><span style="color: #22c55e;">❤️</span> PV: ${hp}</span>
+                  <span><span style="color: #f59e0b;">⚡</span> ${stato}</span>
+              </div>
+              ${timeInfo}
           </div>
-          ${timeInfo}
-      </div>
-      `;
+        `;
 
-    this.armyHoverPopup = new maplibregl.Popup({
-      closeButton: false,
-      closeOnClick: false,
-      anchor: 'bottom',
-      offset: [0, -40], // Shift up to appear ABOVE the marker
-      className: 'tactical-hover-popup'
-    })
-      .setLngLat(coordinates)
-      .setHTML(popupHtml)
-      .addTo(this.map);
+        if (!this.armyHoverPopup) {
+            this.armyHoverPopup = new maplibregl.Popup({
+                closeButton: false,
+                closeOnClick: false,
+                anchor: 'bottom',
+                offset: [0, -40],
+                className: 'tactical-hover-popup'
+            })
+            .setLngLat(coordinates)
+            .setHTML(popupHtml)
+            .addTo(this.map);
 
-    // Rimuoviamo il padding bianco default di maplibre
-    const popupContent = this.armyHoverPopup.getElement().querySelector('.maplibregl-popup-content');
-    if (popupContent) {
-      popupContent.style.padding = '0';
-      popupContent.style.background = 'transparent';
-      popupContent.style.boxShadow = 'none';
-    }
+            const popupContent = this.armyHoverPopup.getElement().querySelector('.maplibregl-popup-content');
+            if (popupContent) {
+                popupContent.style.padding = '0';
+                popupContent.style.background = 'transparent';
+                popupContent.style.boxShadow = 'none';
+            }
+        } else {
+            this.armyHoverPopup.setHTML(popupHtml);
+        }
+    };
+
+    updateBanner();
+    this.armyHoverInterval = setInterval(updateBanner, 1000);
   }
 
   hideArmyHoverBanner() {
     if (this.armyHoverPopup) {
       this.armyHoverPopup.remove();
       this.armyHoverPopup = null;
+    }
+    if (this.armyHoverInterval) {
+      clearInterval(this.armyHoverInterval);
+      this.armyHoverInterval = null;
     }
   }
 

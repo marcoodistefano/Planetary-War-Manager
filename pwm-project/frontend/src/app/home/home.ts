@@ -59,4 +59,8 @@ export class HomeService {
       { withCredentials: true },
     );
   }
+
+  getGraveyard(matchId: string, username: string): Observable<any> {
+    return this.http.get<any>(`${this.matchApiUrl}/${matchId}/player/${username}/graveyard`, { withCredentials: true });
+  }
 }

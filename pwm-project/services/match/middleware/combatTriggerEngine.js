@@ -7,7 +7,7 @@ const { setupCombatFromArrival, processActiveCombats } = require('./combatLogic.
 let troopsVisionMap = {}; 
 let defaultVisionRadius = 15;
 try {
-    const rulesPath = path.join(__dirname, '../../../../shared/assets/game_rules.json');
+    const rulesPath = path.join(__dirname, '../../../shared/assets/game_rules.json');
     if (fs.existsSync(rulesPath)) {
         const cdb = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
         const truppeSheet = cdb.sheets.find(s => s.name === 'Truppe');
@@ -71,7 +71,7 @@ function getEstimatedCoords(army) {
 
 let nodesFeatures = [];
 try {
-    const mapPath = path.join(__dirname, '../../../../shared/assets/map/cities.json');
+    const mapPath = path.join(__dirname, '../../../shared/assets/map/cities.json');
     if (fs.existsSync(mapPath)) {
         const mapGeo = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
         nodesFeatures = mapGeo.features || [];

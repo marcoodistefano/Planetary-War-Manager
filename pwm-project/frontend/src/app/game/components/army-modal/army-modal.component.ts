@@ -2,8 +2,9 @@ import { Component, Output, EventEmitter, Input, OnInit, OnDestroy, OnChanges, S
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
+import { HomeService } from '../../../home/home';
 
-type ArmyTab = 'management' | 'operations' | 'garrison' | 'recruitment' | 'logistics';
+type ArmyTab = 'management' | 'operations' | 'garrison' | 'recruitment' | 'logistics' | 'storico';
 type MissionMode = 'move' | 'attack' | 'cancel';
 
 interface ArmyGroup {
@@ -43,8 +44,11 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
   @Input() selectedTargetCoords = '--';
   @Input() selectedArmyId = '';
   @Input() initialTab: ArmyTab = 'management';
+  @Input() currentMatchId = '';
+  @Input() currentUsername = '';
 
   activeTab: ArmyTab = 'management';
+  graveyardData: any[] = [];
   availableTroops: { [key: string]: number } = {};
   activeArmyId = '';
   armyName = '';
@@ -67,6 +71,8 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
   combatTimers: { [armyId: string]: string } = {};
   movementTimers: { [armyId: string]: string } = {};
   private timerInterval: any;
+
+  constructor(private homeService: HomeService) {}
 
   ngOnInit() {
     this.syncFromInputs(true);
@@ -171,6 +177,10 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
   setTab(tab: ArmyTab) {
     this.activeTab = tab;
 
+    if (tab === 'storico') {
+      this.loadGraveyard();
+    }
+
     if (tab === 'operations') {
       this.missionCoords = this.selectedTargetCoords && this.selectedTargetCoords !== '--'
         ? this.selectedTargetCoords
@@ -180,6 +190,18 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
         this.activeArmyId = this.armies[0].id;
       }
     }
+  }
+
+  loadGraveyard() {
+    if (!this.currentMatchId || !this.currentUsername) return;
+    this.homeService.getGraveyard(this.currentMatchId, this.currentUsername).subscribe({
+      next: (res) => {
+        if (res.status === '200' || res.data) {
+          this.graveyardData = res.data || [];
+        }
+      },
+      error: (err) => console.error("Errore caricamento storico:", err)
+    });
   }
 
   selectArmy(armyId: string) {

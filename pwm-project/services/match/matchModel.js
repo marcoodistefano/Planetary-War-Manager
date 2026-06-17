@@ -1697,6 +1697,30 @@ const authorizeWsConnection = async ({ userId, matchId }) => {
   }
 };
 
+const getGraveyard = async (matchId, username) => {
+  try {
+    const resolvedMatch = await resolveMatchState(matchId);
+    if (!resolvedMatch) {
+      return { status: "404", message: "Partita non trovata" };
+    }
+
+    const id_partita_hash = resolvedMatch.state.id_partita_hash;
+    const graveyardKey = `match:${id_partita_hash}:player:${username}:graveyard`;
+    
+    // Fetch top 100 entries from Redis
+    const entries = await redis.lrange(graveyardKey, 0, 99);
+    const parsedEntries = entries.map(entry => JSON.parse(entry));
+    
+    return {
+      status: "200",
+      data: parsedEntries
+    };
+  } catch (error) {
+    console.error("[SYS_ERR] getGraveyard:", error);
+    return { status: "500", message: "Errore interno", details: error.message };
+  }
+};
+
 module.exports = {
   authorizeWsConnection,
   createMatch,
@@ -1709,4 +1733,5 @@ module.exports = {
   joinAlliance,
   leaveAlliance,
   kickAlliance,
+  getGraveyard
 };
