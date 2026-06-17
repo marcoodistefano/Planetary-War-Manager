@@ -1,4 +1,4 @@
-import { Component, Output, EventEmitter, Input, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Output, EventEmitter, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
@@ -31,7 +31,7 @@ interface ArmyMissionRequest {
   standalone: true,
   imports: [CommonModule, IonicModule, FormsModule]
 })
-export class ArmyModalComponent implements OnInit {
+export class ArmyModalComponent implements OnInit, OnDestroy {
   @Output() close = new EventEmitter<void>();
   @Output() playerTroopsChange = new EventEmitter<{ [key: string]: number }>();
   @Output() armiesChange = new EventEmitter<ArmyGroup[]>();
@@ -64,9 +64,38 @@ export class ArmyModalComponent implements OnInit {
 
   maintenanceTotal = 4250; // Valore simulato
 
+  combatTimers: { [armyId: string]: string } = {};
+  private timerInterval: any;
+
   ngOnInit() {
     this.syncFromInputs(true);
     console.log("MILITARY OS: Protocolli di comando attivati...");
+    this.timerInterval = setInterval(() => {
+      this.updateCombatTimers();
+    }, 1000);
+  }
+
+  ngOnDestroy() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+  }
+
+  updateCombatTimers() {
+    const now = Date.now();
+    for (const army of this.armies) {
+      if ((army as any).status === 'in combattimento' && (army as any).next_round_time) {
+        const targetTime = new Date((army as any).next_round_time).getTime();
+        const diff = targetTime - now;
+        if (diff > 0) {
+          const minutes = Math.floor(diff / 60000);
+          const seconds = Math.floor((diff % 60000) / 1000);
+          this.combatTimers[army.id] = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        } else {
+          this.combatTimers[army.id] = 'Attacco in corso...';
+        }
+      } else {
+        delete this.combatTimers[army.id];
+      }
+    }
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -236,11 +265,11 @@ export class ArmyModalComponent implements OnInit {
   }
 
   getArmyStatusLabel(army: ArmyGroup) {
-    if (army.status === 'moving' || (army as any).status === 'moving_to_border') {
+    if (army.status === 'moving' || (army as any).status === 'moving_to_border' || (army as any).status === "Pronto all'attacco") {
       return 'IN MOVIMENTO';
     }
 
-    if (army.status === 'attacking' || (army as any).status === 'in_battaglia' || (army as any).status === "Pronto all'attacco") {
+    if (army.status === 'attacking' || (army as any).status === 'in_battaglia' || (army as any).status === 'in combattimento') {
       return 'IN COMBATTIMENTO';
     }
 
@@ -248,11 +277,11 @@ export class ArmyModalComponent implements OnInit {
   }
 
   getArmyStatusIcon(army: ArmyGroup) {
-    if (army.status === 'moving') {
+    if (army.status === 'moving' || (army as any).status === 'moving_to_border' || (army as any).status === "Pronto all'attacco") {
       return 'navigate-outline';
     }
 
-    if (army.status === 'attacking') {
+    if (army.status === 'attacking' || (army as any).status === 'in_battaglia' || (army as any).status === 'in combattimento') {
       return 'flame-outline';
     }
 

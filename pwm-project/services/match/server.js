@@ -15,6 +15,7 @@ const { startTroopGenerator } = require("./middleware/troopGenerator.js");
 const { loadMinimumPathToRedis } = require("./middleware/loadPathToRedis.js");
 const { startCombatLoop } = require("./middleware/combatLogic.js");
 const { startFogOfWarEngine } = require("./middleware/fogOfWarEngine.js");
+const { startCombatTriggerEngine } = require("./middleware/combatTriggerEngine.js");
 const Eru = require('./middleware/Eru.js');
 
 const app = express();
@@ -131,6 +132,8 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
              }
          } else if (loc && loc.x !== undefined && loc.y !== undefined) {
              startLng = loc.x; startLat = loc.y;
+         } else if (Array.isArray(loc) && loc.length >= 2) {
+             startLng = loc[0]; startLat = loc[1];
          }
          
          const armyState = armateObj[armyId].status;
@@ -198,16 +201,42 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
           // Check war status / attack
           try {
+              let targetNation = null;
               const nationsCache = await redis.get(`match:${ws.matchId}:nations`);
               if (nationsCache) {
                   const nations = JSON.parse(nationsCache);
-                  const targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(targetName));
+                  targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(targetName));
                   if (targetNation && targetNation.isOccupied && targetNation.playerId && targetNation.playerId !== ws.username && !targetNation.playerId.includes('bot')) {
                       isAttack = true;
                       targetPlayerId = targetNation.playerId;
-                      // Controllo se sono già in guerra (MVP assume boolean globale o check basico)
-                      // Idealmente qui andrebbe un check su `relazioni_diplomatiche`
                       isInWar = targetNation.inWar === true;
+                  }
+              }
+              
+              // Se targetName non è un territorio, controlliamo se è un'armata
+              if (!isAttack && payload.payload.isAttack) {
+                  // Cerca a chi appartiene l'armata
+                  const allArmiesKeys = await redis.keys(`match:${ws.matchId}:player:*:armate`);
+                  for (const k of allArmiesKeys) {
+                      const ownerUsername = k.split(':')[3];
+                      if (ownerUsername === ws.username) continue; // Salta le proprie
+                      const data = await redis.get(k);
+                      if (data) {
+                          const armate = JSON.parse(data);
+                          if (armate[targetName]) {
+                              isAttack = true;
+                              targetPlayerId = ownerUsername;
+                              // Cerca se sono in guerra
+                              if (nationsCache) {
+                                  const nations = JSON.parse(nationsCache);
+                                  const enemyNation = nations.find(n => n.playerId === ownerUsername);
+                                  if (enemyNation) {
+                                      isInWar = enemyNation.inWar === true;
+                                  }
+                              }
+                              break;
+                          }
+                      }
                   }
               }
           } catch (e) {
@@ -664,6 +693,7 @@ loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(async () => {
     startTroopGenerator();
     startCombatLoop();
     startFogOfWarEngine();
+    startCombatTriggerEngine();
     startArrivalEngine();
   });
 }).catch(err => {

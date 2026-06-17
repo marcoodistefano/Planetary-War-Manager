@@ -1440,7 +1440,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                     this.onArmyMissionRequested({
                       armyId: myArmy.id,
                       mode: 'attack',
-                      targetName: army.currentLocation || 'NEMICO',
+                      targetName: army.id,
                       targetCoords: targetCoords,
                       composition: myArmy.composition
                     });
@@ -2279,8 +2279,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
       if (occupier === currentUser) {
         statusColor = '#22c55e'; // Verde per il player
-      } else if (nation.inWar) {
-        statusColor = '#ef4444'; // Rosso per in guerra
+      } else if (nation.inWarWith && nation.inWarWith.includes(currentUser)) {
+        statusColor = '#ef4444'; // Rosso solo se è in guerra con ME
       } else if (occupier.includes('bot')) {
         statusColor = '#cececeff'; // Grigio chiaro per i bot
       } else {
