@@ -98,11 +98,30 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
 
     // If start and dest are same node, path is just the node
     if (startNode === destNode) {
+        let path = [nodesMap.get(startNode)];
+        let distance = 0;
+
+        const distFromStart = haversineDist(startLng, startLat, path[0][0], path[0][1]);
+        if (distFromStart > 0.001) {
+            path.unshift([startLng, startLat]);
+            distance += distFromStart;
+        }
+
+        if (targetName === 'OBIETTIVO') {
+            const distToEnd = haversineDist(path[path.length - 1][0], path[path.length - 1][1], targetLng, targetLat);
+            if (distToEnd > 0.001) {
+                path.push([targetLng, targetLat]);
+                distance += distToEnd;
+            }
+        }
+
+        const baseSpeed = 50;
+        const etaHours = distance / (baseSpeed * multiplier);
         return {
             isValid: true,
-            distance: 0,
-            etaMs: 0,
-            path: [nodesMap.get(startNode)]
+            distance: distance,
+            etaMs: Math.floor(etaHours * 60 * 60 * 1000),
+            path: path
         };
     }
 
@@ -151,7 +170,16 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
 
     const baseSpeed = 50; // km/h
     // La distanza di routeInfo.cost è in METRI. Convertiamo in KM:
-    const costInKm = routeInfo.cost / 1000;
+    let costInKm = routeInfo.cost / 1000;
+
+    // Add initial coordinate if the start wasn't exactly a node
+    if (fullPath.length > 0) {
+        const distFromStart = haversineDist(startLng, startLat, fullPath[0][0], fullPath[0][1]);
+        if (distFromStart > 0.001) {
+            fullPath.unshift([startLng, startLat]);
+            costInKm += distFromStart;
+        }
+    }
     
     // Il tempo di percorrenza scala diviso per il moltiplicatore
     const etaHours = costInKm / (baseSpeed * multiplier);

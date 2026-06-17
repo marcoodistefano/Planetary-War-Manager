@@ -188,8 +188,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const dx = currentLngLat[0] - prevLngLat[0];
         const dy = currentLngLat[1] - prevLngLat[1];
         if (Math.abs(dx) > Math.abs(dy)) {
-          if (dx > 0) direction = 'side-flip';
-          else direction = 'side';
+          if (dx > 0) direction = 'side';
+          else direction = 'side-flip';
         } else {
           if (dy > 0) direction = 'back';
           else direction = 'front';
