@@ -192,123 +192,76 @@ const processActiveCombats = async () => {
 const startCombatLoop = () => {
     console.log("[SYSTEM] Avvio Combat Loop (interval 1m)");
     setInterval(processActiveCombats, 60000); // Esegue il check ogni minuto
-    setInterval(resolveMovements, 15000); // Check movimenti ogni 15s
 };
 
-const resolveMovements = async () => {
+const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUsername) => {
     try {
-        const res = await db.query(`
-            SELECT m.id_mossa, m.id_armata, m.user_id, m.partita_id, m.ttl, s.x_dest, s.y_dest, s.target_node, p.id_partita_hash
-            FROM mosse m
-            JOIN spostamenti s ON m.id_mossa = s.id_mossa
-            JOIN partite p ON m.partita_id = p.id_partita
-            WHERE m.type_action = 'mov' AND m.ttl <= NOW()
-        `);
+        const { id_mossa, id_armata, target_node, x_dest, y_dest } = mossa;
 
-        for (const mossa of res.rows) {
-            const { id_mossa, id_armata, id_partita_hash, user_id, target_node, x_dest, y_dest } = mossa;
-            
-            // Trova l'armata in Redis
-            const keys = await redis.keys(`match:${id_partita_hash}:player:*:armate`);
-            let army = null;
-            let redisKey = null;
-            let attackerUsername = null;
+        // Notifica e Guerra
+        const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
+        let defenderId = null;
+        if (nationsCache) {
+            const nations = JSON.parse(nationsCache);
+            const targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(target_node));
+            if (targetNation && targetNation.playerId) {
+                defenderId = targetNation.playerId;
+                // Imposta inWar (Semplificazione)
+                targetNation.inWar = true;
+                
+                const attackerNation = nations.find(n => n.playerId === attackerUsername);
+                if (attackerNation) attackerNation.inWar = true;
+                
+                await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
+            }
+        }
 
-            for (const key of keys) {
-                const armateStr = await redis.get(key);
-                if (armateStr) {
-                    const armateObj = JSON.parse(armateStr);
-                    if (armateObj[id_armata]) {
-                        army = armateObj[id_armata];
-                        redisKey = key;
-                        attackerUsername = key.split(':')[3];
+        if (defenderId) {
+            // Notifica ai player
+            const nationsCacheUpdated = await redis.get(`match:${id_partita_hash}:nations`);
+            const updatedNations = nationsCacheUpdated ? JSON.parse(nationsCacheUpdated) : [];
+
+            const broadcastPayload = {
+                matchId: id_partita_hash,
+                payload: {
+                    type: 'WAR_DECLARED',
+                    data: { attacker: attackerUsername, defender: defenderId },
+                    nations: updatedNations
+                }
+            };
+            await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+
+            // Trova se c'è un'armata nemica a difesa di target_node
+            let defendingArmyId = null;
+            const defenderArmiesStr = await redis.get(`match:${id_partita_hash}:player:${defenderId}:armate`);
+            if (defenderArmiesStr) {
+                const defArmies = JSON.parse(defenderArmiesStr);
+                for (const [defId, defArmy] of Object.entries(defArmies)) {
+                    if (defArmy.currentLocation === target_node || defArmy.targetName === target_node) {
+                        defendingArmyId = defId;
                         break;
                     }
                 }
             }
 
-            if (!army) {
-                await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
-                continue;
-            }
+            // Aggiorna la mossa originale
+            await db.query(`UPDATE mosse SET type_action = 'atk', ttl = NOW() + INTERVAL '15 minutes' WHERE id_mossa = $1`, [id_mossa]);
 
-            if (army.status === 'moving_to_border' || army.status === "Pronto all'attacco") {
-                // Notifica e Guerra
-                const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
-                let defenderId = null;
-                if (nationsCache) {
-                    const nations = JSON.parse(nationsCache);
-                    const targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(target_node));
-                    if (targetNation && targetNation.playerId) {
-                        defenderId = targetNation.playerId;
-                        // Imposta inWar (Semplificazione)
-                        targetNation.inWar = true;
-                        
-                        const attackerNation = nations.find(n => n.playerId === attackerUsername);
-                        if (attackerNation) attackerNation.inWar = true;
-                        
-                        await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
-                    }
-                }
-
-                if (defenderId) {
-                    // Notifica ai player
-                    const nationsCacheUpdated = await redis.get(`match:${id_partita_hash}:nations`);
-                    const updatedNations = nationsCacheUpdated ? JSON.parse(nationsCacheUpdated) : [];
-
-                    const broadcastPayload = {
-                        matchId: id_partita_hash,
-                        payload: {
-                            type: 'WAR_DECLARED',
-                            data: { attacker: attackerUsername, defender: defenderId },
-                            nations: updatedNations
-                        }
-                    };
-                    await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
-
-                    // Trova se c'è un'armata nemica a difesa di target_node
-                    let defendingArmyId = null;
-                    const defenderArmiesStr = await redis.get(`match:${id_partita_hash}:player:${defenderId}:armate`);
-                    if (defenderArmiesStr) {
-                        const defArmies = JSON.parse(defenderArmiesStr);
-                        for (const [defId, defArmy] of Object.entries(defArmies)) {
-                            if (defArmy.currentLocation === target_node || defArmy.targetName === target_node) {
-                                defendingArmyId = defId;
-                                break;
-                            }
-                        }
-                    }
-
-                    // Aggiorna la mossa originale
-                    await db.query(`UPDATE mosse SET type_action = 'atk', ttl = NOW() + INTERVAL '15 minutes' WHERE id_mossa = $1`, [id_mossa]);
-
-                    // Inserisci in attacco
-                    await db.query(`
-                        INSERT INTO attacco (id_mossa, partita_id, id_attaccante, id_target_citta, id_target_armata, next_round_time)
-                        VALUES ($1, $2, $3, $4, $5, NOW())
-                    `, [id_mossa, mossa.partita_id, id_armata, target_node, defendingArmyId]);
-                }
-
-                army.status = 'in combattimento';
-                army.currentLocation = `${x_dest},${y_dest}`;
-            } else {
-                army.status = 'idle';
-                army.currentLocation = `${x_dest},${y_dest}`;
-                await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
-            }
-
-            const armateStr = await redis.get(redisKey);
-            const armateObj = JSON.parse(armateStr);
-            armateObj[id_armata] = army;
-            await redis.set(redisKey, JSON.stringify(armateObj));
-
-            await db.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [id_mossa]);
+            // Inserisci in attacco
+            await db.query(`
+                INSERT INTO attacco (id_mossa, partita_id, id_attaccante, id_target_citta, id_target_armata, next_round_time)
+                VALUES ($1, $2, $3, $4, $5, NOW())
+            `, [id_mossa, mossa.partita_id, id_armata, target_node, defendingArmyId]);
         }
+
+        army.status = 'in combattimento';
+        army.currentLocation = `${x_dest},${y_dest}`;
     } catch (e) {
-        console.error("Errore resolveMovements:", e);
+        console.error("Errore in setupCombatFromArrival:", e);
     }
 };
 
 module.exports = {
-    startCombatLoop
+    startCombatLoop,
+    setupCombatFromArrival
 };

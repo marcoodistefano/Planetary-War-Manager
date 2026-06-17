@@ -10,10 +10,11 @@ const matchModel = require("./matchModel.js");
 const { getAuthContextFromRequest } = require("../shared/authContext.js");
 const { initDispatcher } = require("./Dispatcher/webDispatcher.js");
 const redis = require("../shared/redisClient.js");
-const { calculatePath, getBorderIntersection } = require("./middleware/movementLogic.js");
+const { calculatePath, getBorderIntersection, getNodeCoords } = require("./middleware/movementLogic.js");
 const { startTroopGenerator } = require("./middleware/troopGenerator.js");
 const { loadMinimumPathToRedis } = require("./middleware/loadPathToRedis.js");
 const { startCombatLoop } = require("./middleware/combatLogic.js");
+const { startFogOfWarEngine } = require("./middleware/fogOfWarEngine.js");
 const Eru = require('./middleware/Eru.js');
 
 const app = express();
@@ -118,8 +119,16 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
          let loc = armateObj[armyId].currentLocation;
          let startLng = 12.0, startLat = 41.0;
          if (loc && typeof loc === 'string') {
-             const pts = loc.split(',').map(s => parseFloat(s.trim()));
-             if (pts.length === 2) { startLng = pts[0]; startLat = pts[1]; }
+             if (loc.includes(',')) {
+                 const pts = loc.split(',').map(s => parseFloat(s.trim()));
+                 if (pts.length === 2 && !isNaN(pts[0]) && !isNaN(pts[1])) { startLng = pts[0]; startLat = pts[1]; }
+             } else {
+                 const nodeCoords = getNodeCoords(loc);
+                 if (nodeCoords) {
+                     startLng = nodeCoords[0];
+                     startLat = nodeCoords[1];
+                 }
+             }
          } else if (loc && loc.x !== undefined && loc.y !== undefined) {
              startLng = loc.x; startLat = loc.y;
          }
@@ -127,7 +136,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
          let targetLng = 12.0, targetLat = 41.0;
          if (typeof targetCoords === 'string') {
              const pts = targetCoords.split(',').map(s => parseFloat(s.trim()));
-             if (pts.length === 2) { targetLng = pts[0]; targetLat = pts[1]; }
+             if (pts.length === 2 && !isNaN(pts[0]) && !isNaN(pts[1])) { targetLng = pts[0]; targetLat = pts[1]; }
          }
 
           let multiplier = 1;
@@ -240,22 +249,23 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
              console.error("[SYS_ERR] Errore salvataggio movimento in DB:", dbErr);
          }
 
-         // Notifica a tutti i giocatori del match (Broadcast)
-         const broadcastPayload = {
-           matchId: ws.matchId,
-           payload: {
-             type: 'TROOPS_MOVED',
-             data: {
-               userId,
-               armyId,
-               targetName,
-               targetCoords,
-               etaMs: pathInfo.etaMs,
-               path: pathInfo.path,
-               startTime: armateObj[armyId].startTime
-             }
-           }
-         };
+          // Notifica SOLO al giocatore che ha mosso (il resto arriva via Fog Of War)
+          const broadcastPayload = {
+            matchId: ws.matchId,
+            targetUsers: [userId],
+            payload: {
+              type: 'TROOPS_MOVED',
+              data: {
+                userId,
+                armyId,
+                targetName,
+                targetCoords,
+                etaMs: pathInfo.etaMs,
+                path: pathInfo.path,
+                startTime: armateObj[armyId].startTime
+              }
+            }
+          };
          await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
       }
     });
@@ -320,6 +330,79 @@ if (!fs.existsSync(MINIMUM_PATH_FILE)) {
   console.log("[SYSTEM] File minimum_path.json trovato. Salto la generazione.");
 }
 
+const startArrivalEngine = () => {
+  setInterval(async () => {
+    try {
+      const db = require('../shared/postgresClient.js');
+      const query = `
+        SELECT s.id_spostamento, s.id_mossa, m.id_armata, u.username, u.id_user, p.id_partita_hash as match_id, s.target_node
+        FROM spostamenti s 
+        JOIN mosse m ON s.id_mossa = m.id_mossa 
+        JOIN utenti u ON m.user_id = u.id_user 
+        JOIN partite p ON m.partita_id = p.id_partita 
+        WHERE s.time_to_arrive <= NOW()
+      `;
+      const res = await db.query(query);
+
+      for (const row of res.rows) {
+        await db.query(`DELETE FROM spostamenti WHERE id_spostamento = $1`, [row.id_spostamento]);
+        await db.query(`UPDATE mosse SET queue_order = 0 WHERE id_mossa = $1`, [row.id_mossa]);
+
+        const redisKey = `match:${row.match_id}:player:${row.username}:armate`;
+        let armateData = await redis.get(redisKey);
+        if (armateData) {
+          let armateObj = JSON.parse(armateData);
+          if (armateObj[row.id_armata]) {
+            let army = armateObj[row.id_armata];
+            if (army.missionMode === 'attack') {
+                const { setupCombatFromArrival } = require('./middleware/combatLogic.js');
+                // Chiamata all'inizializzazione del combattimento
+                const mossaObj = {
+                    id_mossa: row.id_mossa,
+                    id_armata: row.id_armata,
+                    target_node: row.target_node,
+                    x_dest: army.targetCoords ? army.targetCoords[0] : 0,
+                    y_dest: army.targetCoords ? army.targetCoords[1] : 0,
+                    partita_id: row.partita_id
+                };
+                await setupCombatFromArrival(army, mossaObj, row.match_id, row.username);
+            } else {
+                army.status = 'standby';
+                army.currentLocation = army.targetName || row.target_node;
+            }
+
+            delete army.path;
+            delete army.etaMs;
+            delete army.startTime;
+            delete army.targetName;
+            delete army.missionMode;
+
+            await redis.set(redisKey, JSON.stringify(armateObj));
+
+            const broadcastPayload = {
+              matchId: row.match_id,
+              targetUsers: [row.id_user],
+              payload: {
+                type: 'TROOPS_ARRIVED',
+                data: {
+                  userId: row.username,
+                  armyId: row.id_armata,
+                  targetName: row.target_node,
+                  targetCoords: armateObj[row.id_armata].targetCoords
+                }
+              }
+            };
+            await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+            console.log(`[SYSTEM] Armata ${row.id_armata} arrivata a ${row.target_node}.`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[SYS_ERR] Errore nel motore arrivi (ArrivalEngine):", err);
+    }
+  }, 5000);
+};
+
 // Caricamento in Redis
 const restoreActiveMoves = async () => {
   console.log("[SYSTEM] Avvio ripristino mosse attive da DB a Redis...");
@@ -353,13 +436,22 @@ const restoreActiveMoves = async () => {
       if (!armateObj[row.id_armata]) continue;
 
       let army = armateObj[row.id_armata];
+      let loc = army.currentLocation;
       let startLng = 12.0, startLat = 41.0;
-      if (typeof army.currentLocation === 'string') {
-        const pts = army.currentLocation.split(',').map(s => parseFloat(s.trim()));
-        if (pts.length === 2) { startLng = pts[0]; startLat = pts[1]; }
-      } else if (army.currentLocation && army.currentLocation.x !== undefined) {
-        startLng = army.currentLocation.x;
-        startLat = army.currentLocation.y;
+      if (typeof loc === 'string') {
+        if (loc.includes(',')) {
+            const pts = loc.split(',').map(s => parseFloat(s.trim()));
+            if (pts.length === 2 && !isNaN(pts[0]) && !isNaN(pts[1])) { startLng = pts[0]; startLat = pts[1]; }
+        } else {
+            const nodeCoords = getNodeCoords(loc);
+            if (nodeCoords) {
+                startLng = nodeCoords[0];
+                startLat = nodeCoords[1];
+            }
+        }
+      } else if (loc && loc.x !== undefined) {
+        startLng = loc.x;
+        startLat = loc.y;
       }
 
       let multiplier = 1;
@@ -381,7 +473,7 @@ const restoreActiveMoves = async () => {
         // missionMode potrebbe essere perso se non storicizzato in mosse, assumiamo 'move'
         army.missionMode = 'move';
         army.etaMs = pathInfo.etaMs;
-        army.startTime = new Date(row.time_to_arrive).getTime() - pathInfo.etaMs;
+        army.startTime = new Date(row.ttl).getTime() - pathInfo.etaMs;
         
         await redis.set(redisKey, JSON.stringify(armateObj));
         console.log(`[SYSTEM] Ripristinata mossa armata ${row.id_armata} verso ${row.target_node}`);
@@ -401,6 +493,8 @@ loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(async () => {
     // Avvio generatore automatico di truppe (differito)
     startTroopGenerator();
     startCombatLoop();
+    startFogOfWarEngine();
+    startArrivalEngine();
   });
 }).catch(err => {
   console.error("[SYS_ERR] Errore caricamento routing in Redis:", err);

@@ -23,10 +23,10 @@ function loadGeometries() {
             if (!feature.geometry) continue;
             const coords = feature.geometry.coordinates;
             if (props.city1 && coords.length > 0) {
-                nodesMap.set(props.city1, coords[0]);
+                nodesMap.set(props.city1.toLowerCase(), coords[0]);
             }
             if (props.city2 && coords.length > 0) {
-                nodesMap.set(props.city2, coords[coords.length - 1]);
+                nodesMap.set(props.city2.toLowerCase(), coords[coords.length - 1]);
             }
         }
     }
@@ -69,20 +69,22 @@ function getClosestNode(lon, lat) {
 
 // Extract path geometry from cityA to cityB
 function getEdgeGeometry(cityA, cityB) {
+    const cityALower = cityA.toLowerCase();
+    const cityBLower = cityB.toLowerCase();
     for (const f of archsFeatures) {
         if (!f.geometry) continue;
         if ((f.properties.city1 === cityA && f.properties.city2 === cityB) ||
             (f.properties.city1 === cityB && f.properties.city2 === cityA)) {
             // Need to ensure the direction is from cityA to cityB
             const coords = f.geometry.coordinates;
-            const distA = haversineDist(nodesMap.get(cityA)[0], nodesMap.get(cityA)[1], coords[0][0], coords[0][1]);
+            const distA = haversineDist(nodesMap.get(cityALower)[0], nodesMap.get(cityALower)[1], coords[0][0], coords[0][1]);
             if (distA > 1) { // cityA is not at index 0, so we reverse
                 return [...coords].reverse();
             }
             return coords;
         }
     }
-    return [nodesMap.get(cityA), nodesMap.get(cityB)]; // Fallback
+    return [nodesMap.get(cityALower), nodesMap.get(cityBLower)]; // Fallback
 }
 
 // Main calculate function
@@ -90,7 +92,7 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
     loadGeometries();
 
     let destNode = targetName;
-    if (!nodesMap.has(destNode)) {
+    if (!nodesMap.has(destNode.toLowerCase())) {
         destNode = getClosestNode(targetLng, targetLat);
     }
 
@@ -102,7 +104,7 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
             isValid: true,
             distance: 0,
             etaMs: 0,
-            path: [nodesMap.get(startNode)]
+            path: [nodesMap.get(startNode.toLowerCase())]
         };
     }
 
@@ -208,7 +210,10 @@ const getBorderIntersection = (pathCoords, targetName) => {
     return null;
 };
 
-module.exports = {
-  calculatePath,
-  getBorderIntersection
-};
+// Helper for server to get node coords
+function getNodeCoords(name) {
+    loadGeometries();
+    return nodesMap.get(name.toLowerCase()) || null;
+}
+
+module.exports = { calculatePath, getBorderIntersection, getNodeCoords };
