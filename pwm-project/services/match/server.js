@@ -133,10 +133,41 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
              startLng = loc.x; startLat = loc.y;
          }
          
+         const armyState = armateObj[armyId].status;
+         if ((armyState === 'moving' || armyState === 'moving_to_border' || armyState === "Pronto all'attacco") && armateObj[armyId].path && armateObj[armyId].path.length > 1 && armateObj[armyId].startTime && armateObj[armyId].etaMs) {
+             const now = Date.now();
+             const elapsed = now - armateObj[armyId].startTime;
+             let progress = Math.max(0, Math.min(1, elapsed / armateObj[armyId].etaMs));
+             if (progress < 1) {
+                 const totalSegments = armateObj[armyId].path.length - 1;
+                 const exactIndex = progress * totalSegments;
+                 const currentIndex = Math.floor(exactIndex);
+                 const segmentProgress = exactIndex - currentIndex;
+                 const p1 = armateObj[armyId].path[currentIndex];
+                 const p2 = armateObj[armyId].path[currentIndex + 1] || p1;
+                 startLng = p1[0] + (p2[0] - p1[0]) * segmentProgress;
+                 startLat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
+             } else {
+                 const lastPoint = armateObj[armyId].path[armateObj[armyId].path.length - 1];
+                 startLng = lastPoint[0];
+                 startLat = lastPoint[1];
+             }
+             armateObj[armyId].currentLocation = `${startLng},${startLat}`;
+         }
+         
          let targetLng = 12.0, targetLat = 41.0;
+         let parsedTargetCoords = null;
          if (typeof targetCoords === 'string') {
              const pts = targetCoords.split(',').map(s => parseFloat(s.trim()));
-             if (pts.length === 2 && !isNaN(pts[0]) && !isNaN(pts[1])) { targetLng = pts[0]; targetLat = pts[1]; }
+             if (pts.length === 2 && !isNaN(pts[0]) && !isNaN(pts[1])) { 
+                 targetLng = pts[0]; 
+                 targetLat = pts[1]; 
+                 parsedTargetCoords = [targetLng, targetLat];
+             }
+         } else if (Array.isArray(targetCoords) && targetCoords.length === 2) {
+             targetLng = parseFloat(targetCoords[0]);
+             targetLat = parseFloat(targetCoords[1]);
+             parsedTargetCoords = [targetLng, targetLat];
          }
 
           let multiplier = 1;
@@ -199,7 +230,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
               armateObj[armyId].status = 'moving';
           }
 
-          armateObj[armyId].targetCoords = targetCoords;
+          armateObj[armyId].targetCoords = parsedTargetCoords || targetCoords;
           armateObj[armyId].targetName = targetName;
           armateObj[armyId].missionMode = payload.payload.mode;
           armateObj[armyId].path = pathInfo.path;
@@ -368,7 +399,19 @@ const startArrivalEngine = () => {
                 await setupCombatFromArrival(army, mossaObj, row.match_id, row.username);
             } else {
                 army.status = 'standby';
-                army.currentLocation = army.targetName || row.target_node;
+                if (army.path && army.path.length > 0) {
+                    const lastCoord = army.path[army.path.length - 1];
+                    army.currentLocation = `${lastCoord[0]},${lastCoord[1]}`;
+                } else if (army.targetCoords) {
+                    army.currentLocation = `${army.targetCoords[0]},${army.targetCoords[1]}`;
+                } else {
+                    army.currentLocation = army.targetName || row.target_node;
+                }
+            }
+
+            let finalCoords = army.targetCoords;
+            if (army.path && army.path.length > 0) {
+                finalCoords = army.path[army.path.length - 1];
             }
 
             delete army.path;
@@ -388,7 +431,7 @@ const startArrivalEngine = () => {
                   userId: row.username,
                   armyId: row.id_armata,
                   targetName: row.target_node,
-                  targetCoords: armateObj[row.id_armata].targetCoords
+                  targetCoords: finalCoords
                 }
               }
             };

@@ -89,11 +89,13 @@ function sleep(ms) {
 }
 
 function getProjectContainerName(container) {
+    if (container.Name) return container.Name.replace(/^\//, '');
     return (container.Names?.[0] || '').replace(/^\//, '');
 }
 
 function getComposeServiceName(container) {
-    return container.Labels?.['com.docker.compose.service'] || null;
+    const labels = container.Config?.Labels || container.Labels;
+    return labels?.['com.docker.compose.service'] || null;
 }
 
 function buildProgressHandler(resolve, reject) {
@@ -424,7 +426,17 @@ app.post('/api/containers/:id/:action', async (req, res) => {
         else if (action === 'restart') await container.restart();
         else if (action === 'rebuild') {
             const containerInfo = await container.inspect();
-            const serviceName = getComposeServiceName(containerInfo) || getProjectContainerName(containerInfo);
+            let serviceName = getComposeServiceName(containerInfo);
+            if (!serviceName) {
+                const containerName = getProjectContainerName(containerInfo);
+                for (const key of Object.keys(SERVICE_SPECS)) {
+                    if (containerName.includes(key)) {
+                        serviceName = key;
+                        break;
+                    }
+                }
+                if (!serviceName) serviceName = containerName;
+            }
             await rebuildServiceByName(serviceName);
         } else return res.status(400).json({ error: 'Azione non valida' });
 

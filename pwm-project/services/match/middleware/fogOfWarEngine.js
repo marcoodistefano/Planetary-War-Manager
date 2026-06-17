@@ -17,7 +17,7 @@ let troopsVisionMap = {}; // id_truppa -> raggio_visivo
 let defaultVisionRadius = 15;
 
 try {
-    const rulesPath = path.join(__dirname, '../../../../game_rules.cdb');
+    const rulesPath = path.join(__dirname, '../../../../shared/assets/game_rules.json');
     if (fs.existsSync(rulesPath)) {
         const cdb = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
         const truppeSheet = cdb.sheets.find(s => s.name === 'Truppe');

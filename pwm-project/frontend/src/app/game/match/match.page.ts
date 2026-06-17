@@ -162,6 +162,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const now = Date.now();
     this.matchArmies.forEach(army => {
       if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
+        console.log("updateMovingArmies: army", army.id, "startTime:", army.startTime, "etaMs:", army.etaMs, "path.length:", army.path?.length, "status:", army.status);
         const elapsed = now - army.startTime;
         let progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
 
@@ -411,6 +412,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         if (parsed.type === 'INITIAL_STATE') {
           if (parsed.payload?.armies) {
             this.matchArmies = parsed.payload.armies.filter((a: any) => a.owner === this.userProfile.username);
+            const moving = this.matchArmies.find(a => a.status === "moving");
+            if (moving) console.log("INITIAL_STATE moving army:", moving.id, "startTime:", moving.startTime, "path:", moving.path?.length);
             this.renderArmies();
           }
           if (parsed.payload?.nations) {
@@ -1010,7 +1013,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         type: 'line',
         source: 'moving-troops-paths-source',
         paint: {
-          'line-color': '#22c55e', // Verde smeraldo
+          'line-color': '#eab308', // Giallo
           'line-width': 3,
           'line-opacity': 0.8
         }
@@ -1292,6 +1295,15 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         badgeDiv.style.fontSize = '11px';
         badgeDiv.style.fontWeight = 'bold';
         badgeDiv.style.border = '1px solid #9ca3af';
+        if (army.owner !== this.userProfile.username) {
+          if (army.status === "Pronto all'attacco" || army.status === 'in_battaglia' || army.status === 'moving_to_border') {
+            imgDiv.style.filter = 'drop-shadow(0 0 5px red)';
+            badgeDiv.style.border = '2px solid red';
+          } else {
+            imgDiv.style.filter = 'drop-shadow(0 0 5px yellow)';
+            badgeDiv.style.border = '2px solid yellow';
+          }
+        }
         badgeDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
         badgeDiv.style.position = 'absolute';
 
@@ -1685,6 +1697,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             }
           });
         }
+
+        // Riesegue il render delle armate ora che i nodi sono disponibili
+        this.renderArmies();
 
       } catch (err) {
         console.error('Errore caricamento archs.json', err);
