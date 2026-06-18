@@ -71,12 +71,21 @@ function getEstimatedCoords(army) {
 
 let nodesFeatures = [];
 try {
+    const topojson = require('topojson-client');
     const mapPath = path.join(__dirname, '../../../shared/assets/map/cities.json');
     if (fs.existsSync(mapPath)) {
         const mapGeo = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
-        nodesFeatures = mapGeo.features || [];
+        if (mapGeo.type === 'Topology') {
+            const objectKey = Object.keys(mapGeo.objects)[0];
+            const geojson = topojson.feature(mapGeo, mapGeo.objects[objectKey]);
+            nodesFeatures = geojson.features || [];
+        } else {
+            nodesFeatures = mapGeo.features || [];
+        }
     }
-} catch(e) {}
+} catch(e) {
+    console.error("Error loading cities.json in combatTriggerEngine:", e);
+}
 
 const checkCombatTriggers = async () => {
     try {
@@ -119,7 +128,11 @@ const checkCombatTriggers = async () => {
                         const cityFeature = nodesFeatures.find(f => (f.properties.name || f.properties.ADMIN || f.id).toLowerCase() === targetName.toLowerCase());
                         if (cityFeature && cityFeature.geometry && cityFeature.geometry.coordinates) {
                             targetCoords = cityFeature.geometry.coordinates;
+                        } else {
+                            targetCoords = army.targetCoords;
                         }
+                    } else {
+                        targetCoords = army.targetCoords;
                     }
 
                     if (targetCoords) {
@@ -147,16 +160,15 @@ const checkCombatTriggers = async () => {
                                 await db.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [mossa.id_mossa]);
                                 await setupCombatFromArrival(army, mossa, matchId, army.owner);
                                 
-                                // Aggiorna redis con lo stato 'in combattimento'
+                                // Aggiorna redis con eventuali informazioni di next_round_time
                                 const armateStr = await redis.get(army.redisKey);
                                 if (armateStr) {
                                     const armateObj = JSON.parse(armateStr);
                                     if (armateObj[army.id]) {
-                                        armateObj[army.id].status = army.status;
                                         if (army.next_round_time) {
                                             armateObj[army.id].next_round_time = army.next_round_time;
+                                            await redis.set(army.redisKey, JSON.stringify(armateObj));
                                         }
-                                        await redis.set(army.redisKey, JSON.stringify(armateObj));
                                     }
                                 }
                                 

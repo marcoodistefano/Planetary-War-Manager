@@ -297,8 +297,8 @@ const processActiveCombats = async () => {
 
                 if (cityHp <= 0) {
                     combatEnded = true;
-                    // Imposta HP a 500 come da feedback utente (si ripristineranno in futuro con fortezza lvl1)
-                    await redis.set(cityHpKey, "500");
+                    // Imposta HP a 0 quando viene conquistata
+                    await redis.set(cityHpKey, "0");
                     
                     // Conquista
                     const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
