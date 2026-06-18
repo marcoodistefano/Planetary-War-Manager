@@ -52,8 +52,8 @@ const applyDamageToArmy = (army, damage) => {
     const totalMaxHp = getArmyMaxHp(army);
     if (totalMaxHp === 0) return true;
     
-    let currentHp = army.hp !== undefined ? army.hp : totalMaxHp;
-    currentHp -= damage;
+    // We apply damage to the true current max HP of the surviving composition
+    let currentHp = totalMaxHp - damage;
     
     if (currentHp <= 0) {
         army.hp = 0;
@@ -63,11 +63,25 @@ const applyDamageToArmy = (army, damage) => {
     
     army.hp = currentHp;
     const survivalRatio = currentHp / totalMaxHp;
+    let anySurvived = false;
     for (const [troopId, count] of Object.entries(army.composition)) {
         if (count > 0) {
-            army.composition[troopId] = Math.ceil(count * survivalRatio);
+            // Use Math.round instead of Math.ceil to prevent infinite survival of small units
+            army.composition[troopId] = Math.round(count * survivalRatio);
+            if (army.composition[troopId] > 0) {
+                anySurvived = true;
+            } else {
+                delete army.composition[troopId];
+            }
         }
     }
+    
+    if (!anySurvived) {
+        army.hp = 0;
+        army.composition = {};
+        return true; // died
+    }
+    
     return false; // survived
 };
 
@@ -385,6 +399,9 @@ const processActiveCombats = async () => {
                                         if (targetAdmin) {
                                             if (!statoAtt[targetAdmin]) statoAtt[targetAdmin] = {};
                                             statoAtt[targetAdmin][regionId] = true;
+                                        } else {
+                                            if (!statoAtt["Altro"]) statoAtt["Altro"] = {};
+                                            statoAtt["Altro"][regionId] = true;
                                         }
                                         await db.query(`UPDATE partecipanti_partite SET stato_territori = $1::jsonb WHERE partita_id = $2 AND user_id = $3`, [JSON.stringify(statoAtt), partita_id, attRes.rows[0].id_user]);
                                     }

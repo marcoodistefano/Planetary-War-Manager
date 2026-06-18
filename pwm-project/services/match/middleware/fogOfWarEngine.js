@@ -77,10 +77,27 @@ function getEstimatedCoords(army, nodesFeatures = []) {
         const elapsed = Date.now() - army.startTime;
         const progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
         if (progress < 1) {
-            const totalSegments = army.path.length - 1;
-            const exactIndex = progress * totalSegments;
-            const currentIndex = Math.floor(exactIndex);
-            const segmentProgress = exactIndex - currentIndex;
+            let totalDistance = 0;
+            const segmentDistances = [];
+            for (let i = 0; i < army.path.length - 1; i++) {
+                const dx = army.path[i+1][0] - army.path[i][0];
+                const dy = army.path[i+1][1] - army.path[i][1];
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                segmentDistances.push(dist);
+                totalDistance += dist;
+            }
+            const targetDistance = progress * totalDistance;
+            let currentDist = 0;
+            let currentIndex = 0;
+            let segmentProgress = 0;
+            for (let i = 0; i < segmentDistances.length; i++) {
+                if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
+                    currentIndex = i;
+                    segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0;
+                    break;
+                }
+                currentDist += segmentDistances[i];
+            }
             const p1 = army.path[currentIndex];
             const p2 = army.path[currentIndex + 1] || p1;
             const lng = p1[0] + (p2[0] - p1[0]) * segmentProgress;

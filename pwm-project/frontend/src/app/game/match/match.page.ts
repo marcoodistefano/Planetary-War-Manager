@@ -169,7 +169,6 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const now = Date.now();
     this.matchArmies.forEach(army => {
       if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
-        console.log("updateMovingArmies: army", army.id, "startTime:", army.startTime, "etaMs:", army.etaMs, "path.length:", army.path?.length, "status:", army.status);
         const elapsed = now - army.startTime;
         let progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
 
@@ -179,10 +178,31 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         if (progress < 1) {
           army._hasVisuallyArrived = false;
-          const totalSegments = army.path.length - 1;
-          const exactIndex = progress * totalSegments;
-          const currentIndex = Math.floor(exactIndex);
-          const segmentProgress = exactIndex - currentIndex;
+          
+          let totalDistance = 0;
+          const segmentDistances = [];
+          for (let i = 0; i < army.path.length - 1; i++) {
+             const dx = army.path[i+1][0] - army.path[i][0];
+             const dy = army.path[i+1][1] - army.path[i][1];
+             const dist = Math.sqrt(dx*dx + dy*dy);
+             segmentDistances.push(dist);
+             totalDistance += dist;
+          }
+
+          const targetDistance = progress * totalDistance;
+          let currentDist = 0;
+          let currentIndex = 0;
+          let segmentProgress = 0;
+
+          for (let i = 0; i < segmentDistances.length; i++) {
+             if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
+                currentIndex = i;
+                segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0;
+                break;
+             }
+             currentDist += segmentDistances[i];
+          }
+
           const p1 = army.path[currentIndex];
           const p2 = army.path[currentIndex + 1] || p1;
           prevLngLat = p1;
@@ -190,6 +210,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           const lat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
           currentLngLat = [lng, lat];
         } else {
+          prevLngLat = army.path ? army.path[Math.max(0, army.path.length - 2)] : currentLngLat;
           if (!army._hasVisuallyArrived) {
              army._hasVisuallyArrived = true;
              army.status = 'standby';
@@ -199,7 +220,6 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
              delete army.startTime;
              setTimeout(() => this.renderArmies(), 0);
           }
-          prevLngLat = army.path ? army.path[Math.max(0, army.path.length - 2)] : currentLngLat;
         }
 
         const dx = currentLngLat[0] - prevLngLat[0];
