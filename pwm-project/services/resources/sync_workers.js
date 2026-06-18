@@ -9,9 +9,9 @@ const redis = new Redis({
 
 const db = new Pool({
   host: process.env.DB_HOST || 'db',
-  user: process.env.DB_USER || 'postgres',
+  user: process.env.DB_USER || 'commander_admin',
   password: process.env.DB_PASSWORD || 'secret',
-  database: process.env.DB_NAME || 'postgres',
+  database: process.env.DB_NAME || 'pwm_tactical_database',
   port: process.env.DB_PORT || 5432,
 });
 

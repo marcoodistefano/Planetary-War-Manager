@@ -19,17 +19,18 @@ const { startCombatTriggerEngine } = require("./middleware/combatTriggerEngine.j
 const Eru = require('./middleware/Eru.js');
 
 function translateRedisToFe(resources) {
-  if (!resources) return null;
+  // Ritorna sempre un oggetto valido (mai null) con fallback a 0
+  // Così il frontend sovrascrive sempre i valori hardcoded
   return {
-    denaro: resources.denaro || 0,
-    legno: resources.legno || 0,
-    piombo: resources.piombo || 0,
-    acciaio: resources.acciaio || 0,
-    mattoni: resources.mattone || 0,
-    petrolio: resources.petrolio || 0,
-    gas_naturale: resources.gas || 0,
-    uranio: resources.uranio || 0,
-    oro: resources.oro || 0
+    denaro: (resources && resources.denaro) || 0,
+    legno: (resources && resources.legno) || 0,
+    piombo: (resources && resources.piombo) || 0,
+    acciaio: (resources && resources.acciaio) || 0,
+    mattoni: (resources && resources.mattone) || 0,
+    petrolio: (resources && resources.petrolio) || 0,
+    gas_naturale: (resources && resources.gas) || 0,
+    uranio: (resources && resources.uranio) || 0,
+    oro: (resources && resources.oro) || 0
   };
 }
 

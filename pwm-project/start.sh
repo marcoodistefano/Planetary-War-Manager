@@ -1,13 +1,19 @@
 #!/bin/bash
 
-echo "Starting Planetary War Manager (PWM) Microservices..."
-echo "Building and starting containers in detached mode..."
+# Usa --build solo se esplicitamente richiesto: ./start.sh --build
+BUILD_FLAG=""
+if [[ "$1" == "--build" ]]; then
+  BUILD_FLAG="--build"
+  echo "Starting Planetary War Manager (PWM) Microservices... [modalità BUILD]"
+else
+  echo "Starting Planetary War Manager (PWM) Microservices... [avvio veloce, usa --build per rebuilddare]"
+fi
 
 if ! pgrep -f "services/ripristina/host-downloader.js" >/dev/null 2>&1; then
 	nohup node services/ripristina/host-downloader.js > /tmp/pwm-host-downloader.log 2>&1 &
 fi
 
-docker-compose up -d --build
+docker-compose up -d $BUILD_FLAG
 
 echo ""
 echo "Container Status:"
@@ -26,7 +32,7 @@ CLOUDFLARE_URL=$(docker-compose logs cloudflare-tunnel 2>/dev/null | grep -o 'ht
 
 if [ -n "$CLOUDFLARE_URL" ]; then
   echo "=================================================================="
-  echo "🌍 IL TUO GIOCO E' ONLINE SU CLOUDFLARE!"
+  echo "🌍 IL TUO GIOCO E\' ONLINE SU CLOUDFLARE!"
   echo "👉 URL: $CLOUDFLARE_URL"
   echo "=================================================================="
   

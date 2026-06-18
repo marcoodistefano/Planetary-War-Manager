@@ -146,8 +146,17 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      db:
+        condition: service_healthy
     environment:
       - REDIS_URL=redis://redis:6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DB_HOST=db
+      - DB_USER=commander_admin
+      - DB_PASSWORD=secret
+      - DB_NAME=pwm_tactical_database
+      - DB_PORT=5432
     networks:
       - pwm-net
 

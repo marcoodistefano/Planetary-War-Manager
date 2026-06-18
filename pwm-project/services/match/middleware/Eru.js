@@ -139,38 +139,38 @@ const maxPlayersLookup = new Map([
 // Questo forza l'intero blocco REGIONI a occupare esattamente 34 bit nel payload.
 // =======================================================================
 const REGIONI = {
-  CONTROLLO:     0n,
-  WORLD:         1n << 33n,
-  EUROPE:        1n << 32n,
-  ASIA:          1n << 31n,
-  AFRICA:        1n << 30n,
-  OCEANIA:       1n << 29n,
+  CONTROLLO: 0n,
+  WORLD: 1n << 33n,
+  EUROPE: 1n << 32n,
+  ASIA: 1n << 31n,
+  AFRICA: 1n << 30n,
+  OCEANIA: 1n << 29n,
   AMERICA_NORTH: 1n << 28n,
   AMERICA_SOUTH: 1n << 27n,
-  ANTARTICA:     1n << 26n,
-  MIDDLE_EAST:   1n << 25n,
-  ITALY:         1n << 24n,
-  OLD_WORLD:     1n << 23n,
-  PANGEA:        1n << 22n,
-  SIBERIA:       1n << 21n,
-  RUSSIA:        1n << 20n,
-  CUSTOM:        1n << 19n,
-  OTHER:         1n << 18n,
-  OTHER1:        1n << 17n,
-  OTHER2:        1n << 16n,
-  OTHER3:        1n << 15n,
-  OTHER4:        1n << 14n,
-  OTHER5:        1n << 13n,
-  OTHER6:        1n << 12n,
-  OTHER7:        1n << 11n,
-  OTHER8:        1n << 10n,
-  OTHER9:        1n << 9n,
-  OTHER10:       1n << 8n,
-  OTHER11:       1n << 7n,
-  OTHER12:       1n << 6n,
-  OTHER13:       1n << 5n,
-  OTHER14:       1n << 4n,
-  OTHER15:       1n << 3n,
+  ANTARTICA: 1n << 26n,
+  MIDDLE_EAST: 1n << 25n,
+  ITALY: 1n << 24n,
+  OLD_WORLD: 1n << 23n,
+  PANGEA: 1n << 22n,
+  SIBERIA: 1n << 21n,
+  RUSSIA: 1n << 20n,
+  CUSTOM: 1n << 19n,
+  OTHER: 1n << 18n,
+  OTHER1: 1n << 17n,
+  OTHER2: 1n << 16n,
+  OTHER3: 1n << 15n,
+  OTHER4: 1n << 14n,
+  OTHER5: 1n << 13n,
+  OTHER6: 1n << 12n,
+  OTHER7: 1n << 11n,
+  OTHER8: 1n << 10n,
+  OTHER9: 1n << 9n,
+  OTHER10: 1n << 8n,
+  OTHER11: 1n << 7n,
+  OTHER12: 1n << 6n,
+  OTHER13: 1n << 5n,
+  OTHER14: 1n << 4n,
+  OTHER15: 1n << 3n,
 };
 
 const validCombos = new Set([
@@ -243,7 +243,7 @@ const Eru = {
       default: throw new Error("Valore alleanze win non valido");
     }
   },
-  
+
   switch_random_spawn: (randomSpawn) => {
     if (isEnabledValue(randomSpawn)) return RANDOM_SPAWN.RANDOM_SPAWN;
     if (isDisabledValue(randomSpawn)) return RANDOM_SPAWN.NO_RANDOM_SPAWN;
@@ -473,11 +473,11 @@ const Eru = {
       regioni: Eru.procedure_enstablish_regions(req.body.regioni),
     };
     const binary_match = Eru.create_binary_match(match);
-    
+
     // --- PATCH I/O: Serializzatore Custom per BigInt ---
     const logReplacer = (key, value) => {
-        // Se il valore è un BigInt, lo convertiamo in stringa con suffisso 'n' per chiarezza nel log
-        return typeof value === 'bigint' ? value.toString() + 'n' : value;
+      // Se il valore è un BigInt, lo convertiamo in stringa con suffisso 'n' per chiarezza nel log
+      return typeof value === 'bigint' ? value.toString() + 'n' : value;
     };
     console.log(`[SYSTEM LOG] Match creato: \n${JSON.stringify(match, logReplacer, 2)}`);
     // --------------------------------------------------
@@ -493,7 +493,7 @@ const Eru = {
    */
   create_binary_match: (match) => {
     let binaryMatch = 0n;
-    
+
     // Funzione protetta per garantire l'inserimento esatto dei bit.
     // L'operatore AND (&) previene un buffer overflow applicativo.
     const appendBits = (value, width) => {
@@ -522,13 +522,13 @@ const Eru = {
     let res;
     // Conversione sicura per operare sui registri. Il DB fornisce stringa.
     const match = typeof matchData === "string" ? BigInt("0b" + matchData) : BigInt(matchData);
-    
+
     // Estrazione allineata al frame di 56 bit.
-    let stato = (match >> 54n) & 0b11n; 
-    let isSquad = (match >> 53n) & 0b1n; 
-    
+    let stato = (match >> 54n) & 0b11n;
+    let isSquad = (match >> 53n) & 0b1n;
+
     // Shift calcolato per saltare: Regioni (34) + Mod (4) + Molt (4) + Dur (4) = 46.
-    let maxPlayersBits = Number((match >> 46n) & 0b111n); 
+    let maxPlayersBits = Number((match >> 46n) & 0b111n);
     let maxPlayersCount = 0;
 
     if (isSquad === 1n) {
@@ -547,14 +547,14 @@ const Eru = {
       // Spegne i bit 54-55 (Maschera Inversa) e accende il bit 55
       let newMatchBigInt = (match & ~(0b11n << 54n)) | (0b10n << 54n);
       res = {
-        status : 200, 
-        message: "Partita avviata con successo", 
+        status: 200,
+        message: "Partita avviata con successo",
         struttura_partita: newMatchBigInt.toString(2).padStart(56, "0")
       };
     } else {
       res = {
-        status : 400, 
-        message: "Condizioni di avvio non soddisfatte", 
+        status: 400,
+        message: "Condizioni di avvio non soddisfatte",
         // Ricompone per il layer I/O
         struttura_partita: match.toString(2).padStart(56, "0")
       };

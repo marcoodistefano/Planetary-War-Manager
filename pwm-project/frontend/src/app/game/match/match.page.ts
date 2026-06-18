@@ -260,8 +260,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   gameRules: any = null;
 
   playerResources: any = {
-    denaro: 100000, legno: 5000, piombo: 2500, acciaio: 3000,
-    mattoni: 4000, petrolio: 1500, gas_naturale: 1200, uranio: 100, oro: 50
+    denaro: 0, legno: 0, piombo: 0, acciaio: 0,
+    mattoni: 0, petrolio: 0, gas_naturale: 0, uranio: 0, oro: 0
   };
 
   userProfile = {
@@ -290,17 +290,16 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     { id: 'oro', icon: '🪙', label: 'ORO' }
   ];
 
-  // Aggiungi questo oggetto sotto playerResources
   resourceProduction: any = {
-    denaro: 1250,
-    legno: 450,
-    piombo: 120,
-    acciaio: 300,
-    mattoni: 200,
-    petrolio: 80,
-    gas_naturale: 150,
-    uranio: 5,
-    oro: 0 // L'oro solitamente non ha produzione oraria
+    denaro: 0,
+    legno: 0,
+    piombo: 0,
+    acciaio: 0,
+    mattoni: 0,
+    petrolio: 0,
+    gas_naturale: 0,
+    uranio: 0,
+    oro: 0
   };
 
   modelDB: any = {
