@@ -61,8 +61,8 @@ const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, ho
                         const idArmata = randomUUID();
                         const idTruppa = randomUUID();
                         
-                        const x = parseFloat(region.lng.toFixed(3));
-                        const y = parseFloat(region.lat.toFixed(3));
+                        const x = parseFloat(region.lng.toFixed(5));
+                        const y = parseFloat(region.lat.toFixed(5));
 
                         const armyObj = {
                             id: idArmata,

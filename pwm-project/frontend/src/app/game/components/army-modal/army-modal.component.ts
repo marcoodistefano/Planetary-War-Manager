@@ -15,6 +15,7 @@ interface ArmyGroup {
   missionMode?: MissionMode;
   targetName?: string;
   targetCoords?: string;
+  currentLocation?: any;
 }
 
 interface ArmyMissionRequest {

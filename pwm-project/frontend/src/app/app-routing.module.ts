@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
 import { authGuard } from './auth/guards/auth.guard';
+import { noAuthGuard } from './auth/guards/no-auth.guard';
 
 const routes: Routes = [
   {
@@ -15,11 +16,13 @@ const routes: Routes = [
   },
   {
     path: 'login',
-    loadComponent: () => import('./auth/login/login.page').then(m => m.LoginPage)
+    loadComponent: () => import('./auth/login/login.page').then(m => m.LoginPage),
+    canMatch: [noAuthGuard]
   },
   {
     path: 'register',
-    loadComponent: () => import('./auth/register/register.page').then(m => m.RegisterPage)
+    loadComponent: () => import('./auth/register/register.page').then(m => m.RegisterPage),
+    canMatch: [noAuthGuard]
   },
   {
     path: 'login/recovery/username',

@@ -190,7 +190,10 @@ const processActiveCombats = async () => {
                 }
             }
 
-            if (id_target_armata && defenderArmy) {
+            if (id_target_armata && defenderArmy && id_target_citta) {
+                 damageToCity = Math.floor(totalDmg / 3);
+                 damageToArmy = totalDmg - damageToCity; // Il restante ~2/3 va all'armata
+            } else if (id_target_armata && defenderArmy) {
                  damageToArmy = totalDmg;
                  damageToCity = 0;
             } else if (id_target_citta) {
@@ -398,6 +401,9 @@ const processActiveCombats = async () => {
                     };
                     await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
                     
+                    const attackerNameForCity = attackerArmy.name || 'La tua armata';
+                    await emitCombatEvent(id_partita_hash, attackerNameForCity, id_target_citta, damageToCity, 'distrutta', [attackerPlayer]);
+                    
                     // L'armata attaccante entra in idle (se è sopravvissuta)
                     if (!attackerDied) {
                         const attStr = await redis.get(attackerRedisKey);
@@ -411,6 +417,8 @@ const processActiveCombats = async () => {
                     }
                 } else {
                     await redis.set(cityHpKey, cityHp.toString());
+                    const attackerNameForCity = attackerArmy.name || 'La tua armata';
+                    await emitCombatEvent(id_partita_hash, attackerNameForCity, id_target_citta, damageToCity, 'sopravvissuta', [attackerPlayer]);
                 }
             }
             
@@ -478,6 +486,15 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
             let targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(regionId));
             
             if (targetNation && targetNation.playerId) {
+                if (targetNation.playerId === attackerUsername) {
+                    // Stesso proprietario! L'armata è arrivata a destinazione nella propria città.
+                    army.status = 'standby';
+                    delete army.next_round_time;
+                    await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
+                    console.log(`[COMBAT] L'armata ${id_armata} è arrivata nella propria città ${target_node}. Messa in standby.`);
+                    return;
+                }
+
                 defenderId = targetNation.playerId;
                 targetNation.inWarWith = targetNation.inWarWith || [];
                 if (!targetNation.inWarWith.includes(attackerUsername)) targetNation.inWarWith.push(attackerUsername);
@@ -533,83 +550,84 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
                 }
             };
             await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+        }
 
-            // Trova se c'è un'armata nemica a difesa di target_node (o se il target è l'armata stessa)
-            let defendingArmyId = null;
-            if (isArmyTarget) {
-                defendingArmyId = target_node;
-            } else {
-                const { getNodeCoords } = require('./movementLogic.js');
-                const cityCoords = getNodeCoords(target_node);
-                const allArmiesKeys = await redis.keys(`match:${id_partita_hash}:player:*:armate`);
-                for (const k of allArmiesKeys) {
-                    const ownerUsername = k.split(':')[3];
-                    if (ownerUsername === attackerUsername) continue;
-                    
-                    const data = await redis.get(k);
-                    if (data) {
-                        const defArmies = JSON.parse(data);
-                        for (const [defId, defArmy] of Object.entries(defArmies)) {
-                            let isAtCity = false;
-                            if (defArmy.currentLocation === target_node || defArmy.targetName === target_node) {
-                                isAtCity = true;
-                            } else if (cityCoords && defArmy.currentLocation && defArmy.status !== 'moving') {
-                                let ax, ay;
-                                if (typeof defArmy.currentLocation === 'string') {
-                                    const parts = defArmy.currentLocation.split(',');
-                                    ax = parseFloat(parts[0]); ay = parseFloat(parts[1]);
-                                } else if (typeof defArmy.currentLocation === 'object') {
-                                    ax = defArmy.currentLocation.x; ay = defArmy.currentLocation.y;
-                                }
-                                if (ax !== undefined && ay !== undefined) {
-                                    const dx = ax - cityCoords[0];
-                                    const dy = ay - cityCoords[1];
-                                    if (dx*dx + dy*dy < 0.0001) isAtCity = true;
-                                }
+        // Trova se c'è un'armata nemica a difesa di target_node (o se il target è l'armata stessa)
+        let defendingArmyId = null;
+        if (isArmyTarget) {
+            defendingArmyId = target_node;
+        } else {
+            const { getNodeCoords } = require('./movementLogic.js');
+            const cityCoords = getNodeCoords(target_node);
+            const allArmiesKeys = await redis.keys(`match:${id_partita_hash}:player:*:armate`);
+            for (const k of allArmiesKeys) {
+                const ownerUsername = k.split(':')[3];
+                if (ownerUsername === attackerUsername) continue;
+                
+                const data = await redis.get(k);
+                if (data) {
+                    const defArmies = JSON.parse(data);
+                    for (const [defId, defArmy] of Object.entries(defArmies)) {
+                        let isAtCity = false;
+                        if (defArmy.currentLocation === target_node || defArmy.targetName === target_node) {
+                            isAtCity = true;
+                        } else if (cityCoords && defArmy.currentLocation && defArmy.status !== 'moving') {
+                            let ax, ay;
+                            if (typeof defArmy.currentLocation === 'string') {
+                                const parts = defArmy.currentLocation.split(',');
+                                ax = parseFloat(parts[0]); ay = parseFloat(parts[1]);
+                            } else if (typeof defArmy.currentLocation === 'object') {
+                                ax = defArmy.currentLocation.x; ay = defArmy.currentLocation.y;
                             }
-                            if (isAtCity) {
-                                defendingArmyId = defId;
-                                break;
+                            if (ax !== undefined && ay !== undefined) {
+                                const dx = ax - cityCoords[0];
+                                const dy = ay - cityCoords[1];
+                                if (dx*dx + dy*dy < 0.0001) isAtCity = true;
                             }
                         }
+                        if (isAtCity) {
+                            defendingArmyId = defId;
+                            break;
+                        }
                     }
-                    if (defendingArmyId) break;
                 }
+                if (defendingArmyId) break;
+            }
+        }
+
+        // Controlla se l'attacco esiste già
+        const checkAttacco = await db.query(`SELECT id_attacco FROM attacco WHERE id_mossa = $1`, [id_mossa]);
+        const multiplier = await getMatchMultiplier(id_partita_hash);
+        const intervalMs = Math.max(1000, Math.floor((15 * 60000) / multiplier));
+        const newNextRoundDate = new Date(Date.now() + intervalMs);
+
+        if (checkAttacco.rows.length === 0) {
+            // Aggiorna la mossa originale
+            await db.query(`UPDATE mosse SET type_action = 'atk', ttl = $1 WHERE id_mossa = $2`, [newNextRoundDate, id_mossa]);
+
+            // Inserisci in attacco
+            // Se il target è un'armata specificata ESPLICITAMENTE dall'utente, NON bersagliamo la città.
+            // Altrimenti (assedio a una nazione o neutrale), bersagliamo SEMPRE la città
+            let cityTarget = isArmyTarget ? null : target_node;
+
+            if (!cityTarget && !defendingArmyId) {
+                console.log(`[COMBAT] Nessun bersaglio valido trovato per l'armata ${id_armata}. Annullamento attacco.`);
+                army.status = 'standby';
+                await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
+                return;
             }
 
-            // Controlla se l'attacco esiste già
-            const checkAttacco = await db.query(`SELECT id_attacco FROM attacco WHERE id_mossa = $1`, [id_mossa]);
-            const multiplier = await getMatchMultiplier(id_partita_hash);
-            const intervalMs = Math.max(1000, Math.floor((15 * 60000) / multiplier));
-            const newNextRoundDate = new Date(Date.now() + intervalMs);
-
-            if (checkAttacco.rows.length === 0) {
-                // Aggiorna la mossa originale
-                await db.query(`UPDATE mosse SET type_action = 'atk', ttl = $1 WHERE id_mossa = $2`, [newNextRoundDate, id_mossa]);
-
-                // Inserisci in attacco
-            // Se il target è un'armata specificata ESPLICITAMENTE dall'utente, NON bersagliamo la città.
-            // Altrimenti (assedio a una nazione), bersagliamo SEMPRE la città, ma grazie alla logica in processActiveCombats, 
-            // il danno alla città sarà 0 finché defendingArmyId è in vita.
-            let cityTarget = isArmyTarget ? null : target_node;
             await db.query(`
                 INSERT INTO attacco (id_mossa, partita_id, id_attaccante, id_target_citta, id_target_armata, next_round_time)
                 VALUES ($1, $2, $3, $4, $5, $6)
             `, [id_mossa, mossa.partita_id, id_armata, cityTarget, defendingArmyId, newNextRoundDate]);
-                
-                army.status = 'in combattimento';
-                army.currentLocation = `${x_dest},${y_dest}`;
-                army.next_round_time = newNextRoundDate.toISOString();
-            } else {
-                army.status = 'in combattimento';
-                // La data del prossimo round è già nel DB, quindi potremmo caricarla o semplicemente aspettare che il loop lo aggiorni
-            }
-        } else {
-            const multiplier = await getMatchMultiplier(id_partita_hash);
-            const intervalMs = Math.max(1000, Math.floor((15 * 60000) / multiplier));
+            
             army.status = 'in combattimento';
             army.currentLocation = `${x_dest},${y_dest}`;
-            army.next_round_time = new Date(Date.now() + intervalMs).toISOString();
+            army.next_round_time = newNextRoundDate.toISOString();
+        } else {
+            army.status = 'in combattimento';
+            // La data del prossimo round è già nel DB
         }
     } catch (e) {
         console.error("Errore in setupCombatFromArrival:", e);

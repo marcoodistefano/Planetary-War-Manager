@@ -42,6 +42,7 @@ export class AuthInterceptor implements HttpInterceptor {
       '/auth/register',
       '/auth/login/recovery/password',
       '/auth/login/recovery/username',
+      '/player/profile'
     ];
 
     return !protectedAuthErrors.some((path) => request.url.includes(path));

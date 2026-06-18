@@ -1,12 +1,13 @@
-import { Component, OnInit, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, ChangeDetectorRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController, MenuController, ToastController } from '@ionic/angular'; // <--- AGGIUNTO MenuController
+import { IonicModule, ModalController, MenuController, ToastController, ActionSheetController } from '@ionic/angular'; // <--- AGGIUNTO MenuController
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { HomeService } from '../../home/home';
 import { AuthApiService } from '../../auth/auth-api.service';
 import { UserStateService } from '../../user-state.service';
+import { environment } from '../../../environments/environment';
 
 // Componenti
 import { ProfileModalComponent } from '../components/profile-modal/profile-modal.component';
@@ -44,6 +45,7 @@ const AVATAR_ASSET_VERSION = '20260517';
 })
 export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
+  @ViewChild(ArmyModalComponent) armyModalComponent!: ArmyModalComponent;
   // --- 1. PROPRIETÀ E STATO DELLA MAPPA ---
   map: any;
   isGlobe = false;
@@ -126,6 +128,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   selectedArmiesForMovement: string[] = [];
   previousSelectedArmiesForMovement: string[] = [];
   animationFrameId: any;
+  activeArmyPopup: any = null;
 
   getArmyModelAssetUrl(army: any, direction: 'front' | 'back' | 'side' | 'side-flip'): string {
     let modelName = 'Soldier';
@@ -319,6 +322,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     private modalCtrl: ModalController,
     private menuCtrl: MenuController,
     private toastCtrl: ToastController,
+    private actionSheetCtrl: ActionSheetController,
     private route: ActivatedRoute,
     private homeService: HomeService,
     private authApi: AuthApiService,
@@ -391,7 +395,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private getGatewayWsBaseUrl(): string {
-    // Ritorna ws://localhost:4000
+    const configured = String(environment.apiBaseUrl || '').replace(/\/$/, '');
+    if (configured) {
+      return configured.replace(/^http(s?):\/\//i, 'ws$1://');
+    }
     return window.location.origin.replace(/^http(s?):\/\//i, 'ws$1://');
   }
 
@@ -608,6 +615,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               color: color,
               icon: icon
             }).then(t => t.present());
+
+            // Ricarica il cimitero in tempo reale se la modale è aperta sulla tab storico
+            if (this.isArmyModalOpen && this.armyModalComponent && this.armyModalComponent.activeTab === 'storico') {
+              this.armyModalComponent.loadGraveyard();
+            }
           }
         }
       };
@@ -1599,10 +1611,21 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                          <button id="btn-add-multi" style="background: #10b981; color: white; border: 2px solid white; border-radius: 50%; font-weight: bold; font-size: 24px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; line-height: 1; transition: transform 0.1s ease-out;">+</button>
                       </div>
                     `;
+                if (this.activeArmyPopup) {
+                  this.activeArmyPopup.remove();
+                }
                 const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: true, offset: [30, 0], anchor: 'left' })
                   .setLngLat([coords[0], coords[1]])
                   .setHTML(popupHtml)
                   .addTo(this.map);
+                this.activeArmyPopup = popup;
+
+                setTimeout(() => {
+                  if (this.activeArmyPopup === popup) {
+                    popup.remove();
+                    this.activeArmyPopup = null;
+                  }
+                }, 5000);
 
                 const popupContent = popup.getElement().querySelector('.maplibregl-popup-content') as HTMLElement;
                 if (popupContent) {
@@ -1632,6 +1655,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                       this.previousSelectedArmiesForMovement = [...this.selectedArmiesForMovement];
 
                       popup.remove();
+                      if (this.activeArmyPopup === popup) this.activeArmyPopup = null;
+                      
                       this.toastCtrl.create({
                         message: `${this.selectedArmiesForMovement.length} armate selezionate.`,
                         duration: 2000,
@@ -2109,33 +2134,88 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  promptMovementOrAttack(targetName: string, targetCoords: string, lngLat: any) {
+    const popupHtml = `
+      <div style="display:flex; flex-direction:column; gap:8px; padding:12px; background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8); backdrop-filter: blur(8px); min-width: 140px;">
+        <div style="font-weight:bold; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; text-align:center; margin-bottom:4px; color:#9ca3af;">Ordini</div>
+        <button id="btn-popup-attack" style="background:linear-gradient(to right, #ef4444, #dc2626); color:white; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; font-weight:bold; font-size: 14px; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); transition: all 0.2s;">
+          <ion-icon name="flame"></ion-icon> Attacca
+        </button>
+        <button id="btn-popup-move" style="background:linear-gradient(to right, #3b82f6, #2563eb); color:white; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; font-weight:bold; font-size: 14px; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">
+          <ion-icon name="navigate"></ion-icon> Sposta
+        </button>
+      </div>
+    `;
+
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: true, offset: [0, -10] })
+      .setLngLat([lngLat.lng, lngLat.lat])
+      .setHTML(popupHtml)
+      .addTo(this.map);
+
+    const popupContent = popup.getElement().querySelector('.maplibregl-popup-content') as HTMLElement;
+    if (popupContent) {
+      popupContent.style.padding = '0';
+      popupContent.style.background = 'transparent';
+      popupContent.style.boxShadow = 'none';
+    }
+    const popupTip = popup.getElement().querySelector('.maplibregl-popup-tip') as HTMLElement;
+    if (popupTip) {
+      popupTip.style.display = 'none';
+    }
+
+    setTimeout(() => {
+      const btnAttack = document.getElementById('btn-popup-attack');
+      const btnMove = document.getElementById('btn-popup-move');
+
+      if (btnAttack) {
+        btnAttack.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.sendMissionOrder('attack', targetName, targetCoords);
+          popup.remove();
+        });
+      }
+      if (btnMove) {
+        btnMove.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.sendMissionOrder('move', targetName, targetCoords);
+          popup.remove();
+        });
+      }
+    }, 50);
+  }
+
+  private sendMissionOrder(mode: 'attack' | 'move', targetName: string, targetCoords: string) {
+    this.selectedArmiesForMovement.forEach(armyId => {
+      const army = this.matchArmies.find(a => a.id === armyId);
+      if (army) {
+        this.onArmyMissionRequested({
+          armyId: army.id,
+          mode: mode,
+          targetName: targetName,
+          targetCoords: targetCoords,
+          composition: army.composition
+        });
+      }
+    });
+    this.toastCtrl.create({
+      message: `Ordine di ${mode === 'attack' ? 'attacco' : 'movimento'} inviato per ${this.selectedArmiesForMovement.length} armate.`,
+      duration: 2000,
+      position: 'top',
+      color: 'success'
+    }).then(t => t.present());
+    this.selectedArmiesForMovement = [];
+    this.previousSelectedArmiesForMovement = [];
+  }
+
   handleMapPointSelect(e: any) {
     console.log("Map clicked!", e.point);
 
     if (this.selectedArmiesForMovement.length > 0) {
       this.updatePointReadout(e, true);
       const targetCoords = this.formatMapCoordinates(e.lngLat.lng, e.lngLat.lat);
+      const targetName = this.selectedPointName || 'OBIETTIVO';
 
-      this.selectedArmiesForMovement.forEach(armyId => {
-        const army = this.matchArmies.find(a => a.id === armyId);
-        if (army) {
-          this.onArmyMissionRequested({
-            armyId: army.id,
-            mode: 'move',
-            targetName: this.selectedPointName || 'OBIETTIVO',
-            targetCoords: targetCoords,
-            composition: army.composition
-          });
-        }
-      });
-      this.toastCtrl.create({
-        message: `Ordine di movimento inviato per ${this.selectedArmiesForMovement.length} armate.`,
-        duration: 2000,
-        position: 'top',
-        color: 'success'
-      }).then(t => t.present());
-      this.selectedArmiesForMovement = [];
-      this.previousSelectedArmiesForMovement = [];
+      this.promptMovementOrAttack(targetName, targetCoords, e.lngLat);
       return;
     }
 
@@ -2206,7 +2286,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     while (wrappedLng > 180) wrappedLng -= 360;
     while (wrappedLng < -180) wrappedLng += 360;
 
-    return `${wrappedLng.toFixed(3)}, ${lat.toFixed(3)}`;
+    return `${wrappedLng.toFixed(5)}, ${lat.toFixed(5)}`;
   }
 
   private clearHoverState() {
