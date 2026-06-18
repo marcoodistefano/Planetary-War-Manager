@@ -461,6 +461,22 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.matchNations = parsed.payload.nations;
             this.applyTerritoryColors();
           }
+          if (parsed.payload?.resources) {
+            this.playerResources = parsed.payload.resources;
+          }
+          if (parsed.payload?.production) {
+            this.resourceProduction = parsed.payload.production;
+          }
+          this.cdr.detectChanges();
+        }
+
+        if (parsed.type === 'RESOURCES_UPDATED') {
+          if (parsed.data?.resources) {
+            this.playerResources = parsed.data.resources;
+          }
+          if (parsed.data?.production) {
+            this.resourceProduction = parsed.data.production;
+          }
           this.cdr.detectChanges();
         }
 

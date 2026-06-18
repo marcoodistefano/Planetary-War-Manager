@@ -18,6 +18,22 @@ const { startFogOfWarEngine } = require("./middleware/fogOfWarEngine.js");
 const { startCombatTriggerEngine } = require("./middleware/combatTriggerEngine.js");
 const Eru = require('./middleware/Eru.js');
 
+function translateRedisToFe(resources) {
+  if (!resources) return null;
+  return {
+    denaro: resources.denaro || 0,
+    legno: resources.legno || 0,
+    piombo: resources.piombo || 0,
+    acciaio: resources.acciaio || 0,
+    mattoni: resources.mattone || 0,
+    petrolio: resources.petrolio || 0,
+    gas_naturale: resources.gas || 0,
+    uranio: resources.uranio || 0,
+    oro: resources.oro || 0
+  };
+}
+
+
 const app = express();
 
 app.use(cors());
@@ -94,7 +110,23 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
          const nationsStr = await redis.get(`match:${ws.matchId}:nations`);
          const nations = nationsStr ? JSON.parse(nationsStr) : [];
 
-         ws.send(JSON.stringify({ type: 'INITIAL_STATE', payload: { armies, nations } }));
+         const resourcesStr = await redis.get(`match:${ws.matchId}:player:${ws.username}:risorse`);
+         const rawResources = resourcesStr ? JSON.parse(resourcesStr) : null;
+         const resources = translateRedisToFe(rawResources);
+
+         const productionStr = await redis.get(`match:${ws.matchId}:player:${ws.username}:produzione`);
+         const rawProduction = productionStr ? JSON.parse(productionStr) : null;
+         const production = translateRedisToFe(rawProduction);
+
+         ws.send(JSON.stringify({ 
+           type: 'INITIAL_STATE', 
+           payload: { 
+             armies, 
+             nations, 
+             resources, 
+             production 
+           } 
+         }));
          return;
       }
 

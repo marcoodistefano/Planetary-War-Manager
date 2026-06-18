@@ -69,6 +69,35 @@ const setMatchCacheAllIds = async ({
     console.error("[SYS_WARN] setMatchCacheAllIds failed:", e.message);
   }
 };
+
+const initializePlayerResources = async (matchId, username) => {
+  const initialResources = {
+    denaro: 100000,
+    legno: 5000,
+    piombo: 2500,
+    acciaio: 3000,
+    mattone: 4000,
+    petrolio: 1500,
+    gas: 1200,
+    uranio: 100,
+    oro: 50
+  };
+  const initialProduction = {
+    denaro: 1000,
+    legno: 0,
+    piombo: 0,
+    acciaio: 0,
+    mattone: 0,
+    petrolio: 0,
+    gas: 0,
+    uranio: 0,
+    oro: 0
+  };
+  await redis.set(`match:${matchId}:player:${username}:risorse`, JSON.stringify(initialResources));
+  await redis.set(`match:${matchId}:player:${username}:risorse_last_update`, String(Date.now()));
+  await redis.set(`match:${matchId}:player:${username}:produzione`, JSON.stringify(initialProduction));
+};
+
 // Invalidate alliance-related cache entries for a match
 const invalidateMatchAllianceCache = async (matchId, allianceId = null) => {
   try {
@@ -481,6 +510,19 @@ const createMatch = async ({ playerId, gameMode }) => {
       // Generazione dei territori e nazioni
       await territoryGenerator.generateNations(id_partita_hash, gameMode.maxPlayers);
 
+      // Inizializzazione risorse per tutte le nazioni (inclusi i bot)
+      try {
+          const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
+          if (nationsCache) {
+              const nations = JSON.parse(nationsCache);
+              for (const nation of nations) {
+                  await initializePlayerResources(id_partita_hash, nation.playerId);
+              }
+          }
+      } catch (err) {
+          console.error("[SYS_WARN] Errore inizializzazione risorse nazioni:", err);
+      }
+
       // ASSEGNAZIONE TERRITORIO ALL'HOST
       try {
           const userRes = await client.query(`SELECT username FROM utenti WHERE id_user = $1`, [playerId]);
@@ -634,6 +676,33 @@ const join_Match = async (playerId, id_partita_hash) => {
       if (selectedNation) {
           const botId = selectedNation.name + "_bot";
           
+          // TRASFERIMENTO RISORSE DEL BOT AL NUOVO UTENTE
+          const botResourcesKey = `match:${id_partita_hash}:player:${botId}:risorse`;
+          const botProdKey = `match:${id_partita_hash}:player:${botId}:produzione`;
+          const botLastUpdateKey = `match:${id_partita_hash}:player:${botId}:risorse_last_update`;
+          
+          const userResourcesKey = `match:${id_partita_hash}:player:${sessionUsername}:risorse`;
+          const userProdKey = `match:${id_partita_hash}:player:${sessionUsername}:produzione`;
+          const userLastUpdateKey = `match:${id_partita_hash}:player:${sessionUsername}:risorse_last_update`;
+
+          const botResources = await redis.get(botResourcesKey);
+          if (botResources) {
+              await redis.set(userResourcesKey, botResources);
+              await redis.del(botResourcesKey);
+          } else {
+              await initializePlayerResources(id_partita_hash, sessionUsername);
+          }
+          const botProd = await redis.get(botProdKey);
+          if (botProd) {
+              await redis.set(userProdKey, botProd);
+              await redis.del(botProdKey);
+          }
+          const botLastUpdate = await redis.get(botLastUpdateKey);
+          if (botLastUpdate) {
+              await redis.set(userLastUpdateKey, botLastUpdate);
+              await redis.del(botLastUpdateKey);
+          }
+
           // A. Spostamento in Redis
           const botRedisKey = `match:${id_partita_hash}:player:${botId}:armate`;
           const userRedisKey = `match:${id_partita_hash}:player:${sessionUsername}:armate`;

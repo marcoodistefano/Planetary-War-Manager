@@ -150,6 +150,25 @@ const generateNations = async (matchId, maxPlayers) => {
         
         await redis.set(`match:${matchId}:nations`, JSON.stringify(nations));
         
+        // Assign resources to each region in the match
+        const regionsResources = {};
+        const MORE_COMMON = ["legno", "piombo", "acciaio", "mattoni"];
+        const LESS_COMMON = ["petrolio", "gas_naturale"];
+
+        for (const key in adj) {
+            const reg = adj[key];
+            const regId = reg.id;
+            
+            const more = MORE_COMMON[Math.floor(Math.random() * MORE_COMMON.length)];
+            const less = LESS_COMMON[Math.floor(Math.random() * LESS_COMMON.length)];
+
+            regionsResources[regId] = {
+                more_common: more,
+                less_common: less
+            };
+        }
+        await redis.set(`match:${matchId}:regions_resources`, JSON.stringify(regionsResources));
+        
         const territoryToNation = {};
         for (const nation of nations) {
             for (const prov of nation.territories_flat) {
