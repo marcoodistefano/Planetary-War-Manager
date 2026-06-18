@@ -263,21 +263,58 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
               console.error("Errore in validazione attacco:", e);
           }
 
-          if (isAttack && !isInWar && pathInfo.path.length > 0) {
-              const borderInfo = getBorderIntersection(pathInfo.path, targetName);
-              if (borderInfo) {
-                  // Calcola ETA parziale al confine
-                  const speedMultiplier = pathInfo.etaMs / pathInfo.distance;
-                  borderEtaMs = Math.floor(borderInfo.distanceToBorder * speedMultiplier);
-                  armateObj[armyId].status = 'moving_to_border';
-              } else {
-                  armateObj[armyId].status = "Pronto all'attacco";
+          if (isAttack && !isInWar) {
+              // DICHIARA GUERRA IMMEDIATAMENTE
+              try {
+                  const nationsCacheUpdated = await redis.get(`match:${ws.matchId}:nations`);
+                  if (nationsCacheUpdated) {
+                      const nations = JSON.parse(nationsCacheUpdated);
+                      const attackerNation = nations.find(n => n.playerId === ws.username);
+                      const defenderNation = nations.find(n => n.playerId === targetPlayerId);
+
+                      if (attackerNation && defenderNation) {
+                          attackerNation.inWarWith = attackerNation.inWarWith || [];
+                          if (!attackerNation.inWarWith.includes(targetPlayerId)) {
+                              attackerNation.inWarWith.push(targetPlayerId);
+                          }
+                          defenderNation.inWarWith = defenderNation.inWarWith || [];
+                          if (!defenderNation.inWarWith.includes(ws.username)) {
+                              defenderNation.inWarWith.push(ws.username);
+                          }
+
+                          await redis.set(`match:${ws.matchId}:nations`, JSON.stringify(nations));
+
+                          const broadcastWarPayload = {
+                              matchId: ws.matchId,
+                              payload: {
+                                  type: 'WAR_DECLARED',
+                                  data: { attacker: ws.username, defender: targetPlayerId },
+                                  nations: nations
+                              }
+                          };
+                          await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastWarPayload));
+                          isInWar = true; // Impostiamo a true così procede come se fosse già in guerra
+                      }
+                  }
+              } catch (err) {
+                  console.error("[SYS_ERR] Errore dichiarazione guerra immediata:", err);
               }
-          } else if (isAttack && isInWar) {
+          }
+
+          if (isAttack && pathInfo.path.length > 0) {
+              // Dal momento che abbiamo dichiarato guerra subito, l'armata è già ostile
+              // Possiamo decidere se mandarla al confine o metterla subito pronta all'attacco
+              // Se vogliamo che l'attacco inizi al confine, manteniamo moving_to_border, ma 
+              // siccome l'utente si aspetta che attacchi o si prepari, usiamo "Pronto all'attacco"
+              // o manteniamo moving_to_border se c'è un confine. 
+              // Lasciamo Pronto all'attacco in modo che il trigger engine possa intercettarlo.
+              armateObj[armyId].status = "Pronto all'attacco";
+          } else if (isAttack) {
               armateObj[armyId].status = "Pronto all'attacco";
           } else {
               armateObj[armyId].status = 'moving';
           }
+
 
           armateObj[armyId].targetCoords = parsedTargetCoords || targetCoords;
           armateObj[armyId].targetName = targetName;
@@ -342,7 +379,8 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                 targetCoords,
                 etaMs: pathInfo.etaMs,
                 path: pathInfo.path,
-                startTime: armateObj[armyId].startTime
+                startTime: armateObj[armyId].startTime,
+                mode: payload.payload.mode
               }
             }
           };

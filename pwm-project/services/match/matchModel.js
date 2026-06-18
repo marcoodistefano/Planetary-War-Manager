@@ -499,6 +499,7 @@ const createMatch = async ({ playerId, gameMode }) => {
                   const indexToUpdate = nations.findIndex(n => n.nationId === selectedNation.nationId);
                   nations[indexToUpdate] = selectedNation;
                   await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
+                  await redis.set(`match:${id_partita_hash}:player:${sessionUsername}:territori`, JSON.stringify(selectedNation.territories_flat || []));
 
                   let statoTerritori = {};
                   const blankTemplateRaw = await redis.get(`map_data:regions_blank_template`);
@@ -604,6 +605,7 @@ const join_Match = async (playerId, id_partita_hash) => {
               const indexToUpdate = nations.findIndex(n => n.nationId === selectedNation.nationId);
               nations[indexToUpdate] = selectedNation;
               await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
+              await redis.set(`match:${id_partita_hash}:player:${sessionUsername}:territori`, JSON.stringify(selectedNation.territories_flat || []));
 
               // Compilazione JSON per Postgres (Solo per i player reali)
               if (!isBot) {

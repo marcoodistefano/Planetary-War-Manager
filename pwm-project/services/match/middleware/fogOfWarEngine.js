@@ -14,10 +14,10 @@ function haversineDist(lon1, lat1, lon2, lat2) {
 }
 
 let troopsVisionMap = {}; // id_truppa -> raggio_visivo
-let defaultVisionRadius = 15;
+let defaultVisionRadius = 100;
 
 try {
-    const rulesPath = path.join(__dirname, '../../../../shared/assets/game_rules.json');
+    const rulesPath = path.join(__dirname, '../../../shared/assets/game_rules.json');
     if (fs.existsSync(rulesPath)) {
         const gameRules = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
         const truppeSheet = gameRules.sheets.find(s => s.name === 'Truppe');
@@ -160,7 +160,13 @@ const runFogOfWarCycle = async () => {
                     if (f.geometry && f.geometry.coordinates) {
                         const nodeName = (f.properties.name || f.properties.ADMIN || f.id).toLowerCase();
                         if (myTerritoryNames.has(nodeName)) {
-                            myTerritoriesCoords.push(f.geometry.coordinates);
+                            let c = f.geometry.coordinates;
+                            while (c.length && Array.isArray(c[0][0])) c = c[0];
+                            if (c.length > 0 && c[0].length === 2) {
+                                myTerritoriesCoords.push([c[0][0], c[0][1]]);
+                            } else if (c.length === 2 && typeof c[0] === 'number') {
+                                myTerritoriesCoords.push([c[0], c[1]]);
+                            }
                         }
                     }
                 });
@@ -203,6 +209,15 @@ const runFogOfWarCycle = async () => {
                     }
                 }
 
+                // Leggere tutti gli hp delle città danneggiate
+                const citiesHpKeys = await redis.keys(`match:${matchId}:city_hp:*`);
+                const citiesHp = {};
+                for (const hpKey of citiesHpKeys) {
+                    const cityId = hpKey.split(':').pop();
+                    const hp = await redis.get(hpKey);
+                    if (hp) citiesHp[cityId] = parseInt(hp, 10);
+                }
+
                 const payload = {
                     matchId: matchId,
                     targetUsers: [userId],
@@ -210,7 +225,8 @@ const runFogOfWarCycle = async () => {
                         type: 'FOG_OF_WAR_UPDATE',
                         payload: {
                             visibleEnemies: visibleEnemies,
-                            myArmies: myArmies
+                            myArmies: myArmies,
+                            citiesHp: citiesHp
                         }
                     }
                 };

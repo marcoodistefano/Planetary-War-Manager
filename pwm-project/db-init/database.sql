@@ -341,10 +341,7 @@ CREATE TABLE IF NOT EXISTS attacco (
     next_round_time TIMESTAMP NOT NULL,
     status VARCHAR(20) DEFAULT 'active',
     CONSTRAINT fk_attacco_mossa FOREIGN KEY (id_mossa) REFERENCES mosse(id_mossa) ON DELETE CASCADE,
-    CONSTRAINT fk_attacco_partita FOREIGN KEY (partita_id) REFERENCES partite(id_partita) ON DELETE CASCADE,
-    CONSTRAINT fk_attacco_attaccante FOREIGN KEY (id_attaccante) REFERENCES armata(id_istanza_armata) ON DELETE CASCADE,
-    CONSTRAINT fk_attacco_target_truppa FOREIGN KEY (id_target_truppa) REFERENCES truppe(id_istanza_truppa) ON DELETE CASCADE,
-    CONSTRAINT fk_attacco_target_armata FOREIGN KEY (id_target_armata) REFERENCES armata(id_istanza_armata) ON DELETE CASCADE
+    CONSTRAINT fk_attacco_partita FOREIGN KEY (partita_id) REFERENCES partite(id_partita) ON DELETE CASCADE
 );
 
 
@@ -393,34 +390,6 @@ BEGIN
     END IF;
 END $$;
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'fk_attacco_truppa'
-          AND conrelid = 'attacco'::regclass
-    ) THEN
-        ALTER TABLE attacco
-            ADD CONSTRAINT fk_attacco_truppa
-            FOREIGN KEY (id_target_truppa)
-            REFERENCES truppe(id_istanza_truppa)
-            ON DELETE SET NULL;
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'fk_attacco_armata'
-          AND conrelid = 'attacco'::regclass
-    ) THEN
-        ALTER TABLE attacco
-            ADD CONSTRAINT fk_attacco_armata
-            FOREIGN KEY (id_target_armata)
-            REFERENCES armata(id_istanza_armata)
-            ON DELETE SET NULL;
-    END IF;
-END $$;
 
 -- ==========================================
 -- INDEXES E PERMESSI

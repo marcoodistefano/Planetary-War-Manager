@@ -156,24 +156,46 @@ const checkCombatTriggers = async () => {
                                     mossa.y_dest = targetCoords[1];
                                 }
                                 
-                                console.log(`[COMBAT_TRIGGER] Triggering setupCombatFromArrival per army ${army.id}`);
+                                console.log(`[COMBAT_TRIGGER] Triggering setupCombatFromArrival per army ${army.id} at coords ${myCoords}`);
                                 await db.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [mossa.id_mossa]);
-                                await setupCombatFromArrival(army, mossa, matchId, army.owner);
+                                await setupCombatFromArrival(army, mossa, matchId, army.owner, myCoords);
                                 
-                                // Aggiorna redis con eventuali informazioni di next_round_time
+                                // Aggiorna redis con lo stato modificato da setupCombatFromArrival
                                 const armateStr = await redis.get(army.redisKey);
                                 if (armateStr) {
                                     const armateObj = JSON.parse(armateStr);
                                     if (armateObj[army.id]) {
-                                        if (army.next_round_time) {
-                                            armateObj[army.id].next_round_time = army.next_round_time;
-                                            await redis.set(army.redisKey, JSON.stringify(armateObj));
-                                        }
+                                        armateObj[army.id].status = army.status;
+                                        if (army.currentLocation) armateObj[army.id].currentLocation = army.currentLocation;
+                                        if (army.next_round_time) armateObj[army.id].next_round_time = army.next_round_time;
+                                        delete armateObj[army.id].path;
+                                        delete armateObj[army.id].etaMs;
+                                        delete armateObj[army.id].startTime;
+                                        delete armateObj[army.id].targetName;
+                                        delete armateObj[army.id].missionMode;
+                                        delete armateObj[army.id].targetCoords;
+                                        await redis.set(army.redisKey, JSON.stringify(armateObj));
                                     }
                                 }
                                 
                                 // Forza un ricalcolo immediato per applicare i primi danni all'istante
                                 await processActiveCombats();
+                            } else {
+                                console.log(`[COMBAT_TRIGGER] Nessuna mossa in db per armata ${army.id}, forzo standby in Redis e salto.`);
+                                const armateStr = await redis.get(army.redisKey);
+                                if (armateStr) {
+                                    const armateObj = JSON.parse(armateStr);
+                                    if (armateObj[army.id]) {
+                                        armateObj[army.id].status = 'standby';
+                                        delete armateObj[army.id].path;
+                                        delete armateObj[army.id].etaMs;
+                                        delete armateObj[army.id].startTime;
+                                        delete armateObj[army.id].targetName;
+                                        delete armateObj[army.id].missionMode;
+                                        delete armateObj[army.id].targetCoords;
+                                        await redis.set(army.redisKey, JSON.stringify(armateObj));
+                                    }
+                                }
                             }
                         }
                     }

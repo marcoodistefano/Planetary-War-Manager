@@ -297,15 +297,17 @@ const processActiveCombats = async () => {
 
                 if (cityHp <= 0) {
                     combatEnded = true;
-                    // Imposta HP a 0 quando viene conquistata
-                    await redis.set(cityHpKey, "0");
+                    // Ripristina gli HP della città per il nuovo proprietario (eliminando la chiave tornerà al default di 1000)
+                    await redis.del(cityHpKey);
                     
                     // Conquista
+                    console.log(`[COMBAT_DEBUG] City HP <= 0 for ${id_target_citta}. Initiating conquest...`);
                     const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
                     let updatedNations = [];
                     if (nationsCache) {
                         const { getRegionForNode } = require('./movementLogic.js');
                         const regionId = getRegionForNode(id_target_citta) || id_target_citta;
+                        console.log(`[COMBAT_DEBUG] regionId resolved to: ${regionId}`);
 
                         const nations = JSON.parse(nationsCache);
                         let defenderNation = null;
@@ -327,7 +329,10 @@ const processActiveCombats = async () => {
                             }
                         }
 
+                        console.log(`[COMBAT_DEBUG] defenderNation: ${defenderNation ? defenderNation.playerId : 'NULL'}, attackerNation: ${attackerNation ? attackerNation.playerId : 'NULL'}`);
+
                         if (defenderNation && attackerNation && defenderNation.nationId !== attackerNation.nationId) {
+                            console.log(`[COMBAT_DEBUG] Applying transfer of ${regionId} from ${defenderNation.playerId} to ${attackerNation.playerId}`);
                             // Rimuovi dal difensore
                             defenderNation.territories_flat = defenderNation.territories_flat.filter(t => t !== regionId);
                             let targetAdmin = null;
@@ -341,6 +346,7 @@ const processActiveCombats = async () => {
                                     break;
                                 }
                             }
+
                             
                             // Aggiungi all'attaccante
                             if (!attackerNation.territories_flat) attackerNation.territories_flat = [];
@@ -385,6 +391,29 @@ const processActiveCombats = async () => {
                                 }
                             } catch (e) {
                                 console.error("[SYS_ERR] Errore salvataggio conquista territoriale DB:", e);
+                            }
+
+                            // Aggiornamento cache territori per player (STRUTTURA_REDIS.json)
+                            try {
+                                if (defenderNation.playerId) {
+                                    const defTerrKey = `match:${id_partita_hash}:player:${defenderNation.playerId}:territori`;
+                                    let defTerrStr = await redis.get(defTerrKey);
+                                    let defTerr = defTerrStr ? JSON.parse(defTerrStr) : (defenderNation.territories_flat || []);
+                                    defTerr = defTerr.filter(t => t !== regionId);
+                                    await redis.set(defTerrKey, JSON.stringify(defTerr));
+                                }
+
+                                if (attackerNation.playerId) {
+                                    const attTerrKey = `match:${id_partita_hash}:player:${attackerNation.playerId}:territori`;
+                                    let attTerrStr = await redis.get(attTerrKey);
+                                    let attTerr = attTerrStr ? JSON.parse(attTerrStr) : (attackerNation.territories_flat || []);
+                                    if (!attTerr.includes(regionId)) {
+                                        attTerr.push(regionId);
+                                    }
+                                    await redis.set(attTerrKey, JSON.stringify(attTerr));
+                                }
+                            } catch (e) {
+                                console.error("[SYS_ERR] Errore aggiornamento Redis territori player:", e);
                             }
                         }
                         
@@ -469,7 +498,7 @@ const startCombatLoop = () => {
     setInterval(processActiveCombats, 3000); // Esegue il check ogni 3 secondi
 };
 
-const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUsername) => {
+const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUsername, currentCoords) => {
     try {
         const { id_mossa, id_armata, target_node, x_dest, y_dest } = mossa;
 
@@ -623,8 +652,62 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
             `, [id_mossa, mossa.partita_id, id_armata, cityTarget, defendingArmyId, newNextRoundDate]);
             
             army.status = 'in combattimento';
-            army.currentLocation = `${x_dest},${y_dest}`;
+            if (currentCoords) {
+                army.currentLocation = `${currentCoords[0]},${currentCoords[1]}`;
+            } else {
+                army.currentLocation = `${x_dest},${y_dest}`;
+            }
             army.next_round_time = newNextRoundDate.toISOString();
+
+            // Blocca anche l'armata difensore in combattimento
+            if (defendingArmyId && defenderId) {
+                const defKey = `match:${id_partita_hash}:player:${defenderId}:armate`;
+                const defStr = await redis.get(defKey);
+                if (defStr) {
+                    const defObj = JSON.parse(defStr);
+                    if (defObj[defendingArmyId]) {
+                        // Ferma il movimento dell'armata difensore
+                        defObj[defendingArmyId].status = 'in combattimento';
+                        if (defObj[defendingArmyId].path && defObj[defendingArmyId].path.length > 0 && defObj[defendingArmyId].startTime && defObj[defendingArmyId].etaMs) {
+                            const { getEstimatedCoords } = require('./combatTriggerEngine.js');
+                            const currentC = getEstimatedCoords(defObj[defendingArmyId]) || defObj[defendingArmyId].currentLocation;
+                            if (currentC && Array.isArray(currentC)) {
+                                defObj[defendingArmyId].currentLocation = `${currentC[0]},${currentC[1]}`;
+                            } else if (currentC) {
+                                defObj[defendingArmyId].currentLocation = currentC;
+                            }
+                        }
+                        delete defObj[defendingArmyId].path;
+                        delete defObj[defendingArmyId].etaMs;
+                        delete defObj[defendingArmyId].startTime;
+                        delete defObj[defendingArmyId].targetName;
+                        delete defObj[defendingArmyId].missionMode;
+                        delete defObj[defendingArmyId].targetCoords;
+                        
+                        // Elimina le mosse in DB per il difensore
+                        const defMossaRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, [defendingArmyId]);
+                        if (defMossaRes.rows.length > 0) {
+                            for (const mr of defMossaRes.rows) {
+                                await db.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [mr.id_mossa]);
+                                await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [mr.id_mossa]);
+                            }
+                        }
+                        
+                        await redis.set(defKey, JSON.stringify(defObj));
+                        
+                        // Avvisa il client del difensore
+                        const broadcastDef = {
+                            matchId: id_partita_hash,
+                            targetUsers: [defenderId],
+                            payload: {
+                                type: 'MISSION_CANCELLED',
+                                payload: { armyId: defendingArmyId, newLocation: defObj[defendingArmyId].currentLocation }
+                            }
+                        };
+                        await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastDef));
+                    }
+                }
+            }
         } else {
             army.status = 'in combattimento';
             // La data del prossimo round è già nel DB

@@ -120,6 +120,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   matchNations: any[] = [];
   regionsGeoData: any = null;
   nationMarkers: any[] = [];
+  citiesHp: { [cityId: string]: number } = {};
+  cityHpMarkers = new Map<string, any>();
   chatUnreadCount = 0;
   currentMatchId = '';
   matchPlayers: string[] = [];
@@ -443,7 +445,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         }
 
         if (parsed.type === 'TROOPS_MOVED') {
-          const { armyId, targetName, targetCoords, etaMs, startTime, path } = parsed.data;
+          const { armyId, targetName, targetCoords, etaMs, startTime, path, mode } = parsed.data;
           const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
           if (armyIndex !== -1) {
             const newArmies = [...this.matchArmies];
@@ -454,10 +456,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             newArmies[armyIndex].path = path;
             newArmies[armyIndex].etaMs = etaMs;
             newArmies[armyIndex].startTime = startTime || Date.now();
+            if (mode) newArmies[armyIndex].missionMode = mode;
             this.matchArmies = newArmies;
           }
           console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
           this.renderArmies();
+          this.applyTerritoryColors();
           this.cdr.detectChanges();
         }
 
@@ -495,6 +499,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
           console.log(`[WS_MATCH] Armata arrivata a ${targetName}.`);
           this.renderArmies();
+          this.applyTerritoryColors();
           this.cdr.detectChanges();
         }
 
@@ -521,6 +526,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
           console.log(`[WS_MATCH] Missione armata ${armyId} annullata.`);
           this.renderArmies();
+          this.applyTerritoryColors();
           this.cdr.detectChanges();
         }
 
@@ -550,6 +556,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             console.log(`[WS_MATCH] Nuova truppa generata a Palermo per l'utente ${userId}!`);
           }
           this.renderArmies();
+          this.applyTerritoryColors();
           this.cdr.detectChanges();
         }
 
@@ -563,10 +570,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           } else if (parsed.payload && typeof parsed.payload === 'object') {
              visibleEnemies = parsed.payload.visibleEnemies || [];
              myArmies = parsed.payload.myArmies || this.matchArmies.filter(a => a.owner === this.userProfile.username);
+             this.citiesHp = parsed.payload.citiesHp || {};
           }
           
           this.matchArmies = [...myArmies, ...visibleEnemies];
           this.renderArmies();
+          this.renderCitiesHp();
+          this.applyTerritoryColors();
           this.cdr.detectChanges();
         }
 
@@ -581,8 +591,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         if (parsed.type === 'WAR_DECLARED' || parsed.type === 'TERRITORY_CONQUERED' || parsed.type === 'DIPLOMACY_UPDATED') {
           console.log(`[WS_MATCH] Aggiornamento mappa (${parsed.type})`);
-          if (parsed.payload?.nations) {
-            this.matchNations = parsed.payload.nations;
+          const updatedNations = parsed.nations || parsed.payload?.nations;
+          if (updatedNations) {
+            this.matchNations = updatedNations;
             this.applyTerritoryColors();
           }
           this.cdr.detectChanges();
@@ -1817,6 +1828,83 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  // --- RENDERING BARRE HP CITTA ---
+  renderCitiesHp() {
+    if (!this.map || !this.nodesGeoData?.features) return;
+
+    // Rimuoviamo i marker non più presenti (es. tornati a 1000)
+    for (const [cityId, marker] of this.cityHpMarkers.entries()) {
+      if (this.citiesHp[cityId] === undefined || this.citiesHp[cityId] >= 1000) {
+        marker.remove();
+        this.cityHpMarkers.delete(cityId);
+      }
+    }
+
+    for (const [cityId, hp] of Object.entries(this.citiesHp)) {
+      if (hp >= 1000) continue;
+
+      const feature = this.nodesGeoData.features.find((f: any) =>
+        f.id === cityId || (f.properties.name && f.properties.name.toLowerCase() === cityId.toLowerCase())
+      );
+      if (!feature || !feature.geometry || !feature.geometry.coordinates) continue;
+
+      let center = feature.geometry.coordinates;
+      while (center.length && Array.isArray(center[0])) center = center[0];
+      if (center.length !== 2) continue;
+
+      let marker = this.cityHpMarkers.get(cityId);
+      if (!marker) {
+        const el = document.createElement('div');
+        el.className = 'city-hp-marker';
+        el.style.width = '40px';
+        el.style.height = '6px';
+        el.style.backgroundColor = 'rgba(0,0,0,0.8)';
+        el.style.border = '1px solid #333';
+        el.style.borderRadius = '3px';
+        el.style.position = 'relative';
+        el.style.zIndex = '997'; // Sotto armate
+        el.style.pointerEvents = 'none';
+
+        const bar = document.createElement('div');
+        bar.className = 'city-hp-bar';
+        bar.style.height = '100%';
+        bar.style.backgroundColor = '#ef4444'; // red-500
+        bar.style.width = '100%';
+        bar.style.borderRadius = '2px';
+        bar.style.transition = 'width 0.3s ease-out';
+        el.appendChild(bar);
+
+        const text = document.createElement('div');
+        text.className = 'city-hp-text';
+        text.style.color = 'white';
+        text.style.fontSize = '9px';
+        text.style.fontWeight = 'bold';
+        text.style.textShadow = '1px 1px 2px black, -1px -1px 2px black';
+        text.style.position = 'absolute';
+        text.style.top = '8px';
+        text.style.left = '50%';
+        text.style.transform = 'translateX(-50%)';
+        text.style.whiteSpace = 'nowrap';
+        el.appendChild(text);
+
+        marker = new (window as any).maplibregl.Marker({ element: el })
+          .setLngLat([center[0], center[1]])
+          .addTo(this.map);
+        
+        this.cityHpMarkers.set(cityId, marker);
+      }
+
+      const el = marker.getElement();
+      const bar = el.querySelector('.city-hp-bar') as HTMLElement;
+      const text = el.querySelector('.city-hp-text') as HTMLElement;
+      
+      const percent = Math.max(0, Math.min(100, (hp / 1000) * 100));
+      if (bar) bar.style.width = `${percent}%`;
+      if (text) text.innerText = `${hp}/1000`;
+    }
+  }
+
+
   // Carica archs.json e lo converte in GeoJSON LineString per la sovrapposizione
   loadArchesLayer(url: string) {
     fetch(url).then(res => res.json()).then((data: any) => {
@@ -2543,12 +2631,27 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       }
     });
 
+    const attackedTerritories = new Set<string>();
+    if (this.matchArmies) {
+       this.matchArmies.forEach(army => {
+          if (army.owner === currentUser || army.owner === this.userProfile?.username || !army.owner) {
+              if (army.status === 'attacking' || army.status === 'in combattimento' || ((army.status === "Pronto all'attacco" || army.status === 'moving') && army.missionMode === 'attack')) {
+                  if (army.targetName && army.targetName !== 'OBIETTIVO' && army.targetName !== 'SCONOSCIUTO') {
+                      attackedTerritories.add(army.targetName.toLowerCase());
+                  }
+              }
+          }
+       });
+    }
+
     this.regionsGeoData.features.forEach((f: any) => {
       const pId = f.properties.adm1_code || f.properties.name || f.id;
-      if (colorMap[pId]) {
+      if (pId && attackedTerritories.has(pId.toLowerCase())) {
+        f.properties.fillColor = '#ef4444'; // Red for territories under attack
+      } else if (colorMap[pId]) {
         f.properties.fillColor = colorMap[pId];
       } else {
-        delete f.properties.fillColor;
+        f.properties.fillColor = '#00000000'; // Trasparente
       }
     });
 
