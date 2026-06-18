@@ -144,6 +144,7 @@ const checkCombatTriggers = async () => {
                                 }
                                 
                                 console.log(`[COMBAT_TRIGGER] Triggering setupCombatFromArrival per army ${army.id}`);
+                                await db.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [mossa.id_mossa]);
                                 await setupCombatFromArrival(army, mossa, matchId, army.owner);
                                 
                                 // Aggiorna redis con lo stato 'in combattimento'

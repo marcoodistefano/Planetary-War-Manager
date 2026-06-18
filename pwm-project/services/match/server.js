@@ -119,7 +119,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
          
          // --- Parsing Coordinate ---
          let loc = armateObj[armyId].currentLocation;
-         let startLng = 12.0, startLat = 41.0;
+         let startLng, startLat;
          if (loc && typeof loc === 'string') {
              if (loc.includes(',')) {
                  const pts = loc.split(',').map(s => parseFloat(s.trim()));
@@ -135,6 +135,11 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
              startLng = loc.x; startLat = loc.y;
          } else if (Array.isArray(loc) && loc.length >= 2) {
              startLng = loc[0]; startLat = loc[1];
+         }
+         
+         if (startLng === undefined || startLat === undefined) {
+             ws.send(JSON.stringify({ type: 'ERROR', error: 'Coordinate di partenza invalide' }));
+             return;
          }
          
          const armyState = armateObj[armyId].status;
@@ -159,7 +164,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
              armateObj[armyId].currentLocation = `${startLng},${startLat}`;
          }
          
-         let targetLng = 12.0, targetLat = 41.0;
+         let targetLng, targetLat;
          let parsedTargetCoords = null;
          if (typeof targetCoords === 'string') {
              const pts = targetCoords.split(',').map(s => parseFloat(s.trim()));
@@ -172,6 +177,20 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
              targetLng = parseFloat(targetCoords[0]);
              targetLat = parseFloat(targetCoords[1]);
              parsedTargetCoords = [targetLng, targetLat];
+         }
+
+         if (targetLng === undefined && targetName) {
+             const nodeCoords = getNodeCoords(targetName);
+             if (nodeCoords) {
+                 targetLng = nodeCoords[0];
+                 targetLat = nodeCoords[1];
+                 parsedTargetCoords = [targetLng, targetLat];
+             }
+         }
+
+         if (targetLng === undefined || targetLat === undefined) {
+             ws.send(JSON.stringify({ type: 'ERROR', error: 'Coordinate di destinazione invalide' }));
+             return;
          }
 
           let multiplier = 1;
@@ -687,7 +706,7 @@ const restoreActiveMoves = async () => {
 
       let army = armateObj[row.id_armata];
       let loc = army.currentLocation;
-      let startLng = 12.0, startLat = 41.0;
+      let startLng, startLat;
       if (typeof loc === 'string') {
         if (loc.includes(',')) {
             const pts = loc.split(',').map(s => parseFloat(s.trim()));
@@ -702,6 +721,11 @@ const restoreActiveMoves = async () => {
       } else if (loc && loc.x !== undefined) {
         startLng = loc.x;
         startLat = loc.y;
+      }
+      
+      if (startLng === undefined || startLat === undefined) {
+          console.warn(`[SYS_WARN] Coordinate invalide per armata ${row.id_armata}, salto ripristino`);
+          continue;
       }
 
       let multiplier = 1;

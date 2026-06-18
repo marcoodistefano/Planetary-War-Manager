@@ -294,7 +294,8 @@ const processActiveCombats = async () => {
 
                 if (cityHp <= 0) {
                     combatEnded = true;
-                    await redis.del(cityHpKey);
+                    // Imposta HP a 500 come da feedback utente (si ripristineranno in futuro con fortezza lvl1)
+                    await redis.set(cityHpKey, "500");
                     
                     // Conquista
                     const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
@@ -304,13 +305,86 @@ const processActiveCombats = async () => {
                         const regionId = getRegionForNode(id_target_citta) || id_target_citta;
 
                         const nations = JSON.parse(nationsCache);
+                        let defenderNation = null;
+                        let attackerNation = null;
+                        
+                        // Trova nazione difensore
                         for (let n of nations) {
                             if (n.territories_flat && n.territories_flat.includes(regionId)) {
-                                n.playerId = attackerPlayer;
-                                n.isOccupied = true;
+                                defenderNation = n;
                                 break;
                             }
                         }
+                        
+                        // Trova nazione attaccante
+                        for (let n of nations) {
+                            if (n.playerId === attackerPlayer) {
+                                attackerNation = n;
+                                break;
+                            }
+                        }
+
+                        if (defenderNation && attackerNation && defenderNation.nationId !== attackerNation.nationId) {
+                            // Rimuovi dal difensore
+                            defenderNation.territories_flat = defenderNation.territories_flat.filter(t => t !== regionId);
+                            let targetAdmin = null;
+                            for (const admin in defenderNation.territories) {
+                                if (defenderNation.territories[admin].includes(regionId)) {
+                                    targetAdmin = admin;
+                                    defenderNation.territories[admin] = defenderNation.territories[admin].filter(t => t !== regionId);
+                                    if (defenderNation.territories[admin].length === 0) {
+                                        delete defenderNation.territories[admin];
+                                    }
+                                    break;
+                                }
+                            }
+                            
+                            // Aggiungi all'attaccante
+                            if (!attackerNation.territories_flat) attackerNation.territories_flat = [];
+                            attackerNation.territories_flat.push(regionId);
+                            if (targetAdmin) {
+                                if (!attackerNation.territories) attackerNation.territories = {};
+                                if (!attackerNation.territories[targetAdmin]) {
+                                    attackerNation.territories[targetAdmin] = [];
+                                }
+                                attackerNation.territories[targetAdmin].push(regionId);
+                            }
+
+                            // Aggiorna DB (stato_territori) per entrambi (i bot non sono in db)
+                            try {
+                                const defRes = await db.query(`SELECT id_user FROM utenti WHERE username = $1`, [defenderNation.playerId]);
+                                const attRes = await db.query(`SELECT id_user FROM utenti WHERE username = $1`, [attackerNation.playerId]);
+                                
+                                if (defRes.rows.length > 0) {
+                                    let statoDefRes = await db.query(`SELECT stato_territori FROM partecipanti_partite WHERE partita_id = $1 AND user_id = $2`, [partita_id, defRes.rows[0].id_user]);
+                                    if (statoDefRes.rows.length > 0) {
+                                        let statoDef = statoDefRes.rows[0].stato_territori || {};
+                                        if (targetAdmin && statoDef[targetAdmin]) {
+                                            delete statoDef[targetAdmin][regionId];
+                                            if (Object.keys(statoDef[targetAdmin]).length === 0) {
+                                                delete statoDef[targetAdmin];
+                                            }
+                                        }
+                                        await db.query(`UPDATE partecipanti_partite SET stato_territori = $1::jsonb WHERE partita_id = $2 AND user_id = $3`, [JSON.stringify(statoDef), partita_id, defRes.rows[0].id_user]);
+                                    }
+                                }
+                                
+                                if (attRes.rows.length > 0) {
+                                    let statoAttRes = await db.query(`SELECT stato_territori FROM partecipanti_partite WHERE partita_id = $1 AND user_id = $2`, [partita_id, attRes.rows[0].id_user]);
+                                    if (statoAttRes.rows.length > 0) {
+                                        let statoAtt = statoAttRes.rows[0].stato_territori || {};
+                                        if (targetAdmin) {
+                                            if (!statoAtt[targetAdmin]) statoAtt[targetAdmin] = {};
+                                            statoAtt[targetAdmin][regionId] = true;
+                                        }
+                                        await db.query(`UPDATE partecipanti_partite SET stato_territori = $1::jsonb WHERE partita_id = $2 AND user_id = $3`, [JSON.stringify(statoAtt), partita_id, attRes.rows[0].id_user]);
+                                    }
+                                }
+                            } catch (e) {
+                                console.error("[SYS_ERR] Errore salvataggio conquista territoriale DB:", e);
+                            }
+                        }
+                        
                         updatedNations = nations;
                         await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
                     }

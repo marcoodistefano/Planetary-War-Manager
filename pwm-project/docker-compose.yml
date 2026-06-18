@@ -18,6 +18,11 @@ services:
       - redis_data:/data  # Nominato: evita volumi anonimi ad ogni avvio
     networks:
       - pwm-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 # IL DATABASE POSTGRESQL
   db:
     image: postgres:15-alpine
@@ -34,6 +39,11 @@ services:
       - "5432:5432" # Ti permette di collegarti con programmi esterni dal tuo PC
     networks:
       - pwm-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U commander_admin -d pwm_tactical_database"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # FRONTEND IN DEV MODE (CON HOT-RELOAD)
   frontend-dev:
@@ -59,8 +69,10 @@ services:
       - ./services/user-service:/app/services/user-service
       - ./services/shared:/app/services/shared
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - REDIS_URL=redis://redis:6379
       - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
@@ -118,8 +130,10 @@ services:
       - ./services/shared:/app/services/shared
       - ./shared:/app/shared
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - REDIS_URL=redis://redis:6379
       - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
@@ -130,7 +144,8 @@ services:
   engine-res:
     build: ./services/resources
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     environment:
       - REDIS_URL=redis://redis:6379
     networks:
@@ -140,9 +155,12 @@ services:
   cache-warmup:
     build: ./services/cache-warmup
     depends_on:
-      - redis
-      - db
-      - match-service
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      match-service:
+        condition: service_started
     environment:
       - REDIS_URL=redis://redis:6379
       - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
@@ -161,8 +179,10 @@ services:
       - ./services/chat:/app/services/chat
       - ./services/shared:/app/services/shared
     depends_on:
-      - redis
-      - db
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
     environment:
       - REDIS_URL=redis://redis:6379
       - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
@@ -222,7 +242,8 @@ services:
     ports:
       - "8085:8080" # Porta non canonica esterna per visualizzare Postgres
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - pwm-net
       
@@ -233,7 +254,8 @@ services:
     ports:
       - "8086:8081" # Porta non canonica esterna per visualizzare Redis
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     networks:
       - pwm-net
 

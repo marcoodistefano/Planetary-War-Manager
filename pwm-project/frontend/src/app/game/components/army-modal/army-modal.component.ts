@@ -268,11 +268,19 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
       delete nextTroops[troopKey];
     }
 
+    let spawnCoords: any = undefined;
+    if (this.selectedTargetCoords && this.selectedTargetCoords !== '--') {
+      spawnCoords = this.selectedTargetCoords;
+    } else if (this.selectedTargetName) {
+      spawnCoords = this.selectedTargetName;
+    }
+
     const nextArmy: ArmyGroup = {
-      id: `army-${Date.now()}`,
+      id: this.generateUUID(),
       name: this.armyName.trim() || `Armata ${this.armies.length + 1}`,
       composition: { [troopKey]: troopCount },
-      status: 'standby'
+      status: 'standby',
+      currentLocation: spawnCoords
     };
 
     this.availableTroops = nextTroops;
@@ -373,4 +381,11 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
   }
 
   closeModal() { this.close.emit(); }
+
+  private generateUUID(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
 }
