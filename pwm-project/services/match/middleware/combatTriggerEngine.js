@@ -104,6 +104,8 @@ try {
     console.error("Error loading cities.json in combatTriggerEngine:", e);
 }
 
+const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
+
 const checkCombatTriggers = async () => {
     try {
         const matchKeys = await db.query('SELECT id_partita_hash FROM partite').then(res => res.rows.map(r => `match:${r.id_partita_hash}`));
@@ -114,14 +116,15 @@ const checkCombatTriggers = async () => {
         });
 
         for (const matchId of matchIds) {
-            const playersArmiesKeys = [];
+            const matchObj = await getMatch(matchId);
+            if (!matchObj || !matchObj.match || !matchObj.match.player) continue;
+
             let allArmies = [];
-            for (const key of playersArmiesKeys) {
-                const username = key.split(':')[3];
-                const data = await redis.get(key);
-                if (data) {
-                    const obj = JSON.parse(data);
-                    Object.values(obj).forEach(a => allArmies.push({...a, owner: username, redisKey: key}));
+            for (const player of matchObj.match.player) {
+                if (player.armate) {
+                    Object.values(player.armate).forEach(a => {
+                        allArmies.push({...a, owner: player.username});
+                    });
                 }
             }
 
@@ -178,41 +181,39 @@ const checkCombatTriggers = async () => {
                                 await setupCombatFromArrival(army, mossa, matchId, army.owner, myCoords);
                                 
                                 // Aggiorna redis con lo stato modificato da setupCombatFromArrival
-                                const armateStr = await redis.get(army.redisKey);
-                                if (armateStr) {
-                                    const armateObj = JSON.parse(armateStr);
-                                    if (armateObj[army.id]) {
-                                        armateObj[army.id].status = army.status;
-                                        if (army.currentLocation) armateObj[army.id].currentLocation = army.currentLocation;
-                                        if (army.next_round_time) armateObj[army.id].next_round_time = army.next_round_time;
-                                        delete armateObj[army.id].path;
-                                        delete armateObj[army.id].etaMs;
-                                        delete armateObj[army.id].startTime;
-                                        delete armateObj[army.id].targetName;
-                                        delete armateObj[army.id].missionMode;
-                                        delete armateObj[army.id].targetCoords;
-                                        await redis.set(army.redisKey, JSON.stringify(armateObj));
+                                await updateMatch(matchId, (mObj) => {
+                                    const p = mObj.match.player.find(x => x.username === army.owner);
+                                    if (p && p.armate && p.armate[army.id]) {
+                                        p.armate[army.id].status = army.status;
+                                        if (army.currentLocation) p.armate[army.id].currentLocation = army.currentLocation;
+                                        if (army.next_round_time) p.armate[army.id].next_round_time = army.next_round_time;
+                                        delete p.armate[army.id].path;
+                                        delete p.armate[army.id].etaMs;
+                                        delete p.armate[army.id].startTime;
+                                        delete p.armate[army.id].targetName;
+                                        delete p.armate[army.id].missionMode;
+                                        delete p.armate[army.id].targetCoords;
                                     }
-                                }
+                                    return { save: true, matchObj: mObj };
+                                });
                                 
                                 // Forza un ricalcolo immediato per applicare i primi danni all'istante
                                 await processActiveCombats();
                             } else {
                                 console.log(`[COMBAT_TRIGGER] Nessuna mossa in db per armata ${army.id}, forzo standby in Redis e salto.`);
-                                const armateStr = await redis.get(army.redisKey);
-                                if (armateStr) {
-                                    const armateObj = JSON.parse(armateStr);
-                                    if (armateObj[army.id]) {
-                                        armateObj[army.id].status = 'standby';
-                                        delete armateObj[army.id].path;
-                                        delete armateObj[army.id].etaMs;
-                                        delete armateObj[army.id].startTime;
-                                        delete armateObj[army.id].targetName;
-                                        delete armateObj[army.id].missionMode;
-                                        delete armateObj[army.id].targetCoords;
-                                        await redis.set(army.redisKey, JSON.stringify(armateObj));
+                                await updateMatch(matchId, (mObj) => {
+                                    const p = mObj.match.player.find(x => x.username === army.owner);
+                                    if (p && p.armate && p.armate[army.id]) {
+                                        p.armate[army.id].status = 'standby';
+                                        delete p.armate[army.id].path;
+                                        delete p.armate[army.id].etaMs;
+                                        delete p.armate[army.id].startTime;
+                                        delete p.armate[army.id].targetName;
+                                        delete p.armate[army.id].missionMode;
+                                        delete p.armate[army.id].targetCoords;
                                     }
-                                }
+                                    return { save: true, matchObj: mObj };
+                                });
                             }
                         }
                     }
