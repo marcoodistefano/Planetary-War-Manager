@@ -296,11 +296,64 @@ const processActiveCombats = async () => {
                     combatEnded = true;
                     await redis.hDel(cityHpKey, id_target_citta);
                     
-                    console.log(`[COMBAT_DEBUG] City HP <= 0 for ${id_target_citta}. Initiating conquest...`);
-                    
                     const { getRegionForNode } = require('./movementLogic.js');
                     const regionId = getRegionForNode(id_target_citta) || id_target_citta;
 
+                    const { getNodeCoords } = require('./movementLogic.js');
+                    const turf = require('@turf/turf');
+                    let enemyTroopsRemaining = false;
+
+                    const freshMatchObj = await getMatch(id_partita_hash);
+                    if (freshMatchObj && freshMatchObj.match) {
+                        let regionPolygon = null;
+                        try {
+                            const fs = require('fs');
+                            const pathLib = require('path');
+                            const topojson = require('topojson-client');
+                            const regionsFile = pathLib.join(__dirname, '../../../shared/assets/map/regions.json');
+                            if (fs.existsSync(regionsFile)) {
+                                const topo = JSON.parse(fs.readFileSync(regionsFile, 'utf-8'));
+                                const objectKey = Object.keys(topo.objects)[0];
+                                const geojson = topojson.feature(topo, topo.objects[objectKey]);
+                                const feature = geojson.features.find(f => f.properties && (f.properties.adm1_code === regionId || f.id === regionId));
+                                if (feature) regionPolygon = feature;
+                            }
+                        } catch(e) { }
+
+                        for (const pl of freshMatchObj.match.player) {
+                            if (pl.username === attackerPlayer) continue;
+                            if (!pl.armate) continue;
+                            for (const [aid, a] of Object.entries(pl.armate)) {
+                                if (a.status === 'standby' || a.status === 'in combattimento') {
+                                    let ax, ay;
+                                    const loc = a.currentLocation;
+                                    if (typeof loc === 'string') {
+                                        const pts = loc.split(',').map(Number);
+                                        ax = pts[0]; ay = pts[1];
+                                    } else if (loc && loc.x !== undefined) {
+                                        ax = loc.x; ay = loc.y;
+                                    }
+                                    if (ax !== undefined && ay !== undefined && regionPolygon) {
+                                        try {
+                                            const pt = turf.point([ax, ay]);
+                                            if (turf.booleanPointInPolygon(pt, regionPolygon)) {
+                                                enemyTroopsRemaining = true;
+                                                break;
+                                            }
+                                        } catch(e) {}
+                                    }
+                                }
+                            }
+                            if (enemyTroopsRemaining) break;
+                        }
+                    }
+
+                    if (enemyTroopsRemaining) {
+                        console.log(`[COMBAT_DEBUG] Conquest of ${id_target_citta} blocked: enemy troops still in region ${regionId}`);
+                        await redis.hSet(`match:${id_partita_hash}:cities_hp`, id_target_citta, '0');
+                        await emitCombatEvent(id_partita_hash, attackerName, id_target_citta, damageToCity, 'in attesa (truppe nemiche presenti)', [attackerPlayer]);
+                        combatEnded = false;
+                    } else {
                     let updatedNations = [];
                     await updateMatch(id_partita_hash, (mObj) => {
                         let defNation = null;
@@ -375,6 +428,7 @@ const processActiveCombats = async () => {
                             return { save: true, matchObj: mObj };
                         });
                     }
+                    } // fine else (nessuna truppa nemica nella regione)
                 } else {
                     await redis.hSet(cityHpKey, id_target_citta, cityHp.toString());
                     await emitCombatEvent(id_partita_hash, attackerName, id_target_citta, damageToCity, 'sopravvissuta', [attackerPlayer]);
@@ -443,6 +497,19 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
                 await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
                 return;
             }
+
+            // Inibisce il combattimento se il target è un alleato
+            const attackerNation = matchObj.match.player.find(n => n.username === attackerUsername);
+            const attackerAllianceId = attackerNation ? attackerNation.id_alleanza : null;
+            const defenderAllianceId = targetNation.id_alleanza || null;
+            if (attackerAllianceId && defenderAllianceId && attackerAllianceId === defenderAllianceId) {
+                console.log(`[COMBAT] Attacco bloccato: ${attackerUsername} e ${targetNation.username} sono nella stessa alleanza.`);
+                army.status = 'standby';
+                delete army.next_round_time;
+                await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
+                return;
+            }
+
             defenderId = targetNation.username;
             
             await updateMatch(id_partita_hash, (mObj) => {

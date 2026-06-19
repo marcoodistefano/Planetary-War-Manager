@@ -273,19 +273,36 @@ if (payload.action === 'MOVE_TROOPS') {
                  targetNation = matchObj.match.player.find(n => n.territori && n.territori.includes(targetName));
              }
              if (targetNation && targetNation.isOccupied && targetNation.username && targetNation.username !== ws.username) {
-                 isAttack = true;
-                 targetPlayerId = targetNation.username;
-                 isInWar = targetNation.inWarWith && targetNation.inWarWith.includes(ws.username);
+                  // Controlla se il target è un alleato - in quel caso inibire l'attacco
+                  const movingPlayer = matchObj.match.player.find(n => n.username === ws.username);
+                  const movingAllianceId = movingPlayer ? movingPlayer.id_alleanza : null;
+                  const defenderAllianceId = targetNation.id_alleanza || null;
+                  const isAlly = movingAllianceId && defenderAllianceId && movingAllianceId === defenderAllianceId;
+
+                  if (isAlly) {
+                      return { save: false, data: { error: 'Non puoi attaccare un membro della tua alleanza!' } };
+                  }
+
+                  isAttack = true;
+                  targetPlayerId = targetNation.username;
+                  isInWar = targetNation.inWarWith && targetNation.inWarWith.includes(ws.username);
              }
              
              if (!isAttack && payload.payload.mode === 'attack') {
                  for (const n of matchObj.match.player) {
                      if (n.username === ws.username) continue;
                      if (n.armate && n.armate[targetName]) {
-                         isAttack = true;
-                         targetPlayerId = n.username;
-                         isInWar = n.inWarWith && n.inWarWith.includes(ws.username);
-                         break;
+                          // Controlla alleanza anche per target armata
+                          const movingPlayer = matchObj.match.player.find(x => x.username === ws.username);
+                          const movingAllianceId = movingPlayer ? movingPlayer.id_alleanza : null;
+                          const defAllianceId = n.id_alleanza || null;
+                          if (movingAllianceId && defAllianceId && movingAllianceId === defAllianceId) {
+                              return { save: false, data: { error: 'Non puoi attaccare un membro della tua alleanza!' } };
+                          }
+                          isAttack = true;
+                          targetPlayerId = n.username;
+                          isInWar = n.inWarWith && n.inWarWith.includes(ws.username);
+                          break;
                      }
                  }
              }
@@ -329,6 +346,11 @@ if (payload.action === 'MOVE_TROOPS') {
          
          if (updRes && updRes.warBroadcast) {
              await redis.publish('match_ws_broadcast_channel', JSON.stringify(updRes.warBroadcast));
+         }
+         
+         if (updRes && updRes.data && updRes.data.error) {
+             ws.send(JSON.stringify({ type: 'ERROR', error: updRes.data.error }));
+             return;
          }
          
          if (updRes && updRes.armata) {
@@ -691,19 +713,42 @@ const startArrivalEngine = () => {
 
         if (army) {
             let isEnemyTerritory = false;
+            let isAlliedTerritory = false;
             const { getRegionForNode } = require('./middleware/movementLogic.js');
             const regionId = getRegionForNode(row.target_node) || row.target_node;
-            
+
             let targetNation = matchObj.match.player.find(n => n.territori_dict && Object.values(n.territori_dict).some(list => list.includes(regionId)));
             if (!targetNation && row.target_node !== regionId) {
-                 targetNation = matchObj.match.player.find(n => n.territori_dict && Object.values(n.territori_dict).some(list => list.includes(row.target_node)));
+                targetNation = matchObj.match.player.find(n => n.territori_dict && Object.values(n.territori_dict).some(list => list.includes(row.target_node)));
             }
 
             if (targetNation && targetNation.username && targetNation.username !== row.username) {
                 isEnemyTerritory = true;
+
+                // Controlla se il proprietario del territorio è un alleato dell'attaccante
+                const attackerPlayer = matchObj.match.player.find(n => n.username === row.username);
+                const attackerAllianceId = attackerPlayer ? attackerPlayer.id_alleanza : null;
+                const defenderAllianceId = targetNation.id_alleanza || null;
+
+                if (attackerAllianceId && defenderAllianceId && attackerAllianceId === defenderAllianceId) {
+                    isAlliedTerritory = true;
+                }
             }
 
-            if (army.missionMode === 'attack' || isEnemyTerritory) {
+            // Auto-converte in attacco se territorio nemico e NON alleato
+            if (isEnemyTerritory && !isAlliedTerritory && army.missionMode !== 'attack') {
+                army.missionMode = 'attack';
+                await updateMatch(row.match_id, (mObj) => {
+                    const p = mObj.match.player.find(x => x.username === row.username);
+                    if (p && p.armate && p.armate[row.id_armata]) {
+                        p.armate[row.id_armata].missionMode = 'attack';
+                    }
+                    return { save: true, matchObj: mObj };
+                });
+                console.log(`[ARRIVAL] Auto-converted move to ATTACK for army ${row.id_armata} on enemy territory ${row.target_node}`);
+            }
+
+            if (army.missionMode === 'attack') {
                 const { setupCombatFromArrival } = require('./middleware/combatLogic.js');
                 const mossaObj = {
                     id_mossa: row.id_mossa,
