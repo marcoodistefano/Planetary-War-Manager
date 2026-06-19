@@ -413,7 +413,7 @@ const processActiveCombats = async () => {
                 combatEnded = true;
             }
 
-            if (damageToCity > 0 && id_target_citta && !attackerDied) {
+            if (damageToCity > 0 && id_target_citta) {
                 const cityHpKey = `match:${id_partita_hash}:cities_hp`;
                 let cityHpStr = await redis.hGet(cityHpKey, id_target_citta);
                 let cityHp = cityHpStr ? parseInt(cityHpStr, 10) : 100;
