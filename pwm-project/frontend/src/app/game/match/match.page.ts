@@ -708,12 +708,25 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                     updatedStructures = updatedStructures.concat(n.strutture.map((s: any) => ({ ...s, owner: n.username })));
                   }
                 }
-                if (updatedStructures.length > 0) {
-                  this.matchStructures = updatedStructures;
-                  this.renderStructures();
-                }
+                this.matchStructures = updatedStructures;
+                this.renderStructures();
               }
             }
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'STRUCTURE_BUILT') {
+            console.log(`[WS_MATCH] Nuova struttura costruita: ${parsed.data.name}`);
+            if (parsed.replacedStructureId) {
+              const oldMarker = this.structureMarkers.get(parsed.replacedStructureId);
+              if (oldMarker) {
+                oldMarker.remove();
+                this.structureMarkers.delete(parsed.replacedStructureId);
+              }
+              this.matchStructures = this.matchStructures.filter(s => s.id !== parsed.replacedStructureId);
+            }
+            this.matchStructures.push(parsed.data);
+            this.renderStructures();
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
@@ -1455,7 +1468,70 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  calculateCurrentPosition(path: number[][], startTime: number, etaMs: number): { lng: number, lat: number } | null {
+    if (!path || path.length < 2 || !etaMs || !startTime) return null;
+    const elapsed = Date.now() - startTime;
+    const progress = Math.max(0, Math.min(1, elapsed / etaMs));
+    if (progress >= 1) return { lng: path[path.length - 1][0], lat: path[path.length - 1][1] };
+
+    let totalDistance = 0;
+    const segmentDistances: number[] = [];
+    for (let i = 0; i < path.length - 1; i++) {
+        const dx = path[i+1][0] - path[i][0];
+        const dy = path[i+1][1] - path[i][1];
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        segmentDistances.push(dist);
+        totalDistance += dist;
+    }
+    const targetDistance = progress * totalDistance;
+    let currentDist = 0;
+    let currentIndex = 0;
+    let segmentProgress = 0;
+    for (let i = 0; i < segmentDistances.length; i++) {
+        if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
+            currentIndex = i;
+            segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0;
+            break;
+        }
+        currentDist += segmentDistances[i];
+    }
+    const p1 = path[currentIndex];
+    const p2 = path[currentIndex + 1] || p1;
+    const lng = p1[0] + (p2[0] - p1[0]) * segmentProgress;
+    const lat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
+    return { lng, lat };
+  }
+
+  startAnimationLoop() {
+    const loop = () => {
+      this.updateMovingArmies();
+      this.animationFrameId = requestAnimationFrame(loop);
+    };
+    this.animationFrameId = requestAnimationFrame(loop);
+  }
+
+  updateMovingArmies() {
+    if (!this.map || !this.matchArmies || this.matchArmies.length === 0) return;
+    let needsUpdate = false;
+    this.matchArmies.forEach(army => {
+      if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
+        const coords = this.getArmyCoordinates(army);
+        if (coords && this.armyMarkers.has(army.id)) {
+          this.armyMarkers.get(army.id).setLngLat(coords);
+          needsUpdate = true;
+        }
+      }
+    });
+    if (needsUpdate && this.map.getZoom() < 5.5) {
+        this.updateArmyMarkersScale();
+    }
+  }
+
   getArmyCoordinates(army: any): [number, number] | null {
+    if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
+      const pos = this.calculateCurrentPosition(army.path, army.startTime, army.etaMs);
+      if (pos) return [pos.lng, pos.lat];
+    }
     if (!army.currentLocation) return null;
     if (typeof army.currentLocation === 'string') {
       if (army.currentLocation.includes(',')) {
