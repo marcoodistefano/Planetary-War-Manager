@@ -379,4 +379,30 @@ const calculateCurrentPosition = (path, startTime, etaMs) => {
     return { lng, lat, currentIndex, elapsed };
 };
 
-module.exports = { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, getRegionIdByName, calculateCurrentPosition };
+const getArmyLocation = (army) => {
+    let coords = null;
+    let loc = army.currentLocation;
+    if (typeof loc === 'string') {
+        const pts = loc.split(',').map(s => parseFloat(s.trim()));
+        if (pts.length === 2 && !isNaN(pts[0])) {
+            coords = [pts[0], pts[1]];
+        } else {
+            const coordsFound = getNodeCoords(loc.trim());
+            if (coordsFound) coords = coordsFound;
+        }
+    } else if (loc && loc.x !== undefined) {
+        coords = [loc.x, loc.y];
+    } else if (Array.isArray(loc) && loc.length >= 2) {
+        coords = [loc[0], loc[1]];
+    }
+
+    if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 0 && army.startTime && army.etaMs) {
+        const pos = calculateCurrentPosition(army.path, army.startTime, army.etaMs);
+        if (pos) {
+            coords = [pos.lng, pos.lat];
+        }
+    }
+    return coords;
+};
+
+module.exports = { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, getRegionIdByName, calculateCurrentPosition, getArmyLocation, haversineDist };

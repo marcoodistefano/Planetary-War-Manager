@@ -189,10 +189,13 @@ const generateTroopsPeriodic = async () => {
             // Per soddisfare il requisito in modo semplice, assumiamo che quando gira questa funzione, 
             // sia il momento di aggiungere 1 truppa (100 hp) alle armate esistenti, limitando la frequenza nel timer.
             
-            // 1. Recupero tutte le armate dal monolithic JSON
+            let armiesToUpdateDB = [];
+
             const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
-            await updateMatch(matchHashId, async (matchObj) => {
+            const updRes = await updateMatch(matchHashId, (matchObj) => {
                 if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+                
+                armiesToUpdateDB = []; // Reset inside callback in case of retry
                 
                 for (const player of matchObj.match.player) {
                     const playerId = player.username;
@@ -200,43 +203,41 @@ const generateTroopsPeriodic = async () => {
                     
                     if (!player.armate || Object.keys(player.armate).length === 0) continue;
                     
-                    let realUserId = null;
-                    if (!isBot) {
-                        const userRes = await client.query(`SELECT id_user FROM utenti WHERE username = $1 OR id_user::text = $1 LIMIT 1`, [playerId]);
-                        if (userRes.rows.length > 0) {
-                            realUserId = userRes.rows[0].id_user;
+                    for (const armataId in player.armate) {
+                        const armata = player.armate[armataId];
+                        armata.composition.fante = (armata.composition.fante || 0) + 1;
+                        armata.damage = (armata.damage || 0) + 1;
+                        
+                        if (!isBot) {
+                            armiesToUpdateDB.push(armataId);
                         }
-                    }
-
-                    await client.query('BEGIN');
-                    try {
-                        for (const armataId in player.armate) {
-                            const armata = player.armate[armataId];
-                            armata.composition.fante = (armata.composition.fante || 0) + 1;
-                            armata.damage = (armata.damage || 0) + 1;
-                            
-                            if (!isBot && realUserId) {
-                                await client.query(`
-                                    UPDATE armata 
-                                    SET hp_tot = hp_tot + 100, dmg_tot = dmg_tot + 1 
-                                    WHERE id_istanza_armata = $1
-                                `, [armataId]);
-                                
-                                await client.query(`
-                                    UPDATE truppe
-                                    SET hp = hp + 100
-                                    WHERE id_armata = $1 AND id_modello = 'fante'
-                                `, [armataId]);
-                            }
-                        }
-                        await client.query('COMMIT');
-                    } catch (err) {
-                        await client.query('ROLLBACK');
-                        console.error(`[TROOP_GEN] Errore DB durante update periodico per match ${matchHashId}:`, err);
                     }
                 }
                 return { save: true, matchObj, data: true };
             });
+
+            if (updRes && armiesToUpdateDB.length > 0) {
+                await client.query('BEGIN');
+                try {
+                    for (const armataId of armiesToUpdateDB) {
+                        await client.query(`
+                            UPDATE armata 
+                            SET hp_tot = hp_tot + 100, dmg_tot = dmg_tot + 1 
+                            WHERE id_istanza_armata = $1
+                        `, [armataId]);
+                        
+                        await client.query(`
+                            UPDATE truppe
+                            SET hp = hp + 100
+                            WHERE id_armata = $1 AND id_modello = 'fante'
+                        `, [armataId]);
+                    }
+                    await client.query('COMMIT');
+                } catch (err) {
+                    await client.query('ROLLBACK');
+                    console.error(`[TROOP_GEN] Errore DB durante update periodico per match ${matchHashId}:`, err);
+                }
+            }
 
             // BROADCAST ALLA FINE DEL CICLO PARTITA
             try {

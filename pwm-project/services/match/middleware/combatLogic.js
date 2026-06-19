@@ -727,8 +727,8 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
                     if (p && p.armate && p.armate[defendingArmyId]) {
                         p.armate[defendingArmyId].status = 'in combattimento';
                         if (p.armate[defendingArmyId].path && p.armate[defendingArmyId].path.length > 0 && p.armate[defendingArmyId].startTime && p.armate[defendingArmyId].etaMs) {
-                            const { getEstimatedCoords } = require('./combatTriggerEngine.js');
-                            const currentC = getEstimatedCoords(p.armate[defendingArmyId]) || p.armate[defendingArmyId].currentLocation;
+                            const { getArmyLocation } = require('./movementLogic.js');
+                            const currentC = getArmyLocation(p.armate[defendingArmyId]) || p.armate[defendingArmyId].currentLocation;
                             if (currentC && Array.isArray(currentC)) {
                                 p.armate[defendingArmyId].currentLocation = `${currentC[0]},${currentC[1]}`;
                             } else if (currentC) {

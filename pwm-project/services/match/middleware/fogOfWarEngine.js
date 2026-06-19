@@ -3,16 +3,7 @@ const redis = require("../../shared/redisClient");
 const fs = require("fs");
 const path = require("path");
 
-// Haversine distance in km
-function haversineDist(lon1, lat1, lon2, lat2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
+const { getNodeCoords, getArmyLocation, haversineDist } = require('./movementLogic.js');
 
 let troopsVisionMap = {}; // id_truppa -> raggio_visivo
 let defaultVisionRadius = 100;
@@ -46,63 +37,7 @@ function getArmyVisionRadius(army) {
     return maxRadius;
 }
 
-const { getNodeCoords } = require('./movementLogic.js');
-
-// Helper to resolve coordinates
-function getEstimatedCoords(army) {
-    let coords = null;
-    let loc = army.currentLocation;
-    if (typeof loc === 'string') {
-        const pts = loc.split(',').map(s => parseFloat(s.trim()));
-        if (pts.length === 2 && !isNaN(pts[0])) {
-            coords = [pts[0], pts[1]];
-        } else {
-            // Risolvi il nome del territorio tramite movementLogic
-            const coordsFound = getNodeCoords(loc.trim());
-            if (coordsFound) coords = coordsFound;
-        }
-    } else if (loc && loc.x !== undefined) {
-        coords = [loc.x, loc.y];
-    } else if (Array.isArray(loc) && loc.length >= 2) {
-        coords = [loc[0], loc[1]];
-    }
-    
-    if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 0 && army.startTime && army.etaMs) {
-        const elapsed = Date.now() - army.startTime;
-        const progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
-        if (progress < 1) {
-            let totalDistance = 0;
-            const segmentDistances = [];
-            for (let i = 0; i < army.path.length - 1; i++) {
-                const dx = army.path[i+1][0] - army.path[i][0];
-                const dy = army.path[i+1][1] - army.path[i][1];
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                segmentDistances.push(dist);
-                totalDistance += dist;
-            }
-            const targetDistance = progress * totalDistance;
-            let currentDist = 0;
-            let currentIndex = 0;
-            let segmentProgress = 0;
-            for (let i = 0; i < segmentDistances.length; i++) {
-                if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
-                    currentIndex = i;
-                    segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0;
-                    break;
-                }
-                currentDist += segmentDistances[i];
-            }
-            const p1 = army.path[currentIndex];
-            const p2 = army.path[currentIndex + 1] || p1;
-            const lng = p1[0] + (p2[0] - p1[0]) * segmentProgress;
-            const lat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
-            coords = [lng, lat];
-        } else {
-            coords = army.path[army.path.length - 1];
-        }
-    }
-    return coords;
-}
+// getArmyLocation is imported from movementLogic.js
 
 const runFogOfWarCycle = async () => {
     try {
@@ -166,7 +101,7 @@ const runFogOfWarCycle = async () => {
                 });
 
                 const myArmiesVision = myArmies.map(a => {
-                    return { coords: getEstimatedCoords(a), radius: getArmyVisionRadius(a) };
+                    return { coords: getArmyLocation(a), radius: getArmyVisionRadius(a) };
                 }).filter(a => a.coords !== null);
 
                 const visibleEnemies = [];
@@ -174,7 +109,7 @@ const runFogOfWarCycle = async () => {
                 for (const army of allArmies) {
                     if (army.owner === username) continue;
 
-                    const coords = getEstimatedCoords(army);
+                    const coords = getArmyLocation(army);
                     if (!coords) continue;
 
                     let isVisible = false;
