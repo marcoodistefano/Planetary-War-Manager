@@ -174,11 +174,13 @@ const processActiveCombats = async () => {
 
             let attackerArmy = null;
             let attackerPlayer = null;
+            let attackerAllianceId = null;
 
             for (const p of matchObj.match.player) {
                 if (p.armate && p.armate[id_attaccante]) {
                     attackerArmy = p.armate[id_attaccante];
                     attackerPlayer = p.username;
+                    attackerAllianceId = p.id_alleanza;
                     break;
                 }
             }
@@ -224,6 +226,7 @@ const processActiveCombats = async () => {
 
                 for (const p of matchObj.match.player) {
                     if (p.username === attackerPlayer) continue;
+                    if (attackerAllianceId && p.id_alleanza === attackerAllianceId) continue;
                     if (p.armate) {
                         for (const [aid, a] of Object.entries(p.armate)) {
                             let isTarget = false;
@@ -432,30 +435,50 @@ const processActiveCombats = async () => {
 
                     const freshMatchObj = await getMatch(id_partita_hash);
                     if (freshMatchObj && freshMatchObj.match) {
-                        let regionPolygon = null;
-                        const geojson = getRegionsGeojson();
-                        if (geojson) {
-                            const feature = geojson.features.find(f => f.properties && (f.properties.adm1_code === regionId || f.id === regionId));
-                            if (feature) regionPolygon = feature;
-                        }
+                        const { getArmyLocation, haversineDist } = require('./movementLogic.js');
+                        const attackerLoc = getArmyLocation(attackerArmy);
+                        let attackerRadius = 15;
+                        try {
+                            if (attackerArmy && attackerArmy.composition) {
+                                for (const [id_truppa, qty] of Object.entries(attackerArmy.composition)) {
+                                    if (qty > 0) {
+                                        const troopRules = getTroopStats(id_truppa);
+                                        if (troopRules && troopRules.raggio_visivo && troopRules.raggio_visivo > attackerRadius) {
+                                            attackerRadius = troopRules.raggio_visivo;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch(e) {}
 
-                        for (const pl of freshMatchObj.match.player) {
-                            if (pl.username === attackerPlayer) continue;
-                            if (!pl.armate) continue;
-                            for (const [aid, a] of Object.entries(pl.armate)) {
-                                const { getArmyLocation } = require('./movementLogic.js');
-                                const loc = getArmyLocation(a);
-                                if (loc && regionPolygon) {
-                                    try {
-                                        const pt = turf.point([loc[0], loc[1]]);
-                                        if (turf.booleanPointInPolygon(pt, regionPolygon)) {
+                        const attackerPlayerObj = freshMatchObj.match.player.find(p => p.username === attackerPlayer);
+                        const attackerAllianceId = attackerPlayerObj ? attackerPlayerObj.id_alleanza : null;
+
+                        if (attackerDied || !attackerLoc) {
+                            enemyTroopsRemaining = true; // Se l'attaccante muore non può conquistare
+                        } else {
+                            for (const pl of freshMatchObj.match.player) {
+                                if (pl.username === attackerPlayer) continue;
+                                
+                                let isEnemy = true;
+                                if (attackerAllianceId && pl.id_alleanza === attackerAllianceId) {
+                                    isEnemy = false;
+                                }
+                                if (!isEnemy) continue;
+
+                                if (!pl.armate) continue;
+                                for (const [aid, a] of Object.entries(pl.armate)) {
+                                    const loc = getArmyLocation(a);
+                                    if (loc && attackerLoc) {
+                                        const dist = haversineDist(attackerLoc[0], attackerLoc[1], loc[0], loc[1]);
+                                        if (dist <= attackerRadius) {
                                             enemyTroopsRemaining = true;
                                             break;
                                         }
-                                    } catch(e) {}
+                                    }
                                 }
+                                if (enemyTroopsRemaining) break;
                             }
-                            if (enemyTroopsRemaining) break;
                         }
                     }
 

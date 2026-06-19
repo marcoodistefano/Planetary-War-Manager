@@ -129,15 +129,15 @@ const leave = async (req, res) => {
     // 1. Verifica esistenza partita e stato da Redis
     const cachedMatch = await redis.get(redisKey);
     if (!cachedMatch) {
-      return { status: "404", message: "Partita non trovata." };
+      return res.status(404).json({ error: "Partita non trovata." });
     }
-    const red = redis.set(`match:${matchId}:${playerId}`, "Offline");
+    const red = await redis.set(`match:${matchId}:${playerId}`, "Offline");
     if (red)
-      return res.status(200).json({ message: "Richiesta di leave inviata." });
+      return res.status(200).json({ message: "Richiesta di leave inviata con successo." });
     else
       return res
         .status(500)
-        .json({ error: "Errore durante l'ingresso nella partita" });
+        .json({ error: "Errore durante l'uscita dalla partita." });
   } catch (error) {
     console.error("[SYS_ERR] Cortocircuito leave:", error);
     return res
@@ -146,35 +146,7 @@ const leave = async (req, res) => {
   }
 };
 
-const joinMatch = async (playerId, matchId) => {
-  try {
-    const auth = await getAuthContextFromRequest(req);
-    if (!auth.ok)
-      return { status: "401", message: "Identita non verificabile." };
-    const playerId = auth.userId;
-    const matchId = req.params.id;
-    if (!matchId) return { status: "400", message: "Match id mancante." };
-    const redisKey = `match:${matchId}`;
 
-    // 1. Verifica esistenza partita e stato da Redis
-    const cachedMatch = await redis.get(redisKey);
-    if (!cachedMatch) {
-      return { status: "404", message: "Partita non trovata." };
-    }
-    const red = redis.set(`match:${matchId}:${playerId}`, "Online"); // Indica che il player è in joinato DA VEDERE IL PERCORSO CORRETTO
-    if (red)
-      return res
-        .status(200)
-        .json({ message: "Ingresso avvenuto con successo" });
-    else
-      return res
-        .status(500)
-        .json({ error: "Errore durante l'ingresso nella partita" });
-  } catch (error) {
-    console.error("[SYS_ERR] Cortocircuito joinMatch:", error);
-    return { status: "500", message: "Errore interno", details: error.message };
-  }
-};
 
 const getPlayers = async (req, res) => {
   try {

@@ -532,19 +532,28 @@ if (payload.action === 'MOVE_TROOPS') {
                  }
 
                  let strutture = player.strutture || [];
-                 const existingIdx = strutture.findIndex(s => s.structureId.split('_t')[0] === baseName && (s.regionId === regionId || s.targetName === targetName));
                  let replacedStructureId = null;
 
-                 if (existingIdx !== -1) {
-                     const existingStructure = strutture[existingIdx];
-                     if (reqPrevStructure) {
-                         if (existingStructure.structureId !== reqPrevStructure) return { save: false, data: { error: `Devi prima costruire ${reqPrevStructure} in questa regione.` } };
-                         replacedStructureId = existingStructure.id;
+                 const hasSameBaseIdx = strutture.findIndex(s => s.structureId.split('_t')[0] === baseName && (s.regionId === regionId || s.targetName === targetName));
+
+                 if (reqPrevStructure) {
+                     const prevIdx = strutture.findIndex(s => s.structureId === reqPrevStructure && (s.regionId === regionId || s.targetName === targetName));
+                     if (prevIdx === -1) {
+                         return { save: false, data: { error: `Devi prima costruire ${reqPrevStructure} in questa regione.` } };
+                     }
+                     
+                     const prevBaseName = reqPrevStructure.split('_t')[0];
+                     if (prevBaseName === baseName) {
+                         replacedStructureId = strutture[prevIdx].id;
                      } else {
-                         return { save: false, data: { error: 'Hai già costruito questo tipo di struttura in questa regione.' } };
+                         if (hasSameBaseIdx !== -1) {
+                             return { save: false, data: { error: 'Hai già costruito questo tipo di struttura in questa regione.' } };
+                         }
                      }
                  } else {
-                     if (reqPrevStructure) return { save: false, data: { error: `Devi prima costruire ${reqPrevStructure} in questa regione.` } };
+                     if (hasSameBaseIdx !== -1) {
+                         return { save: false, data: { error: 'Hai già costruito questo tipo di struttura in questa regione.' } };
+                     }
                  }
 
                  let resources = player.risorse;

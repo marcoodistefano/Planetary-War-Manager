@@ -64,8 +64,8 @@ const checkCombatTriggers = async () => {
             let allArmies = [];
             for (const player of matchObj.match.player) {
                 if (player.armate) {
-                    Object.values(player.armate).forEach(a => {
-                        allArmies.push({...a, owner: player.username});
+                    Object.entries(player.armate).forEach(([id, a]) => {
+                        allArmies.push({...a, owner: player.username, id: id});
                     });
                 }
             }

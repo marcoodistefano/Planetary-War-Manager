@@ -1502,30 +1502,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     return { lng, lat };
   }
 
-  startAnimationLoop() {
-    const loop = () => {
-      this.updateMovingArmies();
-      this.animationFrameId = requestAnimationFrame(loop);
-    };
-    this.animationFrameId = requestAnimationFrame(loop);
-  }
 
-  updateMovingArmies() {
-    if (!this.map || !this.matchArmies || this.matchArmies.length === 0) return;
-    let needsUpdate = false;
-    this.matchArmies.forEach(army => {
-      if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
-        const coords = this.getArmyCoordinates(army);
-        if (coords && this.armyMarkers.has(army.id)) {
-          this.armyMarkers.get(army.id).setLngLat(coords);
-          needsUpdate = true;
-        }
-      }
-    });
-    if (needsUpdate && this.map.getZoom() < 5.5) {
-        this.updateArmyMarkersScale();
-    }
-  }
 
   getArmyCoordinates(army: any): [number, number] | null {
     if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {

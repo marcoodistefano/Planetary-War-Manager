@@ -354,9 +354,7 @@ const calculateCurrentPosition = (path, startTime, etaMs) => {
     let totalDistance = 0;
     const segmentDistances = [];
     for (let i = 0; i < path.length - 1; i++) {
-        const dx = path[i+1][0] - path[i][0];
-        const dy = path[i+1][1] - path[i][1];
-        const dist = Math.sqrt(dx*dx + dy*dy);
+        const dist = haversineDist(path[i][0], path[i][1], path[i+1][0], path[i+1][1]);
         segmentDistances.push(dist);
         totalDistance += dist;
     }
