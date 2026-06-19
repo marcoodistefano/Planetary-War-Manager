@@ -111,7 +111,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   isTroopsDropdownOpen = false;
   troopsDropdownX = 0;
   troopsDropdownY = 0;
-  
+
   selectedStructureForBuild: any = null;
   matchStructures: any[] = [];
   structureMarkers = new Map<string, any>();
@@ -126,6 +126,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   matchNations: any[] = [];
   regionsGeoData: any = null;
   nationMarkers: any[] = [];
+  regionsResources: any = {};
   citiesHp: { [cityId: string]: number } = {};
   cityHpMarkers = new Map<string, any>();
   chatUnreadCount = 0;
@@ -275,7 +276,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         if (marker) {
           marker.setLngLat(currentLngLat);
           const el = marker.getElement();
-          
+
           let imgDiv = (marker as any).imgDiv;
           if (!imgDiv) {
             imgDiv = el.querySelector('.army-image') as HTMLElement;
@@ -485,308 +486,324 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         this.matchSocket.onmessage = (event) => {
           let parsed;
-        try {
-          parsed = JSON.parse(event.data);
-        } catch (e) {
-          return;
-        }
+          try {
+            parsed = JSON.parse(event.data);
+          } catch (e) {
+            return;
+          }
 
-        console.log('[WS_MATCH] Evento ricevuoto:', parsed);
+          console.log('[WS_MATCH] Evento ricevuoto:', parsed);
 
-        if (parsed.type === 'INITIAL_STATE') {
-          if (parsed.payload?.armies) {
-            this.matchArmies = parsed.payload.armies.filter((a: any) => a.owner === this.userProfile.username);
-            // Pre-calcola la path cache per le armate già in movimento al momento del caricamento
-            this.matchArmies.forEach((a: any) => {
-              if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
-            });
-            const moving = this.matchArmies.find((a: any) => a.status === "moving");
-            if (moving) console.log("INITIAL_STATE moving army:", moving.id, "startTime:", moving.startTime, "path:", moving.path?.length);
-            this.renderArmies();
-          }
-          if (parsed.payload?.nations) {
-            this.matchNations = parsed.payload.nations;
-            this.applyTerritoryColors();
-          }
-          if (parsed.payload?.resources) {
-            this.playerResources = parsed.payload.resources;
-          }
-          if (parsed.payload?.production) {
-            this.resourceProduction = parsed.payload.production;
-          }
-          if (parsed.payload?.structures) {
-            this.matchStructures = parsed.payload.structures;
-            setTimeout(() => this.renderStructures(), 100);
-          }
-          this.ngZone.run(() => this.cdr.detectChanges());
-        }
-
-        if (parsed.type === 'RESOURCES_UPDATED') {
-          if (parsed.data?.resources) {
-            this.playerResources = parsed.data.resources;
-          }
-          if (parsed.data?.production) {
-            this.resourceProduction = parsed.data.production;
-          }
-          this.ngZone.run(() => this.cdr.detectChanges());
-        }
-
-        if (parsed.type === 'TROOPS_MOVED') {
-          const { armyId, targetName, targetCoords, etaMs, startTime, path, mode } = parsed.data;
-          const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
-          if (armyIndex !== -1) {
-            const newArmies = [...this.matchArmies];
-            newArmies[armyIndex] = { ...newArmies[armyIndex] };
-            newArmies[armyIndex].status = 'moving';
-            newArmies[armyIndex].targetName = targetName;
-            newArmies[armyIndex].targetCoords = targetCoords;
-            newArmies[armyIndex].path = path;
-            newArmies[armyIndex].etaMs = etaMs;
-            newArmies[armyIndex].startTime = startTime || Date.now();
-            if (mode) newArmies[armyIndex].missionMode = mode;
-            // Pre-calcola la cache del path una sola volta appena ricevuto
-            this.precomputeArmyPathCache(newArmies[armyIndex]);
-            this.armyTetherCache.delete(armyId); // Invalida il tether per forzare il ricalcolo al nuovo target
-            this.matchArmies = newArmies;
-          }
-          console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
-          this.renderArmies();
-          this.ngZone.run(() => this.cdr.detectChanges());
-        }
-
-        if (parsed.type === 'TROOPS_ARRIVED') {
-          const { armyId, targetName, targetCoords } = parsed.data;
-          const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
-          if (armyIndex !== -1) {
-            const newArmies = [...this.matchArmies];
-            newArmies[armyIndex] = { ...newArmies[armyIndex] };
-            newArmies[armyIndex].status = 'standby';
-            newArmies[armyIndex].currentLocation = targetCoords || targetName;
-            delete newArmies[armyIndex].targetName;
-            delete newArmies[armyIndex].missionMode;
-            delete newArmies[armyIndex].path;
-            delete newArmies[armyIndex].etaMs;
-            delete newArmies[armyIndex].startTime;
-            delete newArmies[armyIndex]._pathCache; // Libera la cache
-            this.armyTetherCache.delete(armyId); // Invalida tether cache per l'arrivo
-            this.matchArmies = newArmies;
-
-            const hoverSource: any = this.map?.getSource('hovered-troop-path-source');
-            if (hoverSource) {
-              hoverSource.setData({ type: 'FeatureCollection', features: [] });
+          if (parsed.type === 'INITIAL_STATE') {
+            if (parsed.payload?.armies) {
+              this.matchArmies = parsed.payload.armies.filter((a: any) => a.owner === this.userProfile.username);
+              // Pre-calcola la path cache per le armate già in movimento al momento del caricamento
+              this.matchArmies.forEach((a: any) => {
+                if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
+              });
+              const moving = this.matchArmies.find((a: any) => a.status === "moving");
+              if (moving) console.log("INITIAL_STATE moving army:", moving.id, "startTime:", moving.startTime, "path:", moving.path?.length);
+              this.renderArmies();
             }
-            this.hideArmyHoverBanner();
+            if (parsed.payload?.nations) {
+              this.matchNations = parsed.payload.nations;
+              this.applyTerritoryColors();
+            }
+            if (parsed.payload?.resources) {
+              this.playerResources = parsed.payload.resources;
+            }
+            if (parsed.payload?.production) {
+              this.resourceProduction = parsed.payload.production;
+            }
+            if (parsed.payload?.structures) {
+              this.matchStructures = parsed.payload.structures;
+              setTimeout(() => this.renderStructures(), 100);
+            }
+            if (parsed.payload?.regionsResources) {
+              this.regionsResources = parsed.payload.regionsResources;
+            }
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
 
-            const marker = this.armyMarkers.get(armyId);
-            if (marker) {
-              const el = marker.getElement();
-              const imgDiv = el.querySelector('.army-image') as HTMLElement;
-              if (imgDiv) {
-                const assetUrl = this.getArmyModelAssetUrl(this.matchArmies[armyIndex], 'front');
-                imgDiv.style.backgroundImage = `url(${assetUrl})`;
-                imgDiv.style.transform = 'scaleX(1)';
+          if (parsed.type === 'RESOURCES_UPDATED') {
+            if (parsed.data?.resources) {
+              this.playerResources = parsed.data.resources;
+            }
+            if (parsed.data?.production) {
+              this.resourceProduction = parsed.data.production;
+            }
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'TROOPS_MOVED') {
+            const { armyId, targetName, targetCoords, etaMs, startTime, path, mode } = parsed.data;
+            const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
+            if (armyIndex !== -1) {
+              const newArmies = [...this.matchArmies];
+              newArmies[armyIndex] = { ...newArmies[armyIndex] };
+              newArmies[armyIndex].status = 'moving';
+              newArmies[armyIndex].targetName = targetName;
+              newArmies[armyIndex].targetCoords = targetCoords;
+              newArmies[armyIndex].path = path;
+              newArmies[armyIndex].etaMs = etaMs;
+              newArmies[armyIndex].startTime = startTime || Date.now();
+              if (mode) newArmies[armyIndex].missionMode = mode;
+              // Pre-calcola la cache del path una sola volta appena ricevuto
+              this.precomputeArmyPathCache(newArmies[armyIndex]);
+              this.armyTetherCache.delete(armyId); // Invalida il tether per forzare il ricalcolo al nuovo target
+              this.matchArmies = newArmies;
+            }
+            console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
+            this.renderArmies();
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'TROOPS_ARRIVED') {
+            const { armyId, targetName, targetCoords } = parsed.data;
+            const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
+            if (armyIndex !== -1) {
+              const newArmies = [...this.matchArmies];
+              newArmies[armyIndex] = { ...newArmies[armyIndex] };
+              newArmies[armyIndex].status = 'standby';
+              newArmies[armyIndex].currentLocation = targetCoords || targetName;
+              delete newArmies[armyIndex].targetName;
+              delete newArmies[armyIndex].missionMode;
+              delete newArmies[armyIndex].path;
+              delete newArmies[armyIndex].etaMs;
+              delete newArmies[armyIndex].startTime;
+              delete newArmies[armyIndex]._pathCache; // Libera la cache
+              this.armyTetherCache.delete(armyId); // Invalida tether cache per l'arrivo
+              this.matchArmies = newArmies;
+
+              const hoverSource: any = this.map?.getSource('hovered-troop-path-source');
+              if (hoverSource) {
+                hoverSource.setData({ type: 'FeatureCollection', features: [] });
+              }
+              this.hideArmyHoverBanner();
+
+              const marker = this.armyMarkers.get(armyId);
+              if (marker) {
+                const el = marker.getElement();
+                const imgDiv = el.querySelector('.army-image') as HTMLElement;
+                if (imgDiv) {
+                  const assetUrl = this.getArmyModelAssetUrl(this.matchArmies[armyIndex], 'front');
+                  imgDiv.style.backgroundImage = `url(${assetUrl})`;
+                  imgDiv.style.transform = 'scaleX(1)';
+                }
+              }
+            }
+            console.log(`[WS_MATCH] Armata arrivata a ${targetName}.`);
+            this.renderArmies();
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'MISSION_CANCELLED') {
+            const { armyId, newLocation } = parsed.payload;
+            const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
+            if (armyIndex !== -1) {
+              const newArmies = [...this.matchArmies];
+              newArmies[armyIndex] = { ...newArmies[armyIndex] };
+              newArmies[armyIndex].status = 'standby';
+              newArmies[armyIndex].currentLocation = newLocation || newArmies[armyIndex].currentLocation;
+              delete newArmies[armyIndex].targetName;
+              delete newArmies[armyIndex].missionMode;
+              delete newArmies[armyIndex].path;
+              delete newArmies[armyIndex].etaMs;
+              delete newArmies[armyIndex].startTime;
+              delete newArmies[armyIndex]._pathCache; // Libera la cache
+              this.matchArmies = newArmies;
+
+              const hoverSource: any = this.map?.getSource('hovered-troop-path-source');
+              if (hoverSource) {
+                hoverSource.setData({ type: 'FeatureCollection', features: [] });
+              }
+              this.hideArmyHoverBanner();
+            }
+            console.log(`[WS_MATCH] Missione armata ${armyId} annullata.`);
+            this.renderArmies();
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'COMBAT_CANCELLED') {
+            const { armyId } = parsed.data;
+            const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
+            if (armyIndex !== -1) {
+              const newArmies = [...this.matchArmies];
+              newArmies[armyIndex] = { ...newArmies[armyIndex] };
+              newArmies[armyIndex].status = 'standby';
+              delete newArmies[armyIndex].targetName;
+              delete newArmies[armyIndex].missionMode;
+              delete newArmies[armyIndex].path;
+              delete newArmies[armyIndex].etaMs;
+              delete newArmies[armyIndex].startTime;
+              delete newArmies[armyIndex].next_round_time;
+              delete newArmies[armyIndex]._pathCache; // Libera la cache
+              this.matchArmies = newArmies;
+              this.renderArmies();
+              this.ngZone.run(() => this.cdr.detectChanges());
+            }
+          }
+
+          if (parsed.type === 'TROOPS_SPAWNED') {
+            const { userId, army } = parsed.data;
+            if (userId === this.userProfile.username) {
+              this.matchArmies.push(army);
+              console.log(`[WS_MATCH] Nuova truppa generata a Palermo per l'utente ${userId}!`);
+            }
+            this.renderArmies();
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'FOG_OF_WAR_UPDATE') {
+            let visibleEnemies = [];
+            let myArmies = [];
+
+            if (Array.isArray(parsed.payload)) {
+              visibleEnemies = parsed.payload;
+              myArmies = this.matchArmies.filter(a => a.owner === this.userProfile.username);
+            } else if (parsed.payload && typeof parsed.payload === 'object') {
+              visibleEnemies = parsed.payload.visibleEnemies || [];
+              myArmies = parsed.payload.myArmies || this.matchArmies.filter(a => a.owner === this.userProfile.username);
+              this.citiesHp = parsed.payload.citiesHp || {};
+            }
+
+            const newArmies = [...myArmies, ...visibleEnemies];
+
+            // Mantieni la path cache e altri flag visivi per evitare ricalcoli costanti e lag loop
+            newArmies.forEach(newA => {
+              const oldA = this.matchArmies.find(a => a.id === newA.id);
+              if (oldA) {
+                if (oldA._pathCache) newA._pathCache = oldA._pathCache;
+                if (oldA._hasVisuallyArrived) newA._hasVisuallyArrived = oldA._hasVisuallyArrived;
+              }
+            });
+
+            this.matchArmies = newArmies;
+            this.renderArmies();
+            this.renderCitiesHp();
+            this.applyTerritoryColors();
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'PLAYER_JOINED') {
+            console.log(`[WS_MATCH] Un nuovo giocatore si è unito: ${parsed.payload.newPlayer}`);
+            if (parsed.payload?.nations) {
+              this.matchNations = parsed.payload.nations;
+              this.applyTerritoryColors();
+            }
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'WAR_DECLARED' || parsed.type === 'TERRITORY_CONQUERED' || parsed.type === 'DIPLOMACY_UPDATED') {
+            console.log(`[WS_MATCH] Aggiornamento mappa (${parsed.type})`);
+            const updatedNations = parsed.nations || parsed.payload?.nations;
+            if (updatedNations) {
+              this.matchNations = updatedNations;
+              this.applyTerritoryColors();
+
+              if (parsed.type === 'TERRITORY_CONQUERED') {
+                let updatedStructures: any[] = [];
+                for (const n of this.matchNations) {
+                  if (n.strutture) {
+                    updatedStructures = updatedStructures.concat(n.strutture.map((s: any) => ({ ...s, owner: n.username })));
+                  }
+                }
+                if (updatedStructures.length > 0) {
+                  this.matchStructures = updatedStructures;
+                  this.renderStructures();
+                }
+              }
+            }
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'ALLIANCE_UPDATED') {
+            console.log(`[WS_MATCH] Aggiornamento alleanze (${parsed.type})`);
+            this.reloadMatchAlliances();
+          }
+
+          if (parsed.type === 'COMBAT_EVENT') {
+            const { attacker, defender, damage, result, players } = parsed.payload;
+            if (players && players.includes(this.userProfile.username)) {
+              let color = 'primary';
+              let icon = 'information-circle-outline';
+              if (result === 'distrutta') {
+                color = 'danger';
+                icon = 'skull-outline';
+              }
+              if (result === 'sopravvissuta') {
+                color = 'warning';
+                icon = 'shield-half-outline';
+              }
+
+              const message = `Scontro: ${attacker} vs ${defender} (Danno: ${damage}). Esito: ${result}.`;
+              this.toastCtrl.create({
+                message: message,
+                duration: 4000,
+                position: 'top',
+                color: color,
+                icon: icon
+              }).then(t => t.present());
+
+              // Ricarica il cimitero in tempo reale se la modale è aperta sulla tab storico
+              if (this.isArmyModalOpen && this.armyModalComponent && this.armyModalComponent.activeTab === 'storico') {
+                this.armyModalComponent.loadGraveyard();
               }
             }
           }
-          console.log(`[WS_MATCH] Armata arrivata a ${targetName}.`);
-          this.renderArmies();
-          this.ngZone.run(() => this.cdr.detectChanges());
-        }
 
-        if (parsed.type === 'MISSION_CANCELLED') {
-          const { armyId, newLocation } = parsed.payload;
-          const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
-          if (armyIndex !== -1) {
-            const newArmies = [...this.matchArmies];
-            newArmies[armyIndex] = { ...newArmies[armyIndex] };
-            newArmies[armyIndex].status = 'standby';
-            newArmies[armyIndex].currentLocation = newLocation || newArmies[armyIndex].currentLocation;
-            delete newArmies[armyIndex].targetName;
-            delete newArmies[armyIndex].missionMode;
-            delete newArmies[armyIndex].path;
-            delete newArmies[armyIndex].etaMs;
-            delete newArmies[armyIndex].startTime;
-            delete newArmies[armyIndex]._pathCache; // Libera la cache
-            this.matchArmies = newArmies;
-
-            const hoverSource: any = this.map?.getSource('hovered-troop-path-source');
-            if (hoverSource) {
-              hoverSource.setData({ type: 'FeatureCollection', features: [] });
-            }
-            this.hideArmyHoverBanner();
-          }
-          console.log(`[WS_MATCH] Missione armata ${armyId} annullata.`);
-          this.renderArmies();
-          this.ngZone.run(() => this.cdr.detectChanges());
-        }
-
-        if (parsed.type === 'COMBAT_CANCELLED') {
-          const { armyId } = parsed.data;
-          const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
-          if (armyIndex !== -1) {
-            const newArmies = [...this.matchArmies];
-            newArmies[armyIndex] = { ...newArmies[armyIndex] };
-            newArmies[armyIndex].status = 'standby';
-            delete newArmies[armyIndex].targetName;
-            delete newArmies[armyIndex].missionMode;
-            delete newArmies[armyIndex].path;
-            delete newArmies[armyIndex].etaMs;
-            delete newArmies[armyIndex].startTime;
-            delete newArmies[armyIndex].next_round_time;
-            delete newArmies[armyIndex]._pathCache; // Libera la cache
-            this.matchArmies = newArmies;
-            this.renderArmies();
-            this.ngZone.run(() => this.cdr.detectChanges());
-          }
-        }
-
-        if (parsed.type === 'TROOPS_SPAWNED') {
-          const { userId, army } = parsed.data;
-          if (userId === this.userProfile.username) {
-            this.matchArmies.push(army);
-            console.log(`[WS_MATCH] Nuova truppa generata a Palermo per l'utente ${userId}!`);
-          }
-          this.renderArmies();
-          this.ngZone.run(() => this.cdr.detectChanges());
-        }
-
-        if (parsed.type === 'FOG_OF_WAR_UPDATE') {
-          let visibleEnemies = [];
-          let myArmies = [];
-          
-          if (Array.isArray(parsed.payload)) {
-             visibleEnemies = parsed.payload;
-             myArmies = this.matchArmies.filter(a => a.owner === this.userProfile.username);
-          } else if (parsed.payload && typeof parsed.payload === 'object') {
-             visibleEnemies = parsed.payload.visibleEnemies || [];
-             myArmies = parsed.payload.myArmies || this.matchArmies.filter(a => a.owner === this.userProfile.username);
-             this.citiesHp = parsed.payload.citiesHp || {};
-          }
-          
-          const newArmies = [...myArmies, ...visibleEnemies];
-          
-          // Mantieni la path cache e altri flag visivi per evitare ricalcoli costanti e lag loop
-          newArmies.forEach(newA => {
-             const oldA = this.matchArmies.find(a => a.id === newA.id);
-             if (oldA) {
-                if (oldA._pathCache) newA._pathCache = oldA._pathCache;
-                if (oldA._hasVisuallyArrived) newA._hasVisuallyArrived = oldA._hasVisuallyArrived;
-             }
-          });
-          
-          this.matchArmies = newArmies;
-          this.renderArmies();
-          this.renderCitiesHp();
-          this.applyTerritoryColors();
-          this.ngZone.run(() => this.cdr.detectChanges());
-        }
-
-        if (parsed.type === 'PLAYER_JOINED') {
-          console.log(`[WS_MATCH] Un nuovo giocatore si è unito: ${parsed.payload.newPlayer}`);
-          if (parsed.payload?.nations) {
-            this.matchNations = parsed.payload.nations;
-            this.applyTerritoryColors();
-          }
-          this.ngZone.run(() => this.cdr.detectChanges());
-        }
-
-        if (parsed.type === 'WAR_DECLARED' || parsed.type === 'TERRITORY_CONQUERED' || parsed.type === 'DIPLOMACY_UPDATED') {
-          console.log(`[WS_MATCH] Aggiornamento mappa (${parsed.type})`);
-          const updatedNations = parsed.nations || parsed.payload?.nations;
-          if (updatedNations) {
-            this.matchNations = updatedNations;
-            this.applyTerritoryColors();
-          }
-          this.ngZone.run(() => this.cdr.detectChanges());
-        }
-
-        if (parsed.type === 'ALLIANCE_UPDATED') {
-          console.log(`[WS_MATCH] Aggiornamento alleanze (${parsed.type})`);
-          this.reloadMatchAlliances();
-        }
-
-        if (parsed.type === 'COMBAT_EVENT') {
-          const { attacker, defender, damage, result, players } = parsed.payload;
-          if (players && players.includes(this.userProfile.username)) {
-            let color = 'primary';
-            let icon = 'information-circle-outline';
-            if (result === 'distrutta') {
-              color = 'danger';
-              icon = 'skull-outline';
-            }
-            if (result === 'sopravvissuta') {
-              color = 'warning';
-              icon = 'shield-half-outline';
-            }
-            
-            const message = `Scontro: ${attacker} vs ${defender} (Danno: ${damage}). Esito: ${result}.`;
+          if (parsed.type === 'BUILD_SUCCESS') {
             this.toastCtrl.create({
-              message: message,
-              duration: 4000,
+              message: `Struttura ${parsed.payload.name} costruita con successo!`,
+              duration: 3000,
               position: 'top',
-              color: color,
-              icon: icon
+              color: 'success'
             }).then(t => t.present());
 
-            // Ricarica il cimitero in tempo reale se la modale è aperta sulla tab storico
-            if (this.isArmyModalOpen && this.armyModalComponent && this.armyModalComponent.activeTab === 'storico') {
-              this.armyModalComponent.loadGraveyard();
+            if (parsed.replacedStructureId) {
+              const oldMarker = this.structureMarkers.get(parsed.replacedStructureId);
+              if (oldMarker) { oldMarker.remove(); this.structureMarkers.delete(parsed.replacedStructureId); }
+              this.matchStructures = this.matchStructures.filter(s => s.id !== parsed.replacedStructureId);
             }
-          }
-        }
-
-        if (parsed.type === 'BUILD_SUCCESS') {
-          this.toastCtrl.create({
-            message: `Struttura ${parsed.payload.name} costruita con successo!`,
-            duration: 3000,
-            position: 'top',
-            color: 'success'
-          }).then(t => t.present());
-          
-          if (parsed.replacedStructureId) {
-             const oldMarker = this.structureMarkers.get(parsed.replacedStructureId);
-             if (oldMarker) { oldMarker.remove(); this.structureMarkers.delete(parsed.replacedStructureId); }
-             this.matchStructures = this.matchStructures.filter(s => s.id !== parsed.replacedStructureId);
-          }
-          this.matchStructures.push(parsed.payload);
-          this.renderStructures();
-          this.ngZone.run(() => this.cdr.detectChanges());
-        }
-
-        if (parsed.type === 'STRUCTURE_BUILT') {
-          if (parsed.replacedStructureId) {
-             const oldMarker = this.structureMarkers.get(parsed.replacedStructureId);
-             if (oldMarker) { oldMarker.remove(); this.structureMarkers.delete(parsed.replacedStructureId); }
-             this.matchStructures = this.matchStructures.filter(s => s.id !== parsed.replacedStructureId);
-          }
-          if (parsed.data.owner !== this.userProfile.username) {
-            this.matchStructures.push(parsed.data);
+            this.matchStructures.push(parsed.payload);
             this.renderStructures();
             this.ngZone.run(() => this.cdr.detectChanges());
           }
-        }
 
-        if (parsed.type === 'ERROR') {
-          this.toastCtrl.create({
-            message: parsed.error || 'Si è verificato un errore',
-            duration: 3000,
-            position: 'top',
-            color: 'danger'
-          }).then(t => t.present());
-        }
-      };
+          if (parsed.type === 'STRUCTURE_BUILT') {
+            if (parsed.replacedStructureId) {
+              const oldMarker = this.structureMarkers.get(parsed.replacedStructureId);
+              if (oldMarker) { oldMarker.remove(); this.structureMarkers.delete(parsed.replacedStructureId); }
+              this.matchStructures = this.matchStructures.filter(s => s.id !== parsed.replacedStructureId);
+            }
+            if (parsed.data.owner !== this.userProfile.username) {
+              this.matchStructures.push(parsed.data);
+              this.renderStructures();
+              this.ngZone.run(() => this.cdr.detectChanges());
+            }
+          }
 
-      this.matchSocket.onerror = (error) => {
-        console.error('[WS_MATCH] Errore di connessione:', error);
-      };
+          if (parsed.type === 'ERROR') {
+            this.toastCtrl.create({
+              message: parsed.error || 'Si è verificato un errore',
+              duration: 3000,
+              position: 'top',
+              color: 'danger'
+            }).then(t => t.present());
+          }
+        };
 
-      this.matchSocket.onclose = (event) => {
-        console.log('[WS_MATCH] Connessione chiusa', event.code, event.reason);
-        if (this.shouldReconnect) {
-          console.log('[WS_MATCH] Riconnessione in corso tra 3 secondi...');
-          this.reconnectTimer = window.setTimeout(() => this.connectMatchSocket(), 3000);
-        }
-      };
+        this.matchSocket.onerror = (error) => {
+          console.error('[WS_MATCH] Errore di connessione:', error);
+        };
+
+        this.matchSocket.onclose = (event) => {
+          console.log('[WS_MATCH] Connessione chiusa', event.code, event.reason);
+          if (this.shouldReconnect) {
+            console.log('[WS_MATCH] Riconnessione in corso tra 3 secondi...');
+            this.reconnectTimer = window.setTimeout(() => this.connectMatchSocket(), 3000);
+          }
+        };
       }); // Close ngZone.runOutsideAngular
     } catch (error) {
       console.error('[WS_MATCH] Eccezione durante la connessione:', error);
@@ -1063,55 +1080,55 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.hideArmyHoverBanner();
 
     const updateBanner = () => {
-        const currentArmy = this.matchArmies.find(a => a.id === army.id) || army;
-        
-        let calculatedDmg = 0;
-        let calculatedMaxHp = 0;
-        if (this.gameRules?.sheets) {
-            const truppeSheet = this.gameRules.sheets.find((s: any) => s.name === 'Truppe');
-            if (truppeSheet && currentArmy.composition) {
-                for (const [troopId, count] of Object.entries(currentArmy.composition)) {
-                    const stats = truppeSheet.lines.find((l: any) => l.id_truppa === troopId);
-                    if (stats && Number(count) > 0) {
-                        calculatedDmg += (stats.danno_base || 0) * Number(count);
-                        calculatedMaxHp += (stats.HP || 10) * Number(count);
-                    }
-                }
+      const currentArmy = this.matchArmies.find(a => a.id === army.id) || army;
+
+      let calculatedDmg = 0;
+      let calculatedMaxHp = 0;
+      if (this.gameRules?.sheets) {
+        const truppeSheet = this.gameRules.sheets.find((s: any) => s.name === 'Truppe');
+        if (truppeSheet && currentArmy.composition) {
+          for (const [troopId, count] of Object.entries(currentArmy.composition)) {
+            const stats = truppeSheet.lines.find((l: any) => l.id_truppa === troopId);
+            if (stats && Number(count) > 0) {
+              calculatedDmg += (stats.danno_base || 0) * Number(count);
+              calculatedMaxHp += (stats.HP || 10) * Number(count);
             }
+          }
         }
+      }
 
-        const dmg = calculatedDmg > 0 ? calculatedDmg : (currentArmy.damage || currentArmy.dmg_tot || 0);
-        const hp = currentArmy.hp !== undefined ? currentArmy.hp : (calculatedMaxHp > 0 ? calculatedMaxHp : 100);
-        const stato = String(currentArmy.status || 'Standby').toUpperCase();
+      const dmg = calculatedDmg > 0 ? calculatedDmg : (currentArmy.damage || currentArmy.dmg_tot || 0);
+      const hp = currentArmy.hp !== undefined ? currentArmy.hp : (calculatedMaxHp > 0 ? calculatedMaxHp : 100);
+      const stato = String(currentArmy.status || 'Standby').toUpperCase();
 
-        let timeInfo = '';
-        const now = Date.now();
-        
-        if (currentArmy.status === 'in combattimento' && currentArmy.next_round_time) {
-            const nextRoundDate = new Date(currentArmy.next_round_time).getTime();
-            const diff = nextRoundDate - now;
-            if (diff > 0) {
-                const mins = Math.floor(diff / 60000);
-                const secs = Math.floor((diff % 60000) / 1000);
-                timeInfo = `<div style="margin-top: 6px; color: #f87171; font-weight: bold;">Prossimo Attacco in: ${mins}:${secs.toString().padStart(2, '0')}</div>`;
-            } else {
-                timeInfo = `<div style="margin-top: 6px; color: #f87171; font-weight: bold;">Attacco in corso...</div>`;
-            }
-        } else if ((currentArmy.status === 'moving' || currentArmy.status === 'moving_to_border' || currentArmy.status === "Pronto all'attacco") && currentArmy.startTime && currentArmy.etaMs) {
-            const endMovementTime = currentArmy.startTime + currentArmy.etaMs;
-            const diff = endMovementTime - now;
-            if (diff > 0) {
-                const hours = Math.floor(diff / 3600000);
-                const mins = Math.floor((diff % 3600000) / 60000);
-                const secs = Math.floor((diff % 60000) / 1000);
-                const timeStr = hours > 0 
-                    ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-                    : `${mins}:${secs.toString().padStart(2, '0')}`;
-                timeInfo = `<div style="margin-top: 6px; color: #eab308; font-weight: bold;">Arrivo tra: ${timeStr}</div>`;
-            }
+      let timeInfo = '';
+      const now = Date.now();
+
+      if (currentArmy.status === 'in combattimento' && currentArmy.next_round_time) {
+        const nextRoundDate = new Date(currentArmy.next_round_time).getTime();
+        const diff = nextRoundDate - now;
+        if (diff > 0) {
+          const mins = Math.floor(diff / 60000);
+          const secs = Math.floor((diff % 60000) / 1000);
+          timeInfo = `<div style="margin-top: 6px; color: #f87171; font-weight: bold;">Prossimo Attacco in: ${mins}:${secs.toString().padStart(2, '0')}</div>`;
+        } else {
+          timeInfo = `<div style="margin-top: 6px; color: #f87171; font-weight: bold;">Attacco in corso...</div>`;
         }
+      } else if ((currentArmy.status === 'moving' || currentArmy.status === 'moving_to_border' || currentArmy.status === "Pronto all'attacco") && currentArmy.startTime && currentArmy.etaMs) {
+        const endMovementTime = currentArmy.startTime + currentArmy.etaMs;
+        const diff = endMovementTime - now;
+        if (diff > 0) {
+          const hours = Math.floor(diff / 3600000);
+          const mins = Math.floor((diff % 3600000) / 60000);
+          const secs = Math.floor((diff % 60000) / 1000);
+          const timeStr = hours > 0
+            ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+            : `${mins}:${secs.toString().padStart(2, '0')}`;
+          timeInfo = `<div style="margin-top: 6px; color: #eab308; font-weight: bold;">Arrivo tra: ${timeStr}</div>`;
+        }
+      }
 
-        const popupHtml = `
+      const popupHtml = `
           <div style="background: rgba(15, 23, 42, 0.9); color: #e2e8f0; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155; font-family: 'JetBrains Mono', monospace; font-size: 11px; backdrop-filter: blur(4px); box-shadow: 0 4px 6px rgba(0,0,0,0.5); width: max-content;">
               <div style="color: #60a5fa; font-weight: bold; margin-bottom: 6px; font-size: 12px; text-transform: uppercase;">${currentArmy.name}</div>
               <div style="display: flex; gap: 12px; font-weight: 600;">
@@ -1123,27 +1140,27 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           </div>
         `;
 
-        if (!this.armyHoverPopup) {
-            this.armyHoverPopup = new maplibregl.Popup({
-                closeButton: false,
-                closeOnClick: false,
-                anchor: 'bottom',
-                offset: [0, -40],
-                className: 'tactical-hover-popup'
-            })
-            .setLngLat(coordinates)
-            .setHTML(popupHtml)
-            .addTo(this.map);
+      if (!this.armyHoverPopup) {
+        this.armyHoverPopup = new maplibregl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          anchor: 'bottom',
+          offset: [0, -40],
+          className: 'tactical-hover-popup'
+        })
+          .setLngLat(coordinates)
+          .setHTML(popupHtml)
+          .addTo(this.map);
 
-            const popupContent = this.armyHoverPopup.getElement().querySelector('.maplibregl-popup-content');
-            if (popupContent) {
-                popupContent.style.padding = '0';
-                popupContent.style.background = 'transparent';
-                popupContent.style.boxShadow = 'none';
-            }
-        } else {
-            this.armyHoverPopup.setHTML(popupHtml);
+        const popupContent = this.armyHoverPopup.getElement().querySelector('.maplibregl-popup-content');
+        if (popupContent) {
+          popupContent.style.padding = '0';
+          popupContent.style.background = 'transparent';
+          popupContent.style.boxShadow = 'none';
         }
+      } else {
+        this.armyHoverPopup.setHTML(popupHtml);
+      }
     };
 
     updateBanner();
@@ -1262,7 +1279,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  startConstruction(item: any) { 
+  startConstruction(item: any) {
     this.selectedStructureForBuild = item;
     this.isBuildPanelOpen = false;
     this.toastCtrl.create({
@@ -1426,6 +1443,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       if (zoomThrottleTimer) return;
       zoomThrottleTimer = setTimeout(() => {
         this.updateArmyMarkersScale();
+        this.updateStructureMarkersScale();
         this.updateNationBannersVisibility();
         zoomThrottleTimer = null;
       }, 100);
@@ -1478,7 +1496,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.matchStructures.forEach(structure => {
       let coords: [number, number] | null = null;
       if (structure.targetCoords && Array.isArray(structure.targetCoords) && structure.targetCoords.length >= 2) {
-         coords = [structure.targetCoords[0], structure.targetCoords[1]];
+        coords = [structure.targetCoords[0], structure.targetCoords[1]];
       }
 
       if (!coords) return;
@@ -1489,27 +1507,32 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const el = document.createElement('div');
         el.className = 'structure-marker-wrapper';
         el.style.position = 'relative';
-        el.style.width = '30px';
-        el.style.height = '30px';
-        el.style.cursor = 'pointer';
+        el.style.width = '0px';
+        el.style.height = '0px';
         el.style.zIndex = '5'; // Sotto le armate (zIndex 10)
 
         // Wrapper per l'immagine
         const container = document.createElement('div');
-        container.style.width = '100%';
-        container.style.height = '100%';
-        container.style.position = 'relative';
+        container.className = 'structure-container';
+        container.style.width = '30px';
+        container.style.height = '30px';
+        container.style.position = 'absolute';
+        container.style.top = '50%';
+        container.style.left = '50%';
+        container.style.transform = 'translate(-50%, -50%)';
         container.style.display = 'flex';
         container.style.alignItems = 'center';
         container.style.justifyContent = 'center';
-        
+        container.style.cursor = 'pointer';
+
         // Determina l'immagine PNG
         let png = 'fabbrica.png';
         const name = (structure.name || '').toLowerCase();
+
         if (name.includes('segheria') || name.includes('boschivo')) png = 'segheria.png';
-        else if (name.includes('miniera') || name.includes('scavo')) {
-           if (name.includes('oro')) png = 'miniera_oro.png';
-           else png = 'carbone.png'; // Fallback per altre miniere (es. piombo)
+        else if (name.includes('miniera') || name.includes('scavo') || name.includes('carbone')) {
+          if (name.includes('oro')) png = 'miniera_oro.png';
+          else png = 'carbone.png'; // Fallback per altre miniere (es. piombo)
         }
         else if (name.includes('mattonificio') || name.includes('fornace')) png = 'mattonificio.png';
         else if (name.includes('acciaieria') || name.includes('fonderia')) png = 'acciaieria.png';
@@ -1517,24 +1540,40 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         else if (name.includes('gas')) png = 'gas.png';
         else if (name.includes('fortezza')) png = 'fortezza.png';
         else if (name.includes('caserma')) png = 'caserma.png';
-        else if (name.includes('fabbrica armamenti')) png = 'fabbrica.png';
-        else if (name.includes('aeroporto')) png = 'airport1.png';
-        else if (name.includes('porto')) png = 'port_est.png';
+        else if (name.includes('fabbrica') || name.includes('armamenti')) png = 'fabbrica.png';
+        else if (name.includes('aeroporto')) {
+          if (name.includes('2') || name.includes('avanzato')) png = 'airport2.png';
+          else png = 'airport1.png';
+        }
+        else if (name.includes('porto')) {
+          if (name.includes('nord')) png = 'port_nord.png';
+          else if (name.includes('sud')) png = 'port_sud.png';
+          else if (name.includes('ovest')) png = 'port_ovest.png';
+          else png = 'port_est.png';
+        }
         else if (name.includes('uranio')) png = 'arricchimento_uranio.png';
-        else if (name.includes('radar')) png = 'radar_terrestre.png';
-        
+        else if (name.includes('radar')) {
+          if (name.includes('aereo') || name.includes('volo')) png = 'radar_aereo.png';
+          else png = 'radar_terrestre.png';
+        }
+        else if (name.includes('treno') || name.includes('stazione') || name.includes('ferrov')) {
+          png = 'train_station.png';
+        }
+        else if (name.includes('hangar')) png = 'hangar.png';
+        else if (name.includes('sampt') || name.includes('missil') || name.includes('difes')) png = 'sampt.png';
+
         const img = document.createElement('img');
         img.src = `assets/2Dmodels/Buildings/${png}`;
         img.style.width = '100%';
         img.style.height = '100%';
         img.style.objectFit = 'contain';
-        img.style.filter = isMine ? 'drop-shadow(0 0 5px #60a5fa)' : 'drop-shadow(0 0 5px #f87171)';
+        img.style.filter = isMine ? 'drop-shadow(0 0 5px #60a5fa)' : 'drop-shadow(0 0 5px #ef4444)';
         img.title = `${structure.name} (${structure.owner})`;
-        
+
         container.appendChild(img);
         el.appendChild(container);
 
-        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat(coords)
           .addTo(this.map);
 
@@ -1544,6 +1583,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         marker.setLngLat(coords);
       }
     });
+
+    this.updateStructureMarkersScale();
   }
 
   // --- RENDERING ARMATE SU MAPPA ---
@@ -1564,7 +1605,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     let hasArmies = false;
     const tetherFeatures: any[] = [];
     const movingPathsFeatures: any[] = [];
-    
+
     // Mappa per tenere traccia delle armate sulle stesse coordinate per evitare sovrapposizioni
     const coordinateCounts = new Map<string, number>();
 
@@ -1622,8 +1663,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 0) {
         let progress = 0;
         if (army.startTime && army.etaMs) {
-           const elapsed = Date.now() - army.startTime;
-           progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
+          const elapsed = Date.now() - army.startTime;
+          progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
         }
         if (progress < 1) {
           movingPathsFeatures.push({
@@ -1915,7 +1956,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
                       popup.remove();
                       if (this.activeArmyPopup === popup) this.activeArmyPopup = null;
-                      
+
                       this.toastCtrl.create({
                         message: `${this.selectedArmiesForMovement.length} armate selezionate.`,
                         duration: 2000,
@@ -2076,6 +2117,37 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  updateStructureMarkersScale() {
+    if (!this.map) return;
+    const currentZoom = this.map.getZoom();
+
+    // Scompare se lo zoom è inferiore a 5.5
+    const thresholdZoom = 5.5;
+
+    // Scala proporzionalmente (più lo zoom è alto, più l'edificio è grande)
+    const minSize = 40;
+    const maxSize = 120;
+    const minZoom = 5.5;
+    const maxZoom = 10.0;
+
+    const scaleFactor = Math.min(Math.max((currentZoom - minZoom) / (maxZoom - minZoom), 0), 1);
+    const dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
+
+    this.structureMarkers.forEach((marker: any) => {
+      const el = marker.getElement();
+      const container = el.querySelector('.structure-container') as HTMLElement;
+      if (!container) return;
+
+      if (currentZoom < thresholdZoom) {
+        el.style.display = 'none';
+      } else {
+        el.style.display = 'block';
+        container.style.width = `${dynamicSize}px`;
+        container.style.height = `${dynamicSize}px`;
+      }
+    });
+  }
+
   // --- RENDERING BARRE HP CITTA ---
   renderCitiesHp() {
     if (!this.map || !this.nodesGeoData?.features) return;
@@ -2138,14 +2210,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         marker = new (window as any).maplibregl.Marker({ element: el })
           .setLngLat([center[0], center[1]])
           .addTo(this.map);
-        
+
         this.cityHpMarkers.set(cityId, marker);
       }
 
       const el = marker.getElement();
       const bar = el.querySelector('.city-hp-bar') as HTMLElement;
       const text = el.querySelector('.city-hp-text') as HTMLElement;
-      
+
       const percent = Math.max(0, Math.min(100, (hp / 1000) * 100));
       if (bar) bar.style.width = `${percent}%`;
       if (text) text.innerText = `${hp}/1000`;
@@ -2388,10 +2460,25 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.activePopup.remove();
     }
 
+    let resourcesHtml = '';
+    if (this.regionsResources && this.regionsResources[provId]) {
+      const res = this.regionsResources[provId];
+      resourcesHtml = `
+        <div style="margin-top: 8px;">
+          <span style="font-size: 0.65rem; color: #86d7ff; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Risorse Estraibili</span>
+          <div style="font-size: 0.85rem; color: #ddd; margin-top: 2px;">
+            <span style="color: #4ade80; text-transform: capitalize;">${res.more_common.replace('_', ' ')}</span> (comune)<br>
+            <span style="color: #f87171; text-transform: capitalize;">${res.less_common.replace('_', ' ')}</span> (rara)
+          </div>
+        </div>
+      `;
+    }
+
     const popupHtml = `
       <div class="tactical-popup-container">
         <span style="font-size: 0.65rem; color: #86d7ff; font-weight: 900; letter-spacing: 1px; margin-bottom: 4px; text-transform: uppercase;">Dominio</span>
         <span style="font-size: 1.1rem; color: #fff; font-weight: 700; font-family: 'JetBrains Mono', monospace;">${owner}</span>
+        ${resourcesHtml}
       </div>
     `;
 
@@ -2552,30 +2639,30 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       const targetName = this.selectedPointName || 'SCONOSCIUTO';
 
       if (targetName === 'SCONOSCIUTO') {
-          this.toastCtrl.create({
-              message: 'Seleziona un territorio valido.',
-              duration: 2000,
-              position: 'top',
-              color: 'warning'
-          }).then(t => t.present());
-          return;
+        this.toastCtrl.create({
+          message: 'Seleziona un territorio valido.',
+          duration: 2000,
+          position: 'top',
+          color: 'warning'
+        }).then(t => t.present());
+        return;
       }
 
       // Ownership validation is done by the backend (which safely resolves region names to IDs).
 
       // Invio websocket
       if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
-          const payload = {
-              action: 'BUILD_STRUCTURE',
-              payload: {
-                  structureId: this.selectedStructureForBuild.id_struttura || this.selectedStructureForBuild.id_extractor,
-                  targetName: targetName,
-                  targetCoords: targetCoords
-              }
-          };
-          this.matchSocket.send(JSON.stringify(payload));
+        const payload = {
+          action: 'BUILD_STRUCTURE',
+          payload: {
+            structureId: this.selectedStructureForBuild.id_struttura || this.selectedStructureForBuild.id_extractor,
+            targetName: targetName,
+            targetCoords: targetCoords
+          }
+        };
+        this.matchSocket.send(JSON.stringify(payload));
       }
-      
+
       this.selectedStructureForBuild = null;
       return;
     }
@@ -2932,15 +3019,15 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     const attackedTerritories = new Set<string>();
     if (this.matchArmies) {
-       this.matchArmies.forEach(army => {
-          if (army.owner === currentUser || army.owner === this.userProfile?.username || !army.owner) {
-              if (army.status === 'attacking' || army.status === 'in combattimento' || ((army.status === "Pronto all'attacco" || army.status === 'moving') && army.missionMode === 'attack')) {
-                  if (army.targetName && army.targetName !== 'OBIETTIVO' && army.targetName !== 'SCONOSCIUTO') {
-                      attackedTerritories.add(army.targetName.toLowerCase());
-                  }
-              }
+      this.matchArmies.forEach(army => {
+        if (army.owner === currentUser || army.owner === this.userProfile?.username || !army.owner) {
+          if (army.status === 'attacking' || army.status === 'in combattimento' || ((army.status === "Pronto all'attacco" || army.status === 'moving') && army.missionMode === 'attack')) {
+            if (army.targetName && army.targetName !== 'OBIETTIVO' && army.targetName !== 'SCONOSCIUTO') {
+              attackedTerritories.add(army.targetName.toLowerCase());
+            }
           }
-       });
+        }
+      });
     }
 
     let hasChanges = false;

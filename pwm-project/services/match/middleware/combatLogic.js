@@ -138,6 +138,23 @@ const emitCombatEvent = async (id_partita_hash, attackerName, defenderName, dama
     }
 };
 
+let cachedRegionsGeojson = null;
+const getRegionsGeojson = () => {
+    if (cachedRegionsGeojson) return cachedRegionsGeojson;
+    try {
+        const fs = require('fs');
+        const pathLib = require('path');
+        const topojson = require('topojson-client');
+        const regionsFile = pathLib.join(__dirname, '../../../shared/assets/map/regions.json');
+        if (fs.existsSync(regionsFile)) {
+            const topo = JSON.parse(fs.readFileSync(regionsFile, 'utf-8'));
+            const objectKey = Object.keys(topo.objects)[0];
+            cachedRegionsGeojson = topojson.feature(topo, topo.objects[objectKey]);
+        }
+    } catch(e) {}
+    return cachedRegionsGeojson;
+};
+
 const processActiveCombats = async () => {
     try {
         const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
@@ -179,24 +196,90 @@ const processActiveCombats = async () => {
             let damageToCity = 0;
             let defenderArmy = null;
             let defenderPlayer = null;
+            let currentTargetArmataId = id_target_armata;
 
-            if (id_target_armata) {
+            if (currentTargetArmataId) {
                 for (const p of matchObj.match.player) {
-                    if (p.armate && p.armate[id_target_armata]) {
-                        defenderArmy = p.armate[id_target_armata];
+                    if (p.armate && p.armate[currentTargetArmataId]) {
+                        defenderArmy = p.armate[currentTargetArmataId];
                         defenderPlayer = p.username;
                         break;
                     }
                 }
             }
 
-            if (id_target_armata && defenderArmy && id_target_citta) {
+            if (!defenderArmy && id_target_citta) {
+                const { getRegionForNode, getNodeCoords } = require('./movementLogic.js');
+                const cityCoords = getNodeCoords(id_target_citta);
+                const regionId = getRegionForNode(id_target_citta) || id_target_citta;
+                
+                let regionPolygon = null;
+                const geojson = getRegionsGeojson();
+                if (geojson) {
+                    const feature = geojson.features.find(f => f.properties && (f.properties.adm1_code === regionId || f.id === regionId));
+                    if (feature) regionPolygon = feature;
+                }
+                
+                const turf = require('@turf/turf');
+
+                for (const p of matchObj.match.player) {
+                    if (p.username === attackerPlayer) continue;
+                    if (p.armate) {
+                        for (const [aid, a] of Object.entries(p.armate)) {
+                            if (a.status === 'standby' || a.status === 'in combattimento') {
+                                let isTarget = false;
+                                if (a.currentLocation === id_target_citta || a.targetName === id_target_citta) {
+                                    isTarget = true;
+                                } else {
+                                    let ax, ay;
+                                    if (typeof a.currentLocation === 'string') {
+                                        const parts = a.currentLocation.split(',');
+                                        if (parts.length === 2) { ax = parseFloat(parts[0]); ay = parseFloat(parts[1]); }
+                                    } else if (typeof a.currentLocation === 'object') {
+                                        ax = a.currentLocation.x; ay = a.currentLocation.y;
+                                    }
+                                    if (ax !== undefined && ay !== undefined) {
+                                        if (cityCoords) {
+                                            const dx = ax - cityCoords[0];
+                                            const dy = ay - cityCoords[1];
+                                            if (dx*dx + dy*dy < 0.0001) isTarget = true;
+                                        }
+                                        if (!isTarget && regionPolygon) {
+                                            try {
+                                                const pt = turf.point([ax, ay]);
+                                                if (turf.booleanPointInPolygon(pt, regionPolygon)) {
+                                                    isTarget = true;
+                                                }
+                                            } catch(e) {}
+                                        }
+                                    }
+                                }
+                                
+                                if (isTarget) {
+                                    defenderArmy = a;
+                                    defenderPlayer = p.username;
+                                    currentTargetArmataId = aid;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (defenderArmy) break;
+                }
+                
+                if (defenderArmy && currentTargetArmataId !== id_target_armata) {
+                    await db.query(`UPDATE attacco SET id_target_armata = $1 WHERE id_attacco = $2`, [currentTargetArmataId, id_attacco]);
+                }
+            }
+
+            if (currentTargetArmataId && defenderArmy && id_target_citta) {
                  damageToCity = Math.floor(totalDmg / 3);
                  damageToArmy = totalDmg - damageToCity;
-            } else if (id_target_armata && defenderArmy) {
+            } else if (currentTargetArmataId && defenderArmy) {
                  damageToArmy = totalDmg;
                  damageToCity = 0;
             } else if (id_target_citta) {
+                 damageToArmy = 0;
                  damageToCity = totalDmg;
             }
 
@@ -307,19 +390,11 @@ const processActiveCombats = async () => {
                     const freshMatchObj = await getMatch(id_partita_hash);
                     if (freshMatchObj && freshMatchObj.match) {
                         let regionPolygon = null;
-                        try {
-                            const fs = require('fs');
-                            const pathLib = require('path');
-                            const topojson = require('topojson-client');
-                            const regionsFile = pathLib.join(__dirname, '../../../shared/assets/map/regions.json');
-                            if (fs.existsSync(regionsFile)) {
-                                const topo = JSON.parse(fs.readFileSync(regionsFile, 'utf-8'));
-                                const objectKey = Object.keys(topo.objects)[0];
-                                const geojson = topojson.feature(topo, topo.objects[objectKey]);
-                                const feature = geojson.features.find(f => f.properties && (f.properties.adm1_code === regionId || f.id === regionId));
-                                if (feature) regionPolygon = feature;
-                            }
-                        } catch(e) { }
+                        const geojson = getRegionsGeojson();
+                        if (geojson) {
+                            const feature = geojson.features.find(f => f.properties && (f.properties.adm1_code === regionId || f.id === regionId));
+                            if (feature) regionPolygon = feature;
+                        }
 
                         for (const pl of freshMatchObj.match.player) {
                             if (pl.username === attackerPlayer) continue;
@@ -401,6 +476,16 @@ const processActiveCombats = async () => {
                             attNation.territori_dict[targetAdmin || "Altro"].push(actualRegionToTransfer);
                             if (!attNation.territori) attNation.territori = [];
                             attNation.territori.push(actualRegionToTransfer);
+
+                            if (defNation.strutture && defNation.strutture.length > 0) {
+                                const capturedStructures = defNation.strutture.filter(s => s.regionId === actualRegionToTransfer || s.targetName === actualRegionToTransfer);
+                                if (capturedStructures.length > 0) {
+                                    capturedStructures.forEach(s => s.owner = attNation.username);
+                                    defNation.strutture = defNation.strutture.filter(s => s.regionId !== actualRegionToTransfer && s.targetName !== actualRegionToTransfer);
+                                    if (!attNation.strutture) attNation.strutture = [];
+                                    attNation.strutture.push(...capturedStructures);
+                                }
+                            }
                         }
                         
                         updatedNations = mObj.match.player;
@@ -419,6 +504,7 @@ const processActiveCombats = async () => {
                     };
                     await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
                     await emitCombatEvent(id_partita_hash, attackerName, id_target_citta, damageToCity, 'distrutta', [attackerPlayer]);
+                    await redis.hSet(`match:${id_partita_hash}:cities_hp`, id_target_citta, '500');
                     
                     if (!attackerDied) {
                         await updateMatch(id_partita_hash, (mObj) => {

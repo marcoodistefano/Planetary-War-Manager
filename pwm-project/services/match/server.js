@@ -123,9 +123,13 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
              }
          }
 
+         const redisClient = require('../shared/redisClient.js');
+         const regionsResourcesStr = await redisClient.get(`match:${ws.matchId}:regions_resources`);
+         const regionsResources = regionsResourcesStr ? JSON.parse(regionsResourcesStr) : {};
+
          ws.send(JSON.stringify({ 
            type: 'INITIAL_STATE', 
-           payload: { armies, nations, resources, production, structures } 
+           payload: { armies, nations, resources, production, structures, regionsResources } 
          }));
          return;
       }
@@ -534,6 +538,16 @@ if (payload.action === 'MOVE_TROOPS') {
 
              const { getRegionIdByName } = require('./middleware/movementLogic.js');
              const regionId = getRegionIdByName(targetName);
+
+             const regionsResourcesStr = await redis.get(`match:${ws.matchId}:regions_resources`);
+             const regionsResources = regionsResourcesStr ? JSON.parse(regionsResourcesStr) : {};
+             const myRegionRes = regionsResources[regionId];
+
+             if (structureDetails.risorsa_estratta && myRegionRes) {
+                 if (myRegionRes.more_common !== structureDetails.risorsa_estratta && myRegionRes.less_common !== structureDetails.risorsa_estratta) {
+                     return ws.send(JSON.stringify({ type: 'ERROR', error: `In questo territorio non vi sono giacimenti di ${structureDetails.risorsa_estratta}.` }));
+                 }
+             }
 
              const updRes = await updateMatch(ws.matchId, async (matchObj) => {
                  if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false, data: { error: 'Partita non trovata' } };

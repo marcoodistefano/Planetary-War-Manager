@@ -94,7 +94,47 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
         destNode = getClosestNode(targetLng, targetLat);
     }
 
-    let startNode = getClosestNode(startLng, startLat);
+    // Invece di prendere solo il nodo più vicino (che potrebbe far tornare indietro la truppa),
+    // valutiamo i 2 nodi più vicini (gli estremi dell'edge corrente) e scegliamo quello che minimizza
+    // il costo totale del percorso fino alla destinazione.
+    let distances = [];
+    for (const [name, coords] of nodesMap.entries()) {
+        const d = haversineDist(startLng, startLat, coords[0], coords[1]);
+        distances.push({ name, d });
+    }
+    distances.sort((a, b) => a.d - b.d);
+    
+    let bestStartNode = distances[0].name;
+    let minTotalCost = Infinity;
+    
+    for (let i = 0; i < Math.min(2, distances.length); i++) {
+        const candidateNode = distances[i].name;
+        const distToStartNode = distances[i].d;
+        
+        if (candidateNode === destNode) {
+            const totalCost = distToStartNode;
+            if (totalCost < minTotalCost) {
+                minTotalCost = totalCost;
+                bestStartNode = candidateNode;
+            }
+            continue;
+        }
+
+        const routingRaw = await redis.get(`map_data:routing:${candidateNode}`);
+        if (routingRaw) {
+            const routingObj = JSON.parse(routingRaw);
+            const routeInfo = routingObj[destNode];
+            if (routeInfo) {
+                const totalCost = distToStartNode + (routeInfo.cost / 1000);
+                if (totalCost < minTotalCost) {
+                    minTotalCost = totalCost;
+                    bestStartNode = candidateNode;
+                }
+            }
+        }
+    }
+
+    let startNode = bestStartNode;
 
     // If start and dest are same node, path is just the node
     if (startNode === destNode) {
