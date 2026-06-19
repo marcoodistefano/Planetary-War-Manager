@@ -37,7 +37,7 @@ const create = async (req, res) => {
     // MAPPATURA LOGICA: Traduciamo l'interfaccia nel linguaggio di Eru
     const gameMode = {
       nome_partita: ui.missione,
-      stato: "In attesa",
+      stato: ui.avvio === "Immediato" ? "In corso" : "In attesa",
       squad: ui.isSquad,
       alleanzeConsentite: ui.alleanze,
       ranked: ui.hasElo,

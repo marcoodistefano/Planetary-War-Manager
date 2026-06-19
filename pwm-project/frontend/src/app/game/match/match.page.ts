@@ -474,16 +474,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     try {
       console.log(`[WS_MATCH] Tentativo di connessione a ${wsUrl}`);
-      this.matchSocket = new WebSocket(wsUrl);
+      this.ngZone.runOutsideAngular(() => {
+        this.matchSocket = new WebSocket(wsUrl);
 
-      this.matchSocket.onopen = () => {
-        console.log('[WS_MATCH] Connessione al server di gioco stabilita.');
-        this.matchSocket?.send(JSON.stringify({ action: 'GET_INITIAL_STATE' }));
-        this.cdr.detectChanges();
-      };
+        this.matchSocket.onopen = () => {
+          console.log('[WS_MATCH] Connessione al server di gioco stabilita.');
+          this.matchSocket?.send(JSON.stringify({ action: 'GET_INITIAL_STATE' }));
+          this.ngZone.run(() => this.cdr.detectChanges());
+        };
 
-      this.matchSocket.onmessage = (event) => {
-        let parsed;
+        this.matchSocket.onmessage = (event) => {
+          let parsed;
         try {
           parsed = JSON.parse(event.data);
         } catch (e) {
@@ -517,7 +518,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.matchStructures = parsed.payload.structures;
             setTimeout(() => this.renderStructures(), 100);
           }
-          this.cdr.detectChanges();
+          this.ngZone.run(() => this.cdr.detectChanges());
         }
 
         if (parsed.type === 'RESOURCES_UPDATED') {
@@ -527,7 +528,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           if (parsed.data?.production) {
             this.resourceProduction = parsed.data.production;
           }
-          this.cdr.detectChanges();
+          this.ngZone.run(() => this.cdr.detectChanges());
         }
 
         if (parsed.type === 'TROOPS_MOVED') {
@@ -550,8 +551,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
           console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
           this.renderArmies();
-          this.applyTerritoryColors();
-          this.cdr.detectChanges();
+          this.ngZone.run(() => this.cdr.detectChanges());
         }
 
         if (parsed.type === 'TROOPS_ARRIVED') {
@@ -590,8 +590,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
           console.log(`[WS_MATCH] Armata arrivata a ${targetName}.`);
           this.renderArmies();
-          this.applyTerritoryColors();
-          this.cdr.detectChanges();
+          this.ngZone.run(() => this.cdr.detectChanges());
         }
 
         if (parsed.type === 'MISSION_CANCELLED') {
@@ -618,8 +617,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
           console.log(`[WS_MATCH] Missione armata ${armyId} annullata.`);
           this.renderArmies();
-          this.applyTerritoryColors();
-          this.cdr.detectChanges();
+          this.ngZone.run(() => this.cdr.detectChanges());
         }
 
         if (parsed.type === 'COMBAT_CANCELLED') {
@@ -638,7 +636,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             delete newArmies[armyIndex]._pathCache; // Libera la cache
             this.matchArmies = newArmies;
             this.renderArmies();
-            this.cdr.detectChanges();
+            this.ngZone.run(() => this.cdr.detectChanges());
           }
         }
 
@@ -649,8 +647,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             console.log(`[WS_MATCH] Nuova truppa generata a Palermo per l'utente ${userId}!`);
           }
           this.renderArmies();
-          this.applyTerritoryColors();
-          this.cdr.detectChanges();
+          this.ngZone.run(() => this.cdr.detectChanges());
         }
 
         if (parsed.type === 'FOG_OF_WAR_UPDATE') {
@@ -681,7 +678,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           this.renderArmies();
           this.renderCitiesHp();
           this.applyTerritoryColors();
-          this.cdr.detectChanges();
+          this.ngZone.run(() => this.cdr.detectChanges());
         }
 
         if (parsed.type === 'PLAYER_JOINED') {
@@ -690,7 +687,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.matchNations = parsed.payload.nations;
             this.applyTerritoryColors();
           }
-          this.cdr.detectChanges();
+          this.ngZone.run(() => this.cdr.detectChanges());
         }
 
         if (parsed.type === 'WAR_DECLARED' || parsed.type === 'TERRITORY_CONQUERED' || parsed.type === 'DIPLOMACY_UPDATED') {
@@ -700,7 +697,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.matchNations = updatedNations;
             this.applyTerritoryColors();
           }
-          this.cdr.detectChanges();
+          this.ngZone.run(() => this.cdr.detectChanges());
         }
 
         if (parsed.type === 'ALLIANCE_UPDATED') {
@@ -753,7 +750,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
           this.matchStructures.push(parsed.payload);
           this.renderStructures();
-          this.cdr.detectChanges();
+          this.ngZone.run(() => this.cdr.detectChanges());
         }
 
         if (parsed.type === 'STRUCTURE_BUILT') {
@@ -765,7 +762,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           if (parsed.data.owner !== this.userProfile.username) {
             this.matchStructures.push(parsed.data);
             this.renderStructures();
-            this.cdr.detectChanges();
+            this.ngZone.run(() => this.cdr.detectChanges());
           }
         }
 
@@ -790,6 +787,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           this.reconnectTimer = window.setTimeout(() => this.connectMatchSocket(), 3000);
         }
       };
+      }); // Close ngZone.runOutsideAngular
     } catch (error) {
       console.error('[WS_MATCH] Eccezione durante la connessione:', error);
     }
@@ -999,16 +997,18 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     // Inizializza la mappa SOLO se non esiste già
     if (!this.map) {
-      setTimeout(() => {
-        this.initMap();
-
-        // Un singolo resize assicurativo post-rendering
+      this.ngZone.runOutsideAngular(() => {
         setTimeout(() => {
-          if (this.map) {
-            this.map.resize();
-          }
-        }, 200);
-      }, 50);
+          this.initMap();
+
+          // Un singolo resize assicurativo post-rendering
+          setTimeout(() => {
+            if (this.map) {
+              this.map.resize();
+            }
+          }, 200);
+        }, 50);
+      });
     } else {
       // Se esisteva già (es. da cache del router), forza il resize
       this.map.resize();
@@ -1421,9 +1421,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.closeTroopsDropdownOnInteraction();
     });
 
+    let zoomThrottleTimer: any = null;
     this.map.on('zoom', () => {
-      this.updateArmyMarkersScale();
-      this.updateNationBannersVisibility();
+      if (zoomThrottleTimer) return;
+      zoomThrottleTimer = setTimeout(() => {
+        this.updateArmyMarkersScale();
+        this.updateNationBannersVisibility();
+        zoomThrottleTimer = null;
+      }, 100);
     });
 
     this.map.on('movestart', () => {
@@ -2835,10 +2840,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   applyTerritoryColors() {
     if (!this.regionsGeoData || !this.matchNations || !this.map || !this.map.getSource('regioni')) return;
 
-    if (this.nationMarkers) {
-      this.nationMarkers.forEach((m: any) => m.remove());
-    }
-    this.nationMarkers = [];
+    if (!this.nationMarkers) this.nationMarkers = [];
+    const usedNationUsernames = new Set<string>();
 
     const colorMap: Record<string, string> = {};
     const currentUser = String(this.userProfile?.username || '').trim().toLowerCase();
@@ -2849,6 +2852,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
       let statusColor = '#eab308'; // Default non neutral (enemy)
       const occupier = String(nation.username || '').trim().toLowerCase();
+      usedNationUsernames.add(occupier);
 
       if (occupier === currentUser) {
         statusColor = '#22c55e'; // Verde per il player
@@ -2886,26 +2890,44 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           if (coords.length > 0 && coords[0].length === 2) {
             const centerPoint = coords[Math.floor(coords.length / 2)];
 
-            const el = document.createElement('div');
-            el.className = 'nation-banner-marker';
-            el.style.backgroundColor = 'rgba(0,0,0,0.8)';
-            el.style.color = '#fff';
-            el.style.border = `2px solid ${statusColor}`;
-            el.style.borderRadius = '4px';
-            el.style.padding = '3px 8px';
-            el.style.fontSize = '11px';
-            el.style.fontWeight = 'bold';
-            el.style.whiteSpace = 'nowrap';
-            el.style.display = 'none';
-            el.innerText = occupier.includes('bot') ? '🤖 BOT' : nation.username.toUpperCase();
+            let marker = this.nationMarkers.find((m: any) => m.nationUsername === occupier);
+            if (!marker) {
+              const el = document.createElement('div');
+              el.className = 'nation-banner-marker';
+              el.style.backgroundColor = 'rgba(0,0,0,0.8)';
+              el.style.color = '#fff';
+              el.style.border = `2px solid ${statusColor}`;
+              el.style.borderRadius = '4px';
+              el.style.padding = '3px 8px';
+              el.style.fontSize = '11px';
+              el.style.fontWeight = 'bold';
+              el.style.whiteSpace = 'nowrap';
+              el.style.display = 'none';
+              el.innerText = occupier.includes('bot') ? '🤖 BOT' : nation.username.toUpperCase();
 
-            const marker = new maplibregl.Marker({ element: el })
-              .setLngLat(centerPoint)
-              .addTo(this.map);
-            this.nationMarkers.push(marker);
+              marker = new maplibregl.Marker({ element: el })
+                .setLngLat(centerPoint)
+                .addTo(this.map);
+              marker.nationUsername = occupier;
+              this.nationMarkers.push(marker);
+            } else {
+              marker.setLngLat(centerPoint);
+              const el = marker.getElement();
+              el.style.border = `2px solid ${statusColor}`;
+              el.innerText = occupier.includes('bot') ? '🤖 BOT' : nation.username.toUpperCase();
+            }
           }
         }
       }
+    });
+
+    // Remove unused markers
+    this.nationMarkers = this.nationMarkers.filter((m: any) => {
+      if (!usedNationUsernames.has(m.nationUsername)) {
+        m.remove();
+        return false;
+      }
+      return true;
     });
 
     const attackedTerritories = new Set<string>();
@@ -2921,20 +2943,28 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
        });
     }
 
+    let hasChanges = false;
     this.regionsGeoData.features.forEach((f: any) => {
       const pId = f.properties.adm1_code || f.properties.name || f.id;
+      let newColor = '#00000000'; // Trasparente
+
       if (pId && attackedTerritories.has(pId.toLowerCase())) {
-        f.properties.fillColor = '#ef4444'; // Red for territories under attack
+        newColor = '#ef4444'; // Red for territories under attack
       } else if (colorMap[pId]) {
-        f.properties.fillColor = colorMap[pId];
-      } else {
-        f.properties.fillColor = '#00000000'; // Trasparente
+        newColor = colorMap[pId];
+      }
+
+      if (f.properties.fillColor !== newColor) {
+        f.properties.fillColor = newColor;
+        hasChanges = true;
       }
     });
 
-    const source = this.map.getSource('regioni') as any;
-    if (source) {
-      source.setData(this.regionsGeoData);
+    if (hasChanges) {
+      const source = this.map.getSource('regioni') as any;
+      if (source) {
+        source.setData(this.regionsGeoData);
+      }
     }
 
     this.updateNationBannersVisibility();

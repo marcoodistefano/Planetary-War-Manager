@@ -464,7 +464,7 @@ const createMatch = async ({ playerId, gameMode }) => {
     }
 
     // B. Generazione Frame a 56-Bit via Eru
-    gameMode.stato = "In attesa";
+    if (!gameMode.stato) gameMode.stato = "In attesa";
     const eruRes = Eru.procedure_create_match({ body: gameMode });
     if (eruRes.binary_match.length !== 56)
       throw new Error("Errore critico di clock nel Multiplexer Eru.");
@@ -620,14 +620,25 @@ const join_Match = async (playerId, id_partita_hash) => {
 
       // 1. Lock riga database
       const matchQuery = await client.query(
-        `SELECT id_partita, id_partita_visualizzato, struttura_partita::text AS struct FROM partite WHERE id_partita_hash = $1 FOR UPDATE;`,
+        `SELECT id_partita, id_partita_visualizzato, struttura_partita::text AS struct, tempo_start FROM partite WHERE id_partita_hash = $1 FOR UPDATE;`,
         [id_partita_hash],
       );
 
       if (matchQuery.rows.length === 0)
         throw { customStatus: "404", message: "Partita non trovata." };
+      
       const partitaId = matchQuery.rows[0].id_partita;
       const currentStruct = matchQuery.rows[0].struct;
+      const tempoStart = matchQuery.rows[0].tempo_start;
+
+      // Se la partita è "In corso" (01), i giocatori possono entrare solo nelle prime 2 ore
+      const statoPartita = currentStruct.substring(0, 2);
+      if (statoPartita === '01') {
+          const oreTrascorse = (Date.now() - new Date(tempoStart).getTime()) / (1000 * 60 * 60);
+          if (oreTrascorse > 2) {
+              throw { customStatus: "403", message: "La partita è già in corso da troppo tempo per potersi unire." };
+          }
+      }
 
       // 2. Verifica se utente già presente
       const checkUser = await client.query(

@@ -153,6 +153,7 @@ const processActiveCombats = async () => {
             
             let matchObj = await getMatch(id_partita_hash);
             if (!matchObj || !matchObj.match || !matchObj.match.player) continue;
+            if (!matchObj.match.struttura_partita || !matchObj.match.struttura_partita.startsWith('01')) continue;
 
             let attackerArmy = null;
             let attackerPlayer = null;

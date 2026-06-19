@@ -156,6 +156,11 @@ if (payload.action === 'MOVE_TROOPS') {
              return;
          }
          
+         if (!matchData.match.struttura_partita || !matchData.match.struttura_partita.startsWith('01')) {
+             ws.send(JSON.stringify({ type: 'ERROR', error: 'La partita non è ancora iniziata.' }));
+             return;
+         }
+         
          const player = matchData.match.player.find(p => p.username === ws.username);
          if (!player || !player.armate || !player.armate[armyId]) {
              ws.send(JSON.stringify({ type: 'ERROR', error: 'Armata non trovata' }));
@@ -700,6 +705,7 @@ const startArrivalEngine = () => {
         const { getMatch, updateMatch } = require('../shared/matchMonolithic.js');
         const matchObj = await getMatch(row.match_id);
         if (!matchObj || !matchObj.match || !matchObj.match.player) continue;
+        if (!matchObj.match.struttura_partita || !matchObj.match.struttura_partita.startsWith('01')) continue;
 
         let army = null;
         let pIndex = -1;
