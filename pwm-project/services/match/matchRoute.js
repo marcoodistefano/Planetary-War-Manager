@@ -3,17 +3,16 @@ const matchController = require("./matchController.js");
 
 const router = express.Router();
 
-// Rimuovi "/match" dall'inizio di ogni percorso
-router.post("/create", matchController.create);          // Diventa /match/create
-router.post("/join", matchController.join);              // Diventa /match/join
-router.get("/joinable", matchController.joinable);        // Diventa /match/joinable 
-router.post("/:id/join", matchController.join);          // Diventa /match/:id/join
-router.get("/:id", matchController.getMatch);            // Diventa /match/:id
-router.post("/:id/leave", matchController.leave);        // Diventa /match/:id/leave
-router.get("/:id/players", matchController.getPlayers);  // Diventa /match/:id/players
-router.get("/:id/status", matchController.getStatus);    // Diventa /match/:id/status
-router.get("/:id/result", matchController.getResult);    // Diventa /match/:id      result
-router.get("/:id/history", matchController.getHistory);  // Diventa /match/:id/history
+router.post("/create", matchController.create);
+router.post("/join", matchController.join);
+router.get("/joinable", matchController.joinable);
+router.post("/:id/join", matchController.join);
+router.get("/:id", matchController.getMatch);
+router.post("/:id/leave", matchController.leave);
+router.get("/:id/players", matchController.getPlayers);
+router.get("/:id/status", matchController.getStatus);
+router.get("/:id/result", matchController.getResult);
+router.get("/:id/history", matchController.getHistory);
 router.get("/:id/player/:username/graveyard", matchController.getGraveyard);
 router.post("/:id/create/alliance", matchController.CreateAlliance);
 router.get("/:id/alliance", matchController.getAlliance);

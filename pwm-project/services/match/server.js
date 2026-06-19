@@ -10,7 +10,9 @@ const matchModel = require("./matchModel.js");
 const { getAuthContextFromRequest } = require("../shared/authContext.js");
 const { initDispatcher } = require("./Dispatcher/webDispatcher.js");
 const redis = require("../shared/redisClient.js");
-const { calculatePath, getBorderIntersection, getNodeCoords } = require("./middleware/movementLogic.js");
+const { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, calculateCurrentPosition } = require("./middleware/movementLogic.js");
+const { getMatch, updateMatch } = require('../shared/matchMonolithic.js');
+const db = require('../shared/postgresClient.js');
 const { startTroopGenerator } = require("./middleware/troopGenerator.js");
 const { loadMinimumPathToRedis } = require("./middleware/loadPathToRedis.js");
 const { startCombatLoop } = require("./middleware/combatLogic.js");
@@ -95,8 +97,8 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
       console.log(`[WS_MATCH] Ricevuto messaggio da ${userId}:`, payload);
       
+      try {
       if (payload.action === 'GET_INITIAL_STATE') {
-         const { getMatch } = require('../shared/matchMonolithic.js');
          const matchData = await getMatch(ws.matchId);
          
          let armies = [];
@@ -123,8 +125,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
              }
          }
 
-         const redisClient = require('../shared/redisClient.js');
-         const regionsResourcesStr = await redisClient.get(`match:${ws.matchId}:regions_resources`);
+         const regionsResourcesStr = await redis.get(`match:${ws.matchId}:regions_resources`);
          const regionsResources = regionsResourcesStr ? JSON.parse(regionsResourcesStr) : {};
 
          ws.send(JSON.stringify({ 
@@ -135,7 +136,6 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
       }
 
       if (payload.action === 'SAVE_ARMIES') {
-         const { updateMatch } = require('../shared/matchMonolithic.js');
          const dict = {};
          (payload.payload.armies || []).forEach(a => dict[a.id] = a);
          await updateMatch(ws.matchId, async (matchObj) => {
@@ -152,7 +152,6 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
 if (payload.action === 'MOVE_TROOPS') {
          const { armyId, targetName, targetCoords } = payload.payload;
-         const { getMatch, updateMatch } = require('../shared/matchMonolithic.js');
          
          const matchData = await getMatch(ws.matchId);
          if (!matchData || !matchData.match || !matchData.match.player) {
@@ -195,40 +194,10 @@ if (payload.action === 'MOVE_TROOPS') {
          
          const armyState = armata.status;
          if ((armyState === 'moving' || armyState === 'moving_to_border' || armyState === "Pronto all'attacco") && armata.path && armata.path.length > 1 && armata.startTime && armata.etaMs) {
-             const now = Date.now();
-             const elapsed = now - armata.startTime;
-             let progress = Math.max(0, Math.min(1, elapsed / armata.etaMs));
-             if (progress < 1) {
-                 const path = armata.path;
-                 let totalDistance = 0;
-                 const segmentDistances = [];
-                 for (let i = 0; i < path.length - 1; i++) {
-                    const dx = path[i+1][0] - path[i][0];
-                    const dy = path[i+1][1] - path[i][1];
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    segmentDistances.push(dist);
-                    totalDistance += dist;
-                 }
-                 const targetDistance = progress * totalDistance;
-                 let currentDist = 0;
-                 let currentIndex = 0;
-                 let segmentProgress = 0;
-                 for (let i = 0; i < segmentDistances.length; i++) {
-                    if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
-                       currentIndex = i;
-                       segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0;
-                       break;
-                    }
-                    currentDist += segmentDistances[i];
-                 }
-                 const p1 = path[currentIndex];
-                 const p2 = path[currentIndex + 1] || p1;
-                 startLng = p1[0] + (p2[0] - p1[0]) * segmentProgress;
-                 startLat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
-             } else {
-                 const lastPoint = armata.path[armata.path.length - 1];
-                 startLng = lastPoint[0];
-                 startLat = lastPoint[1];
+             const currentPos = calculateCurrentPosition(armata.path, armata.startTime, armata.etaMs);
+             if (currentPos) {
+                 startLng = currentPos.lng;
+                 startLat = currentPos.lat;
              }
          }
          
@@ -253,8 +222,12 @@ if (payload.action === 'MOVE_TROOPS') {
          
          let multiplier = 1;
          if (matchData.match.struttura_partita) {
-             const decodedMatch = Eru.decode_match(matchData.match.struttura_partita);
-             multiplier = decodedMatch.multiplierValue || 1;
+             try {
+                 const decodedMatch = Eru.decode_match(matchData.match.struttura_partita);
+                 multiplier = decodedMatch.multiplierValue || 1;
+             } catch(err) {
+                 console.warn("[SYS_WARN] Errore decodifica match:", err.message);
+             }
          }
          
          let pathInfo = { isValid: false, distance: 0, etaMs: 0, path: [] };
@@ -272,7 +245,6 @@ if (payload.action === 'MOVE_TROOPS') {
          const updRes = await updateMatch(ws.matchId, async (matchObj) => {
              if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
              
-             const { getRegionForNode } = require('./middleware/movementLogic.js');
              const regionId = getRegionForNode(targetName) || targetName;
              let targetNation = matchObj.match.player.find(n => n.territori_dict && Object.values(n.territori_dict).some(list => list.includes(regionId)));
              if (!targetNation && targetName !== regionId) {
@@ -365,7 +337,6 @@ if (payload.action === 'MOVE_TROOPS') {
          if (updRes && updRes.armata) {
              const armataObj = updRes.armata;
              try {
-                 const db = require('../shared/postgresClient.js');
                  const mossaRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, [armyId]);
                  const etaDate = new Date(Date.now() + borderEtaMs);
                  if (mossaRes.rows.length > 0) {
@@ -410,7 +381,6 @@ if (payload.action === 'MOVE_TROOPS') {
       if (payload.action === 'CANCEL_MISSION') {
          console.log(`[WS_MATCH] CANCEL_MISSION ricevuto per armata:`, payload.payload);
          const { armyId } = payload.payload;
-         const { updateMatch } = require('../shared/matchMonolithic.js');
          
          const updRes = await updateMatch(ws.matchId, async (matchObj) => {
              if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
@@ -427,29 +397,15 @@ if (payload.action === 'MOVE_TROOPS') {
                  const now = Date.now();
                  let elapsed = 0; let returnPath = []; let currentLng, currentLat;
                  if (army.path && army.path.length > 1 && army.startTime && army.etaMs) {
-                     elapsed = now - army.startTime;
-                     let progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
-                     if (progress < 1) {
-                         let totalDistance = 0; const segmentDistances = [];
-                         for (let i = 0; i < army.path.length - 1; i++) {
-                            const dx = army.path[i+1][0] - army.path[i][0]; const dy = army.path[i+1][1] - army.path[i][1];
-                            const dist = Math.sqrt(dx*dx + dy*dy); segmentDistances.push(dist); totalDistance += dist;
-                         }
-                         const targetDistance = progress * totalDistance;
-                         let currentDist = 0; let currentIndex = 0; let segmentProgress = 0;
-                         for (let i = 0; i < segmentDistances.length; i++) {
-                            if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
-                               currentIndex = i; segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0; break;
-                            }
-                            currentDist += segmentDistances[i];
-                         }
-                         const p1 = army.path[currentIndex]; const p2 = army.path[currentIndex + 1] || p1;
-                         currentLng = p1[0] + (p2[0] - p1[0]) * segmentProgress; currentLat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
+                     const currentPos = calculateCurrentPosition(army.path, army.startTime, army.etaMs);
+                     if (currentPos) {
+                         currentLng = currentPos.lng;
+                         currentLat = currentPos.lat;
+                         elapsed = currentPos.elapsed;
                          returnPath.push([currentLng, currentLat]);
-                         for (let i = currentIndex; i >= 0; i--) returnPath.push(army.path[i]);
-                     } else {
-                         currentLng = army.path[army.path.length - 1][0]; currentLat = army.path[army.path.length - 1][1];
-                         returnPath = [...army.path].reverse();
+                         for (let i = currentPos.currentIndex; i >= 0; i--) {
+                             returnPath.push(army.path[i]);
+                         }
                      }
                  } else {
                      army.status = 'standby';
@@ -467,7 +423,6 @@ if (payload.action === 'MOVE_TROOPS') {
          if (updRes) {
              if (updRes.action === 'combat_cancelled') {
                  try {
-                     const db = require('../shared/postgresClient.js');
                      const mossaRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'atk'`, [armyId]);
                      if (mossaRes.rows.length > 0) {
                          const id_mossa = mossaRes.rows[0].id_mossa;
@@ -484,7 +439,6 @@ if (payload.action === 'MOVE_TROOPS') {
                  const { army, now, returnEtaMs } = updRes;
                  const etaDate = new Date(now + returnEtaMs);
                  try {
-                     const db = require('../shared/postgresClient.js');
                      const mossaRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, [armyId]);
                      if (mossaRes.rows.length > 0) {
                          const id_mossa = mossaRes.rows[0].id_mossa;
@@ -511,7 +465,6 @@ if (payload.action === 'MOVE_TROOPS') {
          const { structureId, targetName, targetCoords } = payload.payload;
 
          try {
-             const { updateMatch } = require('../shared/matchMonolithic.js');
              
              const rulesRawBase64 = await redis.get("assets:game_rules.json");
              let structureDetails = null;
@@ -536,7 +489,6 @@ if (payload.action === 'MOVE_TROOPS') {
              const baseName = structureId.split('_t')[0];
              const reqPrevStructure = structureDetails.richiede_struttura || structureDetails.richiede_estrattore;
 
-             const { getRegionIdByName } = require('./middleware/movementLogic.js');
              const regionId = getRegionIdByName(targetName);
 
              const regionsResourcesStr = await redis.get(`match:${ws.matchId}:regions_resources`);
@@ -636,7 +588,11 @@ if (payload.action === 'MOVE_TROOPS') {
              ws.send(JSON.stringify({ type: 'ERROR', error: 'Errore interno del server durante la costruzione' }));
          }
       }
-
+      
+      } catch (globalError) {
+          console.error("[SYS_ERR] Errore inaspettato durante gestione messaggio WS:", globalError);
+          ws.send(JSON.stringify({ type: "ERROR", error: "Errore interno del server" }));
+      }
     });
 
     ws.on("close", () => {
@@ -701,7 +657,6 @@ if (!fs.existsSync(MINIMUM_PATH_FILE)) {
 const startArrivalEngine = () => {
   setInterval(async () => {
     try {
-      const db = require('../shared/postgresClient.js');
       const query = `
         SELECT s.id_spostamento, s.id_mossa, m.id_armata, m.partita_id, u.username, u.id_user, p.id_partita_hash as match_id, s.target_node
         FROM spostamenti s 
@@ -716,7 +671,6 @@ const startArrivalEngine = () => {
         await db.query(`DELETE FROM spostamenti WHERE id_spostamento = $1`, [row.id_spostamento]);
         await db.query(`UPDATE mosse SET queue_order = 0 WHERE id_mossa = $1`, [row.id_mossa]);
 
-        const { getMatch, updateMatch } = require('../shared/matchMonolithic.js');
         const matchObj = await getMatch(row.match_id);
         if (!matchObj || !matchObj.match || !matchObj.match.player) continue;
         if (!matchObj.match.struttura_partita || !matchObj.match.struttura_partita.startsWith('01')) continue;
@@ -734,7 +688,6 @@ const startArrivalEngine = () => {
         if (army) {
             let isEnemyTerritory = false;
             let isAlliedTerritory = false;
-            const { getRegionForNode } = require('./middleware/movementLogic.js');
             const regionId = getRegionForNode(row.target_node) || row.target_node;
 
             let targetNation = matchObj.match.player.find(n => n.territori_dict && Object.values(n.territori_dict).some(list => list.includes(regionId)));
@@ -756,7 +709,10 @@ const startArrivalEngine = () => {
             }
 
             // Auto-converte in attacco se territorio nemico e NON alleato
-            if (isEnemyTerritory && !isAlliedTerritory && army.missionMode !== 'attack') {
+            if (isAlliedTerritory && army.missionMode === 'attack') {
+                army.missionMode = 'move';
+                console.log(`[ARRIVAL] Annullato attacco per l'armata ${row.id_armata} poiché ora è in territorio alleato`);
+            } else if (isEnemyTerritory && !isAlliedTerritory && army.missionMode !== 'attack') {
                 army.missionMode = 'attack';
                 await updateMatch(row.match_id, (mObj) => {
                     const p = mObj.match.player.find(x => x.username === row.username);
@@ -832,10 +788,7 @@ const startArrivalEngine = () => {
                 payload: { armyId: row.id_armata }
               }
             };
-            const redis = require('ioredis');
-            const redisClient = new redis({ host: process.env.REDIS_HOST || 'redis', port: process.env.REDIS_PORT || 6379 });
-            await redisClient.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
-            redisClient.disconnect();
+            await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
         }
       }
     } catch (e) {
@@ -847,7 +800,6 @@ const startArrivalEngine = () => {
 const restoreActiveMoves = async () => {
   console.log("[SYSTEM] Avvio ripristino mosse attive da DB a Redis...");
   try {
-    const db = require("../shared/postgresClient.js");
     // Aggiungi colonna target_node se non esiste per retrocompatibilità
     await db.query(`ALTER TABLE spostamenti ADD COLUMN IF NOT EXISTS target_node VARCHAR(128)`);
 
@@ -912,7 +864,7 @@ const restoreActiveMoves = async () => {
         const pathInfo = await calculatePath(startLng, startLat, row.target_node, row.x_dest, row.y_dest, multiplier);
         
         army.status = 'moving';
-        army.targetCoords = `${row.x_dest},${row.y_dest}`;
+        army.targetCoords = [parseFloat(row.x_dest), parseFloat(row.y_dest)];
         army.targetName = row.target_node;
         army.path = pathInfo.path;
         // missionMode potrebbe essere perso se non storicizzato in mosse, assumiamo 'move'

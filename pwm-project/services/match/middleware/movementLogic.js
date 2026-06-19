@@ -342,4 +342,41 @@ const getRegionIdByName = (name) => {
     return name;
 };
 
-module.exports = { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, getRegionIdByName };
+// Funzione per calcolare la posizione corrente lungo un path dato startTime e etaMs
+const calculateCurrentPosition = (path, startTime, etaMs) => {
+    if (!path || path.length < 2 || !startTime || !etaMs) return null;
+    const now = Date.now();
+    const elapsed = now - startTime;
+    const progress = Math.max(0, Math.min(1, elapsed / etaMs));
+    if (progress >= 1) {
+        return { lng: path[path.length - 1][0], lat: path[path.length - 1][1], currentIndex: path.length - 1, elapsed };
+    }
+    let totalDistance = 0;
+    const segmentDistances = [];
+    for (let i = 0; i < path.length - 1; i++) {
+        const dx = path[i+1][0] - path[i][0];
+        const dy = path[i+1][1] - path[i][1];
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        segmentDistances.push(dist);
+        totalDistance += dist;
+    }
+    const targetDistance = progress * totalDistance;
+    let currentDist = 0;
+    let currentIndex = 0;
+    let segmentProgress = 0;
+    for (let i = 0; i < segmentDistances.length; i++) {
+        if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
+            currentIndex = i;
+            segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0;
+            break;
+        }
+        currentDist += segmentDistances[i];
+    }
+    const p1 = path[currentIndex];
+    const p2 = path[currentIndex + 1] || p1;
+    const lng = p1[0] + (p2[0] - p1[0]) * segmentProgress;
+    const lat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
+    return { lng, lat, currentIndex, elapsed };
+};
+
+module.exports = { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, getRegionIdByName, calculateCurrentPosition };
