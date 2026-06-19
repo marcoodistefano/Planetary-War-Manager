@@ -138,114 +138,72 @@ async function generateResources() {
                 [matchDbId]
             );
 
-            const nationsStr = await redis.get(`match:${matchId}:nations`);
-            const nations = nationsStr ? JSON.parse(nationsStr) : [];
-            const players = [...participants.rows.map(p => ({ username: p.username, id_user: p.id_user }))];
-            
-            for (const nation of nations) {
-                if (nation.playerId && String(nation.playerId).includes('_bot') && !players.some(p => p.username === nation.playerId)) {
-                    players.push({ username: nation.playerId, id_user: null });
-                }
-            }
+            const { getMatch, updateMatch } = require('../match/shared/matchMonolithic.js');
 
-            for (const player of players) {
-                const username = player.username;
-                const userId = player.id_user; 
-
-                const territoriesStr = await redis.get(`match:${matchId}:player:${username}:territori`);
-                const territories = territoriesStr ? JSON.parse(territoriesStr) : [];
-
-                const production = {
-                    denaro: 1000 + (territories.length * 50),
-                    legno: 250,
-                    piombo: 0,
-                    acciaio: 0,
-                    mattone: 250,
-                    petrolio: 0,
-                    gas: 0,
-                    uranio: 0,
-                    oro: 0
-                };
-
-                // La produzione dai territori posseduti avverrà solo quando saranno costruiti i rispettivi estrattori.
-                // Per il momento la generazione automatica passiva riguarda solo Legno e Mattoni (250/ora).
-                /*
-                for (const regionId of territories) {
-                    const assigned = regionsResources[regionId];
-                    if (assigned) {
-                        if (assigned.more_common) {
-                            const redisKey = FE_TO_REDIS_MAP[assigned.more_common];
-                            const baseRate = ruleProd[assigned.more_common] || 500;
-                            if (production[redisKey] !== undefined) {
-                                production[redisKey] += baseRate;
-                            }
-                        }
-                        if (assigned.less_common) {
-                            const redisKey = FE_TO_REDIS_MAP[assigned.less_common];
-                            const baseRate = ruleProd[assigned.less_common] || 250;
-                            if (production[redisKey] !== undefined) {
-                                production[redisKey] += baseRate;
-                            }
-                        }
-                    }
-                }
-                */
-
-                for (const key in production) {
-                    production[key] = production[key] * multiplier;
-                }
-
-                await redis.set(`match:${matchId}:player:${username}:produzione`, JSON.stringify(production));
-
-                const resourcesStr = await redis.get(`match:${matchId}:player:${username}:risorse`);
-                let resources = resourcesStr ? JSON.parse(resourcesStr) : null;
+            await updateMatch(matchId, async (matchObj) => {
+                if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
                 
-                const lastUpdateStr = await redis.get(`match:${matchId}:player:${username}:risorse_last_update`);
-                let lastUpdate = lastUpdateStr ? parseInt(lastUpdateStr) : Date.now();
+                for (const player of matchObj.match.player) {
+                    const username = player.username;
+                    const isBot = String(username).includes('_bot');
+                    
+                    let userId = player.id_user;
+                    if (!userId && !isBot) {
+                        const participant = participants.rows.find(p => p.username === username);
+                        if (participant) userId = participant.id_user;
+                    }
 
-                const now = Date.now();
-                const dt = Math.max(0, (now - lastUpdate) / 1000); 
+                    const territories = player.territori || [];
 
-                if (!resources) {
-                    resources = {
-                        denaro: 100000,
-                        legno: 5000,
-                        piombo: 2500,
-                        acciaio: 3000,
-                        mattone: 4000,
-                        petrolio: 1500,
-                        gas: 1200,
-                        uranio: 100,
-                        oro: 50
+                    const production = {
+                        denaro: 1000 + (territories.length * 50),
+                        legno: 250, piombo: 0, acciaio: 0, mattone: 250, petrolio: 0, gas: 0, uranio: 0, oro: 0
                     };
-                } else {
-                    for (const resKey in resources) {
-                        const prodRate = production[resKey] || 0;
-                        resources[resKey] = Math.round(resources[resKey] + (prodRate / 3600) * dt);
+
+                    for (const key in production) {
+                        production[key] = production[key] * multiplier;
+                    }
+
+                    player.produzione = production;
+
+                    let resources = player.risorse;
+                    let lastUpdate = player.risorse_last_update || Date.now();
+
+                    const now = Date.now();
+                    const dt = Math.max(0, (now - lastUpdate) / 1000); 
+
+                    if (!resources) {
+                        resources = { denaro: 100000, legno: 5000, piombo: 2500, acciaio: 3000, mattone: 4000, petrolio: 1500, gas: 1200, uranio: 100, oro: 50 };
+                    } else {
+                        for (const resKey in resources) {
+                            const prodRate = production[resKey] || 0;
+                            resources[resKey] = Math.round(resources[resKey] + (prodRate / 3600) * dt);
+                        }
+                    }
+
+                    player.risorse = resources;
+                    player.risorse_last_update = now;
+
+                    if (userId) {
+                        const feResources = translateRedisToFe(resources);
+                        const feProduction = translateRedisToFe(production);
+                        
+                        const broadcastPayload = {
+                            matchId: matchId,
+                            targetUsers: [userId],
+                            payload: {
+                                type: 'RESOURCES_UPDATED',
+                                data: {
+                                    resources: feResources,
+                                    production: feProduction
+                                }
+                            }
+                        };
+                        await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
                     }
                 }
-
-                await redis.set(`match:${matchId}:player:${username}:risorse`, JSON.stringify(resources));
-                await redis.set(`match:${matchId}:player:${username}:risorse_last_update`, String(now));
-
-                if (userId) {
-                    const feResources = translateRedisToFe(resources);
-                    const feProduction = translateRedisToFe(production);
-                    
-                    const broadcastPayload = {
-                        matchId: matchId,
-                        targetUsers: [userId],
-                        payload: {
-                            type: 'RESOURCES_UPDATED',
-                            data: {
-                                resources: feResources,
-                                production: feProduction
-                            }
-                        }
-                    };
-                    await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
-                }
-            }
+                return { save: true, matchObj, data: true };
+            });
         }
     } catch (e) {
         console.error("[RESOURCE_GEN] Errore nel loop generazione risorse:", e);

@@ -10,9 +10,10 @@ let isRunning = false;
  */
 const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, hostUsername) => {
     try {
-        const nationsCache = await redis.get(`match:${matchHashId}:nations`);
-        if (!nationsCache) return;
-        const nations = JSON.parse(nationsCache);
+        const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
+        const matchData = await getMatch(matchHashId);
+        if (!matchData || !matchData.match || !matchData.match.player) return;
+        const nations = matchData.match.player;
 
         const adjData = await redis.get('map_data:regions_adjacency');
         const adj = adjData ? JSON.parse(adjData) : {};
@@ -23,20 +24,21 @@ const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, ho
             await client.query('BEGIN');
 
             for (const nation of nations) {
-                const isBot = String(nation.playerId).includes('_bot');
+                const isBot = String(nation.username).includes('_bot');
                 
                 // Oggetto Redis per questa nazione
                 let playerArmies = {};
+                let playerTruppe = {};
                 
                 // UUID per il DB (se utente reale)
                 // Al momento della creazione, l'unico utente reale assegnato a una nazione è l'host.
                 let realUserId = null;
                 if (!isBot) {
-                    if (nation.playerId === hostUsername || nation.playerId === hostId) {
+                    if (nation.username === hostUsername || nation.username === hostId) {
                         realUserId = hostId;
                     } else {
                         // Se per qualche motivo ci sono altri, proviamo a recuperare l'UUID
-                        const userRes = await client.query(`SELECT id_user FROM utenti WHERE username = $1 OR id_user::text = $1`, [nation.playerId]);
+                        const userRes = await client.query(`SELECT id_user FROM utenti WHERE username = $1 OR id_user::text = $1`, [nation.username]);
                         if (userRes.rows.length > 0) {
                             realUserId = userRes.rows[0].id_user;
                         }
@@ -44,8 +46,8 @@ const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, ho
                 }
 
                 // Generiamo un'armata per ogni territorio
-                for (const admin in nation.territories) {
-                    for (const prov of nation.territories[admin]) {
+                for (const admin in nation.territori_dict) {
+                    for (const prov of nation.territori_dict[admin]) {
                         // Troviamo il territorio in adj (prov è l'ID testuale o index?)
                         // nation.territories contiene un array di adj[idx].id. Per trovare lat e lng cerchiamo nell'object adj
                         let region = null;
@@ -80,6 +82,14 @@ const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, ho
 
                         playerArmies[idArmata] = armyObj;
 
+                        const truppaObj = {
+                            id: idTruppa,
+                            id_armata: idArmata,
+                            hp: 1000,
+                            type: 'fante'
+                        };
+                        playerTruppe[idTruppa] = truppaObj;
+
                         // Salvataggio in Postgres SOLO per i player reali (i bot non esistono in "partecipanti_partite")
                         if (!isBot && realUserId) {
                             await client.query(
@@ -97,9 +107,17 @@ const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, ho
                     }
                 }
 
-                // Salva l'oggetto armate in Redis
-                const redisKey = `match:${matchHashId}:player:${nation.playerId}:armate`;
-                await redis.set(redisKey, JSON.stringify(playerArmies));
+                // Salva l'oggetto armate nel monolithic JSON
+                await updateMatch(matchHashId, async (matchObj) => {
+                    if (!matchObj || !matchObj.match) return { save: false };
+                    const player = matchObj.match.player.find(p => p.username === nation.username);
+                    if (player) {
+                        player.armate = playerArmies;
+                        player.truppe = playerTruppe;
+                        return { save: true, matchObj, data: true };
+                    }
+                    return { save: false };
+                });
             }
 
             await client.query('COMMIT');
@@ -107,22 +125,21 @@ const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, ho
             
             // BROADCAST INITIAL TROOPS ALLA FINE DELLA GENERAZIONE
             try {
-                const keys = await redis.keys(`match:${matchHashId}:player:*:armate`);
+                const finalMatchData = await getMatch(matchHashId);
                 let allArmies = [];
-                for (const key of keys) {
-                    const armateStr = await redis.get(key);
-                    if (armateStr) {
-                       const playerId = key.split(':')[3];
-                       const armateObj = JSON.parse(armateStr);
-                       const playerArmies = Object.values(armateObj).map(a => ({...a, owner: playerId}));
-                       allArmies = allArmies.concat(playerArmies);
+                if (finalMatchData && finalMatchData.match && finalMatchData.match.player) {
+                    for (const player of finalMatchData.match.player) {
+                        if (player.armate) {
+                            const playerArmies = Object.values(player.armate).map(a => ({...a, owner: player.username}));
+                            allArmies = allArmies.concat(playerArmies);
+                        }
                     }
                 }
                 const broadcastPayload = {
                    matchId: matchHashId,
                    payload: {
                        type: 'INITIAL_STATE',
-                       payload: { armies: allArmies, nations }
+                       payload: { armies: allArmies, nations: finalMatchData ? finalMatchData.match.player : [] }
                    }
                 };
                 await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
@@ -172,84 +189,72 @@ const generateTroopsPeriodic = async () => {
             // Per soddisfare il requisito in modo semplice, assumiamo che quando gira questa funzione, 
             // sia il momento di aggiungere 1 truppa (100 hp) alle armate esistenti, limitando la frequenza nel timer.
             
-            // 1. Recupero tutte le chiavi armate della partita in Redis
-            const keys = await redis.keys(`match:${matchHashId}:player:*:armate`);
-            
-            for (const key of keys) {
-                // key = match:HASH:player:playerId:armate
-                const parts = key.split(':');
-                const playerId = parts[3];
-                const isBot = String(playerId).includes('_bot');
+            // 1. Recupero tutte le armate dal monolithic JSON
+            const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
+            await updateMatch(matchHashId, async (matchObj) => {
+                if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
                 
-                const armateStr = await redis.get(key);
-                if (!armateStr) continue;
-                
-                let playerArmies = JSON.parse(armateStr);
-                let realUserId = null;
-                
-                if (!isBot) {
-                    const userRes = await client.query(`SELECT id_user FROM utenti WHERE username = $1 OR id_user::text = $1 LIMIT 1`, [playerId]);
-                    if (userRes.rows.length > 0) {
-                        realUserId = userRes.rows[0].id_user;
-                    }
-                }
-
-                await client.query('BEGIN');
-                try {
-                    for (const armataId in playerArmies) {
-                        const armata = playerArmies[armataId];
-                        // Aggiunge 1 fante (incrementa composizione, hp e danno approssimativamente)
-                        armata.composition.fante = (armata.composition.fante || 0) + 1;
-                        armata.damage = (armata.damage || 0) + 1; // +1 danno per truppa
-                        
-                        if (!isBot && realUserId) {
-                            // Aggiorna l'hp dell'armata nel DB (aggiungiamo 100 hp per un fante)
-                            await client.query(`
-                                UPDATE armata 
-                                SET hp_tot = hp_tot + 100, dmg_tot = dmg_tot + 1 
-                                WHERE id_istanza_armata = $1
-                            `, [armataId]);
-                            
-                            // Aggiorniamo anche le truppe associate. 
-                            // O inseriamo una nuova truppa "fante" oppure ne incrementiamo l'HP.
-                            // Per semplicità, incrementiamo l'HP della prima truppa associata a questa armata.
-                            await client.query(`
-                                UPDATE truppe
-                                SET hp = hp + 100
-                                WHERE id_armata = $1 AND id_modello = 'fante'
-                            `, [armataId]);
+                for (const player of matchObj.match.player) {
+                    const playerId = player.username;
+                    const isBot = String(playerId).includes('_bot');
+                    
+                    if (!player.armate || Object.keys(player.armate).length === 0) continue;
+                    
+                    let realUserId = null;
+                    if (!isBot) {
+                        const userRes = await client.query(`SELECT id_user FROM utenti WHERE username = $1 OR id_user::text = $1 LIMIT 1`, [playerId]);
+                        if (userRes.rows.length > 0) {
+                            realUserId = userRes.rows[0].id_user;
                         }
                     }
-                    
-                    // Salva in Redis
-                    await redis.set(key, JSON.stringify(playerArmies));
-                    await client.query('COMMIT');
-                } catch (err) {
-                    await client.query('ROLLBACK');
-                    console.error(`[TROOP_GEN] Errore DB durante update periodico per match ${matchHashId}:`, err);
+
+                    await client.query('BEGIN');
+                    try {
+                        for (const armataId in player.armate) {
+                            const armata = player.armate[armataId];
+                            armata.composition.fante = (armata.composition.fante || 0) + 1;
+                            armata.damage = (armata.damage || 0) + 1;
+                            
+                            if (!isBot && realUserId) {
+                                await client.query(`
+                                    UPDATE armata 
+                                    SET hp_tot = hp_tot + 100, dmg_tot = dmg_tot + 1 
+                                    WHERE id_istanza_armata = $1
+                                `, [armataId]);
+                                
+                                await client.query(`
+                                    UPDATE truppe
+                                    SET hp = hp + 100
+                                    WHERE id_armata = $1 AND id_modello = 'fante'
+                                `, [armataId]);
+                            }
+                        }
+                        await client.query('COMMIT');
+                    } catch (err) {
+                        await client.query('ROLLBACK');
+                        console.error(`[TROOP_GEN] Errore DB durante update periodico per match ${matchHashId}:`, err);
+                    }
                 }
-            }
+                return { save: true, matchObj, data: true };
+            });
 
             // BROADCAST ALLA FINE DEL CICLO PARTITA
             try {
+                const finalMatchData = await require('../../shared/matchMonolithic.js').getMatch(matchHashId);
                 let allArmies = [];
-                for (const key of keys) {
-                    const armateStr = await redis.get(key);
-                    if (armateStr) {
-                       const playerId = key.split(':')[3];
-                       const armateObj = JSON.parse(armateStr);
-                       const playerArmies = Object.values(armateObj).map(a => ({...a, owner: playerId}));
-                       allArmies = allArmies.concat(playerArmies);
+                if (finalMatchData && finalMatchData.match && finalMatchData.match.player) {
+                    for (const player of finalMatchData.match.player) {
+                        if (player.armate) {
+                            const playerArmies = Object.values(player.armate).map(a => ({...a, owner: player.username}));
+                            allArmies = allArmies.concat(playerArmies);
+                        }
                     }
                 }
-                const nationsStr = await redis.get(`match:${matchHashId}:nations`);
-                const nations = nationsStr ? JSON.parse(nationsStr) : [];
-                
                 const broadcastPayload = {
                    matchId: matchHashId,
                    payload: {
                        type: 'INITIAL_STATE',
-                       payload: { armies: allArmies, nations }
+                       payload: { armies: allArmies, nations: finalMatchData ? finalMatchData.match.player : [] }
                    }
                 };
                 await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));

@@ -36,10 +36,45 @@
         "id_alleanza": "",
         "ruolo": "",
         "is_leader": "",
+        "nationId": 0,
+        "nationName": "",
+        "inWar": false,
+        "isOccupied": true,
         "territori": [""],
-        "strutture": [""],
-        "armate": [""],
-        "truppe": [""],
+        "territori_dict": {
+            "Region": [""]
+        },
+        "strutture": [
+          {
+            "id": "",
+            "structureId": "",
+            "name": "",
+            "targetName": "",
+            "regionId": "",
+            "targetCoords": [0, 0],
+            "status": "",
+            "owner": "",
+            "buildTime": 0
+          }
+        ],
+        "armate": {
+          "id_armata": {
+            "id": "",
+            "owner": "",
+            "truppeIds": [""],
+            "currentLocation": {"x": 0, "y": 0},
+            "status": "",
+            "hp": 0
+          }
+        },
+        "truppe": {
+          "id_truppa": {
+            "id": "",
+            "id_armata": "",
+            "hp": 0,
+            "type": ""
+          }
+        },
         "risorse": {
           "denaro": 0,
           "legno": 0,

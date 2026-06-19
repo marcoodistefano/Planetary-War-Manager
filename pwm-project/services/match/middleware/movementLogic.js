@@ -264,4 +264,18 @@ const getRegionForNode = (nodeName) => {
     return null;
 };
 
-module.exports = { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode };
+// Funzione per ottenere l'ID della regione dal nome (ADMIN o name)
+const getRegionIdByName = (name) => {
+    loadGeometries();
+    if (!regionsFeatures) return name;
+    const targetRegion = regionsFeatures.find(f => 
+        (f.properties && (f.properties.name === name || f.properties.ADMIN === name || f.properties.adm1_code === name)) ||
+        f.id === name
+    );
+    if (targetRegion) {
+        return targetRegion.properties?.adm1_code || targetRegion.id;
+    }
+    return name;
+};
+
+module.exports = { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, getRegionIdByName };

@@ -93,9 +93,19 @@ const initializePlayerResources = async (matchId, username) => {
     uranio: 0,
     oro: 0
   };
-  await redis.set(`match:${matchId}:player:${username}:risorse`, JSON.stringify(initialResources));
-  await redis.set(`match:${matchId}:player:${username}:risorse_last_update`, String(Date.now()));
-  await redis.set(`match:${matchId}:player:${username}:produzione`, JSON.stringify(initialProduction));
+  
+  const { updateMatch } = require('../shared/matchMonolithic');
+  await updateMatch(matchId, (matchObj) => {
+      if (!matchObj || !matchObj.match) return { save: false };
+      let player = matchObj.match.player.find(p => p.username === username);
+      if (player) {
+          player.risorse = initialResources;
+          player.produzione = initialProduction;
+          player.risorse_last_update = Date.now();
+          return { save: true, matchObj, data: true };
+      }
+      return { save: false };
+  });
 };
 
 // Invalidate alliance-related cache entries for a match
@@ -172,8 +182,13 @@ const resolveMatchState = async (matchId, client = db) => {
   if (!matchId) return null;
 
   const cachedState = safeParseRedisJson(await redis.get(`match:${matchId}`));
-  if (cachedState && cachedState.id_partita) {
-    return { source: "redis", state: cachedState };
+  if (cachedState) {
+    if (cachedState.match && cachedState.match.id_partita) {
+      return { source: "redis", state: cachedState.match };
+    }
+    if (cachedState.id_partita) {
+      return { source: "redis", state: cachedState };
+    }
   }
 
   const { rows } = await client.query(
@@ -195,14 +210,19 @@ const resolveMatchState = async (matchId, client = db) => {
   }
 
   const state = rows[0];
+  
+  // Ricostruiamo la struttura JSON monolitica minima se la cache era vuota
+  const { createEmptyMatchJSON } = require('../shared/matchMonolithic.js');
+  const emptyMatch = createEmptyMatchJSON(state.id_partita, state.id_partita_hash, state.id_partita_visualizzato, state.struttura_partita);
+  
   await setMatchCacheAllIds({
     id_partita: state.id_partita,
     id_partita_hash: state.id_partita_hash,
     id_partita_visualizzato: state.id_partita_visualizzato,
-    stateObj: state,
+    stateObj: emptyMatch,
   });
 
-  return { source: "db", state };
+  return { source: "db", state: emptyMatch.match };
 };
 
 const resolveAllianceState = async ({
@@ -487,15 +507,12 @@ const createMatch = async ({ playerId, gameMode }) => {
       await redis.del(`home_info:${playerId}`);
 
       // E. ISTANZIAZIONE REDIS (Iniezione in Memoria Volatile)
-      // La partita viene caricata in Redis sotto tutte e tre le chiavi
-      // (id_partita, id_partita_hash, id_partita_visualizzato)
-      const matchCache = {
-        id_partita: partitaId,
-        id_partita_hash: id_partita_hash,
-        id_partita_visualizzato: id_partita_visualizzato,
-        struttura_partita: eruRes.binary_match,
-        created_at: new Date().toISOString(),
-      };
+      const { createEmptyMatchJSON, updateMatch, getMatch } = require('../shared/matchMonolithic');
+      const matchCache = createEmptyMatchJSON(partitaId, id_partita_hash, id_partita_visualizzato, eruRes.binary_match);
+      matchCache.match.caratteristiche.nome = gameMode.nome_partita || "Operazione senza nome";
+      matchCache.match.caratteristiche.max_players = gameMode.maxPlayers;
+      matchCache.match.created_at = new Date().toISOString();
+
       await setMatchCacheAllIds({
         id_partita: partitaId,
         id_partita_hash: id_partita_hash,
@@ -503,20 +520,17 @@ const createMatch = async ({ playerId, gameMode }) => {
         stateObj: matchCache,
       });
 
-      console.log(
-        `[SYS_OK] Partita istanziata su Postgres e caricata in cache Redis: ${id_partita_hash}`,
-      );
+      console.log(`[SYS_OK] Partita istanziata su Postgres e caricata in cache Redis: ${id_partita_hash}`);
 
       // Generazione dei territori e nazioni
       await territoryGenerator.generateNations(id_partita_hash, gameMode.maxPlayers);
 
       // Inizializzazione risorse per tutte le nazioni (inclusi i bot)
       try {
-          const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
-          if (nationsCache) {
-              const nations = JSON.parse(nationsCache);
-              for (const nation of nations) {
-                  await initializePlayerResources(id_partita_hash, nation.playerId);
+          const matchData = await getMatch(id_partita_hash);
+          if (matchData && matchData.match && matchData.match.player) {
+              for (const player of matchData.match.player) {
+                  await initializePlayerResources(id_partita_hash, player.username);
               }
           }
       } catch (err) {
@@ -528,26 +542,22 @@ const createMatch = async ({ playerId, gameMode }) => {
           const userRes = await client.query(`SELECT username FROM utenti WHERE id_user = $1`, [playerId]);
           const sessionUsername = userRes.rows.length > 0 ? userRes.rows[0].username : playerId;
 
-          const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
-          if (nationsCache) {
-              const nations = JSON.parse(nationsCache);
-              const freeNations = nations.filter(n => String(n.playerId).includes('_bot') && !n.inWar);
+          await updateMatch(id_partita_hash, async (matchObj) => {
+              if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+              const freeNations = matchObj.match.player.filter(p => String(p.username).includes('_bot') && !p.inWar);
               if (freeNations.length > 0) {
                   const randomIndex = Math.floor(Math.random() * freeNations.length);
                   let selectedNation = freeNations[randomIndex];
                   
                   selectedNation.isOccupied = true;
-                  selectedNation.playerId = sessionUsername;
-                  const indexToUpdate = nations.findIndex(n => n.nationId === selectedNation.nationId);
-                  nations[indexToUpdate] = selectedNation;
-                  await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
-                  await redis.set(`match:${id_partita_hash}:player:${sessionUsername}:territori`, JSON.stringify(selectedNation.territories_flat || []));
-
+                  selectedNation.id_user = playerId;
+                  selectedNation.username = sessionUsername;
+                  
                   let statoTerritori = {};
                   const blankTemplateRaw = await redis.get(`map_data:regions_blank_template`);
                   if (blankTemplateRaw) {
                       statoTerritori = JSON.parse(blankTemplateRaw);
-                      for (const [admin, provs] of Object.entries(selectedNation.territories)) {
+                      for (const [admin, provs] of Object.entries(selectedNation.territori_dict)) {
                           if (statoTerritori[admin]) {
                               for (const prov of provs) {
                                   statoTerritori[admin][prov] = true;
@@ -559,8 +569,10 @@ const createMatch = async ({ playerId, gameMode }) => {
                     `UPDATE partecipanti_partite SET stato_territori = $1::jsonb WHERE partita_id = $2 AND user_id = $3`,
                     [JSON.stringify(statoTerritori), partitaId, playerId]
                   );
+                  return { save: true, matchObj, data: true };
               }
-          }
+              return { save: false };
+          });
       } catch (err) {
           console.error("[SYS_WARN] Errore assegnazione territorio host:", err);
       }
@@ -629,32 +641,27 @@ const join_Match = async (playerId, id_partita_hash) => {
       const sessionUsername = userRes.rows.length > 0 ? userRes.rows[0].username : playerId;
 
       // 2.5 Selezione Nazione e Preparazione stato_territori
-      const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
+      const { updateMatch, getMatch } = require('../shared/matchMonolithic');
       let selectedNation = null;
       let statoTerritori = {};
       const isBot = String(playerId).toUpperCase().includes("BOT");
 
-      if (nationsCache) {
-          const nations = JSON.parse(nationsCache);
-          const freeNations = nations.filter(n => String(n.playerId).includes('_bot') && !n.inWar);
+      await updateMatch(id_partita_hash, async (matchObj) => {
+          if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+          const freeNations = matchObj.match.player.filter(p => String(p.username).includes('_bot') && !p.inWar);
           if (freeNations.length > 0) {
               const randomIndex = Math.floor(Math.random() * freeNations.length);
               selectedNation = freeNations[randomIndex];
-
-              // Aggiornamento occupazione in Redis
+              
               selectedNation.isOccupied = true;
-              selectedNation.playerId = sessionUsername;
-              const indexToUpdate = nations.findIndex(n => n.nationId === selectedNation.nationId);
-              nations[indexToUpdate] = selectedNation;
-              await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
-              await redis.set(`match:${id_partita_hash}:player:${sessionUsername}:territori`, JSON.stringify(selectedNation.territories_flat || []));
+              selectedNation.id_user = playerId;
+              selectedNation.username = sessionUsername;
 
-              // Compilazione JSON per Postgres (Solo per i player reali)
               if (!isBot) {
                   const blankTemplateRaw = await redis.get(`map_data:regions_blank_template`);
                   if (blankTemplateRaw) {
                       statoTerritori = JSON.parse(blankTemplateRaw);
-                      for (const [admin, provs] of Object.entries(selectedNation.territories)) {
+                      for (const [admin, provs] of Object.entries(selectedNation.territori_dict)) {
                           if (statoTerritori[admin]) {
                               for (const prov of provs) {
                                   statoTerritori[admin][prov] = true;
@@ -663,8 +670,10 @@ const join_Match = async (playerId, id_partita_hash) => {
                       }
                   }
               }
+              return { save: true, matchObj, data: true };
           }
-      }
+          return { save: false };
+      });
 
       // 3. Inserimento e conteggio
       await client.query(
@@ -672,52 +681,10 @@ const join_Match = async (playerId, id_partita_hash) => {
         [partitaId, playerId, JSON.stringify(statoTerritori)],
       );
 
-      // TRASFERIMENTO ARMATE DEL BOT AL NUOVO UTENTE (DB e Redis)
-      if (selectedNation) {
-          const botId = selectedNation.name + "_bot";
-          
-          // TRASFERIMENTO RISORSE DEL BOT AL NUOVO UTENTE
-          const botResourcesKey = `match:${id_partita_hash}:player:${botId}:risorse`;
-          const botProdKey = `match:${id_partita_hash}:player:${botId}:produzione`;
-          const botLastUpdateKey = `match:${id_partita_hash}:player:${botId}:risorse_last_update`;
-          
-          const userResourcesKey = `match:${id_partita_hash}:player:${sessionUsername}:risorse`;
-          const userProdKey = `match:${id_partita_hash}:player:${sessionUsername}:produzione`;
-          const userLastUpdateKey = `match:${id_partita_hash}:player:${sessionUsername}:risorse_last_update`;
-
-          const botResources = await redis.get(botResourcesKey);
-          if (botResources) {
-              await redis.set(userResourcesKey, botResources);
-              await redis.del(botResourcesKey);
-          } else {
-              await initializePlayerResources(id_partita_hash, sessionUsername);
-          }
-          const botProd = await redis.get(botProdKey);
-          if (botProd) {
-              await redis.set(userProdKey, botProd);
-              await redis.del(botProdKey);
-          }
-          const botLastUpdate = await redis.get(botLastUpdateKey);
-          if (botLastUpdate) {
-              await redis.set(userLastUpdateKey, botLastUpdate);
-              await redis.del(botLastUpdateKey);
-          }
-
-          // A. Spostamento in Redis
-          const botRedisKey = `match:${id_partita_hash}:player:${botId}:armate`;
-          const userRedisKey = `match:${id_partita_hash}:player:${sessionUsername}:armate`;
-          const botArmiesData = await redis.get(botRedisKey);
-          
-          let armiesObj = {};
-          if (botArmiesData) {
-              armiesObj = JSON.parse(botArmiesData);
-              await redis.set(userRedisKey, JSON.stringify(armiesObj));
-              await redis.del(botRedisKey);
-          }
-
-          // B. Inserimento nel Database (i bot esistono solo in Redis, quindi ora inseriamo per l'utente)
-          for (const armataId in armiesObj) {
-              const armata = armiesObj[armataId];
+      // Inserimento armate del bot nel DB (ora che l'utente è reale)
+      if (selectedNation && selectedNation.armate) {
+          for (const armataId in selectedNation.armate) {
+              const armata = selectedNation.armate[armataId];
               const { x, y } = armata.currentLocation;
               
               await client.query(
@@ -728,7 +695,7 @@ const join_Match = async (playerId, id_partita_hash) => {
 
               let idTruppa = armata.truppeIds && armata.truppeIds.length > 0 ? armata.truppeIds[0] : null;
               if (!idTruppa) {
-                  idTruppa = randomUUID();
+                  idTruppa = require('crypto').randomUUID();
               }
               
               await client.query(
@@ -755,19 +722,15 @@ const join_Match = async (playerId, id_partita_hash) => {
         );
 
         // B. Sincronizzazione Redis
-        // Sovrascriviamo il frame in cache con il nuovo stato "IN_CORSO"
-        const matchCache = {
-          id_partita: partitaId,
-          id_partita_hash: id_partita_hash,
-          id_partita_visualizzato: matchQuery.rows[0].id_partita_visualizzato,
-          struttura_partita: eru_start.struttura_partita,
-          updated_at: new Date().toISOString(),
-        };
-        await setMatchCacheAllIds({
-          id_partita: partitaId,
-          id_partita_hash: id_partita_hash,
-          id_partita_visualizzato: matchQuery.rows[0].id_partita_visualizzato,
-          stateObj: matchCache,
+        // Aggiorniamo la struttura partita nel json monolitico
+        await updateMatch(id_partita_hash, async (matchObj) => {
+            if (!matchObj || !matchObj.match) return { save: false };
+            matchObj.match.struttura_partita = eru_start.struttura_partita;
+            if (matchObj.match.caratteristiche) {
+                matchObj.match.caratteristiche.stato = "In corso";
+            }
+            matchObj.updated_at = new Date().toISOString();
+            return { save: true, matchObj, data: true };
         });
 
         console.log(
@@ -782,14 +745,14 @@ const join_Match = async (playerId, id_partita_hash) => {
 
       // Notifica agli altri giocatori l'ingresso (Broadcast)
       try {
-        const updatedNationsCache = await redis.get(`match:${id_partita_hash}:nations`);
-        if (updatedNationsCache) {
+        const matchData = await getMatch(id_partita_hash);
+        if (matchData && matchData.match) {
           const broadcastPayload = {
             matchId: id_partita_hash,
             payload: {
               type: 'PLAYER_JOINED',
               payload: {
-                nations: JSON.parse(updatedNationsCache),
+                nations: matchData.match.player,
                 newPlayer: sessionUsername
               }
             }

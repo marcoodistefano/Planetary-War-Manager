@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit, OnDestroy, ChangeDetectorRef, ViewChild } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, ChangeDetectorRef, ViewChild, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController, MenuController, ToastController, ActionSheetController } from '@ionic/angular'; // <--- AGGIUNTO MenuController
@@ -111,8 +111,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   isTroopsDropdownOpen = false;
   troopsDropdownX = 0;
   troopsDropdownY = 0;
+  
+  selectedStructureForBuild: any = null;
+  matchStructures: any[] = [];
+  structureMarkers = new Map<string, any>();
+
   matchArmies: any[] = [];
   armyMarkers = new Map<string, any>(); // Ripristinato per i marker HTML
+  armyTetherCache = new Map<string, number[]>(); // Cache per i target node tether (evita freeze su spostamenti)
   nodesGeoData: any = null; // Per i tether
   armyHoverPopup: any = null; // Per l'hover di 3 secondi
   armyHoverInterval: any = null;
@@ -153,15 +159,57 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   startAnimationLoop() {
-    const animate = () => {
-      try {
-        this.updateMovingArmies();
-      } catch (err) {
-        console.error('Animation loop error:', err);
-      }
+    this.ngZone.runOutsideAngular(() => {
+      const animate = () => {
+        try {
+          this.updateMovingArmies();
+        } catch (err) {
+          console.error('Animation loop error:', err);
+        }
+        this.animationFrameId = requestAnimationFrame(animate);
+      };
       this.animationFrameId = requestAnimationFrame(animate);
-    };
-    this.animationFrameId = requestAnimationFrame(animate);
+    });
+  }
+
+  /**
+   * Pre-calcola le distanze cumulative dei segmenti del path di un'armata.
+   * Viene chiamato UNA SOLA VOLTA quando il path viene assegnato (TROOPS_MOVED / INITIAL_STATE).
+   * updateMovingArmies() usa poi questo cache per trovare il segmento con ricerca binaria O(log n)
+   * invece di ricalcolare O(n) ogni frame (~60 volte/s).
+   */
+  private precomputeArmyPathCache(army: any) {
+    if (!army.path || army.path.length < 2) {
+      delete army._pathCache;
+      return;
+    }
+    const segDists: number[] = [];
+    const cumDists: number[] = [0];
+    let total = 0;
+    for (let i = 0; i < army.path.length - 1; i++) {
+      const dx = army.path[i + 1][0] - army.path[i][0];
+      const dy = army.path[i + 1][1] - army.path[i][1];
+      const d = Math.sqrt(dx * dx + dy * dy);
+      segDists.push(d);
+      total += d;
+      cumDists.push(total);
+    }
+    army._pathCache = { segmentDistances: segDists, totalDistance: total, cumulativeDistances: cumDists };
+  }
+
+  /** Ricerca binaria dell'indice di segmento dato targetDist nelle distanze cumulative. O(log n). */
+  private findSegmentBinarySearch(cumDists: number[], targetDist: number): number {
+    let lo = 0;
+    let hi = cumDists.length - 2;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (cumDists[mid + 1] < targetDist) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    return lo;
   }
 
   updateMovingArmies() {
@@ -170,83 +218,77 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.matchArmies.forEach(army => {
       if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
         const elapsed = now - army.startTime;
-        let progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
+        const progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
 
-        let currentLngLat = army.path[army.path.length - 1];
-        let prevLngLat = army.path[0];
+        let currentLngLat: [number, number] = army.path[army.path.length - 1];
+        let prevLngLat: [number, number] = army.path[0];
         let direction: 'front' | 'back' | 'side' | 'side-flip' = 'front';
 
         if (progress < 1) {
           army._hasVisuallyArrived = false;
-          
-          let totalDistance = 0;
-          const segmentDistances = [];
-          for (let i = 0; i < army.path.length - 1; i++) {
-             const dx = army.path[i+1][0] - army.path[i][0];
-             const dy = army.path[i+1][1] - army.path[i][1];
-             const dist = Math.sqrt(dx*dx + dy*dy);
-             segmentDistances.push(dist);
-             totalDistance += dist;
+
+          // Usa la cache pre-calcolata se disponibile, altrimenti calcolala ora (lazy)
+          if (!army._pathCache) {
+            this.precomputeArmyPathCache(army);
           }
 
-          const targetDistance = progress * totalDistance;
-          let currentDist = 0;
-          let currentIndex = 0;
-          let segmentProgress = 0;
-
-          for (let i = 0; i < segmentDistances.length; i++) {
-             if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
-                currentIndex = i;
-                segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0;
-                break;
-             }
-             currentDist += segmentDistances[i];
+          const cache = army._pathCache;
+          if (cache && cache.totalDistance > 0) {
+            const targetDistance = progress * cache.totalDistance;
+            // Ricerca binaria O(log n) invece del loop O(n) originale
+            const segIdx = this.findSegmentBinarySearch(cache.cumulativeDistances, targetDistance);
+            const segDist = cache.segmentDistances[segIdx];
+            const segProgress = segDist > 0
+              ? (targetDistance - cache.cumulativeDistances[segIdx]) / segDist
+              : 0;
+            const p1: [number, number] = army.path[segIdx];
+            const p2: [number, number] = army.path[segIdx + 1] || p1;
+            prevLngLat = p1;
+            currentLngLat = [
+              p1[0] + (p2[0] - p1[0]) * segProgress,
+              p1[1] + (p2[1] - p1[1]) * segProgress
+            ];
           }
-
-          const p1 = army.path[currentIndex];
-          const p2 = army.path[currentIndex + 1] || p1;
-          prevLngLat = p1;
-          const lng = p1[0] + (p2[0] - p1[0]) * segmentProgress;
-          const lat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
-          currentLngLat = [lng, lat];
         } else {
           prevLngLat = army.path ? army.path[Math.max(0, army.path.length - 2)] : currentLngLat;
           if (!army._hasVisuallyArrived) {
-             army._hasVisuallyArrived = true;
-             army.status = 'standby';
-             army.currentLocation = { x: currentLngLat[0], y: currentLngLat[1] };
-             delete army.path;
-             delete army.etaMs;
-             delete army.startTime;
-             setTimeout(() => this.renderArmies(), 0);
+            army._hasVisuallyArrived = true;
+            army.status = 'standby';
+            army.currentLocation = { x: currentLngLat[0], y: currentLngLat[1] };
+            delete army.path;
+            delete army.etaMs;
+            delete army.startTime;
+            delete army._pathCache; // Libera la cache
+            setTimeout(() => this.renderArmies(), 0);
           }
         }
 
         const dx = currentLngLat[0] - prevLngLat[0];
         const dy = currentLngLat[1] - prevLngLat[1];
         if (Math.abs(dx) > Math.abs(dy)) {
-          if (dx > 0) direction = 'side';
-          else direction = 'side-flip';
+          direction = dx > 0 ? 'side' : 'side-flip';
         } else {
-          if (dy > 0) direction = 'back';
-          else direction = 'front';
+          direction = dy > 0 ? 'back' : 'front';
         }
 
         const marker = this.armyMarkers.get(army.id);
         if (marker) {
           marker.setLngLat(currentLngLat);
           const el = marker.getElement();
-          const imgDiv = el.querySelector('.army-image') as HTMLElement;
-          if (imgDiv) {
-            const assetUrl = `url(${this.getArmyModelAssetUrl(army, direction)})`;
-            if (imgDiv.style.backgroundImage !== assetUrl) {
-              imgDiv.style.backgroundImage = assetUrl;
-            }
+          
+          let imgDiv = (marker as any).imgDiv;
+          if (!imgDiv) {
+            imgDiv = el.querySelector('.army-image') as HTMLElement;
+            (marker as any).imgDiv = imgDiv;
+          }
 
-            // Apply flip
-            const targetTransform = direction === 'side-flip' ? 'scaleX(-1)' : 'scaleX(1)';
-            if (imgDiv.style.transform !== targetTransform) {
+          if (imgDiv) {
+            if ((marker as any)._lastDirection !== direction) {
+              const assetUrl = `url(${this.getArmyModelAssetUrl(army, direction)})`;
+              imgDiv.style.backgroundImage = assetUrl;
+              const targetTransform = direction === 'side-flip' ? 'scaleX(-1)' : 'scaleX(1)';
               imgDiv.style.transform = targetTransform;
+              (marker as any)._lastDirection = direction;
             }
           }
         }
@@ -347,7 +389,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     private route: ActivatedRoute,
     private homeService: HomeService,
     private authApi: AuthApiService,
-    private userState: UserStateService
+    private userState: UserStateService,
+    private ngZone: NgZone
   ) { }
 
   ngOnInit() {
@@ -452,7 +495,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         if (parsed.type === 'INITIAL_STATE') {
           if (parsed.payload?.armies) {
             this.matchArmies = parsed.payload.armies.filter((a: any) => a.owner === this.userProfile.username);
-            const moving = this.matchArmies.find(a => a.status === "moving");
+            // Pre-calcola la path cache per le armate già in movimento al momento del caricamento
+            this.matchArmies.forEach((a: any) => {
+              if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
+            });
+            const moving = this.matchArmies.find((a: any) => a.status === "moving");
             if (moving) console.log("INITIAL_STATE moving army:", moving.id, "startTime:", moving.startTime, "path:", moving.path?.length);
             this.renderArmies();
           }
@@ -465,6 +512,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
           if (parsed.payload?.production) {
             this.resourceProduction = parsed.payload.production;
+          }
+          if (parsed.payload?.structures) {
+            this.matchStructures = parsed.payload.structures;
+            setTimeout(() => this.renderStructures(), 100);
           }
           this.cdr.detectChanges();
         }
@@ -492,6 +543,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             newArmies[armyIndex].etaMs = etaMs;
             newArmies[armyIndex].startTime = startTime || Date.now();
             if (mode) newArmies[armyIndex].missionMode = mode;
+            // Pre-calcola la cache del path una sola volta appena ricevuto
+            this.precomputeArmyPathCache(newArmies[armyIndex]);
+            this.armyTetherCache.delete(armyId); // Invalida il tether per forzare il ricalcolo al nuovo target
             this.matchArmies = newArmies;
           }
           console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
@@ -513,6 +567,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             delete newArmies[armyIndex].path;
             delete newArmies[armyIndex].etaMs;
             delete newArmies[armyIndex].startTime;
+            delete newArmies[armyIndex]._pathCache; // Libera la cache
+            this.armyTetherCache.delete(armyId); // Invalida tether cache per l'arrivo
             this.matchArmies = newArmies;
 
             const hoverSource: any = this.map?.getSource('hovered-troop-path-source');
@@ -551,6 +607,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             delete newArmies[armyIndex].path;
             delete newArmies[armyIndex].etaMs;
             delete newArmies[armyIndex].startTime;
+            delete newArmies[armyIndex]._pathCache; // Libera la cache
             this.matchArmies = newArmies;
 
             const hoverSource: any = this.map?.getSource('hovered-troop-path-source');
@@ -578,6 +635,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             delete newArmies[armyIndex].etaMs;
             delete newArmies[armyIndex].startTime;
             delete newArmies[armyIndex].next_round_time;
+            delete newArmies[armyIndex]._pathCache; // Libera la cache
             this.matchArmies = newArmies;
             this.renderArmies();
             this.cdr.detectChanges();
@@ -608,7 +666,18 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
              this.citiesHp = parsed.payload.citiesHp || {};
           }
           
-          this.matchArmies = [...myArmies, ...visibleEnemies];
+          const newArmies = [...myArmies, ...visibleEnemies];
+          
+          // Mantieni la path cache e altri flag visivi per evitare ricalcoli costanti e lag loop
+          newArmies.forEach(newA => {
+             const oldA = this.matchArmies.find(a => a.id === newA.id);
+             if (oldA) {
+                if (oldA._pathCache) newA._pathCache = oldA._pathCache;
+                if (oldA._hasVisuallyArrived) newA._hasVisuallyArrived = oldA._hasVisuallyArrived;
+             }
+          });
+          
+          this.matchArmies = newArmies;
           this.renderArmies();
           this.renderCitiesHp();
           this.applyTerritoryColors();
@@ -667,6 +736,46 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.armyModalComponent.loadGraveyard();
             }
           }
+        }
+
+        if (parsed.type === 'BUILD_SUCCESS') {
+          this.toastCtrl.create({
+            message: `Struttura ${parsed.payload.name} costruita con successo!`,
+            duration: 3000,
+            position: 'top',
+            color: 'success'
+          }).then(t => t.present());
+          
+          if (parsed.replacedStructureId) {
+             const oldMarker = this.structureMarkers.get(parsed.replacedStructureId);
+             if (oldMarker) { oldMarker.remove(); this.structureMarkers.delete(parsed.replacedStructureId); }
+             this.matchStructures = this.matchStructures.filter(s => s.id !== parsed.replacedStructureId);
+          }
+          this.matchStructures.push(parsed.payload);
+          this.renderStructures();
+          this.cdr.detectChanges();
+        }
+
+        if (parsed.type === 'STRUCTURE_BUILT') {
+          if (parsed.replacedStructureId) {
+             const oldMarker = this.structureMarkers.get(parsed.replacedStructureId);
+             if (oldMarker) { oldMarker.remove(); this.structureMarkers.delete(parsed.replacedStructureId); }
+             this.matchStructures = this.matchStructures.filter(s => s.id !== parsed.replacedStructureId);
+          }
+          if (parsed.data.owner !== this.userProfile.username) {
+            this.matchStructures.push(parsed.data);
+            this.renderStructures();
+            this.cdr.detectChanges();
+          }
+        }
+
+        if (parsed.type === 'ERROR') {
+          this.toastCtrl.create({
+            message: parsed.error || 'Si è verificato un errore',
+            duration: 3000,
+            position: 'top',
+            color: 'danger'
+          }).then(t => t.present());
         }
       };
 
@@ -1153,7 +1262,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  startConstruction(item: any) { console.log("Inizio costruzione di:", item.name || item.nome); }
+  startConstruction(item: any) { 
+    this.selectedStructureForBuild = item;
+    this.isBuildPanelOpen = false;
+    this.toastCtrl.create({
+      message: `Seleziona un punto sulla mappa per costruire ${item.name || item.nome}.`,
+      duration: 3000,
+      position: 'top',
+      color: 'primary',
+      icon: 'map-outline'
+    }).then(t => t.present());
+  }
 
   // --- LOGICA MAPPA E SENSORI ---
 
@@ -1338,6 +1457,90 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     return null;
   }
 
+  // --- RENDERING STRUTTURE SU MAPPA ---
+  renderStructures() {
+    if (!this.map) return;
+
+    // Rimuoviamo i marker non più presenti
+    const currentStructureIds = new Set(this.matchStructures.map(s => s.id));
+    for (const [id, marker] of this.structureMarkers.entries()) {
+      if (!currentStructureIds.has(id)) {
+        marker.remove();
+        this.structureMarkers.delete(id);
+      }
+    }
+
+    this.matchStructures.forEach(structure => {
+      let coords: [number, number] | null = null;
+      if (structure.targetCoords && Array.isArray(structure.targetCoords) && structure.targetCoords.length >= 2) {
+         coords = [structure.targetCoords[0], structure.targetCoords[1]];
+      }
+
+      if (!coords) return;
+
+      const isMine = structure.owner === this.userProfile.username;
+
+      if (!this.structureMarkers.has(structure.id)) {
+        const el = document.createElement('div');
+        el.className = 'structure-marker-wrapper';
+        el.style.position = 'relative';
+        el.style.width = '30px';
+        el.style.height = '30px';
+        el.style.cursor = 'pointer';
+        el.style.zIndex = '5'; // Sotto le armate (zIndex 10)
+
+        // Wrapper per l'immagine
+        const container = document.createElement('div');
+        container.style.width = '100%';
+        container.style.height = '100%';
+        container.style.position = 'relative';
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.justifyContent = 'center';
+        
+        // Determina l'immagine PNG
+        let png = 'fabbrica.png';
+        const name = (structure.name || '').toLowerCase();
+        if (name.includes('segheria') || name.includes('boschivo')) png = 'segheria.png';
+        else if (name.includes('miniera') || name.includes('scavo')) {
+           if (name.includes('oro')) png = 'miniera_oro.png';
+           else png = 'carbone.png'; // Fallback per altre miniere (es. piombo)
+        }
+        else if (name.includes('mattonificio') || name.includes('fornace')) png = 'mattonificio.png';
+        else if (name.includes('acciaieria') || name.includes('fonderia')) png = 'acciaieria.png';
+        else if (name.includes('petrol') || name.includes('idrocarburi')) png = 'petrolio.png';
+        else if (name.includes('gas')) png = 'gas.png';
+        else if (name.includes('fortezza')) png = 'fortezza.png';
+        else if (name.includes('caserma')) png = 'caserma.png';
+        else if (name.includes('fabbrica armamenti')) png = 'fabbrica.png';
+        else if (name.includes('aeroporto')) png = 'airport1.png';
+        else if (name.includes('porto')) png = 'port_est.png';
+        else if (name.includes('uranio')) png = 'arricchimento_uranio.png';
+        else if (name.includes('radar')) png = 'radar_terrestre.png';
+        
+        const img = document.createElement('img');
+        img.src = `assets/2Dmodels/Buildings/${png}`;
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.objectFit = 'contain';
+        img.style.filter = isMine ? 'drop-shadow(0 0 5px #60a5fa)' : 'drop-shadow(0 0 5px #f87171)';
+        img.title = `${structure.name} (${structure.owner})`;
+        
+        container.appendChild(img);
+        el.appendChild(container);
+
+        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat(coords)
+          .addTo(this.map);
+
+        this.structureMarkers.set(structure.id, marker);
+      } else {
+        const marker = this.structureMarkers.get(structure.id);
+        marker.setLngLat(coords);
+      }
+    });
+  }
+
   // --- RENDERING ARMATE SU MAPPA ---
   renderArmies() {
     console.log('[DEBUG_MAP] renderArmies richiamato. Mappa pronta?', !!this.map, 'Armate in memoria:', this.matchArmies.length);
@@ -1432,32 +1635,37 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       // Trova il nodo target per la linea (tether)
       let targetNodeCoords = [...coords];
       if (this.nodesGeoData && this.nodesGeoData.features) {
-        let cityName = '';
-        if (army.name && army.name.toLowerCase().startsWith('guarnigione ')) {
-          cityName = army.name.substring(12).trim().toLowerCase();
+        if (this.armyTetherCache.has(army.id)) {
+          targetNodeCoords = this.armyTetherCache.get(army.id)!;
         } else {
-          cityName = String(army.name || '').trim().toLowerCase();
-        }
+          let cityName = '';
+          if (army.name && army.name.toLowerCase().startsWith('guarnigione ')) {
+            cityName = army.name.substring(12).trim().toLowerCase();
+          } else {
+            cityName = String(army.name || '').trim().toLowerCase();
+          }
 
-        let matchingNode = this.nodesGeoData.features.find((f: any) =>
-          f.properties.name && f.properties.name.toLowerCase() === cityName
-        );
+          let matchingNode = this.nodesGeoData.features.find((f: any) =>
+            f.properties.name && f.properties.name.toLowerCase() === cityName
+          );
 
-        if (!matchingNode) {
-          let minDist = Infinity;
-          this.nodesGeoData.features.forEach((f: any) => {
-            const nx = f.geometry.coordinates[0];
-            const ny = f.geometry.coordinates[1];
-            const dist = Math.pow(nx - coords[0], 2) + Math.pow(ny - coords[1], 2);
-            if (dist < minDist) {
-              minDist = dist;
-              matchingNode = f;
-            }
-          });
-        }
+          if (!matchingNode) {
+            let minDist = Infinity;
+            this.nodesGeoData.features.forEach((f: any) => {
+              const nx = f.geometry.coordinates[0];
+              const ny = f.geometry.coordinates[1];
+              const dist = Math.pow(nx - coords[0], 2) + Math.pow(ny - coords[1], 2);
+              if (dist < minDist) {
+                minDist = dist;
+                matchingNode = f;
+              }
+            });
+          }
 
-        if (matchingNode && matchingNode.geometry && matchingNode.geometry.coordinates) {
-          targetNodeCoords = matchingNode.geometry.coordinates;
+          if (matchingNode && matchingNode.geometry && matchingNode.geometry.coordinates) {
+            targetNodeCoords = matchingNode.geometry.coordinates;
+          }
+          this.armyTetherCache.set(army.id, targetNodeCoords);
         }
       }
 
@@ -2156,13 +2364,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     const provId = feature ? (feature.properties.adm1_code || feature.properties.name || feature.id) : this.selectedPointName;
 
-    const nation = this.matchNations?.find((n: any) => n.territories_flat && n.territories_flat.includes(provId));
+    const nation = this.matchNations?.find((n: any) => n.territori && n.territori.includes(provId));
 
     if (nation && nation.isOccupied) {
-      if (nation.playerId.includes('bot')) {
+      if (nation.username.includes('bot')) {
         owner = '🤖 BOT';
       } else {
-        owner = nation.playerId.toUpperCase();
+        owner = nation.username.toUpperCase();
       }
     }
 
@@ -2332,6 +2540,40 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   handleMapPointSelect(e: any) {
     console.log("Map clicked!", e.point);
+
+    if (this.selectedStructureForBuild) {
+      this.updatePointReadout(e, true);
+      const targetCoords = [e.lngLat.lng, e.lngLat.lat];
+      const targetName = this.selectedPointName || 'SCONOSCIUTO';
+
+      if (targetName === 'SCONOSCIUTO') {
+          this.toastCtrl.create({
+              message: 'Seleziona un territorio valido.',
+              duration: 2000,
+              position: 'top',
+              color: 'warning'
+          }).then(t => t.present());
+          return;
+      }
+
+      // Ownership validation is done by the backend (which safely resolves region names to IDs).
+
+      // Invio websocket
+      if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
+          const payload = {
+              action: 'BUILD_STRUCTURE',
+              payload: {
+                  structureId: this.selectedStructureForBuild.id_struttura || this.selectedStructureForBuild.id_extractor,
+                  targetName: targetName,
+                  targetCoords: targetCoords
+              }
+          };
+          this.matchSocket.send(JSON.stringify(payload));
+      }
+      
+      this.selectedStructureForBuild = null;
+      return;
+    }
 
     if (this.selectedArmiesForMovement.length > 0) {
       this.updatePointReadout(e, true);
@@ -2606,7 +2848,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       if (!nation.isOccupied) return;
 
       let statusColor = '#eab308'; // Default non neutral (enemy)
-      const occupier = String(nation.playerId || '').trim().toLowerCase();
+      const occupier = String(nation.username || '').trim().toLowerCase();
 
       if (occupier === currentUser) {
         statusColor = '#22c55e'; // Verde per il player
@@ -2625,14 +2867,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         statusColor = isAlly ? '#3b82f6' : '#eab308';
       }
 
-      if (Array.isArray(nation.territories_flat)) {
-        nation.territories_flat.forEach((provId: string) => {
+      if (Array.isArray(nation.territori)) {
+        nation.territori.forEach((provId: string) => {
           colorMap[provId] = statusColor;
         });
       }
 
-      if (Array.isArray(nation.territories_flat) && nation.territories_flat.length > 0) {
-        const firstProvId = nation.territories_flat[0];
+      if (Array.isArray(nation.territori) && nation.territori.length > 0) {
+        const firstProvId = nation.territori[0];
         const feature = this.regionsGeoData.features.find((f: any) =>
           (f.properties.adm1_code === firstProvId) || (f.id === firstProvId) || (f.properties.name === firstProvId)
         );
@@ -2655,7 +2897,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             el.style.fontWeight = 'bold';
             el.style.whiteSpace = 'nowrap';
             el.style.display = 'none';
-            el.innerText = occupier.includes('bot') ? '🤖 BOT' : nation.playerId.toUpperCase();
+            el.innerText = occupier.includes('bot') ? '🤖 BOT' : nation.username.toUpperCase();
 
             const marker = new maplibregl.Marker({ element: el })
               .setLngLat(centerPoint)

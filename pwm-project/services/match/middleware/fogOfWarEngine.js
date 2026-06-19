@@ -1,3 +1,4 @@
+const db = require("../../shared/postgresClient.js");
 const redis = require("../../shared/redisClient");
 const fs = require("fs");
 const path = require("path");
@@ -110,9 +111,36 @@ function getEstimatedCoords(army, nodesFeatures = []) {
     return coords;
 }
 
+let nodesFeatures = [];
+let provinceCoordsMap = {};
+
+try {
+    const mapPath = path.join(__dirname, '../../../../shared/assets/map/cities.json');
+    if (fs.existsSync(mapPath)) {
+        const mapGeo = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+        nodesFeatures = mapGeo.features || [];
+        
+        nodesFeatures.forEach(f => {
+            if (f.geometry && f.geometry.coordinates) {
+                const nodeName = (f.properties.name || f.properties.ADMIN || f.id).toLowerCase();
+                let c = f.geometry.coordinates;
+                while (c.length && Array.isArray(c[0][0])) c = c[0];
+                if (c.length > 0 && c[0].length === 2) {
+                    provinceCoordsMap[nodeName] = [c[0][0], c[0][1]];
+                } else if (c.length === 2 && typeof c[0] === 'number') {
+                    provinceCoordsMap[nodeName] = [c[0], c[1]];
+                }
+            }
+        });
+        console.log(`[FOG_OF_WAR] Caricata mappa con ${nodesFeatures.length} feature.`);
+    }
+} catch (e) {
+    console.error("[FOG_OF_WAR] Errore caricamento mappa cities.json:", e);
+}
+
 const runFogOfWarCycle = async () => {
     try {
-        const matchKeys = await redis.keys("match:*");
+        const matchKeys = await db.query('SELECT id_partita_hash FROM partite').then(res => res.rows.map(r => `match:${r.id_partita_hash}`));
         const matchIds = new Set();
         matchKeys.forEach(k => {
             const parts = k.split(':');
@@ -121,74 +149,55 @@ const runFogOfWarCycle = async () => {
             }
         });
 
-        let nodesFeatures = [];
-        try {
-            const mapPath = path.join(__dirname, '../../../../shared/assets/map/cities.json');
-            if (fs.existsSync(mapPath)) {
-                const mapGeo = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
-                nodesFeatures = mapGeo.features || [];
-            }
-        } catch(e) {}
-
         for (const matchId of matchIds) {
-            const playersArmiesKeys = await redis.keys(`match:${matchId}:player:*:armate`);
+            const matchDataStr = await redis.get(`match:${matchId}`);
+            if (!matchDataStr) continue;
+            
+            let matchObj;
+            try {
+                matchObj = JSON.parse(matchDataStr);
+            } catch(e) { continue; }
+            
+            if (!matchObj || !matchObj.match || !matchObj.match.player) continue;
+            
+            const nations = matchObj.match.player;
             let allArmies = [];
             let armiesByPlayer = {};
             
-            for (const key of playersArmiesKeys) {
-                const parts = key.split(':');
-                const username = parts[3];
-                const data = await redis.get(key);
-                if (data) {
-                    const obj = JSON.parse(data);
-                    const list = Object.values(obj).map(a => ({...a, owner: username}));
+            for (const player of nations) {
+                const username = player.username;
+                armiesByPlayer[username] = [];
+                if (player.armate) {
+                    const list = Object.values(player.armate).map(a => ({...a, owner: username}));
                     armiesByPlayer[username] = list;
                     allArmies = allArmies.concat(list);
                 }
             }
 
-            const usersMap = {};
-            const db = require('../../shared/postgresClient.js');
-            const userRes = await db.query(`SELECT id_user, username FROM utenti`);
-            userRes.rows.forEach(r => usersMap[r.username] = r.id_user);
+            for (const player of nations) {
+                const username = player.username;
+                const userId = player.id_user;
+                
+                if (!userId || String(username).includes('_bot')) continue;
 
-            const nationsData = await redis.get(`match:${matchId}:nations`);
-            const nations = nationsData ? JSON.parse(nationsData) : [];
-
-            for (const [username, myArmies] of Object.entries(armiesByPlayer)) {
-                const userId = usersMap[username];
-                if (!userId) continue;
-
-                const myNations = nations.filter(n => n.playerId === username);
+                const myArmies = armiesByPlayer[username] || [];
                 const myTerritoryNames = new Set();
-                myNations.forEach(n => {
-                    if (n.territories_flat) {
-                        if (Array.isArray(n.territories_flat)) {
-                            n.territories_flat.forEach(t => myTerritoryNames.add(String(t).trim().toLowerCase()));
-                        } else if (typeof n.territories_flat === 'string') {
-                            n.territories_flat.split(',').forEach(t => myTerritoryNames.add(t.trim().toLowerCase()));
-                        }
+                
+                if (player.territori_dict) {
+                    for (const provs of Object.values(player.territori_dict)) {
+                        provs.forEach(t => myTerritoryNames.add(String(t).trim().toLowerCase()));
                     }
-                });
+                } else if (player.territori) {
+                    player.territori.forEach(t => myTerritoryNames.add(String(t).trim().toLowerCase()));
+                }
 
-                // Estraggo le coordinate dei miei territori
                 const myTerritoriesCoords = [];
-                nodesFeatures.forEach(f => {
-                    if (f.geometry && f.geometry.coordinates) {
-                        const nodeName = (f.properties.name || f.properties.ADMIN || f.id).toLowerCase();
-                        if (myTerritoryNames.has(nodeName)) {
-                            let c = f.geometry.coordinates;
-                            while (c.length && Array.isArray(c[0][0])) c = c[0];
-                            if (c.length > 0 && c[0].length === 2) {
-                                myTerritoriesCoords.push([c[0][0], c[0][1]]);
-                            } else if (c.length === 2 && typeof c[0] === 'number') {
-                                myTerritoriesCoords.push([c[0], c[1]]);
-                            }
-                        }
+                myTerritoryNames.forEach(nodeName => {
+                    if (provinceCoordsMap[nodeName]) {
+                        myTerritoriesCoords.push(provinceCoordsMap[nodeName]);
                     }
                 });
 
-                // Mappo le mie armate con il loro raggio di visione
                 const myArmiesVision = myArmies.map(a => {
                     return { coords: getEstimatedCoords(a, nodesFeatures), radius: getArmyVisionRadius(a) };
                 }).filter(a => a.coords !== null);
@@ -203,7 +212,7 @@ const runFogOfWarCycle = async () => {
 
                     let isVisible = false;
 
-                    // 1. Check distanza dalle mie armate (usando il raggio visivo di ciascuna armata)
+                    // 1. Check distanza dalle mie armate
                     for (const myArmy of myArmiesVision) {
                         const dist = haversineDist(coords[0], coords[1], myArmy.coords[0], myArmy.coords[1]);
                         if (dist <= myArmy.radius) {
@@ -211,11 +220,11 @@ const runFogOfWarCycle = async () => {
                         }
                     }
 
-                    // 2. Check distanza dai miei territori (Raggio visivo fisso di confine: 50 km)
+                    // 2. Check distanza dai miei territori
                     if (!isVisible) {
                         for (const terrCoords of myTerritoriesCoords) {
                             const dist = haversineDist(coords[0], coords[1], terrCoords[0], terrCoords[1]);
-                            if (dist <= 50) { // Un buffer di 50 km dai propri confini
+                            if (dist <= 50) { 
                                 isVisible = true; break;
                             }
                         }
@@ -226,13 +235,12 @@ const runFogOfWarCycle = async () => {
                     }
                 }
 
-                // Leggere tutti gli hp delle città danneggiate
-                const citiesHpKeys = await redis.keys(`match:${matchId}:city_hp:*`);
+                const citiesHpStr = await redis.hgetall(`match:${matchId}:cities_hp`);
                 const citiesHp = {};
-                for (const hpKey of citiesHpKeys) {
-                    const cityId = hpKey.split(':').pop();
-                    const hp = await redis.get(hpKey);
-                    if (hp) citiesHp[cityId] = parseInt(hp, 10);
+                if (citiesHpStr) {
+                    for (const [cityId, hp] of Object.entries(citiesHpStr)) {
+                        citiesHp[cityId] = parseInt(hp, 10);
+                    }
                 }
 
                 const payload = {

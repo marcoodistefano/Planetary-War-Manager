@@ -96,73 +96,82 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
       console.log(`[WS_MATCH] Ricevuto messaggio da ${userId}:`, payload);
       
       if (payload.action === 'GET_INITIAL_STATE') {
-         const keys = await redis.keys(`match:${ws.matchId}:player:*:armate`);
+         const { getMatch } = require('../shared/matchMonolithic.js');
+         const matchData = await getMatch(ws.matchId);
+         
          let armies = [];
-         for (const key of keys) {
-            const armateStr = await redis.get(key);
-            if (armateStr) {
-               const playerId = key.split(':')[3];
-               const armateObj = JSON.parse(armateStr);
-               const playerArmies = Object.values(armateObj).map(a => ({...a, owner: playerId}));
-               armies = armies.concat(playerArmies);
-            }
+         let nations = [];
+         let resources = translateRedisToFe({});
+         let production = translateRedisToFe({});
+         let structures = [];
+
+         if (matchData && matchData.match && matchData.match.player) {
+             nations = matchData.match.player;
+             for (const p of nations) {
+                 if (p.armate) {
+                     const playerArmies = Object.values(p.armate).map(a => ({...a, owner: p.username}));
+                     armies = armies.concat(playerArmies);
+                 }
+                 if (p.strutture) {
+                     const playerStr = p.strutture.map(s => ({...s, owner: p.username}));
+                     structures = structures.concat(playerStr);
+                 }
+                 if (p.username === ws.username) {
+                     resources = translateRedisToFe(p.risorse);
+                     production = translateRedisToFe(p.produzione);
+                 }
+             }
          }
-
-         const nationsStr = await redis.get(`match:${ws.matchId}:nations`);
-         const nations = nationsStr ? JSON.parse(nationsStr) : [];
-
-         const resourcesStr = await redis.get(`match:${ws.matchId}:player:${ws.username}:risorse`);
-         const rawResources = resourcesStr ? JSON.parse(resourcesStr) : null;
-         const resources = translateRedisToFe(rawResources);
-
-         const productionStr = await redis.get(`match:${ws.matchId}:player:${ws.username}:produzione`);
-         const rawProduction = productionStr ? JSON.parse(productionStr) : null;
-         const production = translateRedisToFe(rawProduction);
 
          ws.send(JSON.stringify({ 
            type: 'INITIAL_STATE', 
-           payload: { 
-             armies, 
-             nations, 
-             resources, 
-             production 
-           } 
+           payload: { armies, nations, resources, production, structures } 
          }));
          return;
       }
 
       if (payload.action === 'SAVE_ARMIES') {
-         // Sincronizza lo stato armate dal frontend (che invia un array)
+         const { updateMatch } = require('../shared/matchMonolithic.js');
          const dict = {};
          (payload.payload.armies || []).forEach(a => dict[a.id] = a);
-         await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(dict));
+         await updateMatch(ws.matchId, async (matchObj) => {
+             if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+             const player = matchObj.match.player.find(p => p.username === ws.username);
+             if (player) {
+                 player.armate = dict;
+                 return { save: true, matchObj, data: true };
+             }
+             return { save: false };
+         });
          return;
       }
 
-      if (payload.action === 'MOVE_TROOPS') {
+if (payload.action === 'MOVE_TROOPS') {
          const { armyId, targetName, targetCoords } = payload.payload;
-         console.log(`[MOVE_TROOPS] payload received: ${JSON.stringify(payload.payload)}`);
-         const armateStr = await redis.get(`match:${ws.matchId}:player:${ws.username}:armate`);
-         let armateObj = armateStr ? JSON.parse(armateStr) : {};
+         const { getMatch, updateMatch } = require('../shared/matchMonolithic.js');
          
-         if (!armateObj[armyId]) {
+         const matchData = await getMatch(ws.matchId);
+         if (!matchData || !matchData.match || !matchData.match.player) {
+             ws.send(JSON.stringify({ type: 'ERROR', error: 'Partita non trovata' }));
+             return;
+         }
+         
+         const player = matchData.match.player.find(p => p.username === ws.username);
+         if (!player || !player.armate || !player.armate[armyId]) {
              ws.send(JSON.stringify({ type: 'ERROR', error: 'Armata non trovata' }));
              return;
          }
          
-         // --- Parsing Coordinate ---
-         let loc = armateObj[armyId].currentLocation;
+         const armata = player.armate[armyId];
          let startLng, startLat;
+         let loc = armata.currentLocation;
          if (loc && typeof loc === 'string') {
              if (loc.includes(',')) {
                  const pts = loc.split(',').map(s => parseFloat(s.trim()));
                  if (pts.length === 2 && !isNaN(pts[0]) && !isNaN(pts[1])) { startLng = pts[0]; startLat = pts[1]; }
              } else {
                  const nodeCoords = getNodeCoords(loc);
-                 if (nodeCoords) {
-                     startLng = nodeCoords[0];
-                     startLat = nodeCoords[1];
-                 }
+                 if (nodeCoords) { startLng = nodeCoords[0]; startLat = nodeCoords[1]; }
              }
          } else if (loc && loc.x !== undefined && loc.y !== undefined) {
              startLng = loc.x; startLat = loc.y;
@@ -175,13 +184,13 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
              return;
          }
          
-         const armyState = armateObj[armyId].status;
-         if ((armyState === 'moving' || armyState === 'moving_to_border' || armyState === "Pronto all'attacco") && armateObj[armyId].path && armateObj[armyId].path.length > 1 && armateObj[armyId].startTime && armateObj[armyId].etaMs) {
+         const armyState = armata.status;
+         if ((armyState === 'moving' || armyState === 'moving_to_border' || armyState === "Pronto all'attacco") && armata.path && armata.path.length > 1 && armata.startTime && armata.etaMs) {
              const now = Date.now();
-             const elapsed = now - armateObj[armyId].startTime;
-             let progress = Math.max(0, Math.min(1, elapsed / armateObj[armyId].etaMs));
+             const elapsed = now - armata.startTime;
+             let progress = Math.max(0, Math.min(1, elapsed / armata.etaMs));
              if (progress < 1) {
-                 const path = armateObj[armyId].path;
+                 const path = armata.path;
                  let totalDistance = 0;
                  const segmentDistances = [];
                  for (let i = 0; i < path.length - 1; i++) {
@@ -208,11 +217,10 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                  startLng = p1[0] + (p2[0] - p1[0]) * segmentProgress;
                  startLat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
              } else {
-                 const lastPoint = armateObj[armyId].path[armateObj[armyId].path.length - 1];
+                 const lastPoint = armata.path[armata.path.length - 1];
                  startLng = lastPoint[0];
                  startLat = lastPoint[1];
              }
-             armateObj[armyId].currentLocation = `${startLng},${startLat}`;
          }
          
          let targetLng, targetLat;
@@ -220,403 +228,366 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
          if (typeof targetCoords === 'string') {
              const pts = targetCoords.split(',').map(s => parseFloat(s.trim()));
              if (pts.length === 2 && !isNaN(pts[0]) && !isNaN(pts[1])) { 
-                 targetLng = pts[0]; 
-                 targetLat = pts[1]; 
-                 parsedTargetCoords = [targetLng, targetLat];
+                 targetLng = pts[0]; targetLat = pts[1]; parsedTargetCoords = [targetLng, targetLat];
              }
          } else if (Array.isArray(targetCoords) && targetCoords.length === 2) {
-             targetLng = parseFloat(targetCoords[0]);
-             targetLat = parseFloat(targetCoords[1]);
-             parsedTargetCoords = [targetLng, targetLat];
+             targetLng = parseFloat(targetCoords[0]); targetLat = parseFloat(targetCoords[1]); parsedTargetCoords = [targetLng, targetLat];
          }
-
+         
          if (targetLng === undefined && targetName) {
              const nodeCoords = getNodeCoords(targetName);
-             if (nodeCoords) {
-                 targetLng = nodeCoords[0];
-                 targetLat = nodeCoords[1];
-                 parsedTargetCoords = [targetLng, targetLat];
-             }
+             if (nodeCoords) { targetLng = nodeCoords[0]; targetLat = nodeCoords[1]; parsedTargetCoords = [targetLng, targetLat]; }
          }
-
          if (targetLng === undefined || targetLat === undefined) {
-             ws.send(JSON.stringify({ type: 'ERROR', error: 'Coordinate di destinazione invalide' }));
-             return;
+             ws.send(JSON.stringify({ type: 'ERROR', error: 'Coordinate di destinazione invalide' })); return;
          }
-
-          let multiplier = 1;
-          try {
-              const matchDataRaw = await redis.get(`match:${ws.matchId}`);
-              if (matchDataRaw) {
-                  const matchObj = JSON.parse(matchDataRaw);
-                  if (matchObj.struttura_partita) {
-                      const decodedMatch = Eru.decode_match(matchObj.struttura_partita);
-                      multiplier = decodedMatch.multiplierValue || 1;
-                  }
-              }
-          } catch(err) {
-              console.error("[SYS_WARN] Impossibile ottenere il moltiplicatore:", err);
-          }
-
-          let pathInfo = { isValid: false, distance: 0, etaMs: 0, path: [] };
-          try {
-              pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, multiplier);
-          } catch (e) {
-              console.error("Errore durante calculatePath:", e);
-          }
-          
-          let targetPlayerId = null;
-          let isInWar = false;
-          let isAttack = false;
-          let borderEtaMs = pathInfo.etaMs;
-
-          // Check war status / attack
-          try {
-              let targetNation = null;
-              const nationsCache = await redis.get(`match:${ws.matchId}:nations`);
-              if (nationsCache) {
-                  const nations = JSON.parse(nationsCache);
-                  targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(targetName));
-                  if (targetNation && targetNation.isOccupied && targetNation.playerId && targetNation.playerId !== ws.username) {
-                      isAttack = true;
-                      targetPlayerId = targetNation.playerId;
-                      isInWar = targetNation.inWarWith && targetNation.inWarWith.includes(ws.username);
-                  }
-              }
-              
-              // Se targetName non è un territorio, controlliamo se è un'armata
-              if (!isAttack && payload.payload.mode === 'attack') {
-                  // Cerca a chi appartiene l'armata
-                  const allArmiesKeys = await redis.keys(`match:${ws.matchId}:player:*:armate`);
-                  for (const k of allArmiesKeys) {
-                      const ownerUsername = k.split(':')[3];
-                      if (ownerUsername === ws.username) continue; // Salta le proprie
-                      const data = await redis.get(k);
-                      if (data) {
-                          const armate = JSON.parse(data);
-                          if (armate[targetName]) {
-                              isAttack = true;
-                              targetPlayerId = ownerUsername;
-                              // Cerca se sono in guerra
-                              if (nationsCache) {
-                                  const nations = JSON.parse(nationsCache);
-                                  const enemyNation = nations.find(n => n.playerId === ownerUsername);
-                                  if (enemyNation) {
-                                      isInWar = enemyNation.inWarWith && enemyNation.inWarWith.includes(ws.username);
-                                  }
-                              }
-                              break;
-                          }
-                      }
-                  }
-              }
-          } catch (e) {
-              console.error("Errore in validazione attacco:", e);
-          }
-
-          if (isAttack && !isInWar) {
-              // DICHIARA GUERRA IMMEDIATAMENTE
-              try {
-                  const nationsCacheUpdated = await redis.get(`match:${ws.matchId}:nations`);
-                  if (nationsCacheUpdated) {
-                      const nations = JSON.parse(nationsCacheUpdated);
-                      const attackerNation = nations.find(n => n.playerId === ws.username);
-                      const defenderNation = nations.find(n => n.playerId === targetPlayerId);
-
-                      if (attackerNation && defenderNation) {
-                          attackerNation.inWarWith = attackerNation.inWarWith || [];
-                          if (!attackerNation.inWarWith.includes(targetPlayerId)) {
-                              attackerNation.inWarWith.push(targetPlayerId);
-                          }
-                          defenderNation.inWarWith = defenderNation.inWarWith || [];
-                          if (!defenderNation.inWarWith.includes(ws.username)) {
-                              defenderNation.inWarWith.push(ws.username);
-                          }
-
-                          await redis.set(`match:${ws.matchId}:nations`, JSON.stringify(nations));
-
-                          const broadcastWarPayload = {
-                              matchId: ws.matchId,
-                              payload: {
-                                  type: 'WAR_DECLARED',
-                                  data: { attacker: ws.username, defender: targetPlayerId },
-                                  nations: nations
-                              }
-                          };
-                          await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastWarPayload));
-                          isInWar = true; // Impostiamo a true così procede come se fosse già in guerra
-                      }
-                  }
-              } catch (err) {
-                  console.error("[SYS_ERR] Errore dichiarazione guerra immediata:", err);
-              }
-          }
-
-          if (isAttack && pathInfo.path.length > 0) {
-              // Dal momento che abbiamo dichiarato guerra subito, l'armata è già ostile
-              // Possiamo decidere se mandarla al confine o metterla subito pronta all'attacco
-              // Se vogliamo che l'attacco inizi al confine, manteniamo moving_to_border, ma 
-              // siccome l'utente si aspetta che attacchi o si prepari, usiamo "Pronto all'attacco"
-              // o manteniamo moving_to_border se c'è un confine. 
-              // Lasciamo Pronto all'attacco in modo che il trigger engine possa intercettarlo.
-              armateObj[armyId].status = "Pronto all'attacco";
-          } else if (isAttack) {
-              armateObj[armyId].status = "Pronto all'attacco";
-          } else {
-              armateObj[armyId].status = 'moving';
-          }
-
-
-          armateObj[armyId].targetCoords = parsedTargetCoords || targetCoords;
-          armateObj[armyId].targetName = targetName;
-          armateObj[armyId].missionMode = payload.payload.mode;
-          armateObj[armyId].path = pathInfo.path;
-          armateObj[armyId].startTime = Date.now();
-          armateObj[armyId].etaMs = pathInfo.etaMs;
-          
-          // Salva su Redis sovrascrivendo l'eventuale mossa vecchia
-          await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(armateObj));
          
-         // Inserimento o aggiornamento in DB (PostgreSQL)
+         let multiplier = 1;
+         if (matchData.match.struttura_partita) {
+             const decodedMatch = Eru.decode_match(matchData.match.struttura_partita);
+             multiplier = decodedMatch.multiplierValue || 1;
+         }
+         
+         let pathInfo = { isValid: false, distance: 0, etaMs: 0, path: [] };
          try {
-             const db = require('../shared/postgresClient.js');
-             // Cerca mossa esistente
-             const mossaRes = await db.query(
-                `SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, 
-                [armyId]
-             );
-
-             const etaDate = new Date(Date.now() + borderEtaMs);
-
-             if (mossaRes.rows.length > 0) {
-                 const id_mossa = mossaRes.rows[0].id_mossa;
-                 // Aggiorna lo spostamento in db (cancella i vecchi e ricrea o aggiorna)
-                 await db.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [id_mossa]);
-                 await db.query(`UPDATE mosse SET ttl = $1 WHERE id_mossa = $2`, [etaDate, id_mossa]);
-                 await db.query(
-                     `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`,
-                     [id_mossa, targetLng, targetLat, targetName, etaDate]
-                 );
-             } else {
-                 // Estrai la partita id associata al matchId visualizzato
-                 const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1`, [ws.matchId]);
-                 if (partitaRes.rows.length > 0) {
-                     const partitaId = partitaRes.rows[0].id_partita;
-                     const insertMossa = await db.query(
-                         `INSERT INTO mosse (user_id, partita_id, type_action, id_armata, ttl) VALUES ((SELECT id_user FROM utenti WHERE username=$1), $2, 'mov', $3, $4) RETURNING id_mossa`,
-                         [ws.username, partitaId, armyId, etaDate]
-                     );
-                     const newIdMossa = insertMossa.rows[0].id_mossa;
-                     await db.query(
-                         `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`,
-                         [newIdMossa, targetLng, targetLat, targetName, etaDate]
-                     );
-                 }
-             }
-         } catch(dbErr) {
-             console.error("[SYS_ERR] Errore salvataggio movimento in DB:", dbErr);
+             pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, multiplier);
+         } catch (e) {
+             console.error("Errore durante calculatePath:", e);
          }
-
-          // Notifica SOLO al giocatore che ha mosso (il resto arriva via Fog Of War)
-          const broadcastPayload = {
-            matchId: ws.matchId,
-            targetUsers: [userId],
-            payload: {
-              type: 'TROOPS_MOVED',
-              data: {
-                userId,
-                armyId,
-                targetName,
-                targetCoords,
-                etaMs: pathInfo.etaMs,
-                path: pathInfo.path,
-                startTime: armateObj[armyId].startTime,
-                mode: payload.payload.mode
-              }
-            }
-          };
-         await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
-      }
-
-      if (payload.action === 'CANCEL_MISSION') {
-         console.log(`[WS_MATCH] CANCEL_MISSION ricevuto per armata:`, payload.payload);
-         const { armyId } = payload.payload;
-         const armateStr = await redis.get(`match:${ws.matchId}:player:${ws.username}:armate`);
-         if (!armateStr) {
-             console.log(`[WS_MATCH] Nessuna armata trovata per l'utente in redis`);
-             return;
-         }
-         let armateObj = JSON.parse(armateStr);
-         if (!armateObj[armyId]) {
-             console.log(`[WS_MATCH] Armata ${armyId} non trovata per l'utente`);
-             return;
-         }
-
-         let army = armateObj[armyId];
-         console.log(`[WS_MATCH] Stato armata da annullare: ${army.status}`);
          
-         if (army.status === 'in combattimento') {
-             try {
-                 const db = require('../shared/postgresClient.js');
-                 const mossaRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'atk'`, [armyId]);
-                 if (mossaRes.rows.length > 0) {
-                     const id_mossa = mossaRes.rows[0].id_mossa;
-                     await db.query(`DELETE FROM attacco WHERE id_mossa = $1`, [id_mossa]);
-                     await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
-                 }
-                 
-                 army.status = 'standby';
-                 delete army.targetName;
-                 delete army.targetCoords;
-                 delete army.missionMode;
-                 delete army.next_round_time;
-                 
-                 await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(armateObj));
-                 ws.send(JSON.stringify({ type: 'MISSION_CANCELLED', payload: { armyId, newLocation: army.currentLocation } }));
-                 
-                 const broadcastPayload = {
-                     matchId: ws.matchId,
-                     targetUsers: [ws.userId],
-                     payload: {
-                         type: 'COMBAT_CANCELLED',
-                         data: {
-                             userId: ws.username,
-                             armyId: armyId,
-                         }
-                     }
-                 };
-                 await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
-                 return;
-             } catch(dbErr) {
-                 console.error("[SYS_ERR] Errore annullamento combattimento in DB:", dbErr);
+         let targetPlayerId = null;
+         let isInWar = false;
+         let isAttack = false;
+         let borderEtaMs = pathInfo.etaMs;
+         
+         const updRes = await updateMatch(ws.matchId, async (matchObj) => {
+             if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+             
+             let targetNation = matchObj.match.player.find(n => n.territori && n.territori.includes(targetName));
+             if (targetNation && targetNation.isOccupied && targetNation.username && targetNation.username !== ws.username) {
+                 isAttack = true;
+                 targetPlayerId = targetNation.username;
+                 isInWar = targetNation.inWarWith && targetNation.inWarWith.includes(ws.username);
              }
-         } else if (army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") {
-             const now = Date.now();
-             let elapsed = 0;
-             let returnPath = [];
-             let currentLng, currentLat;
-
-             if (army.path && army.path.length > 1 && army.startTime && army.etaMs) {
-                 elapsed = now - army.startTime;
-                 let progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
-                 if (progress < 1) {
-                     let totalDistance = 0;
-                     const segmentDistances = [];
-                     for (let i = 0; i < army.path.length - 1; i++) {
-                        const dx = army.path[i+1][0] - army.path[i][0];
-                        const dy = army.path[i+1][1] - army.path[i][1];
-                        const dist = Math.sqrt(dx*dx + dy*dy);
-                        segmentDistances.push(dist);
-                        totalDistance += dist;
+             
+             if (!isAttack && payload.payload.mode === 'attack') {
+                 for (const n of matchObj.match.player) {
+                     if (n.username === ws.username) continue;
+                     if (n.armate && n.armate[targetName]) {
+                         isAttack = true;
+                         targetPlayerId = n.username;
+                         isInWar = n.inWarWith && n.inWarWith.includes(ws.username);
+                         break;
                      }
-                     const targetDistance = progress * totalDistance;
-                     let currentDist = 0;
-                     let currentIndex = 0;
-                     let segmentProgress = 0;
-                     for (let i = 0; i < segmentDistances.length; i++) {
-                        if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
-                           currentIndex = i;
-                           segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0;
-                           break;
-                        }
-                        currentDist += segmentDistances[i];
-                     }
-                     const p1 = army.path[currentIndex];
-                     const p2 = army.path[currentIndex + 1] || p1;
-                     currentLng = p1[0] + (p2[0] - p1[0]) * segmentProgress;
-                     currentLat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
+                 }
+             }
+             
+             let warBroadcast = null;
+             if (isAttack && !isInWar) {
+                 const attackerNation = matchObj.match.player.find(n => n.username === ws.username);
+                 const defenderNation = matchObj.match.player.find(n => n.username === targetPlayerId);
+                 if (attackerNation && defenderNation) {
+                     attackerNation.inWarWith = attackerNation.inWarWith || [];
+                     if (!attackerNation.inWarWith.includes(targetPlayerId)) attackerNation.inWarWith.push(targetPlayerId);
+                     defenderNation.inWarWith = defenderNation.inWarWith || [];
+                     if (!defenderNation.inWarWith.includes(ws.username)) defenderNation.inWarWith.push(ws.username);
                      
-                     returnPath.push([currentLng, currentLat]);
-                     for (let i = currentIndex; i >= 0; i--) {
-                         returnPath.push(army.path[i]);
-                     }
-                 } else {
-                     currentLng = army.path[army.path.length - 1][0];
-                     currentLat = army.path[army.path.length - 1][1];
-                     returnPath = [...army.path].reverse();
+                     warBroadcast = {
+                         matchId: ws.matchId,
+                         payload: {
+                             type: 'WAR_DECLARED',
+                             data: { attacker: ws.username, defender: targetPlayerId },
+                             nations: matchObj.match.player
+                         }
+                     };
+                     isInWar = true;
                  }
-             } else {
-                 console.log("[WS_MATCH] Impossibile calcolare il ritorno, dati path mancanti. Interrompo e basta.");
-                 army.status = 'standby';
-                 delete army.path;
-                 delete army.startTime;
-                 delete army.etaMs;
-                 delete army.targetCoords;
-                 delete army.targetName;
-                 delete army.missionMode;
-                 await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(armateObj));
-                 ws.send(JSON.stringify({ type: 'MISSION_CANCELLED', payload: { armyId, newLocation: army.currentLocation } }));
-                 return;
              }
-
-             // Aggiorna l'oggetto armata per il viaggio di ritorno
-             const returnEtaMs = Math.floor(elapsed);
-             army.currentLocation = `${currentLng},${currentLat}`;
-             army.path = returnPath;
-             army.startTime = now;
-             army.etaMs = returnEtaMs;
-             army.targetCoords = returnPath[returnPath.length - 1];
-             army.targetName = "Ritorno";
-             army.status = 'moving'; // Mantiene lo stato moving
-
-             await redis.set(`match:${ws.matchId}:player:${ws.username}:armate`, JSON.stringify(armateObj));
-
-             // Aggiorna il database
-             const etaDate = new Date(now + returnEtaMs);
+             
+             const p = matchObj.match.player.find(n => n.username === ws.username);
+             if (!p || !p.armate || !p.armate[armyId]) return { save: false };
+             
+             p.armate[armyId].currentLocation = `${startLng},${startLat}`;
+             p.armate[armyId].status = (isAttack || (isAttack && pathInfo.path.length > 0)) ? "Pronto all'attacco" : "moving";
+             p.armate[armyId].targetCoords = parsedTargetCoords || targetCoords;
+             p.armate[armyId].targetName = targetName;
+             p.armate[armyId].missionMode = payload.payload.mode;
+             p.armate[armyId].path = pathInfo.path;
+             p.armate[armyId].startTime = Date.now();
+             p.armate[armyId].etaMs = pathInfo.etaMs;
+             
+             return { save: true, matchObj, data: { armata: p.armate[armyId], warBroadcast } };
+         });
+         
+         if (updRes && updRes.warBroadcast) {
+             await redis.publish('match_ws_broadcast_channel', JSON.stringify(updRes.warBroadcast));
+         }
+         
+         if (updRes && updRes.armata) {
+             const armataObj = updRes.armata;
              try {
                  const db = require('../shared/postgresClient.js');
                  const mossaRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, [armyId]);
+                 const etaDate = new Date(Date.now() + borderEtaMs);
                  if (mossaRes.rows.length > 0) {
                      const id_mossa = mossaRes.rows[0].id_mossa;
                      await db.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [id_mossa]);
                      await db.query(`UPDATE mosse SET ttl = $1 WHERE id_mossa = $2`, [etaDate, id_mossa]);
-                     await db.query(
-                         `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`,
-                         [id_mossa, army.targetCoords[0], army.targetCoords[1], army.targetName, etaDate]
-                     );
+                     await db.query(`INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`, [id_mossa, targetLng, targetLat, targetName, etaDate]);
                  } else {
-                     // Fallback se non c'era una mossa (non dovrebbe succedere)
                      const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1`, [ws.matchId]);
                      if (partitaRes.rows.length > 0) {
                          const partitaId = partitaRes.rows[0].id_partita;
-                         const insertMossa = await db.query(
-                             `INSERT INTO mosse (user_id, partita_id, type_action, id_armata, ttl) VALUES ((SELECT id_user FROM utenti WHERE username=$1), $2, 'mov', $3, $4) RETURNING id_mossa`,
-                             [ws.username, partitaId, armyId, etaDate]
-                         );
+                         const insertMossa = await db.query(`INSERT INTO mosse (user_id, partita_id, type_action, id_armata, ttl) VALUES ((SELECT id_user FROM utenti WHERE username=$1), $2, 'mov', $3, $4) RETURNING id_mossa`, [ws.username, partitaId, armyId, etaDate]);
                          const newIdMossa = insertMossa.rows[0].id_mossa;
-                         await db.query(
-                             `INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`,
-                             [newIdMossa, army.targetCoords[0], army.targetCoords[1], army.targetName, etaDate]
-                         );
+                         await db.query(`INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`, [newIdMossa, targetLng, targetLat, targetName, etaDate]);
                      }
                  }
              } catch(dbErr) {
-                 console.error("[SYS_ERR] Errore aggiornamento movimento di ritorno in DB:", dbErr);
+                 console.error("[SYS_ERR] Errore salvataggio movimento in DB:", dbErr);
              }
-
-             // Notifica al client che la truppa sta tornando (Usa TROOPS_MOVED anziché MISSION_CANCELLED)
-             const userId = ws.userId;
+             
              const broadcastPayload = {
-                 matchId: ws.matchId,
-                 targetUsers: [userId],
-                 payload: {
-                     type: 'TROOPS_MOVED',
-                     data: {
-                         userId,
-                         armyId,
-                         targetName: army.targetName,
-                         targetCoords: army.targetCoords,
-                         etaMs: returnEtaMs,
-                         path: returnPath,
-                         startTime: now
-                     }
+               matchId: ws.matchId,
+               targetUsers: [userId],
+               payload: {
+                 type: 'TROOPS_MOVED',
+                 data: {
+                   userId,
+                   armyId,
+                   targetName,
+                   targetCoords,
+                   etaMs: pathInfo.etaMs,
+                   path: pathInfo.path,
+                   startTime: armataObj.startTime,
+                   mode: payload.payload.mode
                  }
+               }
              };
              await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
-         } else {
-             console.log("[WS_MATCH] Impossibile annullare, l'armata NON e' in movimento");
          }
       }
+      
+      if (payload.action === 'CANCEL_MISSION') {
+         console.log(`[WS_MATCH] CANCEL_MISSION ricevuto per armata:`, payload.payload);
+         const { armyId } = payload.payload;
+         const { updateMatch } = require('../shared/matchMonolithic.js');
+         
+         const updRes = await updateMatch(ws.matchId, async (matchObj) => {
+             if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+             const player = matchObj.match.player.find(p => p.username === ws.username);
+             if (!player || !player.armate || !player.armate[armyId]) return { save: false };
+             
+             const army = player.armate[armyId];
+             
+             if (army.status === 'in combattimento') {
+                 army.status = 'standby';
+                 delete army.targetName; delete army.targetCoords; delete army.missionMode; delete army.next_round_time;
+                 return { save: true, matchObj, data: { action: 'combat_cancelled', army } };
+             } else if (army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") {
+                 const now = Date.now();
+                 let elapsed = 0; let returnPath = []; let currentLng, currentLat;
+                 if (army.path && army.path.length > 1 && army.startTime && army.etaMs) {
+                     elapsed = now - army.startTime;
+                     let progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
+                     if (progress < 1) {
+                         let totalDistance = 0; const segmentDistances = [];
+                         for (let i = 0; i < army.path.length - 1; i++) {
+                            const dx = army.path[i+1][0] - army.path[i][0]; const dy = army.path[i+1][1] - army.path[i][1];
+                            const dist = Math.sqrt(dx*dx + dy*dy); segmentDistances.push(dist); totalDistance += dist;
+                         }
+                         const targetDistance = progress * totalDistance;
+                         let currentDist = 0; let currentIndex = 0; let segmentProgress = 0;
+                         for (let i = 0; i < segmentDistances.length; i++) {
+                            if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
+                               currentIndex = i; segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0; break;
+                            }
+                            currentDist += segmentDistances[i];
+                         }
+                         const p1 = army.path[currentIndex]; const p2 = army.path[currentIndex + 1] || p1;
+                         currentLng = p1[0] + (p2[0] - p1[0]) * segmentProgress; currentLat = p1[1] + (p2[1] - p1[1]) * segmentProgress;
+                         returnPath.push([currentLng, currentLat]);
+                         for (let i = currentIndex; i >= 0; i--) returnPath.push(army.path[i]);
+                     } else {
+                         currentLng = army.path[army.path.length - 1][0]; currentLat = army.path[army.path.length - 1][1];
+                         returnPath = [...army.path].reverse();
+                     }
+                 } else {
+                     army.status = 'standby';
+                     delete army.path; delete army.startTime; delete army.etaMs; delete army.targetCoords; delete army.targetName; delete army.missionMode;
+                     return { save: true, matchObj, data: { action: 'aborted', army } };
+                 }
+                 const returnEtaMs = Math.floor(elapsed);
+                 army.currentLocation = `${currentLng},${currentLat}`; army.path = returnPath; army.startTime = now; army.etaMs = returnEtaMs;
+                 army.targetCoords = returnPath[returnPath.length - 1]; army.targetName = "Ritorno"; army.status = 'moving';
+                 return { save: true, matchObj, data: { action: 'returning', army, now, returnEtaMs } };
+             }
+             return { save: false };
+         });
+         
+         if (updRes) {
+             if (updRes.action === 'combat_cancelled') {
+                 try {
+                     const db = require('../shared/postgresClient.js');
+                     const mossaRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'atk'`, [armyId]);
+                     if (mossaRes.rows.length > 0) {
+                         const id_mossa = mossaRes.rows[0].id_mossa;
+                         await db.query(`DELETE FROM attacco WHERE id_mossa = $1`, [id_mossa]);
+                         await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
+                     }
+                     ws.send(JSON.stringify({ type: 'MISSION_CANCELLED', payload: { armyId, newLocation: updRes.army.currentLocation } }));
+                     const broadcastPayload = { matchId: ws.matchId, targetUsers: [userId], payload: { type: 'COMBAT_CANCELLED', data: { userId: ws.username, armyId: armyId } } };
+                     await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+                 } catch(dbErr) { console.error("[SYS_ERR] Errore annullamento combattimento in DB:", dbErr); }
+             } else if (updRes.action === 'aborted') {
+                 ws.send(JSON.stringify({ type: 'MISSION_CANCELLED', payload: { armyId, newLocation: updRes.army.currentLocation } }));
+             } else if (updRes.action === 'returning') {
+                 const { army, now, returnEtaMs } = updRes;
+                 const etaDate = new Date(now + returnEtaMs);
+                 try {
+                     const db = require('../shared/postgresClient.js');
+                     const mossaRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, [armyId]);
+                     if (mossaRes.rows.length > 0) {
+                         const id_mossa = mossaRes.rows[0].id_mossa;
+                         await db.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [id_mossa]);
+                         await db.query(`UPDATE mosse SET ttl = $1 WHERE id_mossa = $2`, [etaDate, id_mossa]);
+                         await db.query(`INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`, [id_mossa, army.targetCoords[0], army.targetCoords[1], army.targetName, etaDate]);
+                     } else {
+                         const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1`, [ws.matchId]);
+                         if (partitaRes.rows.length > 0) {
+                             const partitaId = partitaRes.rows[0].id_partita;
+                             const insertMossa = await db.query(`INSERT INTO mosse (user_id, partita_id, type_action, id_armata, ttl) VALUES ((SELECT id_user FROM utenti WHERE username=$1), $2, 'mov', $3, $4) RETURNING id_mossa`, [ws.username, partitaId, armyId, etaDate]);
+                             const newIdMossa = insertMossa.rows[0].id_mossa;
+                             await db.query(`INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`, [newIdMossa, army.targetCoords[0], army.targetCoords[1], army.targetName, etaDate]);
+                         }
+                     }
+                 } catch(dbErr) { console.error("[SYS_ERR] Errore aggiornamento movimento di ritorno in DB:", dbErr); }
+                 const broadcastPayload = { matchId: ws.matchId, targetUsers: [userId], payload: { type: 'TROOPS_MOVED', data: { userId, armyId, targetName: army.targetName, targetCoords: army.targetCoords, etaMs: returnEtaMs, path: army.path, startTime: now } } };
+                 await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+             }
+         }
+      }
+      if (payload.action === 'BUILD_STRUCTURE') {
+         console.log(`[WS_MATCH] Richiesta costruzione struttura ricevuta:`, payload.payload);
+         const { structureId, targetName, targetCoords } = payload.payload;
+
+         try {
+             const { updateMatch } = require('../shared/matchMonolithic.js');
+             
+             const rulesRawBase64 = await redis.get("assets:game_rules.json");
+             let structureDetails = null;
+             if (rulesRawBase64) {
+                 const rules = JSON.parse(Buffer.from(rulesRawBase64, "base64").toString("utf-8"));
+                 const estrattoriSheet = rules.sheets.find(s => s.name === "Estrattori");
+                 const struttureSheet = rules.sheets.find(s => s.name === "Strutture");
+                 const estrattoriLines = estrattoriSheet ? estrattoriSheet.lines : [];
+                 const struttureLines = struttureSheet ? struttureSheet.lines : [];
+                 structureDetails = estrattoriLines.find(l => l.id_extractor === structureId) || struttureLines.find(l => l.id_struttura === structureId);
+             }
+             if (!structureDetails) {
+                 return ws.send(JSON.stringify({ type: 'ERROR', error: 'Struttura sconosciuta' }));
+             }
+
+             const reqDenaro = structureDetails.costo_denaro || 0;
+             const reqLegno = structureDetails.costo_legno || 0;
+             const reqMattone = structureDetails.costo_mattoni || 0;
+             const reqAcciaio = structureDetails.costo_acciaio || 0;
+             const reqPiombo = structureDetails.costo_piombio || structureDetails.costo_piombo || 0;
+             const reqPetrolio = structureDetails.costo_petrolio || 0;
+             const baseName = structureId.split('_t')[0];
+             const reqPrevStructure = structureDetails.richiede_struttura || structureDetails.richiede_estrattore;
+
+             const { getRegionIdByName } = require('./middleware/movementLogic.js');
+             const regionId = getRegionIdByName(targetName);
+
+             const updRes = await updateMatch(ws.matchId, async (matchObj) => {
+                 if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false, data: { error: 'Partita non trovata' } };
+                 if (!matchObj.match.struttura_partita || !matchObj.match.struttura_partita.startsWith('01')) {
+                     return { save: false, data: { error: 'Costruzione non permessa: Partita non attiva' } };
+                 }
+
+                 const player = matchObj.match.player.find(p => p.username === ws.username);
+                 if (!player || !player.territori || !player.territori.includes(regionId)) {
+                     return { save: false, data: { error: 'Puoi costruire solo sui tuoi territori' } };
+                 }
+
+                 let strutture = player.strutture || [];
+                 const existingIdx = strutture.findIndex(s => s.structureId.split('_t')[0] === baseName && (s.regionId === regionId || s.targetName === targetName));
+                 let replacedStructureId = null;
+
+                 if (existingIdx !== -1) {
+                     const existingStructure = strutture[existingIdx];
+                     if (reqPrevStructure) {
+                         if (existingStructure.structureId !== reqPrevStructure) return { save: false, data: { error: `Devi prima costruire ${reqPrevStructure} in questa regione.` } };
+                         replacedStructureId = existingStructure.id;
+                     } else {
+                         return { save: false, data: { error: 'Hai già costruito questo tipo di struttura in questa regione.' } };
+                     }
+                 } else {
+                     if (reqPrevStructure) return { save: false, data: { error: `Devi prima costruire ${reqPrevStructure} in questa regione.` } };
+                 }
+
+                 let resources = player.risorse;
+                 if (!resources) return { save: false, data: { error: 'Risorse non trovate' } };
+                 
+                 if (resources.denaro < reqDenaro || resources.legno < reqLegno || resources.mattone < reqMattone || 
+                     resources.acciaio < reqAcciaio || resources.piombo < reqPiombo || resources.petrolio < reqPetrolio) {
+                     return { save: false, data: { error: 'Risorse insufficienti per la costruzione' } };
+                 }
+
+                 resources.denaro -= reqDenaro;
+                 resources.legno -= reqLegno;
+                 resources.mattone -= reqMattone;
+                 resources.acciaio -= reqAcciaio;
+                 resources.piombo -= reqPiombo;
+                 resources.petrolio -= reqPetrolio;
+
+                 const newStructure = {
+                     id: require('crypto').randomUUID(),
+                     structureId: structureId,
+                     name: structureDetails.nome || structureDetails.name,
+                     targetName: targetName,
+                     regionId: regionId,
+                     targetCoords: targetCoords,
+                     status: 'built',
+                     owner: ws.username,
+                     buildTime: Date.now()
+                 };
+
+                 if (replacedStructureId) strutture = strutture.filter(s => s.id !== replacedStructureId);
+                 strutture.push(newStructure);
+                 player.strutture = strutture;
+                 player.risorse = resources;
+
+                 return { save: true, matchObj, data: { success: true, newStructure, replacedStructureId, resources } };
+             });
+
+             if (!updRes || updRes.error || (updRes.data && updRes.data.error)) {
+                 const err = updRes ? (updRes.error || updRes.data.error) : 'Errore costruzione';
+                 return ws.send(JSON.stringify({ type: 'ERROR', error: err }));
+             }
+
+             if (updRes.data && updRes.data.success) {
+                 ws.send(JSON.stringify({ type: 'BUILD_SUCCESS', payload: updRes.data.newStructure, replacedStructureId: updRes.data.replacedStructureId }));
+                 const broadcastPayload = {
+                     matchId: ws.matchId,
+                     targetUsers: [userId],
+                     payload: { type: 'RESOURCES_UPDATED', data: { resources: translateRedisToFe(updRes.data.resources) } }
+                 };
+                 await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+
+                 const broadcastStructurePayload = {
+                     matchId: ws.matchId,
+                     payload: { type: 'STRUCTURE_BUILT', data: updRes.data.newStructure, replacedStructureId: updRes.data.replacedStructureId }
+                 };
+                 await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastStructurePayload));
+             }
+         } catch (e) {
+             console.error("[SYS_ERR] Errore in BUILD_STRUCTURE:", e);
+             ws.send(JSON.stringify({ type: 'ERROR', error: 'Errore interno del server durante la costruzione' }));
+         }
+      }
+
     });
 
     ws.on("close", () => {

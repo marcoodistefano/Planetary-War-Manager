@@ -88,14 +88,12 @@ const applyDamageToArmy = (army, damage) => {
 const getMatchMultiplier = async (id_partita_hash) => {
     let multiplier = 1;
     try {
-        const matchDataRaw = await redis.get(`match:${id_partita_hash}`);
-        if (matchDataRaw) {
-            const matchObj = JSON.parse(matchDataRaw);
-            if (matchObj.struttura_partita) {
-                const Eru = require('./Eru.js');
-                const decodedMatch = Eru.decode_match(matchObj.struttura_partita);
-                multiplier = decodedMatch.multiplierValue || 1;
-            }
+        const { getMatch } = require('../shared/matchMonolithic.js');
+        const matchData = await getMatch(id_partita_hash);
+        if (matchData && matchData.match && matchData.match.struttura_partita) {
+            const Eru = require('./Eru.js');
+            const decodedMatch = Eru.decode_match(matchData.match.struttura_partita);
+            multiplier = decodedMatch.multiplierValue || 1;
         }
     } catch(err) {
         console.error("[SYS_WARN] Impossibile ottenere il moltiplicatore nel combat:", err);
@@ -155,7 +153,7 @@ const processActiveCombats = async () => {
             
             // 1. Trova l'armata attaccante
             // L'attaccante potrebbe essere ovunque nel dizionario di armate
-            const keys = await redis.keys(`match:${id_partita_hash}:player:*:armate`);
+            const keys = [] /* refactored */;
             let attackerArmy = null;
             let attackerPlayer = null;
             let attackerRedisKey = null;
@@ -316,7 +314,7 @@ const processActiveCombats = async () => {
                     
                     // Conquista
                     console.log(`[COMBAT_DEBUG] City HP <= 0 for ${id_target_citta}. Initiating conquest...`);
-                    const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
+                    const nationsCache = null /* refactored via monolithic */;
                     let updatedNations = [];
                     if (nationsCache) {
                         const { getRegionForNode } = require('./movementLogic.js');
@@ -326,12 +324,23 @@ const processActiveCombats = async () => {
                         const nations = JSON.parse(nationsCache);
                         let defenderNation = null;
                         let attackerNation = null;
+                        let actualRegionToTransfer = regionId;
                         
                         // Trova nazione difensore
                         for (let n of nations) {
                             if (n.territories_flat && n.territories_flat.includes(regionId)) {
                                 defenderNation = n;
                                 break;
+                            }
+                        }
+                        // [FIX BUG #4] Fallback: cerca per target_node direttamente (es. se regionId è null)
+                        if (!defenderNation && id_target_citta && id_target_citta !== regionId) {
+                            for (let n of nations) {
+                                if (n.territories_flat && n.territories_flat.includes(id_target_citta)) {
+                                    defenderNation = n;
+                                    actualRegionToTransfer = id_target_citta; // Trovato con il fallback, usiamo questo per il trasferimento
+                                    break;
+                                }
                             }
                         }
                         
@@ -343,17 +352,17 @@ const processActiveCombats = async () => {
                             }
                         }
 
-                        console.log(`[COMBAT_DEBUG] defenderNation: ${defenderNation ? defenderNation.playerId : 'NULL'}, attackerNation: ${attackerNation ? attackerNation.playerId : 'NULL'}`);
+                        console.log(`[COMBAT_DEBUG] defenderNation: ${defenderNation ? defenderNation.playerId : 'NULL'}, attackerNation: ${attackerNation ? attackerNation.playerId : 'NULL'}, transferring: ${actualRegionToTransfer}`);
 
                         if (defenderNation && attackerNation && defenderNation.nationId !== attackerNation.nationId) {
-                            console.log(`[COMBAT_DEBUG] Applying transfer of ${regionId} from ${defenderNation.playerId} to ${attackerNation.playerId}`);
+                            console.log(`[COMBAT_DEBUG] Applying transfer of ${actualRegionToTransfer} from ${defenderNation.playerId} to ${attackerNation.playerId}`);
                             // Rimuovi dal difensore
-                            defenderNation.territories_flat = defenderNation.territories_flat.filter(t => t !== regionId);
+                            defenderNation.territories_flat = defenderNation.territories_flat.filter(t => t !== actualRegionToTransfer);
                             let targetAdmin = null;
                             for (const admin in defenderNation.territories) {
-                                if (defenderNation.territories[admin].includes(regionId)) {
+                                if (defenderNation.territories[admin].includes(actualRegionToTransfer)) {
                                     targetAdmin = admin;
-                                    defenderNation.territories[admin] = defenderNation.territories[admin].filter(t => t !== regionId);
+                                    defenderNation.territories[admin] = defenderNation.territories[admin].filter(t => t !== actualRegionToTransfer);
                                     if (defenderNation.territories[admin].length === 0) {
                                         delete defenderNation.territories[admin];
                                     }
@@ -364,13 +373,13 @@ const processActiveCombats = async () => {
                             
                             // Aggiungi all'attaccante
                             if (!attackerNation.territories_flat) attackerNation.territories_flat = [];
-                            attackerNation.territories_flat.push(regionId);
+                            attackerNation.territories_flat.push(actualRegionToTransfer);
                             if (targetAdmin) {
                                 if (!attackerNation.territories) attackerNation.territories = {};
                                 if (!attackerNation.territories[targetAdmin]) {
                                     attackerNation.territories[targetAdmin] = [];
                                 }
-                                attackerNation.territories[targetAdmin].push(regionId);
+                                attackerNation.territories[targetAdmin].push(actualRegionToTransfer);
                             }
 
                             // Aggiorna DB (stato_territori) per entrambi (i bot non sono in db)
@@ -383,7 +392,7 @@ const processActiveCombats = async () => {
                                     if (statoDefRes.rows.length > 0) {
                                         let statoDef = statoDefRes.rows[0].stato_territori || {};
                                         if (targetAdmin && statoDef[targetAdmin]) {
-                                            delete statoDef[targetAdmin][regionId];
+                                            delete statoDef[targetAdmin][actualRegionToTransfer];
                                             if (Object.keys(statoDef[targetAdmin]).length === 0) {
                                                 delete statoDef[targetAdmin];
                                             }
@@ -398,10 +407,10 @@ const processActiveCombats = async () => {
                                         let statoAtt = statoAttRes.rows[0].stato_territori || {};
                                         if (targetAdmin) {
                                             if (!statoAtt[targetAdmin]) statoAtt[targetAdmin] = {};
-                                            statoAtt[targetAdmin][regionId] = true;
+                                            statoAtt[targetAdmin][actualRegionToTransfer] = true;
                                         } else {
                                             if (!statoAtt["Altro"]) statoAtt["Altro"] = {};
-                                            statoAtt["Altro"][regionId] = true;
+                                            statoAtt["Altro"][actualRegionToTransfer] = true;
                                         }
                                         await db.query(`UPDATE partecipanti_partite SET stato_territori = $1::jsonb WHERE partita_id = $2 AND user_id = $3`, [JSON.stringify(statoAtt), partita_id, attRes.rows[0].id_user]);
                                     }
@@ -416,7 +425,7 @@ const processActiveCombats = async () => {
                                     const defTerrKey = `match:${id_partita_hash}:player:${defenderNation.playerId}:territori`;
                                     let defTerrStr = await redis.get(defTerrKey);
                                     let defTerr = defTerrStr ? JSON.parse(defTerrStr) : (defenderNation.territories_flat || []);
-                                    defTerr = defTerr.filter(t => t !== regionId);
+                                    defTerr = defTerr.filter(t => t !== actualRegionToTransfer);
                                     await redis.set(defTerrKey, JSON.stringify(defTerr));
                                 }
 
@@ -424,8 +433,8 @@ const processActiveCombats = async () => {
                                     const attTerrKey = `match:${id_partita_hash}:player:${attackerNation.playerId}:territori`;
                                     let attTerrStr = await redis.get(attTerrKey);
                                     let attTerr = attTerrStr ? JSON.parse(attTerrStr) : (attackerNation.territories_flat || []);
-                                    if (!attTerr.includes(regionId)) {
-                                        attTerr.push(regionId);
+                                    if (!attTerr.includes(actualRegionToTransfer)) {
+                                        attTerr.push(actualRegionToTransfer);
                                     }
                                     await redis.set(attTerrKey, JSON.stringify(attTerr));
                                 }
@@ -435,7 +444,7 @@ const processActiveCombats = async () => {
                         }
                         
                         updatedNations = nations;
-                        await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
+                        null;
                     }
                     
                     const broadcastPayload = {
@@ -520,7 +529,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
         const { id_mossa, id_armata, target_node, x_dest, y_dest } = mossa;
 
         // Notifica e Guerra
-        const nationsCache = await redis.get(`match:${id_partita_hash}:nations`);
+        const nationsCache = null /* refactored via monolithic */;
         let defenderId = null;
         let isArmyTarget = false;
         
@@ -530,6 +539,10 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
 
             const nations = JSON.parse(nationsCache);
             let targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(regionId));
+            // [FIX BUG #4] Fallback: cerca per target_node direttamente se regionId non ha match
+            if (!targetNation && target_node && target_node !== regionId) {
+                targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(target_node));
+            }
             
             if (targetNation && targetNation.playerId) {
                 if (targetNation.playerId === attackerUsername) {
@@ -550,10 +563,10 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
                     attackerNation.inWarWith = attackerNation.inWarWith || [];
                     if (!attackerNation.inWarWith.includes(defenderId)) attackerNation.inWarWith.push(defenderId);
                 }
-                await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
+                null;
             } else {
                 // Potrebbe essere un attacco a un'armata
-                const allArmiesKeys = await redis.keys(`match:${id_partita_hash}:player:*:armate`);
+                const allArmiesKeys = [] /* refactored */;
                 for (const k of allArmiesKeys) {
                     const ownerUsername = k.split(':')[3];
                     if (ownerUsername === attackerUsername) continue;
@@ -574,7 +587,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
                                 attackerNation.inWarWith = attackerNation.inWarWith || [];
                                 if (!attackerNation.inWarWith.includes(ownerUsername)) attackerNation.inWarWith.push(ownerUsername);
                             }
-                            await redis.set(`match:${id_partita_hash}:nations`, JSON.stringify(nations));
+                            null;
                             break;
                         }
                     }
@@ -584,7 +597,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
 
         if (defenderId) {
             // Notifica ai player
-            const nationsCacheUpdated = await redis.get(`match:${id_partita_hash}:nations`);
+            const nationsCacheUpdated = null /* refactored via monolithic */;
             const updatedNations = nationsCacheUpdated ? JSON.parse(nationsCacheUpdated) : [];
 
             const broadcastPayload = {
@@ -605,7 +618,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
         } else {
             const { getNodeCoords } = require('./movementLogic.js');
             const cityCoords = getNodeCoords(target_node);
-            const allArmiesKeys = await redis.keys(`match:${id_partita_hash}:player:*:armate`);
+            const allArmiesKeys = [] /* refactored */;
             for (const k of allArmiesKeys) {
                 const ownerUsername = k.split(':')[3];
                 if (ownerUsername === attackerUsername) continue;

@@ -1,4 +1,5 @@
 const redis = require("../../shared/redisClient.js");
+const { updateMatch, createEmptyPlayer } = require("../../shared/matchMonolithic.js");
 
 const calculateNationSize = (maxPlayers) => {
   const players = parseInt(maxPlayers) || 10;
@@ -148,10 +149,24 @@ const generateNations = async (matchId, maxPlayers) => {
             });
         }
         
-        await redis.set(`match:${matchId}:nations`, JSON.stringify(nations));
+        // Inietta le nazioni nel json monolitico
+        await updateMatch(matchId, (matchObj) => {
+            if (!matchObj || !matchObj.match) return { save: false };
+            
+            for (const n of nations) {
+                const playerObj = createEmptyPlayer(n.playerId, n.nationId, n.name);
+                playerObj.isOccupied = n.isOccupied;
+                playerObj.inWar = n.inWar;
+                playerObj.territori = n.territories_flat;
+                playerObj.territori_dict = n.territories;
+                matchObj.match.player.push(playerObj);
+            }
+            return { save: true, matchObj, data: true };
+        });
         
         // Assign resources to each region in the match
         const regionsResources = {};
+        const citiesHpMap = {}; // Mappa degli HP per l'Opzione B
         const MORE_COMMON = ["legno", "piombo", "acciaio", "mattoni"];
         const LESS_COMMON = ["petrolio", "gas_naturale"];
 
@@ -166,8 +181,16 @@ const generateNations = async (matchId, maxPlayers) => {
                 more_common: more,
                 less_common: less
             };
+            
+            // Inizializza gli HP base della città a 100
+            citiesHpMap[regId] = 100;
         }
         await redis.set(`match:${matchId}:regions_resources`, JSON.stringify(regionsResources));
+        
+        // Crea o sovrascrive la mappa Hash degli HP su Redis
+        if (Object.keys(citiesHpMap).length > 0) {
+            await redis.hset(`match:${matchId}:cities_hp`, citiesHpMap);
+        }
         
         const territoryToNation = {};
         for (const nation of nations) {

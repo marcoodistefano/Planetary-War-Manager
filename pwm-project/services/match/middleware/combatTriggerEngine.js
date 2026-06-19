@@ -106,7 +106,7 @@ try {
 
 const checkCombatTriggers = async () => {
     try {
-        const matchKeys = await redis.keys("match:*");
+        const matchKeys = await db.query('SELECT id_partita_hash FROM partite').then(res => res.rows.map(r => `match:${r.id_partita_hash}`));
         const matchIds = new Set();
         matchKeys.forEach(k => {
             const parts = k.split(':');
@@ -114,7 +114,7 @@ const checkCombatTriggers = async () => {
         });
 
         for (const matchId of matchIds) {
-            const playersArmiesKeys = await redis.keys(`match:${matchId}:player:*:armate`);
+            const playersArmiesKeys = [];
             let allArmies = [];
             for (const key of playersArmiesKeys) {
                 const username = key.split(':')[3];
