@@ -138,7 +138,7 @@ async function generateResources() {
                 [matchDbId]
             );
 
-            const { getMatch, updateMatch } = require('../match/shared/matchMonolithic.js');
+            const { getMatch, updateMatch } = require('./services/shared/matchMonolithic.js');
 
             await updateMatch(matchId, async (matchObj) => {
                 if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };

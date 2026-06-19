@@ -143,6 +143,9 @@ services:
   # ENGINE RISORSE
   engine-res:
     build: ./services/resources
+    volumes:
+      - ./services/resources:/app
+      - ./services/shared:/app/services/shared
     depends_on:
       redis:
         condition: service_healthy
