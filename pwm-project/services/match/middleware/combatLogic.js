@@ -226,41 +226,35 @@ const processActiveCombats = async () => {
                     if (p.username === attackerPlayer) continue;
                     if (p.armate) {
                         for (const [aid, a] of Object.entries(p.armate)) {
-                            if (a.status === 'standby' || a.status === 'in combattimento') {
-                                let isTarget = false;
-                                if (a.currentLocation === id_target_citta || a.targetName === id_target_citta) {
-                                    isTarget = true;
-                                } else {
-                                    let ax, ay;
-                                    if (typeof a.currentLocation === 'string') {
-                                        const parts = a.currentLocation.split(',');
-                                        if (parts.length === 2) { ax = parseFloat(parts[0]); ay = parseFloat(parts[1]); }
-                                    } else if (typeof a.currentLocation === 'object') {
-                                        ax = a.currentLocation.x; ay = a.currentLocation.y;
+                            let isTarget = false;
+                            if (a.currentLocation === id_target_citta || a.targetName === id_target_citta) {
+                                isTarget = true;
+                            } else {
+                                const { getArmyLocation } = require('./movementLogic.js');
+                                const loc = getArmyLocation(a);
+                                if (loc) {
+                                    const ax = loc[0]; const ay = loc[1];
+                                    if (cityCoords) {
+                                        const dx = ax - cityCoords[0];
+                                        const dy = ay - cityCoords[1];
+                                        if (dx*dx + dy*dy < 0.0001) isTarget = true;
                                     }
-                                    if (ax !== undefined && ay !== undefined) {
-                                        if (cityCoords) {
-                                            const dx = ax - cityCoords[0];
-                                            const dy = ay - cityCoords[1];
-                                            if (dx*dx + dy*dy < 0.0001) isTarget = true;
-                                        }
-                                        if (!isTarget && regionPolygon) {
-                                            try {
-                                                const pt = turf.point([ax, ay]);
-                                                if (turf.booleanPointInPolygon(pt, regionPolygon)) {
-                                                    isTarget = true;
-                                                }
-                                            } catch(e) {}
-                                        }
+                                    if (!isTarget && regionPolygon) {
+                                        try {
+                                            const pt = turf.point([ax, ay]);
+                                            if (turf.booleanPointInPolygon(pt, regionPolygon)) {
+                                                isTarget = true;
+                                            }
+                                        } catch(e) {}
                                     }
                                 }
-                                
-                                if (isTarget) {
-                                    defenderArmy = a;
-                                    defenderPlayer = p.username;
-                                    currentTargetArmataId = aid;
-                                    break;
-                                }
+                            }
+                            
+                            if (isTarget) {
+                                defenderArmy = a;
+                                defenderPlayer = p.username;
+                                currentTargetArmataId = aid;
+                                break;
                             }
                         }
                     }
@@ -449,24 +443,16 @@ const processActiveCombats = async () => {
                             if (pl.username === attackerPlayer) continue;
                             if (!pl.armate) continue;
                             for (const [aid, a] of Object.entries(pl.armate)) {
-                                if (a.status === 'standby' || a.status === 'in combattimento') {
-                                    let ax, ay;
-                                    const loc = a.currentLocation;
-                                    if (typeof loc === 'string') {
-                                        const pts = loc.split(',').map(Number);
-                                        ax = pts[0]; ay = pts[1];
-                                    } else if (loc && loc.x !== undefined) {
-                                        ax = loc.x; ay = loc.y;
-                                    }
-                                    if (ax !== undefined && ay !== undefined && regionPolygon) {
-                                        try {
-                                            const pt = turf.point([ax, ay]);
-                                            if (turf.booleanPointInPolygon(pt, regionPolygon)) {
-                                                enemyTroopsRemaining = true;
-                                                break;
-                                            }
-                                        } catch(e) {}
-                                    }
+                                const { getArmyLocation } = require('./movementLogic.js');
+                                const loc = getArmyLocation(a);
+                                if (loc && regionPolygon) {
+                                    try {
+                                        const pt = turf.point([loc[0], loc[1]]);
+                                        if (turf.booleanPointInPolygon(pt, regionPolygon)) {
+                                            enemyTroopsRemaining = true;
+                                            break;
+                                        }
+                                    } catch(e) {}
                                 }
                             }
                             if (enemyTroopsRemaining) break;
@@ -716,17 +702,12 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
                         let isAtCity = false;
                         if (defArmy.currentLocation === target_node || defArmy.targetName === target_node) {
                             isAtCity = true;
-                        } else if (cityCoords && defArmy.currentLocation && defArmy.status !== 'moving') {
-                            let ax, ay;
-                            if (typeof defArmy.currentLocation === 'string') {
-                                const parts = defArmy.currentLocation.split(',');
-                                ax = parseFloat(parts[0]); ay = parseFloat(parts[1]);
-                            } else if (typeof defArmy.currentLocation === 'object') {
-                                ax = defArmy.currentLocation.x; ay = defArmy.currentLocation.y;
-                            }
-                            if (ax !== undefined && ay !== undefined) {
-                                const dx = ax - cityCoords[0];
-                                const dy = ay - cityCoords[1];
+                        } else if (cityCoords) {
+                            const { getArmyLocation } = require('./movementLogic.js');
+                            const loc = getArmyLocation(defArmy);
+                            if (loc) {
+                                const dx = loc[0] - cityCoords[0];
+                                const dy = loc[1] - cityCoords[1];
                                 if (dx*dx + dy*dy < 0.0001) isAtCity = true;
                             }
                         }
