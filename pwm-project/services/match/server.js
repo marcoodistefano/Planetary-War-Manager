@@ -337,6 +337,25 @@ if (payload.action === 'MOVE_TROOPS') {
          if (updRes && updRes.armata) {
              const armataObj = updRes.armata;
              try {
+                 // PULIZIA COMBATTIMENTI PENDENTI: se l'armata era in combattimento, eliminiamo le mosse di attacco per evitare combattimenti fantasma a distanza
+                 const mossaAtkRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'atk'`, [armyId]);
+                 if (mossaAtkRes.rows.length > 0) {
+                     for (const r of mossaAtkRes.rows) {
+                         await db.query(`DELETE FROM attacco WHERE id_mossa = $1`, [r.id_mossa]);
+                         await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [r.id_mossa]);
+                     }
+                     // Notifica frontend annullamento combattimento
+                     const combatCancelPayload = {
+                         matchId: ws.matchId,
+                         targetUsers: [userId],
+                         payload: {
+                             type: 'COMBAT_CANCELLED',
+                             data: { armyId }
+                         }
+                     };
+                     await redis.publish('match_ws_broadcast_channel', JSON.stringify(combatCancelPayload));
+                 }
+
                  const mossaRes = await db.query(`SELECT id_mossa FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, [armyId]);
                  const etaDate = new Date(Date.now() + borderEtaMs);
                  if (mossaRes.rows.length > 0) {

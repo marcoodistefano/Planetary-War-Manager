@@ -272,6 +272,55 @@ const processActiveCombats = async () => {
                 }
             }
 
+            // --- CONTROLLO DISTANZA ---
+            if (defenderArmy) {
+                const { getArmyLocation, haversineDist } = require('./movementLogic.js');
+                const attLoc = getArmyLocation(attackerArmy);
+                const defLoc = getArmyLocation(defenderArmy);
+                if (attLoc && defLoc) {
+                    const dist = haversineDist(attLoc[0], attLoc[1], defLoc[0], defLoc[1]);
+                    if (dist > 50) { // Oltre 50km
+                        console.log(`[COMBAT] Bersaglio fuggito: ${dist}km. Annullamento attacco ${id_attacco}`);
+                        await db.query(`UPDATE attacco SET status = 'ended' WHERE id_attacco = $1`, [id_attacco]);
+                        await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
+                        
+                        await updateMatch(id_partita_hash, (mObj) => {
+                            const p = mObj.match.player.find(x => x.username === attackerPlayer);
+                            if (p && p.armate && p.armate[id_attaccante]) {
+                                p.armate[id_attaccante].status = 'standby';
+                                delete p.armate[id_attaccante].targetName;
+                                delete p.armate[id_attaccante].next_round_time;
+                            }
+                            return { save: true, matchObj: mObj };
+                        });
+                        continue; // Passa al prossimo scontro
+                    }
+                }
+            } else if (id_target_citta) {
+                const { getNodeCoords, haversineDist, getArmyLocation } = require('./movementLogic.js');
+                const cityCoords = getNodeCoords(id_target_citta);
+                const attLoc = getArmyLocation(attackerArmy);
+                if (cityCoords && attLoc) {
+                    const dist = haversineDist(attLoc[0], attLoc[1], cityCoords[0], cityCoords[1]);
+                    if (dist > 50) {
+                        console.log(`[COMBAT] Bersaglio fuggito (città lontana): ${dist}km. Annullamento attacco ${id_attacco}`);
+                        await db.query(`UPDATE attacco SET status = 'ended' WHERE id_attacco = $1`, [id_attacco]);
+                        await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
+                        
+                        await updateMatch(id_partita_hash, (mObj) => {
+                            const p = mObj.match.player.find(x => x.username === attackerPlayer);
+                            if (p && p.armate && p.armate[id_attaccante]) {
+                                p.armate[id_attaccante].status = 'standby';
+                                delete p.armate[id_attaccante].targetName;
+                                delete p.armate[id_attaccante].next_round_time;
+                            }
+                            return { save: true, matchObj: mObj };
+                        });
+                        continue;
+                    }
+                }
+            }
+
             if (currentTargetArmataId && defenderArmy && id_target_citta) {
                  damageToCity = Math.floor(totalDmg / 3);
                  damageToArmy = totalDmg - damageToCity;

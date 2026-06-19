@@ -627,7 +627,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           if (parsed.type === 'COMBAT_CANCELLED') {
             const { armyId } = parsed.data;
             const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
-            if (armyIndex !== -1) {
+            if (armyIndex !== -1 && this.matchArmies[armyIndex].status === 'in combattimento') {
               const newArmies = [...this.matchArmies];
               newArmies[armyIndex] = { ...newArmies[armyIndex] };
               newArmies[armyIndex].status = 'standby';
