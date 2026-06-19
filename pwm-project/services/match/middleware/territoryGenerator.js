@@ -189,7 +189,7 @@ const generateNations = async (matchId, maxPlayers) => {
         
         // Crea o sovrascrive la mappa Hash degli HP su Redis
         if (Object.keys(citiesHpMap).length > 0) {
-            await redis.hset(`match:${matchId}:cities_hp`, citiesHpMap);
+            await redis.hSet(`match:${matchId}:cities_hp`, citiesHpMap);
         }
         
         const territoryToNation = {};

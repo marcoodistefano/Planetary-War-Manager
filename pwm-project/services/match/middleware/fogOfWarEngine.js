@@ -46,8 +46,10 @@ function getArmyVisionRadius(army) {
     return maxRadius;
 }
 
-// Funzione per ricavare coordinate correnti stimate (se in movimento)
-function getEstimatedCoords(army, nodesFeatures = []) {
+const { getNodeCoords } = require('./movementLogic.js');
+
+// Helper to resolve coordinates
+function getEstimatedCoords(army) {
     let coords = null;
     let loc = army.currentLocation;
     if (typeof loc === 'string') {
@@ -55,18 +57,9 @@ function getEstimatedCoords(army, nodesFeatures = []) {
         if (pts.length === 2 && !isNaN(pts[0])) {
             coords = [pts[0], pts[1]];
         } else {
-            // Risolvi il nome del territorio
-            const locLower = loc.trim().toLowerCase();
-            const feature = nodesFeatures.find(f => {
-                const name = f.properties.name || f.properties.ADMIN || f.id;
-                return name && String(name).toLowerCase() === locLower;
-            });
-            if (feature && feature.geometry && feature.geometry.coordinates) {
-                let c = feature.geometry.coordinates;
-                while (c.length && Array.isArray(c[0][0])) c = c[0];
-                if (c.length > 0 && c[0].length === 2) coords = [c[0][0], c[0][1]];
-                else if (c.length === 2 && typeof c[0] === 'number') coords = [c[0], c[1]];
-            }
+            // Risolvi il nome del territorio tramite movementLogic
+            const coordsFound = getNodeCoords(loc.trim());
+            if (coordsFound) coords = coordsFound;
         }
     } else if (loc && loc.x !== undefined) {
         coords = [loc.x, loc.y];
@@ -109,33 +102,6 @@ function getEstimatedCoords(army, nodesFeatures = []) {
         }
     }
     return coords;
-}
-
-let nodesFeatures = [];
-let provinceCoordsMap = {};
-
-try {
-    const mapPath = path.join(__dirname, '../../../../shared/assets/map/cities.json');
-    if (fs.existsSync(mapPath)) {
-        const mapGeo = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
-        nodesFeatures = mapGeo.features || [];
-        
-        nodesFeatures.forEach(f => {
-            if (f.geometry && f.geometry.coordinates) {
-                const nodeName = (f.properties.name || f.properties.ADMIN || f.id).toLowerCase();
-                let c = f.geometry.coordinates;
-                while (c.length && Array.isArray(c[0][0])) c = c[0];
-                if (c.length > 0 && c[0].length === 2) {
-                    provinceCoordsMap[nodeName] = [c[0][0], c[0][1]];
-                } else if (c.length === 2 && typeof c[0] === 'number') {
-                    provinceCoordsMap[nodeName] = [c[0], c[1]];
-                }
-            }
-        });
-        console.log(`[FOG_OF_WAR] Caricata mappa con ${nodesFeatures.length} feature.`);
-    }
-} catch (e) {
-    console.error("[FOG_OF_WAR] Errore caricamento mappa cities.json:", e);
 }
 
 const runFogOfWarCycle = async () => {
@@ -193,13 +159,14 @@ const runFogOfWarCycle = async () => {
 
                 const myTerritoriesCoords = [];
                 myTerritoryNames.forEach(nodeName => {
-                    if (provinceCoordsMap[nodeName]) {
-                        myTerritoriesCoords.push(provinceCoordsMap[nodeName]);
+                    const coords = getNodeCoords(nodeName);
+                    if (coords) {
+                        myTerritoriesCoords.push(coords);
                     }
                 });
 
                 const myArmiesVision = myArmies.map(a => {
-                    return { coords: getEstimatedCoords(a, nodesFeatures), radius: getArmyVisionRadius(a) };
+                    return { coords: getEstimatedCoords(a), radius: getArmyVisionRadius(a) };
                 }).filter(a => a.coords !== null);
 
                 const visibleEnemies = [];
@@ -207,7 +174,7 @@ const runFogOfWarCycle = async () => {
                 for (const army of allArmies) {
                     if (army.owner === username) continue;
 
-                    const coords = getEstimatedCoords(army, nodesFeatures);
+                    const coords = getEstimatedCoords(army);
                     if (!coords) continue;
 
                     let isVisible = false;
@@ -235,7 +202,7 @@ const runFogOfWarCycle = async () => {
                     }
                 }
 
-                const citiesHpStr = await redis.hgetall(`match:${matchId}:cities_hp`);
+                const citiesHpStr = await redis.hGetAll(`match:${matchId}:cities_hp`);
                 const citiesHp = {};
                 if (citiesHpStr) {
                     for (const [cityId, hp] of Object.entries(citiesHpStr)) {
