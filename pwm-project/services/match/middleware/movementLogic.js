@@ -236,14 +236,18 @@ const getBorderIntersection = (pathCoords, targetName) => {
     return null;
 };
 
+const normalizeName = (name) => {
+    return String(name).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+};
+
 // Helper for server to get node coords
 function getNodeCoords(name) {
     loadGeometries();
     let coords = nodesMap.get(name);
     if (!coords) {
-        const lowerName = String(name).toLowerCase();
+        const lowerName = normalizeName(name);
         for (const [k, v] of nodesMap.entries()) {
-            if (String(k).toLowerCase() === lowerName) {
+            if (normalizeName(k) === lowerName) {
                 coords = v;
                 break;
             }
@@ -258,9 +262,9 @@ const getRegionForNode = (nodeName) => {
     if (!regionsFeatures) return null;
     let coords = nodesMap.get(nodeName);
     if (!coords) {
-        const lowerName = String(nodeName).toLowerCase();
+        const lowerName = normalizeName(nodeName);
         for (const [k, v] of nodesMap.entries()) {
-            if (String(k).toLowerCase() === lowerName) {
+            if (normalizeName(k) === lowerName) {
                 coords = v;
                 break;
             }
@@ -287,10 +291,10 @@ const getRegionForNode = (nodeName) => {
 const getRegionIdByName = (name) => {
     loadGeometries();
     if (!regionsFeatures) return name;
-    const lowerName = String(name).toLowerCase();
+    const lowerName = normalizeName(name);
     const targetRegion = regionsFeatures.find(f => 
-        (f.properties && (String(f.properties.name).toLowerCase() === lowerName || String(f.properties.ADMIN).toLowerCase() === lowerName || String(f.properties.adm1_code).toLowerCase() === lowerName)) ||
-        String(f.id).toLowerCase() === lowerName
+        (f.properties && (normalizeName(f.properties.name) === lowerName || normalizeName(f.properties.ADMIN) === lowerName || normalizeName(f.properties.adm1_code) === lowerName)) ||
+        normalizeName(f.id) === lowerName
     );
     if (targetRegion) {
         return targetRegion.properties?.adm1_code || targetRegion.id;

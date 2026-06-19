@@ -105,6 +105,7 @@ async function generateResources() {
           petrolio: 250,
           gas_naturale: 250
         };
+        let estrattoriRules = {};
         if (rulesRawBase64) {
           try {
             const rules = JSON.parse(Buffer.from(rulesRawBase64, "base64").toString("utf-8"));
@@ -115,6 +116,17 @@ async function generateResources() {
                   ruleProd[line.id] = line.risorsa_per_ora;
                 }
               });
+            }
+            const estrattoriSheet = rules.sheets.find(s => s.name === "Estrattori");
+            if (estrattoriSheet && estrattoriSheet.lines) {
+                estrattoriSheet.lines.forEach(line => {
+                    if (line.id_extractor) {
+                        estrattoriRules[line.id_extractor] = {
+                            risorsa_estratta: line.risorsa_estratta,
+                            efficienza: parseFloat(line.efficienza) || 1
+                        };
+                    }
+                });
             }
           } catch (err) {
              // Fallback gia impostato
@@ -159,6 +171,23 @@ async function generateResources() {
                         denaro: 1000 + (territories.length * 50),
                         legno: 250, piombo: 0, acciaio: 0, mattone: 250, petrolio: 0, gas: 0, uranio: 0, oro: 0
                     };
+
+                    const ruleToProdKey = {
+                        denaro: "denaro", legno: "legno", piombo: "piombo", acciaio: "acciaio",
+                        mattoni: "mattone", petrolio: "petrolio", gas_naturale: "gas", uranio: "uranio", oro: "oro"
+                    };
+
+                    const strutture = player.strutture || [];
+                    for (const s of strutture) {
+                        if (s.status === 'built' && typeof estrattoriRules !== 'undefined' && estrattoriRules[s.structureId]) {
+                            const rule = estrattoriRules[s.structureId];
+                            const baseProd = ruleProd[rule.risorsa_estratta] || 0;
+                            const prodKey = ruleToProdKey[rule.risorsa_estratta];
+                            if (prodKey && production[prodKey] !== undefined) {
+                                production[prodKey] += baseProd * rule.efficienza;
+                            }
+                        }
+                    }
 
                     for (const key in production) {
                         production[key] = production[key] * multiplier;
