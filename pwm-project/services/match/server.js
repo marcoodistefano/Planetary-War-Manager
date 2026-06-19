@@ -263,7 +263,15 @@ if (payload.action === 'MOVE_TROOPS') {
          const updRes = await updateMatch(ws.matchId, async (matchObj) => {
              if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
              
-             let targetNation = matchObj.match.player.find(n => n.territori && n.territori.includes(targetName));
+             const { getRegionForNode } = require('./middleware/movementLogic.js');
+             const regionId = getRegionForNode(targetName) || targetName;
+             let targetNation = matchObj.match.player.find(n => n.territori_dict && Object.values(n.territori_dict).some(list => list.includes(regionId)));
+             if (!targetNation && targetName !== regionId) {
+                 targetNation = matchObj.match.player.find(n => n.territori_dict && Object.values(n.territori_dict).some(list => list.includes(targetName)));
+             }
+             if (!targetNation) {
+                 targetNation = matchObj.match.player.find(n => n.territori && n.territori.includes(targetName));
+             }
              if (targetNation && targetNation.isOccupied && targetNation.username && targetNation.username !== ws.username) {
                  isAttack = true;
                  targetPlayerId = targetNation.username;
@@ -667,30 +675,36 @@ const startArrivalEngine = () => {
         await db.query(`DELETE FROM spostamenti WHERE id_spostamento = $1`, [row.id_spostamento]);
         await db.query(`UPDATE mosse SET queue_order = 0 WHERE id_mossa = $1`, [row.id_mossa]);
 
-        const redisKey = `match:${row.match_id}:player:${row.username}:armate`;
-        let armateData = await redis.get(redisKey);
-        if (armateData) {
-          let armateObj = JSON.parse(armateData);
-          if (armateObj[row.id_armata]) {
-            let army = armateObj[row.id_armata];
-            
-            // Controlla se il territorio di destinazione appartiene a un nemico
+        const { getMatch, updateMatch } = require('../shared/matchMonolithic.js');
+        const matchObj = await getMatch(row.match_id);
+        if (!matchObj || !matchObj.match || !matchObj.match.player) continue;
+
+        let army = null;
+        let pIndex = -1;
+        for (let i = 0; i < matchObj.match.player.length; i++) {
+            if (matchObj.match.player[i].username === row.username && matchObj.match.player[i].armate && matchObj.match.player[i].armate[row.id_armata]) {
+                army = matchObj.match.player[i].armate[row.id_armata];
+                pIndex = i;
+                break;
+            }
+        }
+
+        if (army) {
             let isEnemyTerritory = false;
-            const nationsCache = await redis.get(`match:${row.match_id}:nations`);
-            if (nationsCache) {
-                const { getRegionForNode } = require('./middleware/movementLogic.js');
-                const regionId = getRegionForNode(row.target_node) || row.target_node;
-                
-                const nations = JSON.parse(nationsCache);
-                let targetNation = nations.find(n => n.territories_flat && n.territories_flat.includes(regionId));
-                if (targetNation && targetNation.playerId && targetNation.playerId !== row.username) {
-                    isEnemyTerritory = true;
-                }
+            const { getRegionForNode } = require('./middleware/movementLogic.js');
+            const regionId = getRegionForNode(row.target_node) || row.target_node;
+            
+            let targetNation = matchObj.match.player.find(n => n.territori_dict && Object.values(n.territori_dict).some(list => list.includes(regionId)));
+            if (!targetNation && row.target_node !== regionId) {
+                 targetNation = matchObj.match.player.find(n => n.territori_dict && Object.values(n.territori_dict).some(list => list.includes(row.target_node)));
+            }
+
+            if (targetNation && targetNation.username && targetNation.username !== row.username) {
+                isEnemyTerritory = true;
             }
 
             if (army.missionMode === 'attack' || isEnemyTerritory) {
                 const { setupCombatFromArrival } = require('./middleware/combatLogic.js');
-                // Chiamata all'inizializzazione del combattimento
                 const mossaObj = {
                     id_mossa: row.id_mossa,
                     id_armata: row.id_armata,
@@ -700,55 +714,70 @@ const startArrivalEngine = () => {
                     partita_id: row.partita_id
                 };
                 await setupCombatFromArrival(army, mossaObj, row.match_id, row.username);
+                
+                await updateMatch(row.match_id, (mObj) => {
+                    const p = mObj.match.player.find(x => x.username === row.username);
+                    if (p && p.armate && p.armate[row.id_armata]) {
+                        p.armate[row.id_armata].status = army.status;
+                        if (army.currentLocation) p.armate[row.id_armata].currentLocation = army.currentLocation;
+                        if (army.next_round_time) p.armate[row.id_armata].next_round_time = army.next_round_time;
+                        delete p.armate[row.id_armata].path;
+                        delete p.armate[row.id_armata].etaMs;
+                        delete p.armate[row.id_armata].startTime;
+                        delete p.armate[row.id_armata].targetName;
+                        delete p.armate[row.id_armata].missionMode;
+                    }
+                    return { save: true, matchObj: mObj };
+                });
+
             } else {
-                army.status = 'standby';
-                if (army.path && army.path.length > 0) {
-                    const lastCoord = army.path[army.path.length - 1];
-                    army.currentLocation = `${lastCoord[0]},${lastCoord[1]}`;
-                } else if (army.targetCoords) {
-                    army.currentLocation = `${army.targetCoords[0]},${army.targetCoords[1]}`;
-                } else {
-                    army.currentLocation = army.targetName || row.target_node;
-                }
+                await updateMatch(row.match_id, (mObj) => {
+                    const p = mObj.match.player.find(x => x.username === row.username);
+                    if (p && p.armate && p.armate[row.id_armata]) {
+                        p.armate[row.id_armata].status = 'standby';
+                        if (p.armate[row.id_armata].path && p.armate[row.id_armata].path.length > 0) {
+                            const lastCoord = p.armate[row.id_armata].path[p.armate[row.id_armata].path.length - 1];
+                            p.armate[row.id_armata].currentLocation = `${lastCoord[0]},${lastCoord[1]}`;
+                        } else if (p.armate[row.id_armata].targetCoords) {
+                            p.armate[row.id_armata].currentLocation = `${p.armate[row.id_armata].targetCoords[0]},${p.armate[row.id_armata].targetCoords[1]}`;
+                        } else {
+                            p.armate[row.id_armata].currentLocation = p.armate[row.id_armata].targetName || row.target_node;
+                        }
+
+                        let finalCoords = p.armate[row.id_armata].targetCoords;
+                        if (p.armate[row.id_armata].path && p.armate[row.id_armata].path.length > 0) {
+                            finalCoords = p.armate[row.id_armata].path[p.armate[row.id_armata].path.length - 1];
+                        }
+
+                        delete p.armate[row.id_armata].path;
+                        delete p.armate[row.id_armata].etaMs;
+                        delete p.armate[row.id_armata].startTime;
+                        delete p.armate[row.id_armata].targetName;
+                        delete p.armate[row.id_armata].missionMode;
+                    }
+                    return { save: true, matchObj: mObj };
+                });
             }
-
-            let finalCoords = army.targetCoords;
-            if (army.path && army.path.length > 0) {
-                finalCoords = army.path[army.path.length - 1];
-            }
-
-            delete army.path;
-            delete army.etaMs;
-            delete army.startTime;
-            delete army.targetName;
-            delete army.missionMode;
-
-            await redis.set(redisKey, JSON.stringify(armateObj));
 
             const broadcastPayload = {
               matchId: row.match_id,
-              targetUsers: [row.id_user],
+              targetUsers: [row.username],
               payload: {
                 type: 'TROOPS_ARRIVED',
-                data: {
-                  userId: row.username,
-                  armyId: row.id_armata,
-                  targetName: row.target_node,
-                  targetCoords: finalCoords
-                }
+                payload: { armyId: row.id_armata }
               }
             };
-            await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
-            console.log(`[SYSTEM] Armata ${row.id_armata} arrivata a ${row.target_node}.`);
-          }
+            const redis = require('ioredis');
+            const redisClient = new redis({ host: process.env.REDIS_HOST || 'redis', port: process.env.REDIS_PORT || 6379 });
+            await redisClient.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+            redisClient.disconnect();
         }
       }
-    } catch (err) {
-      console.error("[SYS_ERR] Errore nel motore arrivi (ArrivalEngine):", err);
+    } catch (e) {
+      console.error("Errore nell'arrival engine:", e);
     }
-  }, 5000);
+  }, 1000);
 };
-
 // Caricamento in Redis
 const restoreActiveMoves = async () => {
   console.log("[SYSTEM] Avvio ripristino mosse attive da DB a Redis...");

@@ -239,14 +239,33 @@ const getBorderIntersection = (pathCoords, targetName) => {
 // Helper for server to get node coords
 function getNodeCoords(name) {
     loadGeometries();
-    return nodesMap.get(name) || null;
+    let coords = nodesMap.get(name);
+    if (!coords) {
+        const lowerName = String(name).toLowerCase();
+        for (const [k, v] of nodesMap.entries()) {
+            if (String(k).toLowerCase() === lowerName) {
+                coords = v;
+                break;
+            }
+        }
+    }
+    return coords || null;
 }
 
 // Aggiunto per mappare una città alla sua regione
 const getRegionForNode = (nodeName) => {
     loadGeometries();
     if (!regionsFeatures) return null;
-    const coords = nodesMap.get(nodeName);
+    let coords = nodesMap.get(nodeName);
+    if (!coords) {
+        const lowerName = String(nodeName).toLowerCase();
+        for (const [k, v] of nodesMap.entries()) {
+            if (String(k).toLowerCase() === lowerName) {
+                coords = v;
+                break;
+            }
+        }
+    }
     if (!coords) return null;
 
     try {
@@ -268,9 +287,10 @@ const getRegionForNode = (nodeName) => {
 const getRegionIdByName = (name) => {
     loadGeometries();
     if (!regionsFeatures) return name;
+    const lowerName = String(name).toLowerCase();
     const targetRegion = regionsFeatures.find(f => 
-        (f.properties && (f.properties.name === name || f.properties.ADMIN === name || f.properties.adm1_code === name)) ||
-        f.id === name
+        (f.properties && (String(f.properties.name).toLowerCase() === lowerName || String(f.properties.ADMIN).toLowerCase() === lowerName || String(f.properties.adm1_code).toLowerCase() === lowerName)) ||
+        String(f.id).toLowerCase() === lowerName
     );
     if (targetRegion) {
         return targetRegion.properties?.adm1_code || targetRegion.id;

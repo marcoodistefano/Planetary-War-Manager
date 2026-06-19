@@ -336,12 +336,17 @@ const processActiveCombats = async () => {
                                     break;
                                 }
                             }
+                            if (defNation.territori) {
+                                defNation.territori = defNation.territori.filter(t => t !== actualRegionToTransfer);
+                            }
 
                             if (!attNation.territori_dict) attNation.territori_dict = {};
                             if (!attNation.territori_dict[targetAdmin || "Altro"]) {
                                 attNation.territori_dict[targetAdmin || "Altro"] = [];
                             }
                             attNation.territori_dict[targetAdmin || "Altro"].push(actualRegionToTransfer);
+                            if (!attNation.territori) attNation.territori = [];
+                            attNation.territori.push(actualRegionToTransfer);
                         }
                         
                         updatedNations = mObj.match.player;
