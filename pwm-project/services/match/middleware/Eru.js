@@ -255,9 +255,11 @@ const Eru = {
   },
 
   switch_max_players: (maxPlayers) => {
-    const maxPlayersValue = maxPlayersLookup.get(normalizeStringValue(maxPlayers));
+    const norm = normalizeStringValue(maxPlayers);
+    if (!norm) return MAX_PLAYERS.ten;
+    const maxPlayersValue = maxPlayersLookup.get(norm);
     if (maxPlayersValue !== undefined) return maxPlayersValue;
-    throw new Error("Numero di giocatori non valido");
+    throw new Error("Numero di giocatori non valido: " + maxPlayers + " (norm: " + norm + ")");
   },
   switch_max_duration: (maxDuration) => {
     switch (normalizeStringValue(maxDuration)) {

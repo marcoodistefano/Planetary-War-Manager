@@ -32,7 +32,7 @@ const create = async (req, res) => {
         .json({ error: "Identita non verificabile." });
     const playerId = auth.userId;
 
-    const ui = req.body; // Dati grezzi dal frontend
+    const ui = req.body;
 
     // MAPPATURA LOGICA: Traduciamo l'interfaccia nel linguaggio di Eru
     const gameMode = {
@@ -297,11 +297,11 @@ const getGraveyard = async (req, res) => {
   try {
     const matchId = req.params.id;
     const username = req.params.username;
-    
+
     if (!matchId || !username) {
       return res.status(400).json({ error: "Match id o username mancante." });
     }
-    
+
     const result = await model.getGraveyard(matchId, username);
     const statusCode = parseInt(result.status, 10) || 500;
     return res.status(statusCode).json(result);

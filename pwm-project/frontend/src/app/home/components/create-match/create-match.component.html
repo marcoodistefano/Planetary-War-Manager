@@ -66,9 +66,9 @@
 
             <div class="setting-item">
               <label>CAPACITÀ COMANDANTI</label>
-              <select class="tactical-select" [(ngModel)]="matchData.maxPlayers">
-                <option *ngFor="let p of maxPlayers" [value]="p">{{ p }} Partecipanti</option>
-              </select>
+              <ion-select justify="space-between" interface="popover" [interfaceOptions]="popoverOptions" name="maxPlayers" class="tactical-select" [(ngModel)]="matchData.maxPlayers">
+                <ion-select-option *ngFor="let p of maxPlayers" [value]="p">{{ p }} Partecipanti</ion-select-option>
+              </ion-select>
             </div>
           </div>
 
@@ -80,9 +80,9 @@
 
             <div class="setting-item">
               <label>MODALITÀ DI GIOCO</label>
-              <select class="tactical-select" [(ngModel)]="matchData.modalita">
-                <option *ngFor="let mod of modalitaGioco" [value]="mod">{{ mod }}</option>
-              </select>
+              <ion-select justify="space-between" interface="popover" [interfaceOptions]="popoverOptions" name="modalita" class="tactical-select" [(ngModel)]="matchData.modalita">
+                <ion-select-option *ngFor="let mod of modalitaGioco" [value]="mod">{{ mod }}</ion-select-option>
+              </ion-select>
             </div>
 
             <div class="setting-item range-item">
@@ -114,23 +114,23 @@
 
             <div class="setting-item">
               <label>DURATA MASSIMA OPERAZIONE</label>
-              <select class="tactical-select" [(ngModel)]="matchData.durata">
-                <option *ngFor="let d of durataMax" [value]="d">{{ d }}</option>
-              </select>
+              <ion-select justify="space-between" interface="popover" [interfaceOptions]="popoverOptions" name="durata" class="tactical-select" [(ngModel)]="matchData.durata">
+                <ion-select-option *ngFor="let d of durataMax" [value]="d">{{ d }}</ion-select-option>
+              </ion-select>
             </div>
 
             <div class="setting-item">
               <label>MOLTIPLICATORE TEMPORALE</label>
-              <select class="tactical-select" [(ngModel)]="matchData.moltiplicatore">
-                <option *ngFor="let m of moltiplicatori" [value]="m">{{ m }}</option>
-              </select>
+              <ion-select justify="space-between" interface="popover" [interfaceOptions]="popoverOptions" name="moltiplicatore" class="tactical-select" [(ngModel)]="matchData.moltiplicatore">
+                <ion-select-option *ngFor="let m of moltiplicatori" [value]="m">{{ m }}</ion-select-option>
+              </ion-select>
             </div>
 
             <div class="setting-item">
               <label>AVVIO PARTITA</label>
-              <select class="tactical-select" [(ngModel)]="matchData.avvio">
-                <option value="Immediato">Immediato</option>
-              </select>
+              <ion-select justify="space-between" interface="popover" [interfaceOptions]="popoverOptions" name="avvio" class="tactical-select" [(ngModel)]="matchData.avvio">
+                <ion-select-option value="Immediato">Immediato</ion-select-option>
+              </ion-select>
             </div>
           </div>
 

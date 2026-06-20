@@ -84,6 +84,10 @@ function B64_detective(input) {
     
     // EURISTICA: Il risultato decodificato deve essere testo valido stampabile
     if (/^[\x20-\x7E\u00A0-\uFFFF\n\r\t]*$/.test(decoded) && decoded.trim() !== "") {
+      // Evita falsi positivi su stringhe corte (es. username) che casualmente decodificano in testo innocuo
+      if (cleanInput.length < 32 && !/[<>()"']/.test(decoded)) {
+        return false;
+      }
       return "B64";
     }
   } catch (e) {
@@ -99,8 +103,16 @@ function HEX_detective(input) {
     return false;
   try {
     const decoded = Buffer.from(cleanInput, "hex").toString("utf8");
+    // Se la decodifica produce caratteri non validi, non è vero testo UTF-8 codificato
+    if (decoded.includes('\uFFFD')) {
+      return false;
+    }
     // Verifica che il risultato sia testo stampabile (evita falsi positivi su codici seriali)
     if (/^[\x20-\x7E\u00A0-\uFFFF\n\r\t]+$/.test(decoded)) {
+      // Evita falsi positivi su stringhe corte
+      if (cleanInput.length < 32 && !/[<>()"']/.test(decoded)) {
+        return false;
+      }
       return "HEX";
     }
   } catch (e) {
@@ -124,6 +136,10 @@ function BIN_detective(input) {
       .join("");
     // Verifica che il risultato sia testo stampabile (come nelle altre detective)
     if (/^[\x20-\x7E\u00A0-\uFFFF\n\r\t]+$/.test(decoded)) {
+      // Evita falsi positivi su stringhe corte
+      if (cleaninput.length < 64 && !/[<>()"']/.test(decoded)) {
+        return false;
+      }
       return "BIN";
     }
   } catch (e) {

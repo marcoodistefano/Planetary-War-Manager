@@ -196,11 +196,10 @@ ion-modal.chat-modal {
 .tactical-popover-menu {
   --background: rgba(5, 10, 20, 0.95);
   --color: #fff;
-  --max-width: 300px;
+  --min-width: 250px;
   border: 1px solid #58a6ff;
   border-radius: 8px;
   box-shadow: 0 0 20px rgba(88, 166, 255, 0.2);
-  backdrop-filter: blur(10px);
 
   /* Stile delle singole opzioni */
   ion-item {

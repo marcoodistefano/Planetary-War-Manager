@@ -1478,23 +1478,23 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     let totalDistance = 0;
     const segmentDistances: number[] = [];
     for (let i = 0; i < path.length - 1; i++) {
-        const dx = path[i+1][0] - path[i][0];
-        const dy = path[i+1][1] - path[i][1];
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        segmentDistances.push(dist);
-        totalDistance += dist;
+      const dx = path[i + 1][0] - path[i][0];
+      const dy = path[i + 1][1] - path[i][1];
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      segmentDistances.push(dist);
+      totalDistance += dist;
     }
     const targetDistance = progress * totalDistance;
     let currentDist = 0;
     let currentIndex = 0;
     let segmentProgress = 0;
     for (let i = 0; i < segmentDistances.length; i++) {
-        if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
-            currentIndex = i;
-            segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0;
-            break;
-        }
-        currentDist += segmentDistances[i];
+      if (currentDist + segmentDistances[i] >= targetDistance || i === segmentDistances.length - 1) {
+        currentIndex = i;
+        segmentProgress = segmentDistances[i] > 0 ? (targetDistance - currentDist) / segmentDistances[i] : 0;
+        break;
+      }
+      currentDist += segmentDistances[i];
     }
     const p1 = path[currentIndex];
     const p2 = path[currentIndex + 1] || p1;
@@ -2645,7 +2645,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         this.buildPreviewMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([e.lngLat.lng, e.lngLat.lat])
           .addTo(this.map);
-          
+
         this.updateStructureMarkersScale();
       } else {
         this.buildPreviewMarker.setLngLat([e.lngLat.lng, e.lngLat.lat]);
