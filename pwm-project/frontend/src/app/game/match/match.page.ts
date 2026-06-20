@@ -2181,13 +2181,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     if (!this.map) return;
     const currentZoom = this.map.getZoom();
 
-    // Scompare se lo zoom è inferiore a 5.5
-    const thresholdZoom = 5.5;
-
     // Scala proporzionalmente (più lo zoom è alto, più l'edificio è grande)
-    const minSize = 40;
+    const minSize = 25;
     const maxSize = 120;
-    const minZoom = 5.5;
+    const minZoom = 3.0;
     const maxZoom = 10.0;
 
     const scaleFactor = Math.min(Math.max((currentZoom - minZoom) / (maxZoom - minZoom), 0), 1);
@@ -2198,13 +2195,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       const container = el.querySelector('.structure-container') as HTMLElement;
       if (!container) return;
 
-      if (currentZoom < thresholdZoom) {
-        el.style.display = 'none';
-      } else {
-        el.style.display = 'block';
-        container.style.width = `${dynamicSize}px`;
-        container.style.height = `${dynamicSize}px`;
-      }
+      el.style.display = 'block';
+      container.style.width = `${dynamicSize}px`;
+      container.style.height = `${dynamicSize}px`;
     };
 
     this.structureMarkers.forEach(scaleMarker);

@@ -27,7 +27,7 @@ export class RegisterPage implements OnInit, AfterViewInit, OnDestroy {
   errorMessage = '';
   isSubmitting = false;
   showPassword = false;
-  
+  showConfirmPassword = false;
   // Variabili per il Modale delle Nazioni
   countries: any[] = [];
   filteredCountries: any[] = [];
@@ -74,6 +74,10 @@ export class RegisterPage implements OnInit, AfterViewInit, OnDestroy {
     this.showPassword = !this.showPassword;
   }
 
+  toggleConfirmPasswordVisibility() {
+    this.showConfirmPassword = !this.showConfirmPassword;
+  }
+
   ngAfterViewInit() {
     this.playBackgroundVideo();
     document.addEventListener('focusin', this.focusHandler);
@@ -100,6 +104,7 @@ export class RegisterPage implements OnInit, AfterViewInit, OnDestroy {
       username: ['', [Validators.required, Validators.minLength(3)]],
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(12)]],
+      confirmPassword: ['', [Validators.required]],
       region: [null, [Validators.required]]
     });
   }
@@ -169,7 +174,13 @@ export class RegisterPage implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    const { username, email, password, region } = this.RegisterForm.value;
+    const { username, email, password, confirmPassword, region } = this.RegisterForm.value;
+
+    if (password !== confirmPassword) {
+      this.errorMessage = 'Le password inserite non coincidono.';
+      return;
+    }
+
     this.errorMessage = '';
     this.isSubmitting = true;
     this.authApi

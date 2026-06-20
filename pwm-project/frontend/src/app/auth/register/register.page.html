@@ -1,8 +1,9 @@
-<ion-content [fullscreen]="true" [scrollY]="false">
-  <div class="auth-background" aria-hidden="true">
-    <video #backgroundVideo class="auth-background__video" autoplay muted loop playsinline preload="metadata" src="assets/background_gif/background_gif.mp4"></video>
-    <div class="auth-background__overlay"></div>
-  </div>
+<div class="auth-background" aria-hidden="true">
+  <video #backgroundVideo class="auth-background__video" autoplay muted loop playsinline preload="metadata" src="assets/background_gif/background_gif.mp4"></video>
+  <div class="auth-background__overlay"></div>
+</div>
+
+<ion-content [fullscreen]="true">
 
   <div class="title-block">
     <p class="eyebrow">Strategia, alleanze, conquista</p>
@@ -36,6 +37,16 @@
           <ion-input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="••••••••"></ion-input>
           <ion-button fill="clear" size="small" (click)="togglePasswordVisibility()" class="toggle-eye-btn">
             <ion-icon slot="icon-only" [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+          </ion-button>
+        </div>
+      </div>
+
+      <div class="field-container">
+        <ion-label class="custom-label">CONFERMA PASSWORD</ion-label>
+        <div class="password-wrapper">
+          <ion-input [type]="showConfirmPassword ? 'text' : 'password'" formControlName="confirmPassword" placeholder="••••••••"></ion-input>
+          <ion-button fill="clear" size="small" (click)="toggleConfirmPasswordVisibility()" class="toggle-eye-btn">
+            <ion-icon slot="icon-only" [name]="showConfirmPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
           </ion-button>
         </div>
       </div>
