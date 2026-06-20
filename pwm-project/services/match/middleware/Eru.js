@@ -545,9 +545,9 @@ const Eru = {
       }
     }
 
-    if (count >= maxPlayersCount / 3 && stato === 1n) {
-      // Spegne i bit 54-55 (Maschera Inversa) e accende il bit 55
-      let newMatchBigInt = (match & ~(0b11n << 54n)) | (0b10n << 54n);
+    if (count >= maxPlayersCount / 3 && stato === 0n) {
+      // Spegne i bit 54-55 (Maschera Inversa) e accende il bit 54 per IN_CORSO (0b01n)
+      let newMatchBigInt = (match & ~(0b11n << 54n)) | (0b01n << 54n);
       res = {
         status: 200,
         message: "Partita avviata con successo",

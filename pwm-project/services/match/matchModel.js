@@ -31,6 +31,9 @@ const hasAbbandonoAlleanzaAtColumn = async (client = db) => {
 };
 
 const hasJoinedAtColumn = async (client = db) => {
+  if (hasJoinedAtColumnCache !== null) {
+    return hasJoinedAtColumnCache;
+  }
   try {
     const { rows } = await client.query(
       `SELECT 1
@@ -39,10 +42,11 @@ const hasJoinedAtColumn = async (client = db) => {
          AND column_name = 'joined_at'
        LIMIT 1;`,
     );
-    return rows.length > 0;
+    hasJoinedAtColumnCache = rows.length > 0;
   } catch (error) {
-    return false;
+    hasJoinedAtColumnCache = false;
   }
+  return hasJoinedAtColumnCache;
 };
 
 // Helper: write match state under three Redis keys (internal id, hash, visual id)
@@ -470,9 +474,8 @@ const createMatch = async ({ playerId, gameMode }) => {
       throw new Error("Errore critico di clock nel Multiplexer Eru.");
 
     // C. Generazione Identificativi
-    const id_partita_hash = await aslan.generateSecureToken(255); //L'hash della partita deve essere calcolato passando come parametri TUTTE le info della partita!
-    //ad ora è un token casuale, ma è da modificare.
-    //TO UPDATE
+    const crypto = require('crypto');
+    const id_partita_hash = crypto.createHash('sha256').update(playerId + gameMode.nome_partita + Date.now()).digest('hex');
     const id_partita_visualizzato = await aslan.generateSecureToken(10);
 
     // D. Transazione SQL (Persistenza)
@@ -490,7 +493,7 @@ const createMatch = async ({ playerId, gameMode }) => {
           id_partita_visualizzato,
           playerId,
           eruRes.binary_match,
-          gameMode.hasElo || false,
+          gameMode.ranked === true || gameMode.ranked === 'true',
         ],
       );
 
@@ -522,23 +525,20 @@ const createMatch = async ({ playerId, gameMode }) => {
 
       console.log(`[SYS_OK] Partita istanziata su Postgres e caricata in cache Redis: ${id_partita_hash}`);
 
-      // Generazione dei territori e nazioni
-      await territoryGenerator.generateNations(id_partita_hash, gameMode.maxPlayers);
-
-      // Inizializzazione risorse per tutte le nazioni (inclusi i bot)
+      // Esecuzione POST-COMMIT delle inizializzazioni pesanti
       try {
+          // Generazione dei territori e nazioni
+          await territoryGenerator.generateNations(id_partita_hash, gameMode.maxPlayers);
+
+          // Inizializzazione risorse per tutte le nazioni (inclusi i bot)
           const matchData = await getMatch(id_partita_hash);
           if (matchData && matchData.match && matchData.match.player) {
               for (const player of matchData.match.player) {
                   await initializePlayerResources(id_partita_hash, player.username);
               }
           }
-      } catch (err) {
-          console.error("[SYS_WARN] Errore inizializzazione risorse nazioni:", err);
-      }
 
-      // ASSEGNAZIONE TERRITORIO ALL'HOST
-      try {
+          // ASSEGNAZIONE TERRITORIO ALL'HOST
           const userRes = await client.query(`SELECT username FROM utenti WHERE id_user = $1`, [playerId]);
           const sessionUsername = userRes.rows.length > 0 ? userRes.rows[0].username : playerId;
 
@@ -573,17 +573,14 @@ const createMatch = async ({ playerId, gameMode }) => {
               }
               return { save: false };
           });
-      } catch (err) {
-          console.error("[SYS_WARN] Errore assegnazione territorio host:", err);
-      }
 
-      // GENERAZIONE INIZIALE TRUPPE
-      try {
+          // GENERAZIONE INIZIALE TRUPPE
           const userResHost = await client.query(`SELECT username FROM utenti WHERE id_user = $1`, [playerId]);
           const hostUsername = userResHost.rows.length > 0 ? userResHost.rows[0].username : playerId;
           await troopGenerator.generateInitialTroopsForMatch(id_partita_hash, partitaId, playerId, hostUsername);
+
       } catch (err) {
-          console.error("[SYS_WARN] Errore generazione truppe iniziali:", err);
+          console.error("[SYS_WARN] Errore durante l'inizializzazione post-commit della partita:", err);
       }
 
       return {
@@ -657,7 +654,7 @@ const join_Match = async (playerId, id_partita_hash) => {
       let statoTerritori = {};
       const isBot = String(playerId).toUpperCase().includes("BOT");
 
-      await updateMatch(id_partita_hash, async (matchObj) => {
+      const updRes = await updateMatch(id_partita_hash, async (matchObj) => {
           if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
           const freeNations = matchObj.match.player.filter(p => String(p.username).includes('_bot') && !p.inWar);
           if (freeNations.length > 0) {
@@ -685,6 +682,10 @@ const join_Match = async (playerId, id_partita_hash) => {
           }
           return { save: false };
       });
+      
+      if (!updRes || !updRes.data) {
+          throw { customStatus: "400", message: "Nessuna nazione disponibile per unirsi." };
+      }
 
       // 3. Inserimento e conteggio
       await client.query(
@@ -983,6 +984,7 @@ const getMatchAlliance = async (matchId) => {
     }
 
     await redis.set(`match:${matchId}:alliances`, JSON.stringify([]));
+    await redis.expire(`match:${matchId}:alliances`, 60);
     return {
       status: "404",
       message: "Nessuna alleanza trovata per questa partita.",
@@ -1358,7 +1360,7 @@ const joinAlliance = async (playerId, matchId, allianceId) => {
       // Notify chat system (best-effort, do not fail the operation)
       try {
         await fetch(
-          `http://localhost:3000/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
+          `${process.env.CHAT_SERVICE_URL || 'http://localhost:3000'}/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1455,6 +1457,14 @@ const removeAllianceMember = async ({
       fail("400", "Il giocatore target non è un membro di questa alleanza.");
     }
 
+    const countRes = await client.query(
+      `SELECT COUNT(*)::int AS count
+       FROM partecipanti_partite
+       WHERE partita_id = $1 AND id_alleanza = $2`,
+      [matchState.state.id_partita, allianceState.alliance.id_alleanza],
+    );
+    const countPlayerBefore = parseInt(countRes.rows[0].count || "0", 10);
+    
     const hasCooldownColumn = await hasAbbandonoAlleanzaAtColumn(client);
     await client.query(
       `${hasCooldownColumn ? "UPDATE partecipanti_partite\n       SET abbandono_alleanza_at = CURRENT_TIMESTAMP,\n           id_alleanza = NULL\n       WHERE user_id = $1 AND partita_id = $2" : "UPDATE partecipanti_partite\n       SET id_alleanza = NULL\n       WHERE user_id = $1 AND partita_id = $2"}`,
@@ -1476,14 +1486,7 @@ const removeAllianceMember = async ({
       [matchState.state.id_partita, allianceState.alliance.id_alleanza, targetPlayerId],
     );
 
-    const countRes = await client.query(
-      `SELECT COUNT(*)::int AS count
-       FROM partecipanti_partite
-       WHERE partita_id = $1 AND id_alleanza = $2`,
-      [matchState.state.id_partita, allianceState.alliance.id_alleanza],
-    );
-
-    const countPlayer = parseInt(countRes.rows[0].count || "0", 10);
+    const countPlayer = Math.max(0, countPlayerBefore - 1);
     const targetWasLeader =
       String(allianceState.alliance.id_leader) === String(targetPlayerId);
     let promotedLeaderId = null;
@@ -1617,7 +1620,7 @@ const leaveAlliance = async (playerId, matchId, allianceId) => {
 
     try {
       await fetch(
-        `http://localhost:3000/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
+        `${process.env.CHAT_SERVICE_URL || 'http://localhost:3000'}/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1679,7 +1682,7 @@ const kickAlliance = async (
 
     try {
       await fetch(
-        `http://localhost:3000/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
+        `${process.env.CHAT_SERVICE_URL || 'http://localhost:3000'}/chat/message/system/cXVlc3RhIOggdW5hIHJvdHRhIGRpIHNpc3RlbWEsIG5vbiB1dGlsaXp6YXJsYSwgcGVyIGZhdm9yZQ/`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1790,6 +1793,77 @@ const getGraveyard = async (matchId, username) => {
   }
 };
 
+const leaveMatch = async (playerId, matchId) => {
+  try {
+    const redisKey = `match:${matchId}`;
+    const cachedMatch = await redis.get(redisKey);
+    if (!cachedMatch) {
+      return { status: "404", message: "Partita non trovata in cache." };
+    }
+
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Verify match
+      const matchQuery = await client.query(
+        `SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1 OR id_partita_hash = $1 OR id_partita::text = $1`,
+        [matchId]
+      );
+      if (matchQuery.rows.length === 0) throw new Error("Partita non trovata su DB.");
+      const partitaId = matchQuery.rows[0].id_partita;
+
+      // Update db
+      await client.query(
+        `DELETE FROM partecipanti_partite WHERE partita_id = $1 AND user_id = $2`,
+        [partitaId, playerId]
+      );
+
+      await client.query("COMMIT");
+
+      // Update redis structure
+      const { updateMatch } = require('../shared/matchMonolithic');
+      const updRes = await updateMatch(matchId, async (matchObj) => {
+          if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+          
+          const playerIdx = matchObj.match.player.findIndex(p => String(p.username) === String(playerId) || String(p.id_user) === String(playerId));
+          if (playerIdx !== -1) {
+              const player = matchObj.match.player[playerIdx];
+              player.isOccupied = false;
+              player.id_user = null;
+              return { save: true, matchObj, data: { username: player.username } };
+          }
+          return { save: false };
+      });
+
+      // broadcast
+      if (updRes && updRes.data) {
+          const payload = {
+              matchId: matchId,
+              payload: {
+                  type: 'PLAYER_LEFT',
+                  payload: {
+                      username: updRes.data.username
+                  }
+              }
+          };
+          await redis.publish('match_ws_broadcast_channel', JSON.stringify(payload));
+      }
+
+      await redis.set(`match:${matchId}:${playerId}`, "Offline");
+      return { status: "200", message: "Uscita dalla partita avvenuta con successo." };
+    } catch (innerError) {
+      await client.query("ROLLBACK");
+      throw innerError;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("[SYS_ERR] Errore durante leaveMatch:", error);
+    return { status: "500", message: "Errore durante l'uscita dalla partita." };
+  }
+};
+
 module.exports = {
   authorizeWsConnection,
   createMatch,
@@ -1802,5 +1876,6 @@ module.exports = {
   joinAlliance,
   leaveAlliance,
   kickAlliance,
-  getGraveyard
+  getGraveyard,
+  leaveMatch
 };

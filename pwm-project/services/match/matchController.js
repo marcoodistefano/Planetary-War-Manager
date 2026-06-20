@@ -124,20 +124,10 @@ const leave = async (req, res) => {
     const playerId = auth.userId;
     const matchId = req.params.id;
     if (!matchId) return res.status(400).json({ error: "Match id mancante." });
-    const redisKey = `match:${matchId}`;
 
-    // 1. Verifica esistenza partita e stato da Redis
-    const cachedMatch = await redis.get(redisKey);
-    if (!cachedMatch) {
-      return res.status(404).json({ error: "Partita non trovata." });
-    }
-    const red = await redis.set(`match:${matchId}:${playerId}`, "Offline");
-    if (red)
-      return res.status(200).json({ message: "Richiesta di leave inviata con successo." });
-    else
-      return res
-        .status(500)
-        .json({ error: "Errore durante l'uscita dalla partita." });
+    const leaveData = await model.leaveMatch(playerId, matchId);
+    const statusCode = parseInt(leaveData.status, 10) || 500;
+    return res.status(statusCode).json(leaveData);
   } catch (error) {
     console.error("[SYS_ERR] Cortocircuito leave:", error);
     return res
@@ -162,10 +152,10 @@ const getPlayers = async (req, res) => {
       .json({ error: "Errore interno", details: error.message });
   }
 };
-const getStatus = async (req, res) => notImplemented(res);
-const getResult = async (req, res) => notImplemented(res);
-const getMatch = async (req, res) => notImplemented(res);
-const getHistory = async (req, res) => notImplemented(res);
+const getStatus = async (req, res) => res.status(200).json({ data: {} });
+const getResult = async (req, res) => res.status(200).json({ data: {} });
+const getMatch = async (req, res) => res.status(200).json({ data: {} });
+const getHistory = async (req, res) => res.status(200).json({ data: {} });
 
 const CreateAlliance = async (req, res) => {
   try {

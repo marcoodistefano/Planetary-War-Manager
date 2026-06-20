@@ -6,7 +6,13 @@ const redis = new Redis({
 
 async function updateMatch(matchId, updaterCallback, maxRetries = 10) {
     const key = `match:${matchId}`;
-    
+    // Resolving alias before watch loop
+    let actualKey = key;
+    let initialData = await redis.get(key);
+    if (initialData && initialData.startsWith('ALIAS:')) {
+        actualKey = `match:${initialData.substring(6)}`;
+    }
+
     for (let i = 0; i < maxRetries; i++) {
         // Create an isolated connection for the watch transaction
         const isolatedClient = new Redis({
@@ -15,8 +21,8 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 10) {
         });
         
         try {
-            await isolatedClient.watch(key);
-            const matchDataStr = await isolatedClient.get(key);
+            await isolatedClient.watch(actualKey);
+            const matchDataStr = await isolatedClient.get(actualKey);
             
             if (!matchDataStr) {
                 isolatedClient.disconnect();
@@ -38,13 +44,20 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 10) {
             const stringified = JSON.stringify(result.matchObj);
             const multiCmd = isolatedClient.multi();
 
-            if (id_partita) multiCmd.set(`match:${id_partita}`, stringified);
-            if (id_partita_hash) multiCmd.set(`match:${id_partita_hash}`, stringified);
-            if (id_visualizzato) multiCmd.set(`match:${id_visualizzato}`, stringified);
+            const mainId = id_partita_hash || id_partita;
+            const mainKey = `match:${mainId}`;
+
+            multiCmd.set(mainKey, stringified);
             
-            // Assicuriamoci che la chiave originaria venga sempre aggiornata se non era tra le tre
-            if (![`match:${id_partita}`, `match:${id_partita_hash}`, `match:${id_visualizzato}`].includes(key)) {
-                multiCmd.set(key, stringified);
+            if (id_partita && id_partita !== mainId) {
+                multiCmd.set(`match:${id_partita}`, `ALIAS:${mainId}`);
+            }
+            if (id_visualizzato && id_visualizzato !== mainId) {
+                multiCmd.set(`match:${id_visualizzato}`, `ALIAS:${mainId}`);
+            }
+            
+            if (actualKey !== mainKey && actualKey !== `match:${id_partita}` && actualKey !== `match:${id_visualizzato}`) {
+                multiCmd.set(actualKey, `ALIAS:${mainId}`);
             }
             
             const execResult = await multiCmd.exec();
@@ -67,7 +80,10 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 10) {
 }
 
 async function getMatch(matchId) {
-    const data = await redis.get(`match:${matchId}`);
+    let data = await redis.get(`match:${matchId}`);
+    if (data && data.startsWith('ALIAS:')) {
+        data = await redis.get(`match:${data.substring(6)}`);
+    }
     return data ? JSON.parse(data) : null;
 }
 

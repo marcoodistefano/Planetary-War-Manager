@@ -81,7 +81,16 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
     }
     clientSockets.get(userId).add(ws);
 
+    let lastMessageTime = 0;
+
     ws.on("message", async (message) => {
+      const now = Date.now();
+      if (now - lastMessageTime < 50) {
+          console.warn(`[WS_MATCH] Rate limit exceeded per user ${userId}`);
+          return;
+      }
+      lastMessageTime = now;
+
       if (message.toString() === "PING") {
         ws.send("PONG");
         return;
@@ -347,7 +356,6 @@ if (payload.action === 'MOVE_TROOPS') {
                      // Notifica frontend annullamento combattimento
                      const combatCancelPayload = {
                          matchId: ws.matchId,
-                         targetUsers: [userId],
                          payload: {
                              type: 'COMBAT_CANCELLED',
                              data: { armyId }
@@ -378,7 +386,6 @@ if (payload.action === 'MOVE_TROOPS') {
              
              const broadcastPayload = {
                matchId: ws.matchId,
-               targetUsers: [userId],
                payload: {
                  type: 'TROOPS_MOVED',
                  data: {
@@ -449,7 +456,7 @@ if (payload.action === 'MOVE_TROOPS') {
                          await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
                      }
                      ws.send(JSON.stringify({ type: 'MISSION_CANCELLED', payload: { armyId, newLocation: updRes.army.currentLocation } }));
-                     const broadcastPayload = { matchId: ws.matchId, targetUsers: [userId], payload: { type: 'COMBAT_CANCELLED', data: { userId: ws.username, armyId: armyId } } };
+                     const broadcastPayload = { matchId: ws.matchId, payload: { type: 'COMBAT_CANCELLED', data: { userId: ws.username, armyId: armyId } } };
                      await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
                  } catch(dbErr) { console.error("[SYS_ERR] Errore annullamento combattimento in DB:", dbErr); }
              } else if (updRes.action === 'aborted') {
@@ -474,7 +481,7 @@ if (payload.action === 'MOVE_TROOPS') {
                          }
                      }
                  } catch(dbErr) { console.error("[SYS_ERR] Errore aggiornamento movimento di ritorno in DB:", dbErr); }
-                 const broadcastPayload = { matchId: ws.matchId, targetUsers: [userId], payload: { type: 'TROOPS_MOVED', data: { userId, armyId, targetName: army.targetName, targetCoords: army.targetCoords, etaMs: returnEtaMs, path: army.path, startTime: now } } };
+                 const broadcastPayload = { matchId: ws.matchId, payload: { type: 'TROOPS_MOVED', data: { userId, armyId, targetName: army.targetName, targetCoords: army.targetCoords, etaMs: returnEtaMs, path: army.path, startTime: now } } };
                  await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
              }
          }
@@ -527,7 +534,7 @@ if (payload.action === 'MOVE_TROOPS') {
                  }
 
                  const player = matchObj.match.player.find(p => p.username === ws.username);
-                 if (!player || !player.territori || !player.territori.includes(regionId)) {
+                 if (!player || (!player.territori?.includes(regionId) && !Object.values(player.territori_dict || {}).some(list => list.includes(regionId)))) {
                      return { save: false, data: { error: 'Puoi costruire solo sui tuoi territori' } };
                  }
 
@@ -810,7 +817,6 @@ const startArrivalEngine = () => {
 
             const broadcastPayload = {
               matchId: row.match_id,
-              targetUsers: [row.username],
               payload: {
                 type: 'TROOPS_ARRIVED',
                 payload: { armyId: row.id_armata }
@@ -848,14 +854,13 @@ const restoreActiveMoves = async () => {
     for (const row of res.rows) {
       if (!row.target_node) continue;
       
-      const redisKey = `match:${row.id_partita_hash}:player:${row.username}:armate`;
-      const armateStr = await redis.get(redisKey);
-      if (!armateStr) continue;
+      const matchObj = await getMatch(row.id_partita_hash);
+      if (!matchObj || !matchObj.match || !matchObj.match.player) continue;
 
-      let armateObj = JSON.parse(armateStr);
-      if (!armateObj[row.id_armata]) continue;
+      const player = matchObj.match.player.find(p => p.username === row.username);
+      if (!player || !player.armate || !player.armate[row.id_armata]) continue;
 
-      let army = armateObj[row.id_armata];
+      let army = player.armate[row.id_armata];
       let loc = army.currentLocation;
       let startLng, startLat;
       if (typeof loc === 'string') {
@@ -900,7 +905,13 @@ const restoreActiveMoves = async () => {
         army.etaMs = pathInfo.etaMs;
         army.startTime = new Date(row.ttl).getTime() - pathInfo.etaMs;
         
-        await redis.set(redisKey, JSON.stringify(armateObj));
+        await updateMatch(row.id_partita_hash, mObj => {
+            const p = mObj.match.player.find(x => x.username === row.username);
+            if (p && p.armate && p.armate[row.id_armata]) {
+                p.armate[row.id_armata] = army;
+            }
+            return { save: true, matchObj: mObj };
+        });
         console.log(`[SYSTEM] Ripristinata mossa armata ${row.id_armata} verso ${row.target_node}`);
       } catch (err) {
         console.error(`[SYS_ERR] Impossibile ricalcolare path ripristino armata ${row.id_armata}:`, err.message);

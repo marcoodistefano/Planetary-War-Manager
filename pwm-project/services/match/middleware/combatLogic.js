@@ -2,6 +2,7 @@ const db = require('../../shared/postgresClient.js');
 const redis = require('../../shared/redisClient.js');
 const fs = require('fs');
 const path = require('path');
+const { defaultVisionRadius } = require('./gameUtils.js');
 
 // Carica le regole dal json
 let gameRules = null;
@@ -278,7 +279,7 @@ const processActiveCombats = async () => {
                 const defLoc = getArmyLocation(defenderArmy);
                 if (attLoc && defLoc) {
                     const dist = haversineDist(attLoc[0], attLoc[1], defLoc[0], defLoc[1]);
-                    if (dist > 50) { // Oltre 50km
+                    if (dist > defaultVisionRadius) {
                         console.log(`[COMBAT] Bersaglio fuggito: ${dist}km. Annullamento attacco ${id_attacco}`);
                         await db.query(`UPDATE attacco SET status = 'ended' WHERE id_attacco = $1`, [id_attacco]);
                         await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
@@ -301,7 +302,7 @@ const processActiveCombats = async () => {
                 const attLoc = getArmyLocation(attackerArmy);
                 if (cityCoords && attLoc) {
                     const dist = haversineDist(attLoc[0], attLoc[1], cityCoords[0], cityCoords[1]);
-                    if (dist > 50) {
+                    if (dist > defaultVisionRadius) {
                         console.log(`[COMBAT] Bersaglio fuggito (città lontana): ${dist}km. Annullamento attacco ${id_attacco}`);
                         await db.query(`UPDATE attacco SET status = 'ended' WHERE id_attacco = $1`, [id_attacco]);
                         await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
@@ -321,7 +322,7 @@ const processActiveCombats = async () => {
             }
 
             const existingCityHpStr = await redis.hGet(`match:${id_partita_hash}:cities_hp`, id_target_citta || 'none');
-            const existingCityHp = existingCityHpStr ? parseInt(existingCityHpStr, 10) : 500;
+            const existingCityHp = existingCityHpStr ? parseInt(existingCityHpStr, 10) : 100;
             const cityAlreadyFallen = id_target_citta && existingCityHp <= 0;
 
             if (cityAlreadyFallen && currentTargetArmataId && defenderArmy) {
@@ -432,7 +433,7 @@ const processActiveCombats = async () => {
             if (damageToCity > 0 && id_target_citta) {
                 const cityHpKey = `match:${id_partita_hash}:cities_hp`;
                 let cityHpStr = await redis.hGet(cityHpKey, id_target_citta);
-                let cityHp = cityHpStr ? parseInt(cityHpStr, 10) : 500;
+                let cityHp = cityHpStr ? parseInt(cityHpStr, 10) : 100;
                 cityHp -= damageToCity;
 
                 if (cityHp <= 0) {
@@ -588,7 +589,7 @@ const processActiveCombats = async () => {
                     };
                     await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
                     await emitCombatEvent(id_partita_hash, attackerName, id_target_citta, damageToCity, 'distrutta', [attackerPlayer]);
-                    await redis.hSet(`match:${id_partita_hash}:cities_hp`, id_target_citta, '500');
+                    await redis.hSet(`match:${id_partita_hash}:cities_hp`, id_target_citta, '100');
                     
                     if (!attackerDied) {
                         await updateMatch(id_partita_hash, (mObj) => {

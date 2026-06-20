@@ -4,42 +4,13 @@ const fs = require("fs");
 const path = require("path");
 
 const { getNodeCoords, getArmyLocation, haversineDist } = require('./movementLogic.js');
-let troopsVisionMap = {}; // id_truppa -> raggio_visivo
-let defaultVisionRadius = 100;
-try {
-    const rulesPath = path.join(__dirname, '../../../shared/assets/game_rules.json');
-    if (fs.existsSync(rulesPath)) {
-        const gameRules = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
-        const truppeSheet = gameRules.sheets.find(s => s.name === 'Truppe');
-        if (truppeSheet && truppeSheet.lines) {
-            truppeSheet.lines.forEach(l => {
-                troopsVisionMap[l.id_truppa] = l.raggio_visivo || defaultVisionRadius;
-            });
-            console.log(`[FOG_OF_WAR] Caricati ${Object.keys(troopsVisionMap).length} raggi visivi dal JSON.`);
-        }
-    }
-} catch (e) {
-    console.error("[FOG_OF_WAR] Errore caricamento game_rules.json:", e);
-}
-
-// Funzione per calcolare il raggio visivo di un'armata
-function getArmyVisionRadius(army) {
-    let maxRadius = defaultVisionRadius;
-    if (army.composition) {
-        for (const [id_truppa, qty] of Object.entries(army.composition)) {
-            if (qty > 0 && troopsVisionMap[id_truppa] > maxRadius) {
-                maxRadius = troopsVisionMap[id_truppa];
-            }
-        }
-    }
-    return maxRadius;
-}
+const { getArmyVisionRadius, defaultVisionRadius } = require('./gameUtils.js');
 
 // getArmyLocation is imported from movementLogic.js
 
 const runFogOfWarCycle = async () => {
     try {
-        const matchKeys = await db.query('SELECT id_partita_hash FROM partite').then(res => res.rows.map(r => `match:${r.id_partita_hash}`));
+        const matchKeys = await db.query("SELECT id_partita_hash FROM partite WHERE substring(struttura_partita::text from 1 for 2) = '01'").then(res => res.rows.map(r => `match:${r.id_partita_hash}`));
         const matchIds = new Set();
         matchKeys.forEach(k => {
             const parts = k.split(':');
@@ -50,7 +21,10 @@ const runFogOfWarCycle = async () => {
 
         for (const matchId of matchIds) {
             const matchDataStr = await redis.get(`match:${matchId}`);
-            if (!matchDataStr) continue;
+            if (!matchDataStr) {
+                console.warn("[FOG_OF_WAR] Cache miss per match:", matchId);
+                continue;
+            }
             
             let matchObj;
             try {
@@ -124,7 +98,7 @@ const runFogOfWarCycle = async () => {
                     if (!isVisible) {
                         for (const terrCoords of myTerritoriesCoords) {
                             const dist = haversineDist(coords[0], coords[1], terrCoords[0], terrCoords[1]);
-                            if (dist <= 50) { 
+                            if (dist <= defaultVisionRadius) { 
                                 isVisible = true; break;
                             }
                         }

@@ -4,28 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { setupCombatFromArrival, processActiveCombats } = require('./combatLogic.js');
 
-let troopsVisionMap = {}; 
-let defaultVisionRadius = 15;
-try {
-    const rulesPath = path.join(__dirname, '../../../shared/assets/game_rules.json');
-    if (fs.existsSync(rulesPath)) {
-        const gameRules = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
-        const truppeSheet = gameRules.sheets.find(s => s.name === 'Truppe');
-        if (truppeSheet) {
-            truppeSheet.lines.forEach(l => { troopsVisionMap[l.id_truppa] = l.raggio_visivo || defaultVisionRadius; });
-        }
-    }
-} catch (e) {}
-
-function getArmyVisionRadius(army) {
-    let maxRadius = defaultVisionRadius;
-    if (army.composition) {
-        for (const [id_truppa, qty] of Object.entries(army.composition)) {
-            if (qty > 0 && troopsVisionMap[id_truppa] > maxRadius) maxRadius = troopsVisionMap[id_truppa];
-        }
-    }
-    return maxRadius;
-}
+const { getArmyVisionRadius } = require('./gameUtils.js');
 
 const { getArmyLocation, haversineDist } = require('./movementLogic.js');
 let nodesFeatures = [];
@@ -50,7 +29,7 @@ const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
 
 const checkCombatTriggers = async () => {
     try {
-        const matchKeys = await db.query('SELECT id_partita_hash FROM partite').then(res => res.rows.map(r => `match:${r.id_partita_hash}`));
+        const matchKeys = await db.query("SELECT id_partita_hash FROM partite WHERE substring(struttura_partita::text from 1 for 2) = '01'").then(res => res.rows.map(r => `match:${r.id_partita_hash}`));
         const matchIds = new Set();
         matchKeys.forEach(k => {
             const parts = k.split(':');
