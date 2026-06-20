@@ -113,6 +113,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   troopsDropdownY = 0;
 
   selectedStructureForBuild: any = null;
+  buildPreviewMarker: any = null;
   matchStructures: any[] = [];
   structureMarkers = new Map<string, any>();
 
@@ -1534,6 +1535,47 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // --- RENDERING STRUTTURE SU MAPPA ---
+
+  getStructureImage(name: string): string {
+    let png = 'fabbrica.png';
+    name = (name || '').toLowerCase();
+
+    if (name.includes('segheria') || name.includes('boschivo')) png = 'segheria.png';
+    else if (name.includes('miniera') || name.includes('scavo') || name.includes('carbone')) {
+      if (name.includes('oro')) png = 'miniera_oro.png';
+      else png = 'carbone.png'; // Fallback per altre miniere (es. piombo)
+    }
+    else if (name.includes('mattonificio') || name.includes('fornace')) png = 'mattonificio.png';
+    else if (name.includes('acciaieria') || name.includes('fonderia')) png = 'acciaieria.png';
+    else if (name.includes('petrol') || name.includes('idrocarburi')) png = 'petrolio.png';
+    else if (name.includes('gas')) png = 'gas.png';
+    else if (name.includes('fortezza')) png = 'fortezza.png';
+    else if (name.includes('caserma')) png = 'caserma.png';
+    else if (name.includes('fabbrica') || name.includes('armamenti')) png = 'fabbrica.png';
+    else if (name.includes('aeroporto')) {
+      if (name.includes('2') || name.includes('avanzato')) png = 'airport2.png';
+      else png = 'airport1.png';
+    }
+    else if (name.includes('porto')) {
+      if (name.includes('nord')) png = 'port_nord.png';
+      else if (name.includes('sud')) png = 'port_sud.png';
+      else if (name.includes('ovest')) png = 'port_ovest.png';
+      else png = 'port_est.png';
+    }
+    else if (name.includes('uranio')) png = 'arricchimento_uranio.png';
+    else if (name.includes('radar')) {
+      if (name.includes('aereo') || name.includes('volo')) png = 'radar_aereo.png';
+      else png = 'radar_terrestre.png';
+    }
+    else if (name.includes('treno') || name.includes('stazione') || name.includes('ferrov')) {
+      png = 'train_station.png';
+    }
+    else if (name.includes('hangar')) png = 'hangar.png';
+    else if (name.includes('sampt') || name.includes('missil') || name.includes('difes')) png = 'sampt.png';
+
+    return png;
+  }
+
   renderStructures() {
     if (!this.map) return;
 
@@ -1578,42 +1620,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         container.style.justifyContent = 'center';
         container.style.cursor = 'pointer';
 
-        // Determina l'immagine PNG
-        let png = 'fabbrica.png';
-        const name = (structure.name || '').toLowerCase();
-
-        if (name.includes('segheria') || name.includes('boschivo')) png = 'segheria.png';
-        else if (name.includes('miniera') || name.includes('scavo') || name.includes('carbone')) {
-          if (name.includes('oro')) png = 'miniera_oro.png';
-          else png = 'carbone.png'; // Fallback per altre miniere (es. piombo)
-        }
-        else if (name.includes('mattonificio') || name.includes('fornace')) png = 'mattonificio.png';
-        else if (name.includes('acciaieria') || name.includes('fonderia')) png = 'acciaieria.png';
-        else if (name.includes('petrol') || name.includes('idrocarburi')) png = 'petrolio.png';
-        else if (name.includes('gas')) png = 'gas.png';
-        else if (name.includes('fortezza')) png = 'fortezza.png';
-        else if (name.includes('caserma')) png = 'caserma.png';
-        else if (name.includes('fabbrica') || name.includes('armamenti')) png = 'fabbrica.png';
-        else if (name.includes('aeroporto')) {
-          if (name.includes('2') || name.includes('avanzato')) png = 'airport2.png';
-          else png = 'airport1.png';
-        }
-        else if (name.includes('porto')) {
-          if (name.includes('nord')) png = 'port_nord.png';
-          else if (name.includes('sud')) png = 'port_sud.png';
-          else if (name.includes('ovest')) png = 'port_ovest.png';
-          else png = 'port_est.png';
-        }
-        else if (name.includes('uranio')) png = 'arricchimento_uranio.png';
-        else if (name.includes('radar')) {
-          if (name.includes('aereo') || name.includes('volo')) png = 'radar_aereo.png';
-          else png = 'radar_terrestre.png';
-        }
-        else if (name.includes('treno') || name.includes('stazione') || name.includes('ferrov')) {
-          png = 'train_station.png';
-        }
-        else if (name.includes('hangar')) png = 'hangar.png';
-        else if (name.includes('sampt') || name.includes('missil') || name.includes('difes')) png = 'sampt.png';
+        const png = this.getStructureImage(structure.name);
 
         const img = document.createElement('img');
         img.src = `assets/2Dmodels/Buildings/${png}`;
@@ -2186,7 +2193,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const scaleFactor = Math.min(Math.max((currentZoom - minZoom) / (maxZoom - minZoom), 0), 1);
     const dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
 
-    this.structureMarkers.forEach((marker: any) => {
+    const scaleMarker = (marker: any) => {
       const el = marker.getElement();
       const container = el.querySelector('.structure-container') as HTMLElement;
       if (!container) return;
@@ -2198,7 +2205,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         container.style.width = `${dynamicSize}px`;
         container.style.height = `${dynamicSize}px`;
       }
-    });
+    };
+
+    this.structureMarkers.forEach(scaleMarker);
+    if (this.buildPreviewMarker) {
+      scaleMarker(this.buildPreviewMarker);
+    }
   }
 
   // --- RENDERING BARRE HP CITTA ---
@@ -2600,6 +2612,55 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   handleMapMouseMove(e: any) {
     this.updatePointReadout(e, false);
+
+    if (this.selectedStructureForBuild && this.map) {
+      if (!this.buildPreviewMarker) {
+        const el = document.createElement('div');
+        el.className = 'structure-marker-wrapper';
+        el.style.position = 'relative';
+        el.style.width = '0px';
+        el.style.height = '0px';
+        el.style.zIndex = '5';
+
+        const container = document.createElement('div');
+        container.className = 'structure-container';
+        container.style.width = '30px';
+        container.style.height = '30px';
+        container.style.position = 'absolute';
+        container.style.top = '50%';
+        container.style.left = '50%';
+        container.style.transform = 'translate(-50%, -50%)';
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.justifyContent = 'center';
+        container.style.pointerEvents = 'none';
+
+        const name = this.selectedStructureForBuild.name || this.selectedStructureForBuild.nome || '';
+        const png = this.getStructureImage(name);
+
+        const img = document.createElement('img');
+        img.src = `assets/2Dmodels/Buildings/${png}`;
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.objectFit = 'contain';
+        img.style.filter = 'drop-shadow(0 0 5px #10b981)';
+        img.style.opacity = '0.7';
+
+        container.appendChild(img);
+        el.appendChild(container);
+
+        this.buildPreviewMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([e.lngLat.lng, e.lngLat.lat])
+          .addTo(this.map);
+          
+        this.updateStructureMarkersScale();
+      } else {
+        this.buildPreviewMarker.setLngLat([e.lngLat.lng, e.lngLat.lat]);
+      }
+    } else if (this.buildPreviewMarker) {
+      this.buildPreviewMarker.remove();
+      this.buildPreviewMarker = null;
+    }
   }
 
   centerMapOnArmy(armyId: string) {
@@ -2717,6 +2778,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       }
 
       this.selectedStructureForBuild = null;
+      if (this.buildPreviewMarker) {
+        this.buildPreviewMarker.remove();
+        this.buildPreviewMarker = null;
+      }
       return;
     }
 

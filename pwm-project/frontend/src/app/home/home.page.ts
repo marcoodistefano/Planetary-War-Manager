@@ -225,6 +225,12 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
               timeCreated: m.data_creazione,
               timeCreatedFormatted: this.formatTimestamp(m.data_creazione)
             };
+          }).filter((game: any) => {
+            if (game.timeCreated) {
+              const oreTrascorse = (Date.now() - new Date(game.timeCreated).getTime()) / (1000 * 60 * 60);
+              return oreTrascorse <= 2;
+            }
+            return true;
           });
           this.filteredNewGames = [...this.newGames];
         }

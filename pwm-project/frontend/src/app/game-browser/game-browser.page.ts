@@ -90,7 +90,15 @@ export class GameBrowserPage implements OnInit, AfterViewInit {
           });
         };
 
-        this.activeMatches = mapMatches(response.data).sort((a, b) => new Date(b.startTime || b.timeCreated).getTime() - new Date(a.startTime || a.timeCreated).getTime());
+        this.activeMatches = mapMatches(response.data)
+          .filter((m: any) => {
+            if (m.startTime) {
+              const oreTrascorse = (Date.now() - new Date(m.startTime).getTime()) / (1000 * 60 * 60);
+              return oreTrascorse <= 2;
+            }
+            return true;
+          })
+          .sort((a, b) => new Date(b.startTime || b.timeCreated).getTime() - new Date(a.startTime || a.timeCreated).getTime());
         this.applyFilters();
       },
       error: (err) => {

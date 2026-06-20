@@ -125,11 +125,13 @@ const emitCombatEvent = async (id_partita_hash, attackerName, defenderName, dama
             matchId: id_partita_hash,
             payload: {
                 type: 'COMBAT_EVENT',
-                attacker: attackerName,
-                defender: defenderName,
-                damage: damage,
-                result: result,
-                players: playersInvolved
+                payload: {
+                    attacker: attackerName,
+                    defender: defenderName,
+                    damage: damage,
+                    result: result,
+                    players: playersInvolved
+                }
             }
         };
         await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
@@ -318,7 +320,14 @@ const processActiveCombats = async () => {
                 }
             }
 
-            if (currentTargetArmataId && defenderArmy && id_target_citta) {
+            const existingCityHpStr = await redis.hGet(`match:${id_partita_hash}:cities_hp`, id_target_citta || 'none');
+            const existingCityHp = existingCityHpStr ? parseInt(existingCityHpStr, 10) : 500;
+            const cityAlreadyFallen = id_target_citta && existingCityHp <= 0;
+
+            if (cityAlreadyFallen && currentTargetArmataId && defenderArmy) {
+                 damageToArmy = totalDmg;
+                 damageToCity = 0;
+            } else if (currentTargetArmataId && defenderArmy && id_target_citta) {
                  damageToCity = Math.floor(totalDmg / 3);
                  damageToArmy = totalDmg - damageToCity;
             } else if (currentTargetArmataId && defenderArmy) {
@@ -349,7 +358,11 @@ const processActiveCombats = async () => {
                     await db.query(`DELETE FROM mosse WHERE id_armata = $1`, [id_target_armata]);
                     await emitCombatEvent(id_partita_hash, attackerName, defenderName, damageToArmy, 'distrutta', [attackerPlayer, defenderPlayer]);
                     
-                    if (!id_target_citta) combatEnded = true;
+                    if (!id_target_citta) {
+                        combatEnded = true;
+                    } else {
+                        await db.query(`UPDATE attacco SET id_target_armata = NULL WHERE id_attacco = $1`, [id_attacco]);
+                    }
                 } else {
                     const deadDefenderTroops = {};
                     for (const troop in oldDefenderComposition) {
@@ -419,7 +432,7 @@ const processActiveCombats = async () => {
             if (damageToCity > 0 && id_target_citta) {
                 const cityHpKey = `match:${id_partita_hash}:cities_hp`;
                 let cityHpStr = await redis.hGet(cityHpKey, id_target_citta);
-                let cityHp = cityHpStr ? parseInt(cityHpStr, 10) : 100;
+                let cityHp = cityHpStr ? parseInt(cityHpStr, 10) : 500;
                 cityHp -= damageToCity;
 
                 if (cityHp <= 0) {
@@ -429,6 +442,13 @@ const processActiveCombats = async () => {
                     const { getRegionForNode } = require('./movementLogic.js');
                     const regionId = getRegionForNode(id_target_citta) || id_target_citta;
 
+                    let regionPolygon = null;
+                    const geojson = getRegionsGeojson();
+                    if (geojson) {
+                        const feature = geojson.features.find(f => f.properties && (f.properties.adm1_code === regionId || f.id === regionId));
+                        if (feature) regionPolygon = feature;
+                    }
+
                     const { getNodeCoords } = require('./movementLogic.js');
                     const turf = require('@turf/turf');
                     let enemyTroopsRemaining = false;
@@ -437,19 +457,6 @@ const processActiveCombats = async () => {
                     if (freshMatchObj && freshMatchObj.match) {
                         const { getArmyLocation, haversineDist } = require('./movementLogic.js');
                         const attackerLoc = getArmyLocation(attackerArmy);
-                        let attackerRadius = 15;
-                        try {
-                            if (attackerArmy && attackerArmy.composition) {
-                                for (const [id_truppa, qty] of Object.entries(attackerArmy.composition)) {
-                                    if (qty > 0) {
-                                        const troopRules = getTroopStats(id_truppa);
-                                        if (troopRules && troopRules.raggio_visivo && troopRules.raggio_visivo > attackerRadius) {
-                                            attackerRadius = troopRules.raggio_visivo;
-                                        }
-                                    }
-                                }
-                            }
-                        } catch(e) {}
 
                         const attackerPlayerObj = freshMatchObj.match.player.find(p => p.username === attackerPlayer);
                         const attackerAllianceId = attackerPlayerObj ? attackerPlayerObj.id_alleanza : null;
@@ -468,13 +475,32 @@ const processActiveCombats = async () => {
 
                                 if (!pl.armate) continue;
                                 for (const [aid, a] of Object.entries(pl.armate)) {
-                                    const loc = getArmyLocation(a);
-                                    if (loc && attackerLoc) {
-                                        const dist = haversineDist(attackerLoc[0], attackerLoc[1], loc[0], loc[1]);
-                                        if (dist <= attackerRadius) {
-                                            enemyTroopsRemaining = true;
-                                            break;
+                                    let isTarget = false;
+                                    if (a.currentLocation === id_target_citta || a.targetName === id_target_citta) {
+                                        isTarget = true;
+                                    } else {
+                                        const loc = getArmyLocation(a);
+                                        if (loc) {
+                                            const ax = loc[0]; const ay = loc[1];
+                                            const cityCoords = getNodeCoords(id_target_citta);
+                                            if (cityCoords) {
+                                                const dx = ax - cityCoords[0];
+                                                const dy = ay - cityCoords[1];
+                                                if (dx*dx + dy*dy < 0.0001) isTarget = true;
+                                            }
+                                            if (!isTarget && regionPolygon) {
+                                                try {
+                                                    const pt = turf.point([ax, ay]);
+                                                    if (turf.booleanPointInPolygon(pt, regionPolygon)) {
+                                                        isTarget = true;
+                                                    }
+                                                } catch(e) {}
+                                            }
                                         }
+                                    }
+                                    if (isTarget) {
+                                        enemyTroopsRemaining = true;
+                                        break;
                                     }
                                 }
                                 if (enemyTroopsRemaining) break;
