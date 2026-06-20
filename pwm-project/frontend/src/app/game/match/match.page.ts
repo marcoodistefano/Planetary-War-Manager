@@ -728,21 +728,6 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
-          if (parsed.type === 'STRUCTURE_BUILT') {
-            console.log(`[WS_MATCH] Nuova struttura costruita: ${parsed.data.name}`);
-            if (parsed.replacedStructureId) {
-              const oldMarker = this.structureMarkers.get(parsed.replacedStructureId);
-              if (oldMarker) {
-                oldMarker.remove();
-                this.structureMarkers.delete(parsed.replacedStructureId);
-              }
-              this.matchStructures = this.matchStructures.filter(s => s.id !== parsed.replacedStructureId);
-            }
-            this.matchStructures.push(parsed.data);
-            this.renderStructures();
-            this.ngZone.run(() => this.cdr.detectChanges());
-          }
-
           if (parsed.type === 'ALLIANCE_UPDATED') {
             console.log(`[WS_MATCH] Aggiornamento alleanze (${parsed.type})`);
             this.reloadMatchAlliances();
@@ -792,7 +777,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.matchStructures = this.matchStructures.filter(s => s.id !== parsed.replacedStructureId);
             }
             this.matchStructures.push(parsed.payload);
-            this.renderStructures();
+            setTimeout(() => this.renderStructures(), 100);
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
@@ -804,7 +789,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             }
             if (parsed.data.owner !== this.userProfile.username) {
               this.matchStructures.push(parsed.data);
-              this.renderStructures();
+              setTimeout(() => this.renderStructures(), 100);
               this.ngZone.run(() => this.cdr.detectChanges());
             }
           }
@@ -2193,10 +2178,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     if (!this.map) return;
     const currentZoom = this.map.getZoom();
 
+    const disappearZoomThreshold = 4.0; // Sotto questo livello gli edifici scompaiono per non ingombrare
+
     // Scala proporzionalmente (più lo zoom è alto, più l'edificio è grande)
     const minSize = 25;
     const maxSize = 120;
-    const minZoom = 3.0;
+    const minZoom = 4.0;
     const maxZoom = 10.0;
 
     const scaleFactor = Math.min(Math.max((currentZoom - minZoom) / (maxZoom - minZoom), 0), 1);
@@ -2207,9 +2194,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       const container = el.querySelector('.structure-container') as HTMLElement;
       if (!container) return;
 
-      el.style.display = 'block';
-      container.style.width = `${dynamicSize}px`;
-      container.style.height = `${dynamicSize}px`;
+      if (currentZoom < disappearZoomThreshold) {
+        el.style.display = 'none';
+      } else {
+        el.style.display = 'block';
+        container.style.width = `${dynamicSize}px`;
+        container.style.height = `${dynamicSize}px`;
+      }
     };
 
     this.structureMarkers.forEach(scaleMarker);
