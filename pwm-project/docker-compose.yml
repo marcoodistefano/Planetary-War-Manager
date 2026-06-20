@@ -138,6 +138,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - DB_URL=postgres://commander_admin:secret@db:5432/pwm_tactical_database
       - SECRET_KEY=${SECRET_KEY}
+      - CHAT_SERVICE_URL=http://chat:3001  # DNS interno Docker per il chat service
     networks:
       - pwm-net
   # ENGINE RISORSE

@@ -525,7 +525,10 @@ const createMatch = async ({ playerId, gameMode }) => {
 
       console.log(`[SYS_OK] Partita istanziata su Postgres e caricata in cache Redis: ${id_partita_hash}`);
 
-      // Esecuzione POST-COMMIT delle inizializzazioni pesanti
+      // Esecuzione POST-COMMIT delle inizializzazioni pesanti.
+      // In caso di errore grave, eseguiamo un rollback compensatorio su Postgres
+      // per evitare che la partita resti in stato inconsistente (esiste nel DB ma
+      // non è inizializzata in Redis).
       try {
           // Generazione dei territori e nazioni
           await territoryGenerator.generateNations(id_partita_hash, gameMode.maxPlayers);
@@ -539,48 +542,72 @@ const createMatch = async ({ playerId, gameMode }) => {
           }
 
           // ASSEGNAZIONE TERRITORIO ALL'HOST
-          const userRes = await client.query(`SELECT username FROM utenti WHERE id_user = $1`, [playerId]);
-          const sessionUsername = userRes.rows.length > 0 ? userRes.rows[0].username : playerId;
+          const freshClient = await db.connect();
+          try {
+              const userRes = await freshClient.query(`SELECT username FROM utenti WHERE id_user = $1`, [playerId]);
+              const sessionUsername = userRes.rows.length > 0 ? userRes.rows[0].username : playerId;
 
-          await updateMatch(id_partita_hash, async (matchObj) => {
-              if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
-              const freeNations = matchObj.match.player.filter(p => String(p.username).includes('_bot') && !p.inWar);
-              if (freeNations.length > 0) {
-                  const randomIndex = Math.floor(Math.random() * freeNations.length);
-                  let selectedNation = freeNations[randomIndex];
-                  
-                  selectedNation.isOccupied = true;
-                  selectedNation.id_user = playerId;
-                  selectedNation.username = sessionUsername;
-                  
-                  let statoTerritori = {};
-                  const blankTemplateRaw = await redis.get(`map_data:regions_blank_template`);
-                  if (blankTemplateRaw) {
-                      statoTerritori = JSON.parse(blankTemplateRaw);
-                      for (const [admin, provs] of Object.entries(selectedNation.territori_dict)) {
-                          if (statoTerritori[admin]) {
-                              for (const prov of provs) {
-                                  statoTerritori[admin][prov] = true;
+              await updateMatch(id_partita_hash, async (matchObj) => {
+                  if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+                  const freeNations = matchObj.match.player.filter(p => String(p.username).includes('_bot') && !p.inWar);
+                  if (freeNations.length > 0) {
+                      const randomIndex = Math.floor(Math.random() * freeNations.length);
+                      let selectedNation = freeNations[randomIndex];
+
+                      selectedNation.isOccupied = true;
+                      selectedNation.id_user = playerId;
+                      selectedNation.username = sessionUsername;
+
+                      let statoTerritori = {};
+                      const blankTemplateRaw = await redis.get(`map_data:regions_blank_template`);
+                      if (blankTemplateRaw) {
+                          statoTerritori = JSON.parse(blankTemplateRaw);
+                          for (const [admin, provs] of Object.entries(selectedNation.territori_dict)) {
+                              if (statoTerritori[admin]) {
+                                  for (const prov of provs) {
+                                      statoTerritori[admin][prov] = true;
+                                  }
                               }
                           }
                       }
+                      await freshClient.query(
+                          `UPDATE partecipanti_partite SET stato_territori = $1::jsonb WHERE partita_id = $2 AND user_id = $3`,
+                          [JSON.stringify(statoTerritori), partitaId, playerId]
+                      );
+                      return { save: true, matchObj, data: true };
                   }
-                  await client.query(
-                    `UPDATE partecipanti_partite SET stato_territori = $1::jsonb WHERE partita_id = $2 AND user_id = $3`,
-                    [JSON.stringify(statoTerritori), partitaId, playerId]
-                  );
-                  return { save: true, matchObj, data: true };
-              }
-              return { save: false };
-          });
+                  return { save: false };
+              });
 
-          // GENERAZIONE INIZIALE TRUPPE
-          const userResHost = await client.query(`SELECT username FROM utenti WHERE id_user = $1`, [playerId]);
-          const hostUsername = userResHost.rows.length > 0 ? userResHost.rows[0].username : playerId;
-          await troopGenerator.generateInitialTroopsForMatch(id_partita_hash, partitaId, playerId, hostUsername);
+              // GENERAZIONE INIZIALE TRUPPE
+              const userResHost = await freshClient.query(`SELECT username FROM utenti WHERE id_user = $1`, [playerId]);
+              const hostUsername = userResHost.rows.length > 0 ? userResHost.rows[0].username : playerId;
+              await troopGenerator.generateInitialTroopsForMatch(id_partita_hash, partitaId, playerId, hostUsername);
+          } finally {
+              freshClient.release();
+          }
 
       } catch (err) {
-          console.error("[SYS_WARN] Errore durante l'inizializzazione post-commit della partita:", err);
+          console.error("[SYS_ERR] Errore critico durante l'inizializzazione post-commit, avvio rollback compensatorio:", err);
+          // Rollback compensatorio: rimuoviamo la partita da Postgres e da Redis
+          // così non resta in uno stato parziale non recuperabile.
+          try {
+              const rollbackClient = await db.connect();
+              try {
+                  await rollbackClient.query(`DELETE FROM partecipanti_partite WHERE partita_id = $1`, [partitaId]);
+                  await rollbackClient.query(`DELETE FROM partite WHERE id_partita = $1`, [partitaId]);
+                  console.warn(`[SYS_WARN] Rollback compensatorio completato per partita ${partitaId}.`);
+              } finally {
+                  rollbackClient.release();
+              }
+          } catch (rollbackErr) {
+              console.error("[SYS_ERR] Rollback compensatorio fallito:", rollbackErr);
+          }
+          // Pulizia Redis
+          try {
+              await redis.del(`match:${partitaId}`, `match:${id_partita_hash}`, `match:${id_partita_visualizzato}`);
+          } catch (redisErr) { /* non bloccare */ }
+          throw err; // ri-lancia per restituire 500 al client
       }
 
       return {
@@ -1813,7 +1840,38 @@ const leaveMatch = async (playerId, matchId) => {
       if (matchQuery.rows.length === 0) throw new Error("Partita non trovata su DB.");
       const partitaId = matchQuery.rows[0].id_partita;
 
-      // Update db
+      // --- Gestione combattimenti attivi del giocatore che abbandona ---
+      // Recupera tutte le mosse di attacco attive dell'utente e le annulla
+      const mossaAtkRes = await client.query(
+        `SELECT m.id_mossa, m.id_armata
+         FROM mosse m
+         WHERE m.user_id = $1 AND m.partita_id = $2 AND m.type_action = 'atk'`,
+        [playerId, partitaId]
+      );
+      if (mossaAtkRes.rows.length > 0) {
+        const armyIds = mossaAtkRes.rows.map(r => r.id_armata);
+        for (const row of mossaAtkRes.rows) {
+          await client.query(`DELETE FROM attacco WHERE id_mossa = $1`, [row.id_mossa]);
+          await client.query(`DELETE FROM mosse WHERE id_mossa = $1`, [row.id_mossa]);
+        }
+        console.log(`[SYS_INFO] leaveMatch: annullati ${mossaAtkRes.rows.length} combattimenti attivi per player ${playerId}`);
+        // Broadcast annullamento combattimenti al match (dopo il commit)
+        // Salviamo gli ID per il broadcast successivo
+        var cancelledArmyIds = armyIds;
+      }
+
+      // Rimuovi anche gli spostamenti in corso
+      const mossaMovRes = await client.query(
+        `SELECT m.id_mossa FROM mosse m
+         WHERE m.user_id = $1 AND m.partita_id = $2 AND m.type_action = 'mov'`,
+        [playerId, partitaId]
+      );
+      for (const row of mossaMovRes.rows) {
+        await client.query(`DELETE FROM spostamenti WHERE id_mossa = $1`, [row.id_mossa]);
+        await client.query(`DELETE FROM mosse WHERE id_mossa = $1`, [row.id_mossa]);
+      }
+
+      // Update db: rimuovi il partecipante
       await client.query(
         `DELETE FROM partecipanti_partite WHERE partita_id = $1 AND user_id = $2`,
         [partitaId, playerId]
@@ -1821,33 +1879,70 @@ const leaveMatch = async (playerId, matchId) => {
 
       await client.query("COMMIT");
 
-      // Update redis structure
+      // --- Aggiornamento stato Redis ---
       const { updateMatch } = require('../shared/matchMonolithic');
       const updRes = await updateMatch(matchId, async (matchObj) => {
           if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
-          
-          const playerIdx = matchObj.match.player.findIndex(p => String(p.username) === String(playerId) || String(p.id_user) === String(playerId));
+
+          const playerIdx = matchObj.match.player.findIndex(
+            p => String(p.username) === String(playerId) || String(p.id_user) === String(playerId)
+          );
           if (playerIdx !== -1) {
               const player = matchObj.match.player[playerIdx];
+              const leftUsername = player.username;
+
+              // Resetta la nazione al bot (libera per un nuovo giocatore)
               player.isOccupied = false;
               player.id_user = null;
-              return { save: true, matchObj, data: { username: player.username } };
+              // Annulla eventuali stati di guerra residui
+              if (player.inWarWith) player.inWarWith = [];
+
+              // Rimuovi il giocatore uscente dalla lista inWarWith degli altri
+              for (const p of matchObj.match.player) {
+                  if (p.inWarWith && p.inWarWith.includes(leftUsername)) {
+                      p.inWarWith = p.inWarWith.filter(u => u !== leftUsername);
+                  }
+              }
+
+              // Imposta tutte le armate del giocatore in standby
+              if (player.armate) {
+                  for (const armataId of Object.keys(player.armate)) {
+                      player.armate[armataId].status = 'standby';
+                      delete player.armate[armataId].path;
+                      delete player.armate[armataId].etaMs;
+                      delete player.armate[armataId].startTime;
+                      delete player.armate[armataId].targetName;
+                      delete player.armate[armataId].missionMode;
+                      delete player.armate[armataId].targetCoords;
+                      delete player.armate[armataId].next_round_time;
+                  }
+              }
+
+              return { save: true, matchObj, data: { username: leftUsername } };
           }
           return { save: false };
       });
 
-      // broadcast
+      // --- Broadcast agli altri giocatori ---
       if (updRes && updRes.data) {
-          const payload = {
+          // Notifica uscita giocatore
+          await redis.publish('match_ws_broadcast_channel', JSON.stringify({
               matchId: matchId,
               payload: {
                   type: 'PLAYER_LEFT',
-                  payload: {
-                      username: updRes.data.username
-                  }
+                  payload: { username: updRes.data.username }
               }
-          };
-          await redis.publish('match_ws_broadcast_channel', JSON.stringify(payload));
+          }));
+
+          // Se c'erano combattimenti attivi, notifica annullamento
+          if (cancelledArmyIds && cancelledArmyIds.length > 0) {
+              for (const armyId of cancelledArmyIds) {
+                  await redis.publish('match_ws_broadcast_channel', JSON.stringify({
+                      matchId: matchId,
+                      payload: { type: 'COMBAT_CANCELLED', data: { armyId } }
+                  }));
+              }
+          }
       }
 
       await redis.set(`match:${matchId}:${playerId}`, "Offline");

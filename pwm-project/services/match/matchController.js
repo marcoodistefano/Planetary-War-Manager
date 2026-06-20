@@ -1,6 +1,10 @@
 const model = require("./matchModel");
 const { getAuthContextFromRequest } = require("../shared/authContext.js");
 const redis = require("../shared/redisClient.js");
+const { getMatch: getMatchFromRedis } = require("../shared/matchMonolithic.js");
+const Eru = require("./middleware/Eru.js");
+const db = require("../shared/postgresClient.js");
+
 
 const notImplemented = (res) =>
   res.status(501).json({ error: "Hardware o Endpoint non implementato" });
@@ -152,10 +156,147 @@ const getPlayers = async (req, res) => {
       .json({ error: "Errore interno", details: error.message });
   }
 };
-const getStatus = async (req, res) => res.status(200).json({ data: {} });
-const getResult = async (req, res) => res.status(200).json({ data: {} });
-const getMatch = async (req, res) => res.status(200).json({ data: {} });
-const getHistory = async (req, res) => res.status(200).json({ data: {} });
+const getStatus = async (req, res) => {
+  try {
+    const matchId = req.params.id;
+    if (!matchId) return res.status(400).json({ error: "Match id mancante." });
+
+    const matchData = await getMatchFromRedis(matchId);
+    if (!matchData || !matchData.match) {
+      return res.status(404).json({ error: "Partita non trovata." });
+    }
+
+    const struttura = matchData.match.struttura_partita;
+    let stato = "Sconosciuto";
+    let decoded = null;
+    if (struttura) {
+      try {
+        decoded = Eru.decode_match(struttura);
+        stato = decoded.stato || "Sconosciuto";
+      } catch (_) { /* ignora errori di decodifica */ }
+    }
+
+    return res.status(200).json({
+      matchId,
+      stato,
+      struttura_partita: struttura,
+      player_count: (matchData.match.player || []).filter(p => p.isOccupied).length,
+      max_players: decoded ? decoded.maxPlayersCount : null,
+      caratteristiche: matchData.match.caratteristiche || {},
+    });
+  } catch (error) {
+    console.error("[SYS_ERR] Cortocircuito getStatus:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
+  }
+};
+
+const getResult = async (req, res) => {
+  try {
+    const matchId = req.params.id;
+    if (!matchId) return res.status(400).json({ error: "Match id mancante." });
+
+    const matchData = await getMatchFromRedis(matchId);
+    if (!matchData || !matchData.match) {
+      return res.status(404).json({ error: "Partita non trovata." });
+    }
+
+    const struttura = matchData.match.struttura_partita || "";
+    const isFinished = struttura.startsWith('10') || struttura.startsWith('11');
+
+    const players = (matchData.match.player || []).map(p => ({
+      username: p.username,
+      id_user: p.id_user,
+      isOccupied: p.isOccupied || false,
+      id_alleanza: p.id_alleanza || null,
+      territori_count: p.territori_dict
+        ? Object.values(p.territori_dict).reduce((sum, list) => sum + (list ? list.length : 0), 0)
+        : (p.territori ? p.territori.length : 0),
+    }));
+
+    return res.status(200).json({
+      matchId,
+      isFinished,
+      players,
+    });
+  } catch (error) {
+    console.error("[SYS_ERR] Cortocircuito getResult:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
+  }
+};
+
+const getMatch = async (req, res) => {
+  try {
+    const matchId = req.params.id;
+    if (!matchId) return res.status(400).json({ error: "Match id mancante." });
+
+    const matchData = await getMatchFromRedis(matchId);
+    if (!matchData || !matchData.match) {
+      return res.status(404).json({ error: "Partita non trovata." });
+    }
+
+    // Restituisce il match monolitico senza i dati sensibili (armate, risorse private)
+    const publicMatch = {
+      id_partita: matchData.match.id_partita,
+      id_partita_hash: matchData.match.id_partita_hash,
+      id_partita_visualizzato: matchData.match.id_partita_visualizzato,
+      struttura_partita: matchData.match.struttura_partita,
+      caratteristiche: matchData.match.caratteristiche || {},
+      created_at: matchData.match.created_at,
+      updated_at: matchData.updated_at,
+      player_count: (matchData.match.player || []).filter(p => p.isOccupied).length,
+      players: (matchData.match.player || []).map(p => ({
+        username: p.username,
+        isOccupied: p.isOccupied || false,
+        id_alleanza: p.id_alleanza || null,
+      })),
+    };
+
+    return res.status(200).json({ data: publicMatch });
+  } catch (error) {
+    console.error("[SYS_ERR] Cortocircuito getMatch:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
+  }
+};
+
+// getHistory: la tabella storico partite non è ancora implementata nel DB.
+// Restituisce i dati di base della partita dalla cache Redis.
+const getHistory = async (req, res) => {
+  try {
+    const matchId = req.params.id;
+    if (!matchId) return res.status(400).json({ error: "Match id mancante." });
+
+    const { rows } = await db.query(
+      `SELECT p.id_partita, p.id_partita_hash, p.id_partita_visualizzato, p.nome_partita,
+              p.struttura_partita::text AS struttura_partita, p.created_at,
+              COUNT(pp.user_id) AS player_count
+       FROM partite p
+       LEFT JOIN partecipanti_partite pp ON pp.partita_id = p.id_partita
+       WHERE p.id_partita_hash = $1 OR p.id_partita_visualizzato = $1 OR p.id_partita::text = $1
+       GROUP BY p.id_partita
+       LIMIT 1`,
+      [matchId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Partita non trovata." });
+    }
+
+    const row = rows[0];
+    return res.status(200).json({
+      data: {
+        id_partita_hash: row.id_partita_hash,
+        id_partita_visualizzato: row.id_partita_visualizzato,
+        nome_partita: row.nome_partita,
+        struttura_partita: row.struttura_partita,
+        created_at: row.created_at,
+        player_count: Number(row.player_count),
+      },
+    });
+  } catch (error) {
+    console.error("[SYS_ERR] Cortocircuito getHistory:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
+  }
+};
 
 const CreateAlliance = async (req, res) => {
   try {

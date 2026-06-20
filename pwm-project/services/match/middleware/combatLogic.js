@@ -53,37 +53,38 @@ const applyDamageToArmy = (army, damage) => {
     const totalMaxHp = getArmyMaxHp(army);
     if (totalMaxHp === 0) return true;
     
-    // We apply damage to the true current max HP of the surviving composition
-    let currentHp = totalMaxHp - damage;
-    
-    if (currentHp <= 0) {
+    if (damage >= totalMaxHp) {
         army.hp = 0;
         army.composition = {};
-        return true; // died
+        return true;
     }
     
-    army.hp = currentHp;
-    const survivalRatio = currentHp / totalMaxHp;
-    let anySurvived = false;
-    for (const [troopId, count] of Object.entries(army.composition)) {
-        if (count > 0) {
-            // Use Math.round instead of Math.ceil to prevent infinite survival of small units
-            army.composition[troopId] = Math.round(count * survivalRatio);
-            if (army.composition[troopId] > 0) {
-                anySurvived = true;
-            } else {
-                delete army.composition[troopId];
-            }
+    let remainingDamage = damage;
+    let troopTypes = Object.keys(army.composition).filter(id => army.composition[id] > 0);
+    
+    while (remainingDamage > 0 && troopTypes.length > 0) {
+        const idx = Math.floor(Math.random() * troopTypes.length);
+        const tId = troopTypes[idx];
+        
+        const stats = getTroopStats(tId);
+        const hpPerTroop = stats ? (stats.HP || 10) : 10;
+        
+        army.composition[tId] -= 1;
+        remainingDamage -= hpPerTroop;
+        
+        if (army.composition[tId] <= 0) {
+            delete army.composition[tId];
+            troopTypes = Object.keys(army.composition).filter(id => army.composition[id] > 0);
         }
     }
     
-    if (!anySurvived) {
+    if (Object.keys(army.composition).length === 0) {
         army.hp = 0;
-        army.composition = {};
-        return true; // died
+        return true;
     }
     
-    return false; // survived
+    army.hp = getArmyMaxHp(army);
+    return false;
 };
 
 const getMatchMultiplier = async (id_partita_hash) => {
@@ -430,7 +431,7 @@ const processActiveCombats = async () => {
                 combatEnded = true;
             }
 
-            if (damageToCity > 0 && id_target_citta) {
+            if ((damageToCity > 0 || (id_target_citta && existingCityHp <= 0)) && id_target_citta) {
                 const cityHpKey = `match:${id_partita_hash}:cities_hp`;
                 let cityHpStr = await redis.hGet(cityHpKey, id_target_citta);
                 let cityHp = cityHpStr ? parseInt(cityHpStr, 10) : 100;
@@ -457,12 +458,15 @@ const processActiveCombats = async () => {
                     const freshMatchObj = await getMatch(id_partita_hash);
                     if (freshMatchObj && freshMatchObj.match) {
                         const { getArmyLocation, haversineDist } = require('./movementLogic.js');
-                        const attackerLoc = getArmyLocation(attackerArmy);
 
-                        const attackerPlayerObj = freshMatchObj.match.player.find(p => p.username === attackerPlayer);
-                        const attackerAllianceId = attackerPlayerObj ? attackerPlayerObj.id_alleanza : null;
+                        const freshAttackerObj = freshMatchObj.match.player.find(p => p.username === attackerPlayer);
+                        const freshAttackerArmy = freshAttackerObj && freshAttackerObj.armate ? freshAttackerObj.armate[id_attaccante] : null;
+                        const freshAttackerLoc = freshAttackerArmy ? getArmyLocation(freshAttackerArmy) : null;
+                        const isAttackerDead = !freshAttackerArmy || freshAttackerArmy.status === 'dead';
 
-                        if (attackerDied || !attackerLoc) {
+                        const attackerAllianceId = freshAttackerObj ? freshAttackerObj.id_alleanza : null;
+
+                        if (isAttackerDead || !freshAttackerLoc) {
                             enemyTroopsRemaining = true; // Se l'attaccante muore non può conquistare
                         } else {
                             for (const pl of freshMatchObj.match.player) {
@@ -516,7 +520,7 @@ const processActiveCombats = async () => {
                         combatEnded = false;
                     } else {
                     let updatedNations = [];
-                    await updateMatch(id_partita_hash, (mObj) => {
+                    const conquestData = await updateMatch(id_partita_hash, (mObj) => {
                         let defNation = null;
                         let attNation = mObj.match.player.find(n => n.username === attackerPlayer);
                         let actualRegionToTransfer = regionId;
@@ -550,15 +554,24 @@ const processActiveCombats = async () => {
                                     break;
                                 }
                             }
+                            
+                            if (!targetAdmin) {
+                                if (attNation.territori_dict && Object.keys(attNation.territori_dict).length > 0) {
+                                    targetAdmin = Object.keys(attNation.territori_dict)[0];
+                                } else {
+                                    targetAdmin = "Altro";
+                                }
+                            }
+
                             if (defNation.territori) {
                                 defNation.territori = defNation.territori.filter(t => t !== actualRegionToTransfer);
                             }
 
                             if (!attNation.territori_dict) attNation.territori_dict = {};
-                            if (!attNation.territori_dict[targetAdmin || "Altro"]) {
-                                attNation.territori_dict[targetAdmin || "Altro"] = [];
+                            if (!attNation.territori_dict[targetAdmin]) {
+                                attNation.territori_dict[targetAdmin] = [];
                             }
-                            attNation.territori_dict[targetAdmin || "Altro"].push(actualRegionToTransfer);
+                            attNation.territori_dict[targetAdmin].push(actualRegionToTransfer);
                             if (!attNation.territori) attNation.territori = [];
                             attNation.territori.push(actualRegionToTransfer);
 
@@ -574,11 +587,18 @@ const processActiveCombats = async () => {
                         }
                         
                         updatedNations = mObj.match.player;
-                        return { save: true, matchObj: mObj };
+                        return { save: true, matchObj: mObj, data: { attNation, defNation } };
                     });
 
-                    // Database Sync for Conquest (omitted for brevity, keep what was there if needed, 
-                    // but since monolithic is the source of truth, we just emit event)
+                    // Database Sync for Conquest
+                    if (conquestData && conquestData.attNation && conquestData.defNation) {
+                        try {
+                            await db.query(`UPDATE partecipanti_partite SET stato_territori = $1 WHERE id_partita_hash = $2 AND username = $3`, [JSON.stringify(conquestData.defNation.territori_dict), id_partita_hash, conquestData.defNation.username]);
+                            await db.query(`UPDATE partecipanti_partite SET stato_territori = $1 WHERE id_partita_hash = $2 AND username = $3`, [JSON.stringify(conquestData.attNation.territori_dict), id_partita_hash, conquestData.attNation.username]);
+                        } catch (err) {
+                            console.error("[COMBAT] Errore salvataggio territori DB:", err);
+                        }
+                    }
                     
                     const broadcastPayload = {
                         matchId: id_partita_hash,
@@ -611,15 +631,34 @@ const processActiveCombats = async () => {
                 await db.query(`UPDATE attacco SET status = 'ended' WHERE id_attacco = $1`, [id_attacco]);
                 await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
                 
-                if (!attackerDied) {
-                    await updateMatch(id_partita_hash, (mObj) => {
-                        const p = mObj.match.player.find(x => x.username === attackerPlayer);
-                        if (p && p.armate && p.armate[id_attaccante]) {
-                            p.armate[id_attaccante].status = 'standby';
+                const activeWarsRes = await db.query(
+                    `SELECT 1 FROM attacco 
+                     WHERE id_partita_hash = $1 
+                       AND status = 'active'
+                       AND id_attacco != $2
+                       AND ((attacker = $3 AND defender = $4) OR (attacker = $4 AND defender = $3))
+                     LIMIT 1`,
+                    [id_partita_hash, id_attacco, attackerPlayer, defenderPlayer]
+                );
+                const stillAtWar = activeWarsRes.rows.length > 0;
+
+                await updateMatch(id_partita_hash, (mObj) => {
+                    const att = mObj.match.player.find(x => x.username === attackerPlayer);
+                    if (!attackerDied && att && att.armate && att.armate[id_attaccante]) {
+                        att.armate[id_attaccante].status = 'standby';
+                    }
+
+                    if (!stillAtWar && defenderPlayer) {
+                        const def = mObj.match.player.find(x => x.username === defenderPlayer);
+                        if (att && att.inWarWith) {
+                            att.inWarWith = att.inWarWith.filter(u => u !== defenderPlayer);
                         }
-                        return { save: true, matchObj: mObj };
-                    });
-                }
+                        if (def && def.inWarWith) {
+                            def.inWarWith = def.inWarWith.filter(u => u !== attackerPlayer);
+                        }
+                    }
+                    return { save: true, matchObj: mObj };
+                });
             } else {
                 await db.query(`UPDATE attacco SET next_round_time = $1 WHERE id_attacco = $2`, [newNextRoundDate, id_attacco]);
                 if (!attackerDied) {
@@ -697,29 +736,35 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
                 }
                 return { save: true, matchObj: mObj };
             });
-        } else {
-            for (const n of matchObj.match.player) {
-                if (n.username === attackerUsername) continue;
-                if (n.armate && n.armate[target_node]) {
-                    defenderId = n.username;
-                    isArmyTarget = true;
-                    await updateMatch(id_partita_hash, (mObj) => {
-                        const def = mObj.match.player.find(x => x.username === defenderId);
-                        const att = mObj.match.player.find(x => x.username === attackerUsername);
-                        if (def) {
-                            def.inWarWith = def.inWarWith || [];
-                            if (!def.inWarWith.includes(attackerUsername)) def.inWarWith.push(attackerUsername);
-                        }
-                        if (att) {
-                            att.inWarWith = att.inWarWith || [];
-                            if (!att.inWarWith.includes(defenderId)) att.inWarWith.push(defenderId);
-                        }
-                        return { save: true, matchObj: mObj };
-                    });
-                    break;
-                }
-            }
-        }
+                            } else {
+                                for (const n of matchObj.match.player) {
+                                    if (n.username === attackerUsername) continue;
+                                    if (n.armate && n.armate[target_node]) {
+                                        let isEnemy = true;
+                                        if (attackerAllianceId && n.id_alleanza === attackerAllianceId) {
+                                            isEnemy = false;
+                                        }
+                                        if (!isEnemy) continue; // Salta armate alleate
+
+                                        defenderId = n.username;
+                                        isArmyTarget = true;
+                                        await updateMatch(id_partita_hash, (mObj) => {
+                                            const def = mObj.match.player.find(x => x.username === defenderId);
+                                            const att = mObj.match.player.find(x => x.username === attackerUsername);
+                                            if (def) {
+                                                def.inWarWith = def.inWarWith || [];
+                                                if (!def.inWarWith.includes(attackerUsername)) def.inWarWith.push(attackerUsername);
+                                            }
+                                            if (att) {
+                                                att.inWarWith = att.inWarWith || [];
+                                                if (!att.inWarWith.includes(defenderId)) att.inWarWith.push(defenderId);
+                                            }
+                                            return { save: true, matchObj: mObj };
+                                        });
+                                        break;
+                                    }
+                                }
+                            }
 
         if (defenderId) {
             let updatedNations = [];

@@ -4,28 +4,54 @@ const redis = new Redis({
   port: process.env.REDIS_PORT || 6379,
 });
 
+const POOL_SIZE = 10;
+const transactionClients = [];
+for (let i = 0; i < POOL_SIZE; i++) {
+    transactionClients.push({
+        client: new Redis({
+            host: process.env.REDIS_HOST || 'redis',
+            port: process.env.REDIS_PORT || 6379,
+        }),
+        inUse: false
+    });
+}
+
+async function getTransactionClient() {
+    for (let i = 0; i < 50; i++) {
+        const freeClient = transactionClients.find(c => !c.inUse);
+        if (freeClient) {
+            freeClient.inUse = true;
+            return freeClient;
+        }
+        await new Promise(r => setTimeout(r, 20));
+    }
+    throw new Error("Timeout acquiring Redis transaction client");
+}
+
+function releaseTransactionClient(poolObj) {
+    if (poolObj) {
+        poolObj.inUse = false;
+    }
+}
+
 async function updateMatch(matchId, updaterCallback, maxRetries = 10) {
     const key = `match:${matchId}`;
-    // Resolving alias before watch loop
     let actualKey = key;
     let initialData = await redis.get(key);
     if (initialData && initialData.startsWith('ALIAS:')) {
         actualKey = `match:${initialData.substring(6)}`;
     }
 
-    for (let i = 0; i < maxRetries; i++) {
-        // Create an isolated connection for the watch transaction
-        const isolatedClient = new Redis({
-            host: process.env.REDIS_HOST || 'redis',
-            port: process.env.REDIS_PORT || 6379,
-        });
-        
-        try {
+    const poolObj = await getTransactionClient();
+    const isolatedClient = poolObj.client;
+    
+    try {
+        for (let i = 0; i < maxRetries; i++) {
             await isolatedClient.watch(actualKey);
             const matchDataStr = await isolatedClient.get(actualKey);
             
             if (!matchDataStr) {
-                isolatedClient.disconnect();
+                await isolatedClient.unwatch();
                 throw new Error("Match non trovata: " + matchId);
             }
             
@@ -33,7 +59,7 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 10) {
             const result = await updaterCallback(matchObj);
             
             if (!result || !result.save) {
-                isolatedClient.disconnect();
+                await isolatedClient.unwatch();
                 return result ? result.data : null;
             }
             
@@ -62,21 +88,17 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 10) {
             
             const execResult = await multiCmd.exec();
                 
-            isolatedClient.disconnect();
-            
             if (!execResult) {
-                // Transaction failed due to concurrent modification, retry
                 await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
                 continue;
             }
             
             return result.data;
-        } catch (e) {
-            isolatedClient.disconnect();
-            throw e;
         }
+        throw new Error("Superato limite massimo di retry per aggiornamento match: " + matchId);
+    } finally {
+        releaseTransactionClient(poolObj);
     }
-    throw new Error("Superato limite massimo di retry per aggiornamento match: " + matchId);
 }
 
 async function getMatch(matchId) {
