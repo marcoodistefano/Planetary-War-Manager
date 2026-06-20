@@ -4,10 +4,8 @@ const fs = require("fs");
 const path = require("path");
 
 const { getNodeCoords, getArmyLocation, haversineDist } = require('./movementLogic.js');
-
 let troopsVisionMap = {}; // id_truppa -> raggio_visivo
 let defaultVisionRadius = 100;
-
 try {
     const rulesPath = path.join(__dirname, '../../../shared/assets/game_rules.json');
     if (fs.existsSync(rulesPath)) {

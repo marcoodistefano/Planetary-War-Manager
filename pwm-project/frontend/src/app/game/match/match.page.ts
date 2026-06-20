@@ -556,6 +556,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             }
             console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
             this.renderArmies();
+            this.applyTerritoryColors(); // <-- Re-added to fix red layout on attack
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
@@ -676,6 +677,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               if (oldA) {
                 if (oldA._pathCache) newA._pathCache = oldA._pathCache;
                 if (oldA._hasVisuallyArrived) newA._hasVisuallyArrived = oldA._hasVisuallyArrived;
+
+                // Conserva i parametri di movimento locale se per qualche motivo il FOW_UPDATE
+                // arriva prima che il DB abbia confermato il salvataggio dei nuovi dati
+                if (!newA.missionMode && oldA.missionMode) newA.missionMode = oldA.missionMode;
+                if (!newA.targetName && oldA.targetName) newA.targetName = oldA.targetName;
+                if (!newA.path && oldA.path) newA.path = oldA.path;
+                if (!newA.etaMs && oldA.etaMs) newA.etaMs = oldA.etaMs;
+                if (!newA.startTime && oldA.startTime) newA.startTime = oldA.startTime;
+                if (oldA.status === 'moving' || oldA.status === 'moving_to_border' || oldA.status === "Pronto all'attacco") {
+                  if (newA.status !== oldA.status) newA.status = oldA.status;
+                }
               }
             });
 
