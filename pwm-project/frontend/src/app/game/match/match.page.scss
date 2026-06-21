@@ -1268,3 +1268,50 @@ ion-menu {
     z-index: 1;
   }
 }
+
+.construction-instruction-banner {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  background: rgba(12, 24, 42, 0.9);
+  border: 1px solid var(--primary-blue);
+  border-radius: 8px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 0 20px rgba(134, 215, 255, 0.3);
+  backdrop-filter: blur(10px);
+  animation: popupFade 0.3s ease-out forwards;
+
+  ion-icon {
+    font-size: 1.5rem;
+    color: var(--primary-blue);
+  }
+
+  span {
+    color: #fff;
+    font-size: 0.9rem;
+    font-family: 'Inter', sans-serif;
+    strong {
+      color: #facc15;
+    }
+  }
+
+  button {
+    background: transparent;
+    border: 1px solid #f87171;
+    color: #f87171;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+    &:hover {
+      background: rgba(248, 113, 113, 0.1);
+    }
+  }
+}

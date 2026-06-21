@@ -168,6 +168,7 @@
               <span class="item-tier">TIER {{ item.tier }}</span>
             </div>
             <div class="build-cost">
+              <span class="cost-unit" *ngIf="item.risorsa_estratta" style="color: #4ade80; text-transform: uppercase;">{{ getResourceIcon(item.risorsa_estratta) }} {{ item.risorsa_estratta }}</span>
               <span class="cost-unit" *ngIf="item.costo_denaro > 0">💵 {{ item.costo_denaro | number }}</span>
               <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio | number }}</span>
             </div>
@@ -347,6 +348,12 @@
           <div class="sector-content"><ion-icon name="construct"></ion-icon></div>
         </div>
       </div>
+    </div>
+
+    <div class="construction-instruction-banner" *ngIf="selectedStructureForBuild">
+      <ion-icon name="hammer-outline"></ion-icon>
+      <span>Seleziona la regione per <strong>{{ selectedStructureForBuild.name || selectedStructureForBuild.nome }}</strong><br><small style="color: #a1a1aa; font-size: 0.75rem;">Premi <strong>ESC</strong> o clicca su annulla</small></span>
+      <button (click)="cancelConstruction()">ANNULLA</button>
     </div>
 
   </ion-content>

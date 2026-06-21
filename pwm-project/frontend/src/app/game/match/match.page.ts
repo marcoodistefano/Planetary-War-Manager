@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit, OnDestroy, ChangeDetectorRef, ViewChild, NgZone } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, ChangeDetectorRef, ViewChild, NgZone, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController, MenuController, ToastController, ActionSheetController } from '@ionic/angular'; // <--- AGGIUNTO MenuController
@@ -333,6 +333,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     { id: 'truppe', icon: '👥', label: 'UNITÀ', isTrigger: true },
     { id: 'oro', icon: '🪙', label: 'ORO' }
   ];
+
+  getResourceIcon(resourceId: string): string {
+    if (!resourceId) return '';
+    const res = this.resourceConfig.find(r => r.id === resourceId);
+    return res ? res.icon : '';
+  }
 
   resourceProduction: any = {
     denaro: 0,
@@ -1294,12 +1300,25 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   startConstruction(item: any) {
     this.selectedStructureForBuild = item;
     this.isBuildPanelOpen = false;
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onKeydownHandler(event: KeyboardEvent) {
+    if (this.selectedStructureForBuild) {
+      this.cancelConstruction();
+    }
+    if (this.isRadialMenuVisible) {
+      this.closeRadialMenu();
+    }
+  }
+
+  cancelConstruction() {
+    this.selectedStructureForBuild = null;
     this.toastCtrl.create({
-      message: `Seleziona un punto sulla mappa per costruire ${item.name || item.nome}.`,
-      duration: 3000,
-      position: 'top',
-      color: 'primary',
-      icon: 'map-outline'
+      message: 'Costruzione annullata.',
+      duration: 2000,
+      position: 'bottom',
+      color: 'medium'
     }).then(t => t.present());
   }
 
