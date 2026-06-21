@@ -345,8 +345,8 @@ const processActiveCombats = async () => {
                  damageToCity = 0;
             } else if (id_target_citta) {
                  damageToArmy = 0;
-                 // Option C: Conquista istantanea se non ci sono difensori
-                 damageToCity = existingCityHp > 0 ? existingCityHp : totalDmg;
+                 // Danno al 100% se non ci sono difensori
+                 damageToCity = totalDmg;
             }
 
             const defenderName = defenderArmy ? defenderArmy.name : 'Armata nemica';
@@ -918,5 +918,6 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
 module.exports = {
     startCombatLoop,
     setupCombatFromArrival,
-    processActiveCombats
+    processActiveCombats,
+    getRegionsGeojson
 };

@@ -2,7 +2,8 @@ const redis = require('../../shared/redisClient.js');
 const db = require('../../shared/postgresClient.js');
 const fs = require('fs');
 const path = require('path');
-const { setupCombatFromArrival, processActiveCombats } = require('./combatLogic.js');
+const { setupCombatFromArrival, processActiveCombats, getRegionsGeojson } = require('./combatLogic.js');
+const turf = require('@turf/turf');
 
 const { getArmyVisionRadius } = require('./gameUtils.js');
 
@@ -53,7 +54,7 @@ const checkCombatTriggers = async () => {
             }
 
             for (const army of allArmies) {
-                if (army.status === "Pronto all'attacco") {
+                if (army.status === "Pronto all'attacco" || army.status === "Pronto alla conquista") {
                     const radius = getArmyVisionRadius(army);
                     const myCoords = getArmyLocation(army);
                     if (!myCoords) continue;
@@ -61,7 +62,7 @@ const checkCombatTriggers = async () => {
                     let targetCoords = null;
                     const targetName = army.targetName;
                     
-                    console.log(`[COMBAT_TRIGGER] Army ${army.id} is Pronto all'attacco. targetName: ${targetName}, myCoords: ${myCoords}`);
+                    console.log(`[COMBAT_TRIGGER] Army ${army.id} is ${army.status}. targetName: ${targetName}, myCoords: ${myCoords}`);
                     
                     // Controlla se targetName è un'armata nemica
                     const enemyArmy = allArmies.find(a => a.id === targetName);
@@ -81,8 +82,27 @@ const checkCombatTriggers = async () => {
 
                     if (targetCoords) {
                         const dist = haversineDist(myCoords[0], myCoords[1], targetCoords[0], targetCoords[1]);
-                        console.log(`[COMBAT_TRIGGER] dist: ${dist}, radius: ${radius}, targetCoords: ${targetCoords}`);
-                        if (dist <= radius) {
+                        let isInsideRegion = false;
+                        
+                        if (!enemyArmy && targetName) {
+                            const { getRegionForNode } = require('./movementLogic.js');
+                            const regionId = getRegionForNode(targetName) || targetName;
+                            const geojson = getRegionsGeojson();
+                            if (geojson) {
+                                const feature = geojson.features.find(f => f.properties && (f.properties.adm1_code === regionId || f.id === regionId));
+                                if (feature) {
+                                    try {
+                                        const pt = turf.point([myCoords[0], myCoords[1]]);
+                                        if (turf.booleanPointInPolygon(pt, feature)) {
+                                            isInsideRegion = true;
+                                        }
+                                    } catch(e) {}
+                                }
+                            }
+                        }
+
+                        console.log(`[COMBAT_TRIGGER] dist: ${dist}, radius: ${radius}, targetCoords: ${targetCoords}, isInsideRegion: ${isInsideRegion}`);
+                        if (dist <= radius || isInsideRegion) {
                             // Innesca il combattimento!
                             // Dobbiamo recuperare la mossa dal DB
                             const mossaRes = await db.query(`SELECT * FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, [army.id]);

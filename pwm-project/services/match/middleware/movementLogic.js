@@ -420,7 +420,7 @@ const getArmyLocation = (army) => {
         coords = [loc[0], loc[1]];
     }
 
-    if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 0 && army.startTime && army.etaMs) {
+    if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco" || army.status === "Pronto alla conquista") && army.path && army.path.length > 0 && army.startTime && army.etaMs) {
         const pos = calculateCurrentPosition(army.path, army.startTime, army.etaMs);
         if (pos) {
             coords = [pos.lng, pos.lat];
