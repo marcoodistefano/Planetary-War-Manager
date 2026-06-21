@@ -164,6 +164,52 @@ const getRegionsGeojson = () => {
     return cachedRegionsGeojson;
 };
 
+const resolveRegionId = (inputStr) => {
+    if (!inputStr) return null;
+    const { getRegionForNode } = require('./movementLogic.js');
+    const directRegion = getRegionForNode(inputStr);
+    if (directRegion) return directRegion;
+    
+    if (typeof inputStr === 'string' && inputStr.includes(',')) {
+        const parts = inputStr.split(',');
+        if (parts.length >= 2) {
+            const lng = parseFloat(parts[0]);
+            const lat = parseFloat(parts[1]);
+            if (!isNaN(lng) && !isNaN(lat)) {
+                const geojson = getRegionsGeojson();
+                if (geojson && geojson.features) {
+                    const turf = require('@turf/turf');
+                    const pt = turf.point([lng, lat]);
+                    for (const feature of geojson.features) {
+                        try {
+                            if (turf.booleanPointInPolygon(pt, feature)) {
+                                return feature.properties.adm1_code || feature.id;
+                            }
+                        } catch(e) {}
+                    }
+                }
+            }
+        }
+    } else if (typeof inputStr === 'string') {
+        const geojson = getRegionsGeojson();
+        if (geojson && geojson.features) {
+            const lowerInput = inputStr.toLowerCase().trim();
+            for (const feature of geojson.features) {
+                if (feature.properties) {
+                    const match = Object.values(feature.properties).some(val => 
+                        typeof val === 'string' && val.toLowerCase().trim() === lowerInput
+                    );
+                    if (match) {
+                        return feature.properties.adm1_code || feature.id;
+                    }
+                }
+            }
+        }
+    }
+    return inputStr;
+};
+
+
 const processActiveCombats = async () => {
     try {
         const lockAcquired = await redis.set('engine_lock:combatLoop', 'locked', 'NX', 'PX', 2900);
@@ -241,6 +287,7 @@ const processActiveCombats = async () => {
                     if (attackerAllianceId && p.id_alleanza === attackerAllianceId) continue;
                     if (p.armate) {
                         for (const [aid, a] of Object.entries(p.armate)) {
+                            if (a.status === 'dead') continue;
                             let isTarget = false;
                             if (a.currentLocation === id_target_citta || a.targetName === id_target_citta) {
                                 isTarget = true;
@@ -450,8 +497,7 @@ const processActiveCombats = async () => {
                     combatEnded = true;
                     await redis.hDel(cityHpKey, id_target_citta);
                     
-                    const { getRegionForNode } = require('./movementLogic.js');
-                    const regionId = getRegionForNode(id_target_citta) || id_target_citta;
+                    const regionId = resolveRegionId(id_target_citta);
 
                     let regionPolygon = null;
                     const geojson = getRegionsGeojson();
@@ -489,6 +535,7 @@ const processActiveCombats = async () => {
 
                                 if (!pl.armate) continue;
                                 for (const [aid, a] of Object.entries(pl.armate)) {
+                                    if (a.status === 'dead') continue;
                                     let isTarget = false;
                                     if (a.currentLocation === id_target_citta || a.targetName === id_target_citta) {
                                         isTarget = true;
@@ -714,8 +761,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
         const attackerNation = matchObj.match.player.find(n => n.username === attackerUsername);
         const attackerAllianceId = attackerNation ? attackerNation.id_alleanza : null;
 
-        const { getRegionForNode } = require('./movementLogic.js');
-        const regionId = getRegionForNode(target_node) || target_node;
+        const regionId = resolveRegionId(target_node);
 
         let targetNation = matchObj.match.player.find(n => n.territori_dict && Object.values(n.territori_dict).some(list => list.includes(regionId)));
         if (!targetNation && target_node && target_node !== regionId) {
