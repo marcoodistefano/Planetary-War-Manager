@@ -1211,6 +1211,10 @@ ion-menu {
 
 
 /* MAPLIBRE TACTICAL POPUP OVERRIDES */
+::ng-deep .tactical-popup {
+  z-index: 1000 !important;
+}
+
 ::ng-deep .tactical-popup .maplibregl-popup-content {
   background: transparent !important;
   box-shadow: none !important;

@@ -601,23 +601,23 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             return { save: true, matchObj, data: { success: true, newStructure, replacedStructureId, resources } };
                         });
 
-                        if (!updRes || updRes.error || (updRes.data && updRes.data.error)) {
-                            const err = updRes ? (updRes.error || updRes.data.error) : 'Errore costruzione';
+                        if (!updRes || updRes.error) {
+                            const err = updRes ? updRes.error : 'Errore costruzione';
                             return ws.send(JSON.stringify({ type: 'ERROR', error: err }));
                         }
 
-                        if (updRes.data && updRes.data.success) {
-                            ws.send(JSON.stringify({ type: 'BUILD_SUCCESS', payload: updRes.data.newStructure, replacedStructureId: updRes.data.replacedStructureId }));
+                        if (updRes.success) {
+                            ws.send(JSON.stringify({ type: 'BUILD_SUCCESS', payload: updRes.newStructure, replacedStructureId: updRes.replacedStructureId }));
                             const broadcastPayload = {
                                 matchId: ws.matchId,
                                 targetUsers: [userId],
-                                payload: { type: 'RESOURCES_UPDATED', data: { resources: translateRedisToFe(updRes.data.resources) } }
+                                payload: { type: 'RESOURCES_UPDATED', data: { resources: translateRedisToFe(updRes.resources) } }
                             };
                             await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
 
                             const broadcastStructurePayload = {
                                 matchId: ws.matchId,
-                                payload: { type: 'STRUCTURE_BUILT', data: updRes.data.newStructure, replacedStructureId: updRes.data.replacedStructureId }
+                                payload: { type: 'STRUCTURE_BUILT', data: updRes.newStructure, replacedStructureId: updRes.replacedStructureId }
                             };
                             await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastStructurePayload));
                         }

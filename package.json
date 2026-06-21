@@ -32,6 +32,7 @@
     "pg-format": "^1.0.4",
     "redis": "^5.12.1",
     "socket.io": "^4.8.3",
+    "topojson-client": "^3.1.0",
     "uuid": "^14.0.0"
   }
 }

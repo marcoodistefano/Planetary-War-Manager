@@ -776,7 +776,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               if (oldMarker) { oldMarker.remove(); this.structureMarkers.delete(parsed.replacedStructureId); }
               this.matchStructures = this.matchStructures.filter(s => s.id !== parsed.replacedStructureId);
             }
-            this.matchStructures.push(parsed.payload);
+            this.matchStructures = [...this.matchStructures, parsed.payload];
+
             setTimeout(() => this.renderStructures(), 100);
             this.ngZone.run(() => this.cdr.detectChanges());
           }
@@ -788,7 +789,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.matchStructures = this.matchStructures.filter(s => s.id !== parsed.replacedStructureId);
             }
             if (parsed.data.owner !== this.userProfile.username) {
-              this.matchStructures.push(parsed.data);
+              this.matchStructures = [...this.matchStructures, parsed.data];
               setTimeout(() => this.renderStructures(), 100);
               this.ngZone.run(() => this.cdr.detectChanges());
             }
@@ -1588,7 +1589,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.matchStructures.forEach(structure => {
       let coords: [number, number] | null = null;
       if (structure.targetCoords && Array.isArray(structure.targetCoords) && structure.targetCoords.length >= 2) {
-        coords = [structure.targetCoords[0], structure.targetCoords[1]];
+        coords = [Number(structure.targetCoords[0]), Number(structure.targetCoords[1])];
       }
 
       if (!coords) return;
@@ -2462,7 +2463,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   // Eseguita quando si preme un'azione nel menu radiale
   handleRadialAction(action: string) {
-    if (Date.now() - this.radialMenuOpenedAt < 400) {
+    if (Date.now() - this.radialMenuOpenedAt < 50) {
       console.log("Ignorato click sintetico/immediato sul menu radiale");
       return;
     }
@@ -2512,6 +2513,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
+    // Forza la chiusura di eventuali popup rimasti appesi nel DOM
+    const existingPopups = document.querySelectorAll('.tactical-popup');
+    existingPopups.forEach(p => p.remove());
+
     if (this.popupTimer) {
       clearTimeout(this.popupTimer);
       this.popupTimer = null;
@@ -2519,6 +2524,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     if (this.activePopup) {
       this.activePopup.remove();
+      this.activePopup = null;
     }
 
     let resourcesHtml = '';
@@ -2535,8 +2541,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       `;
     }
 
+    const provinceName = this.selectedPointName || provId || 'TERRITORIO SCONOSCIUTO';
+
     const popupHtml = `
-      <div class="tactical-popup-container">
+      <div class="tactical-popup-container" style="display: flex; flex-direction: column; align-items: center;">
+        <span style="font-size: 0.65rem; color: #86d7ff; font-weight: 900; letter-spacing: 1px; margin-bottom: 2px; text-transform: uppercase;">Provincia</span>
+        <span style="font-size: 0.85rem; color: #facc15; font-weight: 900; font-family: 'Inter', sans-serif; text-transform: uppercase; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px; width: 100%; text-align: center;">${provinceName}</span>
         <span style="font-size: 0.65rem; color: #86d7ff; font-weight: 900; letter-spacing: 1px; margin-bottom: 4px; text-transform: uppercase;">Dominio</span>
         <span style="font-size: 1.1rem; color: #fff; font-weight: 700; font-family: 'JetBrains Mono', monospace;">${owner}</span>
         ${resourcesHtml}
@@ -2553,6 +2563,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       .setLngLat(this.selectedPointLngLat)
       .setHTML(popupHtml)
       .addTo(this.map);
+
+    const popupEl = this.activePopup.getElement();
+    if (popupEl) {
+      popupEl.style.zIndex = '9999'; // Al di sopra delle truppe (zIndex 10)
+    }
 
     // Chiusura automatica dopo 5 secondi
     this.popupTimer = setTimeout(() => {
@@ -2762,6 +2777,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   handleMapPointSelect(e: any) {
     console.log("Map clicked!", e.point);
+
+    if (this.activePopup) {
+      this.activePopup.remove();
+      this.activePopup = null;
+    }
 
     if (this.selectedStructureForBuild) {
       this.updatePointReadout(e, true);
