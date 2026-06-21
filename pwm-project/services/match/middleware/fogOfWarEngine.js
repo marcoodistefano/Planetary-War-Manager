@@ -1,15 +1,18 @@
 const db = require("../../shared/postgresClient.js");
-const redis = require("../../shared/redisClient");
+const Redis = require("ioredis");
+const redis = new Redis({ host: process.env.REDIS_HOST || 'redis', port: process.env.REDIS_PORT || 6379 });
 const fs = require("fs");
 const path = require("path");
+const { getMatch } = require('../../shared/matchMonolithic.js');
 
-const { getNodeCoords, getArmyLocation, haversineDist } = require('./movementLogic.js');
+const { getNodeCoords, getArmyLocation } = require('./movementLogic.js');
 const { getArmyVisionRadius, defaultVisionRadius } = require('./gameUtils.js');
-
-// getArmyLocation is imported from movementLogic.js
 
 const runFogOfWarCycle = async () => {
     try {
+        const lockAcquired = await redis.set('engine_lock:fogOfWar', 'locked', 'NX', 'PX', 2900);
+        if (!lockAcquired) return;
+
         const matchKeys = await db.query("SELECT id_partita_hash FROM partite WHERE substring(struttura_partita::text from 1 for 2) = '01'").then(res => res.rows.map(r => `match:${r.id_partita_hash}`));
         const matchIds = new Set();
         matchKeys.forEach(k => {
@@ -20,23 +23,20 @@ const runFogOfWarCycle = async () => {
         });
 
         for (const matchId of matchIds) {
-            const matchDataStr = await redis.get(`match:${matchId}`);
-            if (!matchDataStr) {
-                console.warn("[FOG_OF_WAR] Cache miss per match:", matchId);
-                continue;
-            }
-            
-            let matchObj;
-            try {
-                matchObj = JSON.parse(matchDataStr);
-            } catch(e) { continue; }
-            
+            const matchObj = await getMatch(matchId);
             if (!matchObj || !matchObj.match || !matchObj.match.player) continue;
             
             const nations = matchObj.match.player;
             let allArmies = [];
             let armiesByPlayer = {};
+            const armiesDict = {}; // per lookup rapido post-GEOSEARCH
             
+            const geoKey = `match:${matchId}:geo:armies`;
+            const geoPipeline = redis.pipeline();
+            geoPipeline.del(geoKey); // Pulisce il vecchio indice
+            
+            let hasArmies = false;
+
             for (const player of nations) {
                 const username = player.username;
                 armiesByPlayer[username] = [];
@@ -44,7 +44,21 @@ const runFogOfWarCycle = async () => {
                     const list = Object.values(player.armate).map(a => ({...a, owner: username}));
                     armiesByPlayer[username] = list;
                     allArmies = allArmies.concat(list);
+                    
+                    for (const army of list) {
+                        const coords = getArmyLocation(army);
+                        if (coords) {
+                            hasArmies = true;
+                            // Aggiunge all'indice spaziale: lng, lat, memberName
+                            geoPipeline.geoadd(geoKey, coords[0], coords[1], `${username}|${army.id}`);
+                            armiesDict[`${username}|${army.id}`] = army;
+                        }
+                    }
                 }
+            }
+            
+            if (hasArmies) {
+                await geoPipeline.exec();
             }
 
             for (const player of nations) {
@@ -76,40 +90,44 @@ const runFogOfWarCycle = async () => {
                     return { coords: getArmyLocation(a), radius: getArmyVisionRadius(a) };
                 }).filter(a => a.coords !== null);
 
+                // Pipeline per le ricerche visive
+                const searchPipeline = redis.pipeline();
+                let searchCount = 0;
+
+                // 1. Ricerca visiva attorno ai miei territori
+                for (const tCoord of myTerritoriesCoords) {
+                    searchPipeline.georadius(geoKey, tCoord[0], tCoord[1], defaultVisionRadius, 'km');
+                    searchCount++;
+                }
+
+                // 2. Ricerca visiva attorno alle mie armate
+                for (const aVision of myArmiesVision) {
+                    searchPipeline.georadius(geoKey, aVision.coords[0], aVision.coords[1], aVision.radius, 'km');
+                    searchCount++;
+                }
+
                 const visibleEnemies = [];
+                if (searchCount > 0 && hasArmies) {
+                    const searchResults = await searchPipeline.exec();
+                    const seenArmyIds = new Set();
 
-                for (const army of allArmies) {
-                    if (army.owner === username) continue;
-
-                    const coords = getArmyLocation(army);
-                    if (!coords) continue;
-
-                    let isVisible = false;
-
-                    // 1. Check distanza dalle mie armate
-                    for (const myArmy of myArmiesVision) {
-                        const dist = haversineDist(coords[0], coords[1], myArmy.coords[0], myArmy.coords[1]);
-                        if (dist <= myArmy.radius) {
-                            isVisible = true; break;
-                        }
-                    }
-
-                    // 2. Check distanza dai miei territori
-                    if (!isVisible) {
-                        for (const terrCoords of myTerritoriesCoords) {
-                            const dist = haversineDist(coords[0], coords[1], terrCoords[0], terrCoords[1]);
-                            if (dist <= defaultVisionRadius) { 
-                                isVisible = true; break;
+                    for (const res of searchResults) {
+                        const members = res[1]; // array di stringhe "username|armyId"
+                        if (members && Array.isArray(members)) {
+                            for (const member of members) {
+                                if (member.startsWith(`${username}|`)) continue; // Ignora le mie armate
+                                if (!seenArmyIds.has(member)) {
+                                    seenArmyIds.add(member);
+                                    if (armiesDict[member]) {
+                                        visibleEnemies.push(armiesDict[member]);
+                                    }
+                                }
                             }
                         }
                     }
-
-                    if (isVisible) {
-                        visibleEnemies.push(army);
-                    }
                 }
 
-                const citiesHpStr = await redis.hGetAll(`match:${matchId}:cities_hp`);
+                const citiesHpStr = await redis.hgetall(`match:${matchId}:cities_hp`);
                 const citiesHp = {};
                 if (citiesHpStr) {
                     for (const [cityId, hp] of Object.entries(citiesHpStr)) {
@@ -142,4 +160,7 @@ const startFogOfWarEngine = () => {
     console.log("[SYSTEM] Fog of War Engine started.");
 };
 
-module.exports = { startFogOfWarEngine };
+module.exports = {
+    startFogOfWarEngine,
+    runFogOfWarCycle
+};

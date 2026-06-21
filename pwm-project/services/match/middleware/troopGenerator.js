@@ -163,6 +163,10 @@ const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, ho
  */
 const generateTroopsPeriodic = async () => {
     if (isRunning) return;
+    
+    const lockAcquired = await redis.set('engine_lock:troopGenerator', 'locked', 'NX', 'PX', 59000);
+    if (!lockAcquired) return;
+    
     isRunning = true;
 
     const client = await db.connect();

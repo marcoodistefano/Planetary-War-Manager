@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { HomeService } from '../../../home/home';
 
 type ArmyTab = 'management' | 'operations' | 'garrison' | 'recruitment' | 'logistics' | 'storico';
-type MissionMode = 'move' | 'attack' | 'cancel';
+type MissionMode = 'move' | 'conquer' | 'cancel';
 
 interface ArmyGroup {
   id: string;
@@ -324,7 +324,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
 
     const updatedArmy: ArmyGroup = {
       ...army,
-      status: this.selectedMissionMode === 'attack' ? 'attacking' : 'moving',
+      status: this.selectedMissionMode === 'conquer' ? 'attacking' : 'moving',
       missionMode: this.selectedMissionMode,
       targetName: this.missionTargetName || this.selectedTargetName,
       targetCoords

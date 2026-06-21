@@ -229,7 +229,7 @@
                   <p class="track-label">Ordini sul Terreno</p>
                   <h3>Movimento o Attacco</h3>
                 </div>
-                <span class="panel-chip" [class.is-danger]="selectedMissionMode === 'attack'">{{ selectedMissionMode === 'attack' ? 'ATTACCO' : 'SPOSTAMENTO' }}</span>
+                <span class="panel-chip" [class.is-danger]="selectedMissionMode === 'conquer'">{{ selectedMissionMode === 'conquer' ? 'ATTACCO' : 'SPOSTAMENTO' }}</span>
               </div>
 
               <div class="command-field">
@@ -244,7 +244,7 @@
 
               <div class="mission-toggle">
                 <button [class.active]="selectedMissionMode === 'move'" (click)="selectedMissionMode = 'move'">SPOSTA</button>
-                <button [class.active]="selectedMissionMode === 'attack'" (click)="selectedMissionMode = 'attack'">ATTACCA</button>
+                <button [class.active]="selectedMissionMode === 'conquer'" (click)="selectedMissionMode = 'conquer'">CONQUISTA</button>
               </div>
 
               <div class="command-field">

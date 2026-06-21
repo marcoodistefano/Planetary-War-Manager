@@ -1930,21 +1930,21 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
               if (army.owner !== this.userProfile?.username && this.selectedArmiesForMovement.length > 0) {
                 // Stiamo comandando un attacco!
-                const targetCoords = [coords[0], coords[1]];
+                // Stiamo comandando una conquista!
                 this.selectedArmiesForMovement.forEach(armyId => {
                   const myArmy = this.matchArmies.find(a => a.id === armyId);
                   if (myArmy) {
                     this.onArmyMissionRequested({
                       armyId: myArmy.id,
-                      mode: 'attack',
+                      mode: 'conquer',
                       targetName: army.id,
-                      targetCoords: targetCoords,
+                      targetCoords: [coords[0], coords[1]],
                       composition: myArmy.composition
                     });
                   }
                 });
                 this.toastCtrl.create({
-                  message: `Ordine di attacco inviato per ${this.selectedArmiesForMovement.length} armate!`,
+                  message: `Ordine di conquista inviato per ${this.selectedArmiesForMovement.length} armate!`,
                   duration: 2000,
                   position: 'top',
                   color: 'danger'
@@ -2024,7 +2024,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                 }, 50);
               } else {
                 this.toastCtrl.create({
-                  message: 'Truppa nemica. Seleziona prima una tua truppa per attaccare.',
+                  message: 'Truppa nemica. Seleziona prima una tua truppa per conquistare.',
                   duration: 2000,
                   position: 'top',
                   color: 'warning'
@@ -2480,7 +2480,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       case 'INFO':
         this.showTerritoryInfoBanner();
         break;
-      case 'ATTACCA':
+      case 'CONQUISTA':
         // Logica combattimento
         break;
     }
@@ -2667,23 +2667,40 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  promptMovementOrAttack(targetName: string, targetCoords: string, lngLat: any) {
+  promptMovementOrConquest(targetName: string, targetCoords: string, lngLat: any) {
+    if (!this.map || this.selectedArmiesForMovement.length === 0) return;
+
     const popupHtml = `
-      <div style="display:flex; flex-direction:column; gap:8px; padding:12px; background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8); backdrop-filter: blur(8px); min-width: 140px;">
-        <div style="font-weight:bold; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; text-align:center; margin-bottom:4px; color:#9ca3af;">Ordini</div>
-        <button id="btn-popup-attack" style="background:linear-gradient(to right, #ef4444, #dc2626); color:white; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; font-weight:bold; font-size: 14px; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); transition: all 0.2s;">
-          <ion-icon name="flame"></ion-icon> Attacca
-        </button>
-        <button id="btn-popup-move" style="background:linear-gradient(to right, #3b82f6, #2563eb); color:white; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; font-weight:bold; font-size: 14px; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">
-          <ion-icon name="navigate"></ion-icon> Sposta
-        </button>
+      <div style="padding: 12px; font-family: 'Inter', sans-serif; min-width: 200px; display:flex; flex-direction:column; gap:12px; background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8); backdrop-filter: blur(8px); color: #f8fafc;">
+        <h3 style="margin:0; font-size: 16px; font-weight: bold; color:#f1f5f9; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px; text-align: center;">Ordine Armate</h3>
+        <p style="margin:0; font-size:13px; color:#cbd5e1; text-align: center;">Bersaglio: <strong style="color: white;">${targetName}</strong></p>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:4px;">
+          <button id="btn-popup-move" style="background:linear-gradient(to right, #3b82f6, #2563eb); color:white; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; font-weight:bold; font-size: 14px; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">
+            <ion-icon name="navigate"></ion-icon> Sposta
+          </button>
+          <button id="btn-popup-conquer" style="background:linear-gradient(to right, #ef4444, #dc2626); color:white; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; font-weight:bold; font-size: 14px; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); transition: all 0.2s;">
+            <ion-icon name="flag"></ion-icon> Conquista
+          </button>
+        </div>
       </div>
     `;
 
-    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: true, offset: [0, -10] })
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: true, offset: [0, -10], className: 'strategic-popup-above' })
       .setLngLat([lngLat.lng, lngLat.lat])
       .setHTML(popupHtml)
       .addTo(this.map);
+
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        popup.remove();
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+    popup.on('close', () => {
+      document.removeEventListener('keydown', handleEsc);
+    });
+
+    popup.getElement().style.zIndex = '9999';
 
     const popupContent = popup.getElement().querySelector('.maplibregl-popup-content') as HTMLElement;
     if (popupContent) {
@@ -2697,13 +2714,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
 
     setTimeout(() => {
-      const btnAttack = document.getElementById('btn-popup-attack');
       const btnMove = document.getElementById('btn-popup-move');
+      const btnConquer = document.getElementById('btn-popup-conquer');
 
-      if (btnAttack) {
-        btnAttack.addEventListener('click', (e) => {
+      if (btnConquer) {
+        btnConquer.addEventListener('click', (e) => {
           e.stopPropagation();
-          this.sendMissionOrder('attack', targetName, targetCoords);
+          this.sendMissionOrder('conquer', targetName, targetCoords);
           popup.remove();
         });
       }
@@ -2717,7 +2734,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }, 50);
   }
 
-  private sendMissionOrder(mode: 'attack' | 'move', targetName: string, targetCoords: string) {
+  private sendMissionOrder(mode: 'conquer' | 'move', targetName: string, targetCoords: string) {
+    if (this.selectedArmiesForMovement.length === 0) return;
+
     this.selectedArmiesForMovement.forEach(armyId => {
       const army = this.matchArmies.find(a => a.id === armyId);
       if (army) {
@@ -2730,8 +2749,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         });
       }
     });
+
     this.toastCtrl.create({
-      message: `Ordine di ${mode === 'attack' ? 'attacco' : 'movimento'} inviato per ${this.selectedArmiesForMovement.length} armate.`,
+      message: `Ordine di ${mode === 'conquer' ? 'conquista' : 'movimento'} inviato per ${this.selectedArmiesForMovement.length} armate.`,
       duration: 2000,
       position: 'top',
       color: 'success'
@@ -2786,7 +2806,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       const targetCoords = this.formatMapCoordinates(e.lngLat.lng, e.lngLat.lat);
       const targetName = this.selectedPointName || 'OBIETTIVO';
 
-      this.promptMovementOrAttack(targetName, targetCoords, e.lngLat);
+      this.promptMovementOrConquest(targetName, targetCoords, e.lngLat);
       return;
     }
 
@@ -3135,7 +3155,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     if (this.matchArmies) {
       this.matchArmies.forEach(army => {
         if (army.owner === currentUser || army.owner === this.userProfile?.username || !army.owner) {
-          if (army.status === 'attacking' || army.status === 'in combattimento' || ((army.status === "Pronto all'attacco" || army.status === 'moving') && army.missionMode === 'attack')) {
+          if (army.status === 'attacking' || army.status === 'in combattimento' || ((army.status === "Pronto alla conquista" || army.status === 'moving') && army.missionMode === 'conquer')) {
             if (army.targetName && army.targetName !== 'OBIETTIVO' && army.targetName !== 'SCONOSCIUTO') {
               attackedTerritories.add(army.targetName.toLowerCase());
             }

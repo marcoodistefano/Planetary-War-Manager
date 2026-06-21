@@ -18,6 +18,7 @@ const { loadMinimumPathToRedis } = require("./middleware/loadPathToRedis.js");
 const { startCombatLoop } = require("./middleware/combatLogic.js");
 const { startFogOfWarEngine } = require("./middleware/fogOfWarEngine.js");
 const { startCombatTriggerEngine } = require("./middleware/combatTriggerEngine.js");
+const { startSnapshotEngine } = require("./middleware/snapshotEngine.js");
 const Eru = require('./middleware/Eru.js');
 
 function translateRedisToFe(resources) {
@@ -201,12 +202,14 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         return;
                     }
 
+                    let currentPathInfo = null;
                     const armyState = armata.status;
-                    if ((armyState === 'moving' || armyState === 'moving_to_border' || armyState === "Pronto all'attacco") && armata.path && armata.path.length > 1 && armata.startTime && armata.etaMs) {
+                    if ((armyState === 'moving' || armyState === 'moving_to_border' || armyState === "Pronto alla conquista") && armata.path && armata.path.length > 1 && armata.startTime && armata.etaMs) {
                         const currentPos = calculateCurrentPosition(armata.path, armata.startTime, armata.etaMs);
                         if (currentPos) {
                             startLng = currentPos.lng;
                             startLat = currentPos.lat;
+                            currentPathInfo = { path: armata.path, currentIndex: currentPos.currentIndex };
                         }
                     }
 
@@ -241,7 +244,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                     let pathInfo = { isValid: false, distance: 0, etaMs: 0, path: [] };
                     try {
-                        pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, multiplier);
+                        pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, multiplier, currentPathInfo);
                     } catch (e) {
                         console.error("Errore durante calculatePath:", e);
                     }
@@ -278,7 +281,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             isInWar = targetNation.inWarWith && targetNation.inWarWith.includes(ws.username);
                         }
 
-                        if (!isAttack && payload.payload.mode === 'attack') {
+                        if (!isAttack && payload.payload.mode === 'conquer') {
                             for (const n of matchObj.match.player) {
                                 if (n.username === ws.username) continue;
                                 if (n.armate && n.armate[targetName]) {
@@ -323,7 +326,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         if (!p || !p.armate || !p.armate[armyId]) return { save: false };
 
                         p.armate[armyId].currentLocation = `${startLng},${startLat}`;
-                        p.armate[armyId].status = (isAttack || (isAttack && pathInfo.path.length > 0)) ? "Pronto all'attacco" : "moving";
+                        p.armate[armyId].status = (isAttack || (isAttack && pathInfo.path.length > 0)) ? "Pronto alla conquista" : "moving";
                         p.armate[armyId].targetCoords = parsedTargetCoords || targetCoords;
                         p.armate[armyId].targetName = targetName;
                         p.armate[armyId].missionMode = payload.payload.mode;
@@ -419,7 +422,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             army.status = 'standby';
                             delete army.targetName; delete army.targetCoords; delete army.missionMode; delete army.next_round_time;
                             return { save: true, matchObj, data: { action: 'combat_cancelled', army } };
-                        } else if (army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") {
+                        } else if (army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto alla conquista") {
                             const now = Date.now();
                             let elapsed = 0; let returnPath = []; let currentLng, currentLat;
                             if (army.path && army.path.length > 1 && army.startTime && army.etaMs) {
@@ -692,6 +695,9 @@ if (!fs.existsSync(MINIMUM_PATH_FILE)) {
 const startArrivalEngine = () => {
     setInterval(async () => {
         try {
+            const lockAcquired = await redis.set('engine_lock:arrivalEngine', 'locked', 'NX', 'PX', 900);
+            if (!lockAcquired) return;
+
             const query = `
         SELECT s.id_spostamento, s.id_mossa, m.id_armata, m.partita_id, u.username, u.id_user, p.id_partita_hash as match_id, s.target_node
         FROM spostamenti s 
@@ -744,22 +750,22 @@ const startArrivalEngine = () => {
                     }
 
                     // Auto-converte in attacco se territorio nemico e NON alleato
-                    if (isAlliedTerritory && army.missionMode === 'attack') {
+                    if (isAlliedTerritory && army.missionMode === 'conquer') {
                         army.missionMode = 'move';
                         console.log(`[ARRIVAL] Annullato attacco per l'armata ${row.id_armata} poiché ora è in territorio alleato`);
-                    } else if (isEnemyTerritory && !isAlliedTerritory && army.missionMode !== 'attack') {
-                        army.missionMode = 'attack';
+                    } else if (isEnemyTerritory && !isAlliedTerritory && army.missionMode !== 'conquer') {
+                        army.missionMode = 'conquer';
                         await updateMatch(row.match_id, (mObj) => {
                             const p = mObj.match.player.find(x => x.username === row.username);
                             if (p && p.armate && p.armate[row.id_armata]) {
-                                p.armate[row.id_armata].missionMode = 'attack';
+                                p.armate[row.id_armata].missionMode = 'conquer';
                             }
                             return { save: true, matchObj: mObj };
                         });
                         console.log(`[ARRIVAL] Auto-converted move to ATTACK for army ${row.id_armata} on enemy territory ${row.target_node}`);
                     }
 
-                    if (army.missionMode === 'attack') {
+                    if (army.missionMode === 'conquer') {
                         const { setupCombatFromArrival } = require('./middleware/combatLogic.js');
                         const mossaObj = {
                             id_mossa: row.id_mossa,
@@ -931,6 +937,7 @@ loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(async () => {
         startCombatLoop();
         startFogOfWarEngine();
         startCombatTriggerEngine();
+        startSnapshotEngine();
         startArrivalEngine();
     });
 }).catch(err => {

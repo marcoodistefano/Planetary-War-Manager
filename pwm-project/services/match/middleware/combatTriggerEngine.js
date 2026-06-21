@@ -29,6 +29,9 @@ const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
 
 const checkCombatTriggers = async () => {
     try {
+        const lockAcquired = await redis.set('engine_lock:combatTrigger', 'locked', 'NX', 'PX', 2900);
+        if (!lockAcquired) return;
+        
         const matchKeys = await db.query("SELECT id_partita_hash FROM partite WHERE substring(struttura_partita::text from 1 for 2) = '01'").then(res => res.rows.map(r => `match:${r.id_partita_hash}`));
         const matchIds = new Set();
         matchKeys.forEach(k => {

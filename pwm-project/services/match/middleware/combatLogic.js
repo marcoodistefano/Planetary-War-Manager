@@ -106,9 +106,14 @@ const getMatchMultiplier = async (id_partita_hash) => {
 const addToGraveyard = async (id_partita_hash, playerUsername, armyData, destroyedBy) => {
     if (!playerUsername || !armyData) return;
     try {
+        const { getArmyLocation } = require('./movementLogic.js');
+        const loc = getArmyLocation(armyData);
+        const safeLoc = loc ? { x: loc[0], y: loc[1] } : null;
+        
         const graveyardKey = `match:${id_partita_hash}:player:${playerUsername}:graveyard`;
         const record = {
             ...armyData,
+            currentLocation: safeLoc,
             destroyedAt: new Date().toISOString(),
             destroyedBy: destroyedBy || 'Sconosciuto'
         };
@@ -161,6 +166,9 @@ const getRegionsGeojson = () => {
 
 const processActiveCombats = async () => {
     try {
+        const lockAcquired = await redis.set('engine_lock:combatLoop', 'locked', 'NX', 'PX', 2900);
+        if (!lockAcquired) return;
+        
         const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
         const res = await db.query(`
             SELECT c.*, p.id_partita_hash 
@@ -337,7 +345,8 @@ const processActiveCombats = async () => {
                  damageToCity = 0;
             } else if (id_target_citta) {
                  damageToArmy = 0;
-                 damageToCity = totalDmg;
+                 // Option C: Conquista istantanea se non ci sono difensori
+                 damageToCity = existingCityHp > 0 ? existingCityHp : totalDmg;
             }
 
             const defenderName = defenderArmy ? defenderArmy.name : 'Armata nemica';
@@ -593,8 +602,17 @@ const processActiveCombats = async () => {
                     // Database Sync for Conquest
                     if (conquestData && conquestData.attNation && conquestData.defNation) {
                         try {
-                            await db.query(`UPDATE partecipanti_partite SET stato_territori = $1 WHERE id_partita_hash = $2 AND username = $3`, [JSON.stringify(conquestData.defNation.territori_dict), id_partita_hash, conquestData.defNation.username]);
-                            await db.query(`UPDATE partecipanti_partite SET stato_territori = $1 WHERE id_partita_hash = $2 AND username = $3`, [JSON.stringify(conquestData.attNation.territori_dict), id_partita_hash, conquestData.attNation.username]);
+                            const updateQuery = `
+                                UPDATE partecipanti_partite pp 
+                                SET stato_territori = $1 
+                                FROM partite p, utenti u 
+                                WHERE pp.partita_id = p.id_partita 
+                                  AND pp.user_id = u.id_user 
+                                  AND p.id_partita_hash = $2 
+                                  AND u.username = $3
+                            `;
+                            await db.query(updateQuery, [JSON.stringify(conquestData.defNation.territori_dict), id_partita_hash, conquestData.defNation.username]);
+                            await db.query(updateQuery, [JSON.stringify(conquestData.attNation.territori_dict), id_partita_hash, conquestData.attNation.username]);
                         } catch (err) {
                             console.error("[COMBAT] Errore salvataggio territori DB:", err);
                         }
@@ -633,12 +651,12 @@ const processActiveCombats = async () => {
                 
                 const activeWarsRes = await db.query(
                     `SELECT 1 FROM attacco 
-                     WHERE id_partita_hash = $1 
+                     WHERE partita_id = $1 
                        AND status = 'active'
                        AND id_attacco != $2
                        AND ((attacker = $3 AND defender = $4) OR (attacker = $4 AND defender = $3))
                      LIMIT 1`,
-                    [id_partita_hash, id_attacco, attackerPlayer, defenderPlayer]
+                    [partita_id, id_attacco, attackerPlayer, defenderPlayer]
                 );
                 const stillAtWar = activeWarsRes.rows.length > 0;
 
@@ -693,6 +711,9 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
         let defenderId = null;
         let isArmyTarget = false;
         
+        const attackerNation = matchObj.match.player.find(n => n.username === attackerUsername);
+        const attackerAllianceId = attackerNation ? attackerNation.id_alleanza : null;
+
         const { getRegionForNode } = require('./movementLogic.js');
         const regionId = getRegionForNode(target_node) || target_node;
 
@@ -710,8 +731,6 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
             }
 
             // Inibisce il combattimento se il target è un alleato
-            const attackerNation = matchObj.match.player.find(n => n.username === attackerUsername);
-            const attackerAllianceId = attackerNation ? attackerNation.id_alleanza : null;
             const defenderAllianceId = targetNation.id_alleanza || null;
             if (attackerAllianceId && defenderAllianceId && attackerAllianceId === defenderAllianceId) {
                 console.log(`[COMBAT] Attacco bloccato: ${attackerUsername} e ${targetNation.username} sono nella stessa alleanza.`);

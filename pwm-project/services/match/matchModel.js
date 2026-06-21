@@ -185,7 +185,8 @@ const safeParseRedisJson = (value) => {
 const resolveMatchState = async (matchId, client = db) => {
   if (!matchId) return null;
 
-  const cachedState = safeParseRedisJson(await redis.get(`match:${matchId}`));
+  const { getMatch } = require('../shared/matchMonolithic.js');
+  const cachedState = await getMatch(matchId);
   if (cachedState) {
     if (cachedState.match && cachedState.match.id_partita) {
       return { source: "redis", state: cachedState.match };

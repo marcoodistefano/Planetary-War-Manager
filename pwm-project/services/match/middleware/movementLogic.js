@@ -86,7 +86,7 @@ function getEdgeGeometry(cityA, cityB) {
 }
 
 // Main calculate function
-const calculatePath = async (startLng, startLat, targetName, targetLng, targetLat, multiplier = 1) => {
+const calculatePath = async (startLng, startLat, targetName, targetLng, targetLat, multiplier = 1, currentPathInfo = null) => {
     loadGeometries();
 
     let destNode = targetName;
@@ -94,22 +94,53 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
         destNode = getClosestNode(targetLng, targetLat);
     }
 
-    // Invece di prendere solo il nodo più vicino (che potrebbe far tornare indietro la truppa),
-    // valutiamo i 2 nodi più vicini (gli estremi dell'edge corrente) e scegliamo quello che minimizza
-    // il costo totale del percorso fino alla destinazione.
-    let distances = [];
-    for (const [name, coords] of nodesMap.entries()) {
-        const d = haversineDist(startLng, startLat, coords[0], coords[1]);
-        distances.push({ name, d });
+    let candidateNodes = [];
+    if (currentPathInfo && currentPathInfo.path && currentPathInfo.currentIndex !== undefined) {
+        let nextCityName = null;
+        let prevCityName = null;
+        
+        // Cerca in avanti per la prossima città
+        for (let i = currentPathInfo.currentIndex; i < currentPathInfo.path.length; i++) {
+            const pt = currentPathInfo.path[i];
+            const city = getClosestNode(pt[0], pt[1]);
+            if (city && haversineDist(pt[0], pt[1], nodesMap.get(city)[0], nodesMap.get(city)[1]) < 0.1) {
+                nextCityName = city;
+                break;
+            }
+        }
+        
+        // Cerca all'indietro per la città precedente
+        for (let i = currentPathInfo.currentIndex; i >= 0; i--) {
+            const pt = currentPathInfo.path[i];
+            const city = getClosestNode(pt[0], pt[1]);
+            if (city && haversineDist(pt[0], pt[1], nodesMap.get(city)[0], nodesMap.get(city)[1]) < 0.1) {
+                prevCityName = city;
+                break;
+            }
+        }
+        
+        if (nextCityName && prevCityName) {
+            if (nodesMap.has(prevCityName)) candidateNodes.push({ name: prevCityName, d: haversineDist(startLng, startLat, nodesMap.get(prevCityName)[0], nodesMap.get(prevCityName)[1]) });
+            if (nodesMap.has(nextCityName) && nextCityName !== prevCityName) candidateNodes.push({ name: nextCityName, d: haversineDist(startLng, startLat, nodesMap.get(nextCityName)[0], nodesMap.get(nextCityName)[1]) });
+        }
     }
-    distances.sort((a, b) => a.d - b.d);
+
+    if (candidateNodes.length === 0) {
+        let distances = [];
+        for (const [name, coords] of nodesMap.entries()) {
+            const d = haversineDist(startLng, startLat, coords[0], coords[1]);
+            distances.push({ name, d });
+        }
+        distances.sort((a, b) => a.d - b.d);
+        candidateNodes = distances.slice(0, 5); // Fallback top 5
+    }
     
-    let bestStartNode = distances[0].name;
+    let bestStartNode = candidateNodes[0].name;
     let minTotalCost = Infinity;
     
-    for (let i = 0; i < Math.min(2, distances.length); i++) {
-        const candidateNode = distances[i].name;
-        const distToStartNode = distances[i].d;
+    for (let i = 0; i < candidateNodes.length; i++) {
+        const candidateNode = candidateNodes[i].name;
+        const distToStartNode = candidateNodes[i].d;
         
         if (candidateNode === destNode) {
             const totalCost = distToStartNode;
@@ -136,31 +167,25 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
 
     let startNode = bestStartNode;
 
-    // If start and dest are same node, path is just the node
+    // If start and dest are same node, path is just the exact coordinates
     if (startNode === destNode) {
-        let path = [nodesMap.get(startNode)];
-        let distance = 0;
-
-        const distFromStart = haversineDist(startLng, startLat, path[0][0], path[0][1]);
-        if (distFromStart > 0.001) {
-            path.unshift([startLng, startLat]);
-            distance += distFromStart;
-        }
-
-        if (targetName === 'OBIETTIVO') {
-            const distToEnd = haversineDist(path[path.length - 1][0], path[path.length - 1][1], targetLng, targetLat);
-            if (distToEnd > 0.001) {
-                path.push([targetLng, targetLat]);
-                distance += distToEnd;
-            }
+        let distance = haversineDist(startLng, startLat, targetLng, targetLat);
+        let path = [ [startLng, startLat] ];
+        
+        if (distance > 0.001) {
+            path.push([targetLng, targetLat]);
+        } else {
+            // Seleziona un punto leggermente sfalsato per avere un path valido
+            path.push([startLng + 0.0001, startLat + 0.0001]);
         }
 
         const baseSpeed = 50;
         const etaHours = distance / (baseSpeed * multiplier);
+        const etaMs = Math.floor(etaHours * 60 * 60 * 1000);
         return {
             isValid: true,
             distance: distance,
-            etaMs: Math.floor(etaHours * 60 * 60 * 1000),
+            etaMs: etaMs > 0 ? etaMs : 1000,
             path: path
         };
     }
@@ -204,7 +229,8 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
     }
 
     // Add final coordinate if the destination wasn't exactly a node
-    if (targetName === 'OBIETTIVO') {
+    const distToEnd = haversineDist(fullPath[fullPath.length - 1][0], fullPath[fullPath.length - 1][1], targetLng, targetLat);
+    if (distToEnd > 0.001) {
         fullPath.push([targetLng, targetLat]);
     }
 
