@@ -164,6 +164,27 @@ const getRegionsGeojson = () => {
     return cachedRegionsGeojson;
 };
 
+let regionNameMap = null;
+const buildRegionNameMap = () => {
+    if (regionNameMap) return regionNameMap;
+    const geojson = getRegionsGeojson();
+    if (!geojson || !geojson.features) return null;
+    
+    regionNameMap = new Map();
+    for (const feature of geojson.features) {
+        if (feature.properties) {
+            const code = feature.properties.adm1_code || feature.id;
+            for (const val of Object.values(feature.properties)) {
+                if (typeof val === 'string') {
+                    regionNameMap.set(val.toLowerCase().trim(), code);
+                }
+            }
+        }
+    }
+    return regionNameMap;
+};
+
+
 const resolveRegionId = (inputStr) => {
     if (!inputStr) return null;
     const { getRegionForNode } = require('./movementLogic.js');
@@ -191,19 +212,10 @@ const resolveRegionId = (inputStr) => {
             }
         }
     } else if (typeof inputStr === 'string') {
-        const geojson = getRegionsGeojson();
-        if (geojson && geojson.features) {
-            const lowerInput = inputStr.toLowerCase().trim();
-            for (const feature of geojson.features) {
-                if (feature.properties) {
-                    const match = Object.values(feature.properties).some(val => 
-                        typeof val === 'string' && val.toLowerCase().trim() === lowerInput
-                    );
-                    if (match) {
-                        return feature.properties.adm1_code || feature.id;
-                    }
-                }
-            }
+        const lowerInput = inputStr.toLowerCase().trim();
+        const map = buildRegionNameMap();
+        if (map && map.has(lowerInput)) {
+            return map.get(lowerInput);
         }
     }
     return inputStr;
@@ -261,9 +273,13 @@ const processActiveCombats = async () => {
             if (currentTargetArmataId) {
                 for (const p of matchObj.match.player) {
                     if (p.armate && p.armate[currentTargetArmataId]) {
-                        defenderArmy = p.armate[currentTargetArmataId];
-                        defenderPlayer = p.username;
-                        break;
+                        if (p.armate[currentTargetArmataId].status !== 'dead') {
+                            defenderArmy = p.armate[currentTargetArmataId];
+                            defenderPlayer = p.username;
+                            break;
+                        } else {
+                            currentTargetArmataId = null;
+                        }
                     }
                 }
             }
@@ -271,7 +287,7 @@ const processActiveCombats = async () => {
             if (!defenderArmy && id_target_citta) {
                 const { getRegionForNode, getNodeCoords } = require('./movementLogic.js');
                 const cityCoords = getNodeCoords(id_target_citta);
-                const regionId = getRegionForNode(id_target_citta) || id_target_citta;
+                const regionId = resolveRegionId(id_target_citta);
                 
                 let regionPolygon = null;
                 const geojson = getRegionsGeojson();
@@ -410,10 +426,10 @@ const processActiveCombats = async () => {
                     await addToGraveyard(id_partita_hash, defenderPlayer, defenderArmy, attackerPlayer);
                     await updateMatch(id_partita_hash, (mObj) => {
                         const p = mObj.match.player.find(x => x.username === defenderPlayer);
-                        if (p && p.armate) delete p.armate[id_target_armata];
+                        if (p && p.armate) delete p.armate[currentTargetArmataId];
                         return { save: true, matchObj: mObj };
                     });
-                    await db.query(`DELETE FROM mosse WHERE id_armata = $1`, [id_target_armata]);
+                    await db.query(`DELETE FROM mosse WHERE id_armata = $1`, [currentTargetArmataId]);
                     await emitCombatEvent(id_partita_hash, attackerName, defenderName, damageToArmy, 'distrutta', [attackerPlayer, defenderPlayer]);
                     
                     if (!id_target_citta) {
@@ -437,9 +453,9 @@ const processActiveCombats = async () => {
                     
                     await updateMatch(id_partita_hash, (mObj) => {
                         const p = mObj.match.player.find(x => x.username === defenderPlayer);
-                        if (p && p.armate && p.armate[id_target_armata]) {
-                            p.armate[id_target_armata] = defenderArmy;
-                            p.armate[id_target_armata].next_round_time = newNextRoundDate.toISOString();
+                        if (p && p.armate && p.armate[currentTargetArmataId]) {
+                            p.armate[currentTargetArmataId] = defenderArmy;
+                            p.armate[currentTargetArmataId].next_round_time = newNextRoundDate.toISOString();
                         }
                         return { save: true, matchObj: mObj };
                     });

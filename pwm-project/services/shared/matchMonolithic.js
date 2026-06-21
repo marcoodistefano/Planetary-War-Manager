@@ -98,7 +98,7 @@ async function getMatch(matchId) {
 // ==========================================
 // UPDATE MATCH (DIFF ENGINE)
 // ==========================================
-async function updateMatch(matchId, updaterCallback, maxRetries = 3) {
+async function updateMatch(matchId, updaterCallback, maxRetries = 30) {
     let actualKey = `match:${matchId}`;
     let aliasCheck = await redis.get(actualKey);
     if (aliasCheck && aliasCheck.startsWith('ALIAS:')) {
@@ -111,118 +111,130 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 3) {
         isMigrating = true;
     }
 
+    const lockKey = `lock:updateMatch:${actualKey}`;
+
     for (let retry = 0; retry < maxRetries; retry++) {
-        const currentMatchObj = await getMatch(matchId);
-        if (!currentMatchObj) {
-            throw new Error("Match non trovata o base frammentata assente: " + matchId);
-        }
-
-        const preState = JSON.parse(JSON.stringify(currentMatchObj));
-        const result = await updaterCallback(currentMatchObj);
-
-        if (!result || !result.save) {
-            return result ? result.data : null;
-        }
-
-        const newMatchObj = result.matchObj;
-        const mainId = newMatchObj.match.id_partita_hash || newMatchObj.match.id_partita;
-
-        const multiCmd = redis.multi();
-
-        if (newMatchObj.match.id_partita && newMatchObj.match.id_partita !== mainId) {
-            multiCmd.set(`match:${newMatchObj.match.id_partita}`, `ALIAS:${mainId}`);
-        }
-        if (newMatchObj.match.id_visualizzato && newMatchObj.match.id_visualizzato !== mainId) {
-            multiCmd.set(`match:${newMatchObj.match.id_visualizzato}`, `ALIAS:${mainId}`);
-        }
-
-        if (isMigrating) {
-            multiCmd.del(actualKey);
-        }
-
-        const preBase = isMigrating ? {} : { ...preState.match }; delete preBase.player;
-        const newBase = { ...newMatchObj.match }; delete newBase.player;
-        if (JSON.stringify(preBase) !== JSON.stringify(newBase)) {
-            multiCmd.set(`match:${mainId}:base`, JSON.stringify(newBase));
-        }
-
-        const currentPlayersSet = new Set(newMatchObj.match.player.map(p => p.username));
-        if (currentPlayersSet.size > 0) {
-            multiCmd.sadd(`match:${mainId}:players`, ...Array.from(currentPlayersSet));
-        }
-
-        const prePlayersSet = new Set(preState.match.player ? preState.match.player.map(p => p.username) : []);
-        const removedPlayers = Array.from(prePlayersSet).filter(p => !currentPlayersSet.has(p));
-        
-        for (const oldUsername of removedPlayers) {
-            multiCmd.srem(`match:${mainId}:players`, oldUsername);
-            multiCmd.del(`match:${mainId}:player:${oldUsername}:base`);
-            multiCmd.del(`match:${mainId}:player:${oldUsername}:territori`);
-            multiCmd.del(`match:${mainId}:player:${oldUsername}:risorse`);
-            multiCmd.del(`match:${mainId}:player:${oldUsername}:armate`);
-            multiCmd.del(`match:${mainId}:player:${oldUsername}:truppe`);
-        }
-
-        for (const newPlayer of newMatchObj.match.player) {
-            const username = newPlayer.username;
-            const prePlayer = preState.match.player ? preState.match.player.find(p => p.username === username) || {} : {};
-
-            const pBaseOld = { ...prePlayer }; 
-            delete pBaseOld.armate; delete pBaseOld.truppe; delete pBaseOld.risorse; delete pBaseOld.territori; delete pBaseOld.territori_dict;
-            const pBaseNew = { ...newPlayer }; 
-            delete pBaseNew.armate; delete pBaseNew.truppe; delete pBaseNew.risorse; delete pBaseNew.territori; delete pBaseNew.territori_dict;
-            
-            if (JSON.stringify(pBaseOld) !== JSON.stringify(pBaseNew)) {
-                multiCmd.set(`match:${mainId}:player:${username}:base`, JSON.stringify(pBaseNew));
-            }
-
-            const oldTerritori = { territori: prePlayer.territori || [], territori_dict: prePlayer.territori_dict || {} };
-            const newTerritori = { territori: newPlayer.territori || [], territori_dict: newPlayer.territori_dict || {} };
-            if (JSON.stringify(oldTerritori) !== JSON.stringify(newTerritori)) {
-                multiCmd.set(`match:${mainId}:player:${username}:territori`, JSON.stringify(newTerritori));
-            }
-
-            if (JSON.stringify(prePlayer.risorse || {}) !== JSON.stringify(newPlayer.risorse || {})) {
-                multiCmd.set(`match:${mainId}:player:${username}:risorse`, JSON.stringify(newPlayer.risorse || {}));
-            }
-
-            const oldArmate = prePlayer.armate || {};
-            const newArmate = newPlayer.armate || {};
-            for (const [aId, aData] of Object.entries(newArmate)) {
-                if (JSON.stringify(oldArmate[aId]) !== JSON.stringify(aData)) {
-                    multiCmd.hset(`match:${mainId}:player:${username}:armate`, aId, JSON.stringify(aData));
-                }
-            }
-            for (const aId of Object.keys(oldArmate)) {
-                if (!newArmate[aId]) {
-                    multiCmd.hdel(`match:${mainId}:player:${username}:armate`, aId);
-                }
-            }
-
-            const oldTruppe = prePlayer.truppe || {};
-            const newTruppe = newPlayer.truppe || {};
-            for (const [tId, tData] of Object.entries(newTruppe)) {
-                if (JSON.stringify(oldTruppe[tId]) !== JSON.stringify(tData)) {
-                    multiCmd.hset(`match:${mainId}:player:${username}:truppe`, tId, JSON.stringify(tData));
-                }
-            }
-            for (const tId of Object.keys(oldTruppe)) {
-                if (!newTruppe[tId]) {
-                    multiCmd.hdel(`match:${mainId}:player:${username}:truppe`, tId);
-                }
-            }
-        }
-
-        const execResult = await multiCmd.exec();
-        if (!execResult) {
+        const lockAcquired = await redis.set(lockKey, 'locked', 'NX', 'PX', 5000);
+        if (!lockAcquired) {
             await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
             continue;
         }
 
-        return result.data;
+        try {
+            const currentMatchObj = await getMatch(matchId);
+            if (!currentMatchObj) {
+                throw new Error("Match non trovata o base frammentata assente: " + matchId);
+            }
+
+            const preState = JSON.parse(JSON.stringify(currentMatchObj));
+            const result = await updaterCallback(currentMatchObj);
+
+            if (!result || !result.save) {
+                return result ? result.data : null;
+            }
+
+            const newMatchObj = result.matchObj;
+            const mainId = newMatchObj.match.id_partita_hash || newMatchObj.match.id_partita;
+
+            const multiCmd = redis.multi();
+
+            if (newMatchObj.match.id_partita && newMatchObj.match.id_partita !== mainId) {
+                multiCmd.set(`match:${newMatchObj.match.id_partita}`, `ALIAS:${mainId}`);
+            }
+            if (newMatchObj.match.id_visualizzato && newMatchObj.match.id_visualizzato !== mainId) {
+                multiCmd.set(`match:${newMatchObj.match.id_visualizzato}`, `ALIAS:${mainId}`);
+            }
+
+            if (isMigrating) {
+                multiCmd.del(actualKey);
+            }
+
+            const preBase = isMigrating ? {} : { ...preState.match }; delete preBase.player;
+            const newBase = { ...newMatchObj.match }; delete newBase.player;
+            if (JSON.stringify(preBase) !== JSON.stringify(newBase)) {
+                multiCmd.set(`match:${mainId}:base`, JSON.stringify(newBase));
+            }
+
+            const currentPlayersSet = new Set(newMatchObj.match.player.map(p => p.username));
+            if (currentPlayersSet.size > 0) {
+                multiCmd.sadd(`match:${mainId}:players`, ...Array.from(currentPlayersSet));
+            }
+
+            const prePlayersSet = new Set(preState.match.player ? preState.match.player.map(p => p.username) : []);
+            const removedPlayers = Array.from(prePlayersSet).filter(p => !currentPlayersSet.has(p));
+            
+            for (const oldUsername of removedPlayers) {
+                multiCmd.srem(`match:${mainId}:players`, oldUsername);
+                multiCmd.del(`match:${mainId}:player:${oldUsername}:base`);
+                multiCmd.del(`match:${mainId}:player:${oldUsername}:territori`);
+                multiCmd.del(`match:${mainId}:player:${oldUsername}:risorse`);
+                multiCmd.del(`match:${mainId}:player:${oldUsername}:armate`);
+                multiCmd.del(`match:${mainId}:player:${oldUsername}:truppe`);
+            }
+
+            for (const newPlayer of newMatchObj.match.player) {
+                const username = newPlayer.username;
+                const prePlayer = preState.match.player ? preState.match.player.find(p => p.username === username) || {} : {};
+
+                const pBaseOld = { ...prePlayer }; 
+                delete pBaseOld.armate; delete pBaseOld.truppe; delete pBaseOld.risorse; delete pBaseOld.territori; delete pBaseOld.territori_dict;
+                const pBaseNew = { ...newPlayer }; 
+                delete pBaseNew.armate; delete pBaseNew.truppe; delete pBaseNew.risorse; delete pBaseNew.territori; delete pBaseNew.territori_dict;
+                
+                if (JSON.stringify(pBaseOld) !== JSON.stringify(pBaseNew)) {
+                    multiCmd.set(`match:${mainId}:player:${username}:base`, JSON.stringify(pBaseNew));
+                }
+
+                const oldTerritori = { territori: prePlayer.territori || [], territori_dict: prePlayer.territori_dict || {} };
+                const newTerritori = { territori: newPlayer.territori || [], territori_dict: newPlayer.territori_dict || {} };
+                if (JSON.stringify(oldTerritori) !== JSON.stringify(newTerritori)) {
+                    multiCmd.set(`match:${mainId}:player:${username}:territori`, JSON.stringify(newTerritori));
+                }
+
+                if (JSON.stringify(prePlayer.risorse || {}) !== JSON.stringify(newPlayer.risorse || {})) {
+                    multiCmd.set(`match:${mainId}:player:${username}:risorse`, JSON.stringify(newPlayer.risorse || {}));
+                }
+
+                const oldArmate = prePlayer.armate || {};
+                const newArmate = newPlayer.armate || {};
+                for (const [aId, aData] of Object.entries(newArmate)) {
+                    if (JSON.stringify(oldArmate[aId]) !== JSON.stringify(aData)) {
+                        multiCmd.hset(`match:${mainId}:player:${username}:armate`, aId, JSON.stringify(aData));
+                    }
+                }
+                for (const aId of Object.keys(oldArmate)) {
+                    if (!newArmate[aId]) {
+                        multiCmd.hdel(`match:${mainId}:player:${username}:armate`, aId);
+                    }
+                }
+
+                const oldTruppe = prePlayer.truppe || {};
+                const newTruppe = newPlayer.truppe || {};
+                for (const [tId, tData] of Object.entries(newTruppe)) {
+                    if (JSON.stringify(oldTruppe[tId]) !== JSON.stringify(tData)) {
+                        multiCmd.hset(`match:${mainId}:player:${username}:truppe`, tId, JSON.stringify(tData));
+                    }
+                }
+                for (const tId of Object.keys(oldTruppe)) {
+                    if (!newTruppe[tId]) {
+                        multiCmd.hdel(`match:${mainId}:player:${username}:truppe`, tId);
+                    }
+                }
+            }
+
+            const execResult = await multiCmd.exec();
+            if (!execResult) {
+                console.error("Errore critico in redis.multi().exec() durante updateMatch", matchId);
+                throw new Error("Transazione fallita");
+            }
+
+            return result.data;
+        } finally {
+            await redis.del(lockKey);
+        }
     }
     
-    throw new Error("Superato limite massimo di retry per aggiornamento frammentato: " + matchId);
+    throw new Error("Superato limite massimo di retry per acquisizione lock in updateMatch: " + matchId);
 }
 
 function createEmptyMatchJSON(id_partita, id_partita_hash, id_partita_visualizzato, struttura_partita) {
