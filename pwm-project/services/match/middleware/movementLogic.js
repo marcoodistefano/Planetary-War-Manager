@@ -89,83 +89,68 @@ function getEdgeGeometry(cityA, cityB) {
 const calculatePath = async (startLng, startLat, targetName, targetLng, targetLat, multiplier = 1, currentPathInfo = null) => {
     loadGeometries();
 
-    let destNode = targetName;
-    if (!nodesMap.has(destNode)) {
-        destNode = getClosestNode(targetLng, targetLat);
-    }
-
-    let candidateNodes = [];
-    if (currentPathInfo && currentPathInfo.path && currentPathInfo.currentIndex !== undefined) {
-        let nextCityName = null;
-        let prevCityName = null;
-        
-        // Cerca in avanti per la prossima città
-        for (let i = currentPathInfo.currentIndex; i < currentPathInfo.path.length; i++) {
-            const pt = currentPathInfo.path[i];
-            const city = getClosestNode(pt[0], pt[1]);
-            if (city && haversineDist(pt[0], pt[1], nodesMap.get(city)[0], nodesMap.get(city)[1]) < 0.1) {
-                nextCityName = city;
-                break;
-            }
-        }
-        
-        // Cerca all'indietro per la città precedente
-        for (let i = currentPathInfo.currentIndex; i >= 0; i--) {
-            const pt = currentPathInfo.path[i];
-            const city = getClosestNode(pt[0], pt[1]);
-            if (city && haversineDist(pt[0], pt[1], nodesMap.get(city)[0], nodesMap.get(city)[1]) < 0.1) {
-                prevCityName = city;
-                break;
-            }
-        }
-        
-        if (nextCityName && prevCityName) {
-            if (nodesMap.has(prevCityName)) candidateNodes.push({ name: prevCityName, d: haversineDist(startLng, startLat, nodesMap.get(prevCityName)[0], nodesMap.get(prevCityName)[1]) });
-            if (nodesMap.has(nextCityName) && nextCityName !== prevCityName) candidateNodes.push({ name: nextCityName, d: haversineDist(startLng, startLat, nodesMap.get(nextCityName)[0], nodesMap.get(nextCityName)[1]) });
-        }
-    }
-
-    if (candidateNodes.length === 0) {
-        let distances = [];
-        for (const [name, coords] of nodesMap.entries()) {
-            const d = haversineDist(startLng, startLat, coords[0], coords[1]);
-            distances.push({ name, d });
-        }
-        distances.sort((a, b) => a.d - b.d);
-        candidateNodes = distances.slice(0, 5); // Fallback top 5
-    }
-    
-    let bestStartNode = candidateNodes[0].name;
-    let minTotalCost = Infinity;
-    
-    for (let i = 0; i < candidateNodes.length; i++) {
-        const candidateNode = candidateNodes[i].name;
-        const distToStartNode = candidateNodes[i].d;
-        
-        if (candidateNode === destNode) {
-            const totalCost = distToStartNode;
-            if (totalCost < minTotalCost) {
-                minTotalCost = totalCost;
-                bestStartNode = candidateNode;
-            }
-            continue;
-        }
-
-        const routingRaw = await redis.get(`map_data:routing:${candidateNode}`);
-        if (routingRaw) {
-            const routingObj = JSON.parse(routingRaw);
-            const routeInfo = routingObj[destNode];
-            if (routeInfo) {
-                const totalCost = distToStartNode + (routeInfo.cost / 1000);
-                if (totalCost < minTotalCost) {
-                    minTotalCost = totalCost;
-                    bestStartNode = candidateNode;
+    let startRegion = null;
+    try {
+        const ptStart = turf.point([startLng, startLat]);
+        for (const f of regionsFeatures) {
+            if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
+                if (turf.booleanPointInPolygon(ptStart, f)) {
+                    startRegion = f;
+                    break;
                 }
             }
         }
-    }
+    } catch(e) {}
 
-    let startNode = bestStartNode;
+    let startNode = null;
+    if (startRegion) {
+        for (const [name, coords] of nodesMap.entries()) {
+            try {
+                if (turf.booleanPointInPolygon(turf.point(coords), startRegion)) {
+                    startNode = name;
+                    break;
+                }
+            } catch(e) {}
+        }
+    }
+    if (!startNode) startNode = getClosestNode(startLng, startLat);
+
+    let destNode = null;
+    if (nodesMap.has(targetName)) {
+        destNode = targetName;
+    } else {
+        let destRegion = null;
+        let destRegionId = getRegionIdByName(targetName);
+        if (destRegionId !== targetName) {
+            destRegion = regionsFeatures.find(f => (f.properties?.adm1_code || f.id) === destRegionId);
+        }
+        
+        if (!destRegion) {
+            try {
+                const ptTarget = turf.point([targetLng, targetLat]);
+                for (const f of regionsFeatures) {
+                    if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
+                        if (turf.booleanPointInPolygon(ptTarget, f)) {
+                            destRegion = f;
+                            break;
+                        }
+                    }
+                }
+            } catch(e) {}
+        }
+
+        if (destRegion) {
+            for (const [name, coords] of nodesMap.entries()) {
+                try {
+                    if (turf.booleanPointInPolygon(turf.point(coords), destRegion)) {
+                        destNode = name;
+                        break;
+                    }
+                } catch(e) {}
+            }
+        }
+    }
+    if (!destNode) destNode = getClosestNode(targetLng, targetLat);
 
     // If start and dest are same node, path is just the exact coordinates
     if (startNode === destNode) {

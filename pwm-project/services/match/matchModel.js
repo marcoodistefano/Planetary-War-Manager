@@ -74,43 +74,6 @@ const setMatchCacheAllIds = async ({
   }
 };
 
-const initializePlayerResources = async (matchId, username) => {
-  const initialResources = {
-    denaro: 100000,
-    legno: 5000,
-    piombo: 2500,
-    acciaio: 3000,
-    mattone: 4000,
-    petrolio: 1500,
-    gas: 1200,
-    uranio: 100,
-    oro: 50
-  };
-  const initialProduction = {
-    denaro: 1000,
-    legno: 0,
-    piombo: 0,
-    acciaio: 0,
-    mattone: 0,
-    petrolio: 0,
-    gas: 0,
-    uranio: 0,
-    oro: 0
-  };
-  
-  const { updateMatch } = require('../shared/matchMonolithic');
-  await updateMatch(matchId, (matchObj) => {
-      if (!matchObj || !matchObj.match) return { save: false };
-      let player = matchObj.match.player.find(p => p.username === username);
-      if (player) {
-          player.risorse = initialResources;
-          player.produzione = initialProduction;
-          player.risorse_last_update = Date.now();
-          return { save: true, matchObj, data: true };
-      }
-      return { save: false };
-  });
-};
 
 // Invalidate alliance-related cache entries for a match
 const invalidateMatchAllianceCache = async (matchId, allianceId = null) => {
@@ -535,12 +498,28 @@ const createMatch = async ({ playerId, gameMode }) => {
           await territoryGenerator.generateNations(id_partita_hash, gameMode.maxPlayers);
 
           // Inizializzazione risorse per tutte le nazioni (inclusi i bot)
-          const matchData = await getMatch(id_partita_hash);
-          if (matchData && matchData.match && matchData.match.player) {
-              for (const player of matchData.match.player) {
-                  await initializePlayerResources(id_partita_hash, player.username);
+          await updateMatch(id_partita_hash, async (matchObj) => {
+              if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+              
+              const initialResources = {
+                  denaro: 100000, legno: 5000, piombo: 2500,
+                  acciaio: 3000, mattone: 4000, petrolio: 1500,
+                  gas: 1200, uranio: 100, oro: 50
+              };
+              const initialProduction = {
+                  denaro: 1000, legno: 0, piombo: 0,
+                  acciaio: 0, mattone: 0, petrolio: 0,
+                  gas: 0, uranio: 0, oro: 0
+              };
+              const ora = Date.now();
+              
+              for (const player of matchObj.match.player) {
+                  player.risorse = { ...initialResources };
+                  player.produzione = { ...initialProduction };
+                  player.risorse_last_update = ora;
               }
-          }
+              return { save: true, matchObj, data: true };
+          });
 
           // ASSEGNAZIONE TERRITORIO ALL'HOST
           const freshClient = await db.connect();
