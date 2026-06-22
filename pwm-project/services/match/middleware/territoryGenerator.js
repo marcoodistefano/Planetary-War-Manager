@@ -169,6 +169,7 @@ const generateNations = async (matchId, maxPlayers) => {
         const citiesHpMap = {}; // Mappa degli HP per l'Opzione B
         const MORE_COMMON = ["legno", "piombo", "acciaio", "mattoni"];
         const LESS_COMMON = ["petrolio", "gas_naturale"];
+        const ULTRA_RARE = ["oro", "uranio"];
 
         for (const key in adj) {
             const reg = adj[key];
@@ -177,10 +178,17 @@ const generateNations = async (matchId, maxPlayers) => {
             const more = MORE_COMMON[Math.floor(Math.random() * MORE_COMMON.length)];
             const less = LESS_COMMON[Math.floor(Math.random() * LESS_COMMON.length)];
 
-            regionsResources[regId] = {
+            const resourceObj = {
                 more_common: more,
                 less_common: less
             };
+
+            // 5% di probabilità di avere una risorsa ultra rara
+            if (Math.random() < 0.05) {
+                resourceObj.ultra_rare = ULTRA_RARE[Math.floor(Math.random() * ULTRA_RARE.length)];
+            }
+
+            regionsResources[regId] = resourceObj;
             
             // Inizializza gli HP base della città a 1000
             citiesHpMap[regId] = 1000;

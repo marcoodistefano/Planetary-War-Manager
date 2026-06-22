@@ -2690,12 +2690,16 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     let resourcesHtml = '';
     if (this.regionsResources && this.regionsResources[provId]) {
       const res = this.regionsResources[provId];
+      let ultraRareHtml = '';
+      if (res.ultra_rare) {
+        ultraRareHtml = `<br><span style="color: #eab308; text-transform: capitalize;">${res.ultra_rare.replace('_', ' ')}</span> <span style="color: #facc15; font-size: 0.7rem; letter-spacing: 1px;">(ULTRA RARA)</span>`;
+      }
       resourcesHtml = `
         <div style="margin-top: 8px;">
           <span style="font-size: 0.65rem; color: #86d7ff; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Risorse Estraibili</span>
           <div style="font-size: 0.85rem; color: #ddd; margin-top: 2px;">
             <span style="color: #4ade80; text-transform: capitalize;">${res.more_common.replace('_', ' ')}</span> (comune)<br>
-            <span style="color: #f87171; text-transform: capitalize;">${res.less_common.replace('_', ' ')}</span> (rara)
+            <span style="color: #f87171; text-transform: capitalize;">${res.less_common.replace('_', ' ')}</span> (rara)${ultraRareHtml}
           </div>
         </div>
       `;
@@ -3045,10 +3049,37 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.hoveredState = { id: f.id, source: f.source };
       this.map.setFeatureState({ source: this.hoveredState.source, id: this.hoveredState.id }, { hover: true });
       this.map.getCanvas().style.cursor = 'pointer';
+
+      let resourceText = '--';
+      if (this.regionsResources && this.regionsResources[f.id]) {
+        const res = this.regionsResources[f.id];
+        resourceText = res.more_common;
+        if (res.ultra_rare) {
+          resourceText += ` + ${res.ultra_rare}`;
+        }
+      }
+      const outResCom = document.getElementById('out-res-com');
+      if (outResCom) {
+        outResCom.innerText = resourceText.replace(/_/g, ' ').toUpperCase();
+        if (resourceText.includes('+')) {
+          outResCom.style.color = '#eab308'; // highlight if ultra rare
+          outResCom.style.textShadow = '0 0 5px rgba(234, 179, 8, 0.5)';
+        } else {
+          outResCom.style.color = '';
+          outResCom.style.textShadow = '';
+        }
+      }
+
     } else {
       this.clearHoverState();
       if (persistSelection || this.isTouchLayout) {
         this.selectedPointName = '';
+      }
+      const outResCom = document.getElementById('out-res-com');
+      if (outResCom) {
+        outResCom.innerText = '--';
+        outResCom.style.color = '';
+        outResCom.style.textShadow = '';
       }
     }
   }
