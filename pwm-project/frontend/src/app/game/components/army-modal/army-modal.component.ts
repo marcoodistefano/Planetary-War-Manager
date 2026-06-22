@@ -39,8 +39,13 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
   @Output() armiesChange = new EventEmitter<ArmyGroup[]>();
   @Output() missionRequested = new EventEmitter<ArmyMissionRequest>();
   @Output() centerOnArmy = new EventEmitter<string>();
+  @Output() recruitUnitRequest = new EventEmitter<any>();
   @Input() playerTroops: { [key: string]: number } = {};
   @Input() armies: ArmyGroup[] = [];
+  @Input() fantiRate: number = 0;
+  @Input() trainings: any[] = [];
+  @Input() matchStructures: any[] = [];
+  @Input() gameRules: any = null;
   @Input() selectedTargetName = '';
   @Input() selectedTargetCoords = '--';
   @Input() selectedArmyId = '';
@@ -60,18 +65,17 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
   missionCoords = '';
   missionTargetName = '';
 
-  // Catalogo reclutamento
-  recruitmentCatalog = [
-    { id: 'fante', name: 'Fante', tier: 1, icon: '🪖', costMoney: 150, costSteel: 0, description: 'Unità di fanteria base. Versatile e poco costosa.', hp: 100, damage: 50 },
-    { id: 'lmv', name: 'Veicolo Leggero', tier: 1, icon: '🏎️', costMoney: 800, costSteel: 200, description: 'Mezzo veloce per ricognizione e attacchi rapidi.', hp: 300, damage: 0 },
-    { id: 'carro_armato', name: 'Carro Armato', tier: 2, icon: '🚜', costMoney: 2500, costSteel: 1200, description: 'Forza d\'urto pesante. Indispensabile per gli assedi.', hp: 2500, damage: 500 },
-    { id: 'caccia', name: 'Caccia', tier: 3, icon: '✈️', costMoney: 5000, costSteel: 800, description: 'Dominio aereo. Colpisce bersagli di terra e aria.', hp: 1200, damage: 1000 }
-  ];
+  selectedRecruitLocations: { [unitId: string]: any } = {};
+  validStructuresCache: { [unitId: string]: any[] } = {};
+
+  // Catalogo reclutamento popolato da gameRules
+  recruitmentCatalog: any[] = [];
 
   maintenanceTotal = 4250; // Valore simulato
 
   combatTimers: { [armyId: string]: string } = {};
   movementTimers: { [armyId: string]: string } = {};
+  trainingTimers: { [index: number]: string } = {};
   private timerInterval: any;
 
   constructor(private homeService: HomeService) {}
@@ -123,12 +127,92 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
         delete this.movementTimers[army.id];
       }
     }
+
+    if (this.trainings) {
+      this.trainings.forEach((t, i) => {
+        if (t.endTime) {
+          const diff = t.endTime - now;
+          if (diff > 0) {
+            const hours = Math.floor(diff / 3600000);
+            const minutes = Math.floor((diff % 3600000) / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            const timeStr = hours > 0 
+                ? `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+                : `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            this.trainingTimers[i] = timeStr;
+          } else {
+            this.trainingTimers[i] = 'Completato';
+          }
+        }
+      });
+    }
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['playerTroops'] || changes['armies'] || changes['selectedTargetName'] || changes['selectedTargetCoords'] || changes['initialTab']) {
-      this.syncFromInputs(false);
+    if (changes['gameRules']) {
+      this.buildRecruitmentCatalog();
     }
+    if (changes['playerTroops'] || changes['armies'] || changes['selectedTargetName'] || changes['selectedTargetCoords'] || changes['initialTab'] || changes['matchStructures']) {
+      this.syncFromInputs(false);
+      this.updateValidStructuresCache();
+    }
+  }
+
+  updateValidStructuresCache() {
+    this.validStructuresCache = {};
+    if (!this.recruitmentCatalog) return;
+    for (const unit of this.recruitmentCatalog) {
+       this.validStructuresCache[unit.id] = this.getValidStructuresForUnit(unit);
+       if (this.validStructuresCache[unit.id].length > 0 && !this.selectedRecruitLocations[unit.id]) {
+           this.selectedRecruitLocations[unit.id] = this.validStructuresCache[unit.id][0];
+       }
+    }
+  }
+
+  buildRecruitmentCatalog() {
+    if (!this.gameRules) return;
+    const truppeSheet = this.gameRules.sheets.find((s: any) => s.name === 'Truppe');
+    if (!truppeSheet) return;
+
+    // Definiamo le icone base e le descrizioni (o potremmo prenderle dal json se ci fossero)
+    const extraInfo: any = {
+      'fante': { icon: '🪖', description: 'Unità di fanteria base. Generata anche passivamente.' },
+      'lmv': { icon: '🏎️', description: 'Mezzo veloce per ricognizione e attacchi rapidi.' },
+      'speciali': { icon: '🥷', description: 'Forze speciali per operazioni tattiche.' },
+      'artiglieria': { icon: '🎯', description: 'Supporto dalla distanza.' },
+      'apc': { icon: '🛡️', description: 'Trasporto truppe corazzato.' },
+      'sam_mobile': { icon: '🚀', description: 'Difesa contraerea mobile.' },
+      'carro_armato': { icon: '🚜', description: 'Forza d\'urto pesante.' },
+      'missile_crociera': { icon: '🛰️', description: 'Missile tattico a lungo raggio.' },
+      'missile_balistico': { icon: '🚀', description: 'Missile strategico intercontinentale.' },
+      'icbm': { icon: '☢️', description: 'Arma di distruzione di massa.' }
+    };
+
+    const newCatalog = [];
+    for (const unit of truppeSheet.lines) {
+      if (!unit.id_truppa) continue;
+      if (unit.id_truppa === 'fante') continue;
+      // Filtriamo solo le truppe di terra (prodotte in caserma o fabbrica, no aria o mare per ora)
+      if (unit.prodotta_in && (unit.prodotta_in.startsWith('caserma') || unit.prodotta_in.startsWith('fabbrica'))) {
+        newCatalog.push({
+          id: unit.id_truppa,
+          name: unit.nome || unit.id_truppa,
+          tier: unit.tier || 1,
+          icon: extraInfo[unit.id_truppa]?.icon || '⚔️',
+          description: extraInfo[unit.id_truppa]?.description || 'Unità di terra.',
+          costMoney: unit.costo_denaro || 0,
+          costSteel: unit.costo_acciaio || 0,
+          costLead: unit.costo_piombo || 0,
+          costOil: unit.costo_petrolio || 0,
+          costUranium: unit.costo_uranio || 0,
+          hp: unit.HP || 100,
+          damage: unit.danno_base || 10,
+          trainTime: unit.tempo_addestramento || 0,
+          requiredBuilding: unit.prodotta_in // Es: 'caserma_t1'
+        });
+      }
+    }
+    this.recruitmentCatalog = newCatalog;
   }
 
   get availableTroopEntries() {
@@ -371,9 +455,73 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
     return 'ellipse-outline';
   }
 
+  getValidStructuresForUnit(unit: any): any[] {
+    if (!this.matchStructures || !unit.requiredBuilding) return [];
+    const reqBase = unit.requiredBuilding.split('_')[0];
+    const reqTier = parseInt(unit.requiredBuilding.split('_t')[1]) || 1;
+
+    return this.matchStructures.filter((s: any) => {
+      if (s.owner !== this.currentUsername || s.status !== 'built') return false;
+      const sBase = s.structureId.split('_')[0];
+      const sTier = parseInt(s.structureId.split('_t')[1]) || 1;
+      return sBase === reqBase && sTier >= reqTier;
+    });
+  }
+
+  isTrainingInProgress(): boolean {
+    return this.trainings && this.trainings.length > 0;
+  }
+
+  getInProgressTrainingTime(): string {
+    if (!this.trainings || this.trainings.length === 0) return '';
+    // Find the first training that is not complete
+    for (let i = 0; i < this.trainings.length; i++) {
+       if (this.trainingTimers[i] && this.trainingTimers[i] !== 'Completato') {
+           return this.trainingTimers[i];
+       }
+    }
+    return '';
+  }
+
+  hasRequiredStructure(unit: any): boolean {
+    if (!unit.requiredBuilding) return true;
+    const cache = this.validStructuresCache[unit.id];
+    return cache && cache.length > 0;
+  }
+
+  canRecruit(unit: any): boolean {
+    if (unit.id !== 'fante' && this.isTrainingInProgress()) {
+      return false;
+    }
+    return this.hasRequiredStructure(unit);
+  }
+
   recruitUnit(unit: any) {
-    console.log(`RECLUTAMENTO AVVIATO: ${unit.name}`);
-    // Logica di backend qui
+    if (!this.canRecruit(unit)) {
+      console.warn("Requisiti struttura non soddisfatti per " + unit.name);
+      return;
+    }
+
+    let targetName = this.selectedTargetName;
+    let targetCoords = this.selectedTargetCoords;
+
+    if (unit.requiredBuilding) {
+      const selectedStruct = this.selectedRecruitLocations[unit.id];
+      if (selectedStruct) {
+         targetName = selectedStruct.locationName;
+         targetCoords = selectedStruct.coords ? `${selectedStruct.coords[0]}, ${selectedStruct.coords[1]}` : '--';
+      }
+    }
+
+    console.log(`RECLUTAMENTO AVVIATO: ${unit.name} a ${targetName}`);
+    this.recruitUnitRequest.emit({
+      unitId: unit.id,
+      targetName: targetName,
+      targetCoords: targetCoords,
+      costMoney: unit.costMoney,
+      costSteel: unit.costSteel,
+      trainTime: unit.trainTime
+    });
   }
 
   centerOnArmyMap(army: ArmyGroup) {

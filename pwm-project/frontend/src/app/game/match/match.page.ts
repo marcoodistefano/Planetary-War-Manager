@@ -9,7 +9,6 @@ import { AuthApiService } from '../../auth/auth-api.service';
 import { UserStateService } from '../../user-state.service';
 import { environment } from '../../../environments/environment';
 
-// Componenti
 import { ProfileModalComponent } from '../components/profile-modal/profile-modal.component';
 import { DiplomacyModalComponent } from '../components/diplomacy-modal/diplomacy-modal.component';
 import { IntelligenceModalComponent } from '../components/intelligence-modal/intelligence-modal.component';
@@ -18,7 +17,6 @@ import { TechTreeComponent } from '../components/tech-tree/tech-tree.component';
 import { MarketModalComponent } from '../components/market-modal/market-modal.component';
 import { ArmyModalComponent } from '../components/army-modal/army-modal.component';
 
-// Librerie esterne caricate via CDN o definite globalmente
 declare var maplibregl: any;
 declare var topojson: any;
 declare var THREE: any;
@@ -107,6 +105,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   isChatOpen = false;
   isMarketModalOpen = false;
   isArmyModalOpen = false;
+  playerTrainings: any[] = [];
+  fantiRate: number = 0;
+
+  showResourceDetails = false;
   armyModalInitialTab: 'management' | 'operations' = 'management';
   isTroopsDropdownOpen = false;
   troopsDropdownX = 0;
@@ -128,6 +130,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   isFirstArmyRender = true;
   matchNations: any[] = [];
   regionsGeoData: any = null;
+  regionIdMap: Map<string, number> = new Map();
   nationMarkers: any[] = [];
   regionsResources: any = {};
   citiesHp: { [cityId: string]: number } = {};
@@ -529,6 +532,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             if (parsed.payload?.technologies) {
               this.userTechnologies = parsed.payload.technologies;
             }
+            if (parsed.payload?.trainings) {
+              this.playerTrainings = parsed.payload.trainings;
+            }
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
@@ -548,12 +554,40 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
+          if (parsed.type === 'RECRUIT_UNIT_SUCCESS') {
+            if (parsed.payload?.trainings) {
+              this.playerTrainings = parsed.payload.trainings;
+            }
+            if (parsed.payload?.resources) {
+              this.playerResources = parsed.payload.resources;
+            }
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
           if (parsed.type === 'RESOURCES_UPDATED') {
             if (parsed.data?.resources) {
               this.playerResources = parsed.data.resources;
             }
             if (parsed.data?.production) {
               this.resourceProduction = parsed.data.production;
+            }
+            if (parsed.data?.truppe) {
+              this.playerTroops = parsed.data.truppe;
+            }
+            if (parsed.data?.fanti_rate !== undefined) {
+              this.fantiRate = parsed.data.fanti_rate;
+            }
+            if (parsed.data?.armies_updated && parsed.data?.armies) {
+              this.matchArmies = parsed.data.armies;
+            }
+            if (parsed.data?.addestramenti) {
+              this.playerTrainings = parsed.data.addestramenti;
+            }
+            if (parsed.data?.strutture) {
+              const playerStr = parsed.data.strutture.map((s: any) => ({ ...s, owner: this.userProfile.username }));
+              // Keep non-player structures intact
+              this.matchStructures = this.matchStructures.filter((s: any) => s.owner !== this.userProfile.username).concat(playerStr);
+              setTimeout(() => this.renderStructures(), 100);
             }
             this.ngZone.run(() => this.cdr.detectChanges());
           }
@@ -1344,7 +1378,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     } else {
       items = this.gameRules?.sheets?.find((s: any) => s.name === 'Strutture')?.lines || [];
     }
-    
+
     return items.filter((item: any) => {
       const tier = item.tier || 1;
       const id = item.id_extractor || item.id_struttura;
@@ -1613,26 +1647,26 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     let extDetails: any = null;
     let strDetails: any = null;
     let risorse: any[] = [];
-    
+
     if (this.gameRules && this.gameRules.sheets) {
-        const estrattori = this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
-        const strutture = this.gameRules.sheets.find((s: any) => s.name === 'Strutture')?.lines || [];
-        risorse = this.gameRules.sheets.find((s: any) => s.name === 'Risorse')?.lines || [];
-        
-        extDetails = estrattori.find((s: any) => s.id_extractor === structure.structureId);
-        if (extDetails && extDetails.tier !== undefined) {
-            tierDisplay = ` <span style="color:#fcd34d; font-size:0.85em; margin-left: 5px;">[T${extDetails.tier}]</span>`;
-        } else {
-            strDetails = strutture.find((s: any) => s.id_struttura === structure.structureId);
-            if (strDetails && strDetails.tier !== undefined) {
-                tierDisplay = ` <span style="color:#fcd34d; font-size:0.85em; margin-left: 5px;">[T${strDetails.tier}]</span>`;
-            }
+      const estrattori = this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
+      const strutture = this.gameRules.sheets.find((s: any) => s.name === 'Strutture')?.lines || [];
+      risorse = this.gameRules.sheets.find((s: any) => s.name === 'Risorse')?.lines || [];
+
+      extDetails = estrattori.find((s: any) => s.id_extractor === structure.structureId);
+      if (extDetails && extDetails.tier !== undefined) {
+        tierDisplay = ` <span style="color:#fcd34d; font-size:0.85em; margin-left: 5px;">[T${extDetails.tier}]</span>`;
+      } else {
+        strDetails = strutture.find((s: any) => s.id_struttura === structure.structureId);
+        if (strDetails && strDetails.tier !== undefined) {
+          tierDisplay = ` <span style="color:#fcd34d; font-size:0.85em; margin-left: 5px;">[T${strDetails.tier}]</span>`;
         }
+      }
     }
 
     let html = `<div style="text-align: center; font-family: 'Rajdhani', sans-serif;">`;
     html += `<strong style="font-size: 1.1em; color: #60a5fa;">${structure.name}</strong>${tierDisplay} <span style="color:#a1a1aa; font-size:0.9em">(${structure.owner})</span><br/>`;
-    
+
     if (structure.status === 'building') {
       if (structure.completionTime) {
         const timeLeftMs = Math.max(0, structure.completionTime - Date.now());
@@ -1671,19 +1705,19 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     name = (name || '').toLowerCase();
 
     if (structureId && this.gameRules && this.gameRules.sheets) {
-        const estrattori = this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
-        const extDetails = estrattori.find((s: any) => s.id_extractor === structureId);
-        if (extDetails && extDetails.risorsa_estratta) {
-            const resType = extDetails.risorsa_estratta.toLowerCase();
-            if (resType === 'legno') return 'segheria.png';
-            if (resType === 'mattoni') return 'mattonificio.png';
-            if (resType === 'acciaio') return 'acciaieria.png';
-            if (resType === 'petrolio') return 'petrolio.png';
-            if (resType === 'piombo') return 'carbone.png'; // Fallback per miniere senza icona dedicata
-            if (resType === 'oro') return 'miniera_oro.png';
-            if (resType === 'uranio') return 'arricchimento_uranio.png';
-            if (resType === 'gas_naturale') return 'gas.png';
-        }
+      const estrattori = this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
+      const extDetails = estrattori.find((s: any) => s.id_extractor === structureId);
+      if (extDetails && extDetails.risorsa_estratta) {
+        const resType = extDetails.risorsa_estratta.toLowerCase();
+        if (resType === 'legno') return 'segheria.png';
+        if (resType === 'mattoni') return 'mattonificio.png';
+        if (resType === 'acciaio') return 'acciaieria.png';
+        if (resType === 'petrolio') return 'petrolio.png';
+        if (resType === 'piombo') return 'carbone.png'; // Fallback per miniere senza icona dedicata
+        if (resType === 'oro') return 'miniera_oro.png';
+        if (resType === 'uranio') return 'arricchimento_uranio.png';
+        if (resType === 'gas_naturale') return 'gas.png';
+      }
     }
 
     if (name.includes('segheria') || name.includes('boschivo')) png = 'segheria.png';
@@ -1768,7 +1802,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         let png = this.getStructureImage(structure.name, structure.structureId);
         if (structure.status === 'building') {
-            png = 'workinprogress.png';
+          png = 'workinprogress.png';
         }
 
         const img = document.createElement('img');
@@ -1777,27 +1811,27 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         img.style.height = '100%';
         img.style.objectFit = 'contain';
         img.style.filter = isMine ? 'drop-shadow(0 0 5px #60a5fa)' : 'drop-shadow(0 0 5px #ef4444)';
-        
+
         if (structure.status === 'building') {
-            img.style.opacity = '0.5';
+          img.style.opacity = '0.5';
         }
-        
+
         img.removeAttribute('title'); // Remove native tooltip
-        
+
         const popup = new maplibregl.Popup({
-            closeButton: false,
-            closeOnClick: false,
-            offset: 20,
-            className: 'structure-hover-popup'
+          closeButton: false,
+          closeOnClick: false,
+          offset: 20,
+          className: 'structure-hover-popup'
         });
 
         img.addEventListener('mouseenter', () => {
-            popup.setHTML(this.getStructureTooltipHTML(structure))
-                 .setLngLat(coords as [number, number])
-                 .addTo(this.map);
+          popup.setHTML(this.getStructureTooltipHTML(structure))
+            .setLngLat(coords as [number, number])
+            .addTo(this.map);
         });
         img.addEventListener('mouseleave', () => {
-            popup.remove();
+          popup.remove();
         });
 
         container.appendChild(img);
@@ -1816,22 +1850,22 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         marker.setLngLat(coords);
         const img = marker.getElement().querySelector('img') as HTMLImageElement;
         if (img) {
-            let png = this.getStructureImage(structure.name, structure.structureId);
-            if (structure.status === 'building') {
-                png = 'workinprogress.png';
-            }
-            img.src = `assets/2Dmodels/Buildings/${png}`;
-            img.style.opacity = structure.status === 'building' ? '0.5' : '1';
-            
-            // Re-assign listeners
-            const existingPopup = (img as any)._structurePopup;
-            if (existingPopup) {
-                img.onmouseenter = () => {
-                    existingPopup.setHTML(this.getStructureTooltipHTML(structure))
-                         .setLngLat(coords as [number, number])
-                         .addTo(this.map);
-                };
-            }
+          let png = this.getStructureImage(structure.name, structure.structureId);
+          if (structure.status === 'building') {
+            png = 'workinprogress.png';
+          }
+          img.src = `assets/2Dmodels/Buildings/${png}`;
+          img.style.opacity = structure.status === 'building' ? '0.5' : '1';
+
+          // Re-assign listeners
+          const existingPopup = (img as any)._structurePopup;
+          if (existingPopup) {
+            img.onmouseenter = () => {
+              existingPopup.setHTML(this.getStructureTooltipHTML(structure))
+                .setLngLat(coords as [number, number])
+                .addTo(this.map);
+            };
+          }
         }
       }
     });
@@ -1851,7 +1885,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         }
       }
     }
-    
+
     // Create sorted object so the dropdown looks nice
     const sortedTotals: Record<string, number> = {};
     Object.keys(totals).sort().forEach(k => sortedTotals[k] = totals[k]);
@@ -2823,12 +2857,43 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  onRecruitUnitRequest(event: any) {
+    console.log("Inviando richiesta RECRUIT_UNIT", event);
+    if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
+      this.matchSocket.send(JSON.stringify({
+        action: 'RECRUIT_UNIT',
+        matchId: this.currentMatchId,
+        unitId: event.unitId,
+        targetName: event.targetName,
+        targetCoords: event.targetCoords,
+        costMoney: event.costMoney,
+        costSteel: event.costSteel,
+        trainTime: event.trainTime
+      }));
+      this.toastCtrl.create({
+        message: 'Richiesta di addestramento inviata...',
+        duration: 2000,
+        position: 'top',
+        color: 'primary'
+      }).then(t => t.present());
+    } else {
+      console.warn("WebSocket non pronto per RECRUIT_UNIT");
+      this.toastCtrl.create({
+        message: 'Connessione al server persa. Aggiorna la pagina.',
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      }).then(t => t.present());
+    }
+  }
+
   saveArmiesToBackend() {
     if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
       this.matchSocket.send(JSON.stringify({
         action: 'SAVE_ARMIES',
         payload: {
-          armies: this.matchArmies
+          armies: this.matchArmies,
+          playerTroops: this.playerTroops
         }
       }));
     }
@@ -3162,26 +3227,37 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadTopoJsonLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
-    const fetchUrl = `${url}?v=${new Date().getTime()}`;
+    const fetchUrl = url;
     fetch(fetchUrl).then(res => res.json()).then(topology => {
       const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
 
       if (layerId === 'regioni-layer') {
+        let nextId = 1;
+        this.regionIdMap = new Map<string, number>();
+        geoData.features.forEach((f: any) => {
+          f.id = nextId++;
+          const pId = f.properties.adm1_code || f.properties.name;
+          if (pId) {
+            this.regionIdMap.set(String(pId).toLowerCase(), f.id);
+          }
+        });
         this.regionsGeoData = geoData;
       }
 
-      this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
+      this.map.addSource(sourceId, { type: 'geojson', data: geoData });
 
       const paintConfig = layerId === 'regioni-layer' ? {
         'fill-color': [
           'case',
           ['boolean', ['feature-state', 'hover'], false], '#00ccffff',
+          ['!=', ['feature-state', 'color'], null], ['feature-state', 'color'],
           ['has', 'fillColor'], ['get', 'fillColor'],
           'rgba(150, 150, 150, 0.2)'
         ],
         'fill-opacity': [
           'case',
           ['boolean', ['feature-state', 'hover'], false], 0.25,
+          ['!=', ['feature-state', 'color'], null], 0.45,
           ['has', 'fillColor'], 0.45,
           0.1
         ]
@@ -3210,7 +3286,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadTopoJsonArchsLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
-    const fetchUrl = `${url}?v=${new Date().getTime()}`;
+    const fetchUrl = url;
     fetch(fetchUrl).then(res => res.json()).then(topology => {
       let allFeatures: any[] = [];
       const featureMap = new Map<string, any>();
@@ -3253,7 +3329,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadTopoJsonCitiesLayer(url: string, sourceId: string, pointsLayerId: string, labelsLayerId: string, minZ: number, maxZ: number) {
-    const fetchUrl = `${url}?v=${new Date().getTime()}`;
+    const fetchUrl = url;
     fetch(fetchUrl).then(res => res.json()).then(topology => {
       const objectName = Object.keys(topology.objects || {})[0];
       if (!objectName) {
@@ -3430,28 +3506,25 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       });
     }
 
-    let hasChanges = false;
-    this.regionsGeoData.features.forEach((f: any) => {
-      const pId = f.properties.adm1_code || f.properties.name || f.id;
-      let newColor = '#00000000'; // Trasparente
+    // Remove old feature states to reset colors
+    if (this.map.getSource('regioni')) {
+      this.map.removeFeatureState({ source: 'regioni' });
 
-      if (pId && attackedTerritories.has(pId.toLowerCase())) {
-        newColor = '#ef4444'; // Red for territories under attack
-      } else if (colorMap[pId]) {
-        newColor = colorMap[pId];
+      // Apply ownership colors
+      for (const [pId, color] of Object.entries(colorMap)) {
+        const numericId = this.regionIdMap.get(pId.toLowerCase());
+        if (numericId !== undefined) {
+          this.map.setFeatureState({ source: 'regioni', id: numericId }, { color: color });
+        }
       }
 
-      if (f.properties.fillColor !== newColor) {
-        f.properties.fillColor = newColor;
-        hasChanges = true;
-      }
-    });
-
-    if (hasChanges) {
-      const source = this.map.getSource('regioni') as any;
-      if (source) {
-        source.setData(this.regionsGeoData);
-      }
+      // Overwrite with attacked colors
+      attackedTerritories.forEach(pId => {
+        const numericId = this.regionIdMap.get(pId.toLowerCase());
+        if (numericId !== undefined) {
+          this.map.setFeatureState({ source: 'regioni', id: numericId }, { color: '#ef4444' });
+        }
+      });
     }
 
     this.updateNationBannersVisibility();

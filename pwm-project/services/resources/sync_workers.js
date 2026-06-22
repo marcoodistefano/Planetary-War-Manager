@@ -179,6 +179,10 @@ async function generateResources() {
 
                     const strutture = player.strutture || [];
                     for (const s of strutture) {
+                        if (s.status === 'building' && s.completionTime && Date.now() >= s.completionTime) {
+                            s.status = 'built';
+                            delete s.completionTime;
+                        }
                         if (s.status === 'built' && typeof estrattoriRules !== 'undefined' && estrattoriRules[s.structureId]) {
                             const rule = estrattoriRules[s.structureId];
                             const baseProd = ruleProd[rule.risorsa_estratta] || 0;
@@ -213,6 +217,55 @@ async function generateResources() {
                     player.risorse = resources;
                     player.risorse_last_update = now;
 
+                    // --- GENERAZIONE PASSIVA FANTI ---
+                    let truppe_float = player.truppe_float || {};
+                    let truppe = player.truppe || {};
+                    // Inizializza fanti se non esiste
+                    if (truppe_float.fante === undefined) truppe_float.fante = truppe.fante || 0;
+                    
+                    // Generazione passiva fissa: 50 fanti all'ora reale
+                    const fantiProdRate = 50; 
+                    truppe_float.fante += (fantiProdRate / 3600) * dt;
+                    truppe.fante = Math.floor(truppe_float.fante);
+
+                    player.truppe = truppe;
+                    player.truppe_float = truppe_float;
+                    
+                    // --- GESTIONE CODA DI ADDESTRAMENTO ---
+                    let addestramenti = player.addestramenti || [];
+                    let addestramentiRimasti = [];
+                    let nuoveArmate = false;
+                    for (const add of addestramenti) {
+                        if (now >= add.endTime) {
+                            // Addestramento completato: Spawna l'armata sul nodo!
+                            const uuidv4 = require('crypto').randomUUID; // Assicuriamoci di averlo
+                            
+                            const spawnName = `Armata ${add.troopId}`;
+                            const newArmy = {
+                                id: uuidv4(),
+                                name: spawnName,
+                                composition: { [add.troopId]: add.count || 1 },
+                                status: 'standby',
+                                currentLocation: add.spawnCoords,
+                                path: [],
+                                timestamp: Date.now()
+                            };
+                            
+                            if (!player.armate) player.armate = [];
+                            // Controlla se è un array o un dizionario. Nel frontend `armate` è spesso un array, ma in redis?
+                            // Wait, nel DB è dict o array? `server.js` lo tratta come dict: `player.armate[armyId]`? No, nel frontend è Array. `matchObj.match.player.armate` is an array?
+                            if (Array.isArray(player.armate)) {
+                                player.armate.push(newArmy);
+                            } else {
+                                player.armate[newArmy.id] = newArmy;
+                            }
+                            nuoveArmate = true;
+                        } else {
+                            addestramentiRimasti.push(add);
+                        }
+                    }
+                    player.addestramenti = addestramentiRimasti;
+
                     if (userId) {
                         const feResources = translateRedisToFe(resources);
                         const feProduction = translateRedisToFe(production);
@@ -224,7 +277,13 @@ async function generateResources() {
                                 type: 'RESOURCES_UPDATED',
                                 data: {
                                     resources: feResources,
-                                    production: feProduction
+                                    production: feProduction,
+                                    truppe: player.truppe,
+                                    fanti_rate: fantiProdRate,
+                                    armies_updated: nuoveArmate,
+                                    armies: player.armate ? (Array.isArray(player.armate) ? player.armate : Object.values(player.armate)) : [],
+                                    addestramenti: player.addestramenti,
+                                    strutture: player.strutture
                                 }
                             }
                         };

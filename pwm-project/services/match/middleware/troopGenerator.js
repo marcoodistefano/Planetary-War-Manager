@@ -276,11 +276,7 @@ const generateTroopsPeriodic = async () => {
 };
 
 const startTroopGenerator = () => {
-    console.log('[SYSTEM] Avvio cron timer Troop Generator');
-    // Esempio: esegue ogni ora / moltiplicatore. In locale usiamo 5 minuti per test.
-    // L'utente vuole un intervallo_periodico / moltiplicatore. 
-    // Attualmente impostiamo a 1 minuto per testing (60000ms)
-    setInterval(generateTroopsPeriodic, 60000); 
+    console.log('[SYSTEM] Avvio cron timer Troop Generator DISABILITATO. Generazione fanti demandata a sync_workers.js');
 };
 
 module.exports = { 

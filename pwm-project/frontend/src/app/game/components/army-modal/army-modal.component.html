@@ -279,26 +279,7 @@
           <p class="status-msg">Le truppe qui rappresentano il bacino operativo da cui creare nuove armate o rinforzare quelle esistenti.</p>
         </ng-container>
 
-        <ng-container *ngIf="activeTab === 'recruitment'">
-          <p class="track-label">Addestramento Unità Militari</p>
-          <div class="recruitment-list">
-            <div class="build-card no-hover" *ngFor="let unit of recruitmentCatalog">
-              <div class="build-info">
-                <span class="item-name">{{ unit.icon }} {{ unit.name }}</span>
-                <span class="item-tier">TIER {{ unit.tier }}</span>
-              </div>
-              <p class="unit-description">{{ unit.description }}</p>
-              
-              <div class="recruitment-actions">
-                <div class="cost-row">
-                   <span class="cost-unit" *ngIf="unit.costMoney">💵 {{ unit.costMoney | number }}</span>
-                   <span class="cost-unit" *ngIf="unit.costSteel">🏗️ {{ unit.costSteel | number }}</span>
-                </div>
-                <button class="primary-glow slim" (click)="recruitUnit(unit)">ADDESTRA</button>
-              </div>
-            </div>
-          </div>
-        </ng-container>
+
 
         <ng-container *ngIf="activeTab === 'logistics'">
           <p class="track-label">Rapporto Manutenzione e Rifornimenti</p>
@@ -321,21 +302,60 @@
         </ng-container>
 
         <ng-container *ngIf="activeTab === 'recruitment'">
-          <p class="track-label">Addestramento Unità Militari</p>
+          <div class="panel-head">
+             <div>
+               <p class="track-label">Addestramento Unità Militari</p>
+               <h3>Generazione Passiva Fanti: <span style="color: #4ade80">+{{ fantiRate | number:'1.0-0' }}/h</span></h3>
+             </div>
+          </div>
+
+          <div class="trainings-queue" *ngIf="trainings && trainings.length > 0" style="margin-bottom: 20px;">
+             <p class="track-label" style="color: var(--primary-blue)">Coda Addestramento</p>
+             <div *ngFor="let t of trainings; let i = index" style="background: rgba(0,0,0,0.3); padding: 10px; margin-bottom: 5px; border-left: 2px solid var(--primary-blue); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <span style="color: #fff; font-weight: bold;">{{ t.troopId | uppercase }}</span> in addestramento a <strong>{{ t.targetName }}</strong>
+                </div>
+                <div style="color: #fbbf24; font-family: monospace; font-size: 14px;">
+                  <ion-icon name="time-outline" style="vertical-align: middle; margin-right: 4px;"></ion-icon>
+                  {{ trainingTimers[i] || 'Calcolo...' }}
+                </div>
+             </div>
+          </div>
+
           <div class="recruitment-list">
-            <div class="build-card no-hover" *ngFor="let unit of recruitmentCatalog">
+            <div class="build-card no-hover" *ngFor="let unit of recruitmentCatalog" [ngClass]="{'disabled': !canRecruit(unit)}">
               <div class="build-info">
                 <span class="item-name">{{ unit.icon }} {{ unit.name }}</span>
                 <span class="item-tier">TIER {{ unit.tier }}</span>
               </div>
-              <p class="unit-description">{{ unit.description }}</p>
+              <p class="unit-description">
+                <span *ngIf="!hasRequiredStructure(unit)" style="color: #f87171; display: block; margin-bottom: 4px;">
+                  <ion-icon name="warning"></ion-icon> Richiede: {{ unit.requiredBuilding | uppercase }}
+                </span>
+                <span *ngIf="isTrainingInProgress() && unit.id !== 'fante'" style="color: #f59e0b; display: block; margin-bottom: 4px;">
+                  <ion-icon name="time"></ion-icon> Un altro addestramento è in corso ({{ getInProgressTrainingTime() }})
+                </span>
+                <span *ngIf="hasRequiredStructure(unit) && unit.requiredBuilding" style="display: block; margin-top: 8px; margin-bottom: 8px;">
+                  <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">LUOGO SCHIERAMENTO:</label>
+                  <select [(ngModel)]="selectedRecruitLocations[unit.id]" style="width: 100%; background: #1e293b; color: #fff; border: 1px solid #334155; padding: 5px; border-radius: 4px; font-family: inherit;">
+                    <option [ngValue]="undefined" disabled>Seleziona una base...</option>
+                    <option *ngFor="let s of validStructuresCache[unit.id]" [ngValue]="s">
+                      {{ s.name || s.structureId }} ({{ s.targetName || s.regionId }})
+                    </option>
+                  </select>
+                </span>
+                {{ unit.description }}
+              </p>
 
               <div class="recruitment-actions">
                 <div class="cost-row">
                    <span class="cost-unit" *ngIf="unit.costMoney">💵 {{ unit.costMoney | number }}</span>
                    <span class="cost-unit" *ngIf="unit.costSteel">🏗️ {{ unit.costSteel | number }}</span>
                 </div>
-                <button class="primary-glow slim" (click)="recruitUnit(unit)">ADDESTRA</button>
+                <button class="primary-glow slim" [disabled]="!canRecruit(unit)" (click)="recruitUnit(unit)">
+                  <ion-icon *ngIf="!canRecruit(unit)" name="lock-closed"></ion-icon>
+                  {{ canRecruit(unit) ? 'ADDESTRA' : 'BLOCCATO' }}
+                </button>
               </div>
             </div>
           </div>

@@ -116,6 +116,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                     let production = translateRedisToFe({});
                     let structures = [];
                     let technologies = [];
+                    let trainings = [];
 
                     if (matchData && matchData.match && matchData.match.player) {
                         nations = matchData.match.player;
@@ -132,6 +133,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                                 resources = translateRedisToFe(p.risorse);
                                 production = translateRedisToFe(p.produzione);
                                 technologies = p.technologies || [];
+                                trainings = p.addestramenti || [];
                             }
                         }
                     }
@@ -141,7 +143,74 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                     ws.send(JSON.stringify({
                         type: 'INITIAL_STATE',
-                        payload: { armies, nations, resources, production, structures, regionsResources, technologies }
+                        payload: { armies, nations, resources, production, structures, regionsResources, technologies, trainings }
+                    }));
+                    return;
+                }
+
+                if (payload.action === 'RECRUIT_UNIT') {
+                    console.log("[RECRUIT_UNIT] Inizio elaborazione", payload);
+                    const { unitId, targetName, targetCoords, costMoney, costSteel, trainTime } = payload;
+                    
+                    await updateMatch(ws.matchId, async (matchObj) => {
+                        if (!matchObj || !matchObj.match || !matchObj.match.player) {
+                            console.log("[RECRUIT_UNIT] Partita o player mancanti");
+                            return { save: false };
+                        }
+
+                        let player = matchObj.match.player.find(p => p.username === ws.username);
+                        if (!player) {
+                            console.log("[RECRUIT_UNIT] Player non trovato per", ws.username);
+                            return { save: false };
+                        }
+
+                        if (unitId !== 'fante' && player.addestramenti && player.addestramenti.length > 0) {
+                            console.log("[RECRUIT_UNIT] Addestramento già in corso");
+                            ws.send(JSON.stringify({ type: 'ERROR', error: 'Coda di addestramento occupata.' }));
+                            return { save: false };
+                        }
+                        
+                        let resources = player.risorse || { denaro: 0, acciaio: 0 };
+                        
+                        if (resources.denaro < costMoney || resources.acciaio < (costSteel || 0)) {
+                            console.log("[RECRUIT_UNIT] Risorse insufficienti");
+                            ws.send(JSON.stringify({ type: 'ERROR', error: 'Risorse insufficienti per il reclutamento.' }));
+                            return { save: false };
+                        }
+                        
+                        resources.denaro -= costMoney;
+                        if (costSteel) resources.acciaio -= costSteel;
+                        player.risorse = resources;
+                        
+                        let multiplier = 1;
+                        if (matchObj.match.struttura_partita) {
+                            try {
+                                const decodedMatch = Eru.decode_match(matchObj.match.struttura_partita);
+                                multiplier = decodedMatch.multiplierValue || 1;
+                            } catch (err) {}
+                        }
+                        const trainTimeMs = (trainTime / multiplier) * 3600 * 1000;
+                        const endTime = Date.now() + trainTimeMs;
+                        
+                        if (!player.addestramenti) player.addestramenti = [];
+                        player.addestramenti.push({
+                            troopId: unitId,
+                            targetName: targetName,
+                            spawnCoords: targetCoords,
+                            count: 1,
+                            endTime: endTime
+                        });
+                        console.log(`[RECRUIT_UNIT] Salvataggio addestramento di ${unitId} per ${ws.username}`);
+                        return { save: true, matchObj, data: true };
+                    });
+                    
+                    const trainTimeMs = (trainTime / 1) * 3600 * 1000;
+                    ws.send(JSON.stringify({
+                        type: 'RECRUIT_UNIT_SUCCESS',
+                        payload: {
+                            trainings: player.addestramenti,
+                            resources: player.risorse
+                        }
                     }));
                     return;
                 }
@@ -701,13 +770,21 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             const buildEtaMs = (tempoCostruzioneHours * 60 * 60 * 1000) / multiplier;
                             const isBuilding = buildEtaMs > 0;
 
+                            let finalTargetCoords = targetCoords;
+                            if (replacedStructureId) {
+                                const oldStruct = strutture.find(s => s.id === replacedStructureId);
+                                if (oldStruct && oldStruct.targetCoords) {
+                                    finalTargetCoords = oldStruct.targetCoords;
+                                }
+                            }
+
                             const newStructure = {
                                 id: require('crypto').randomUUID(),
                                 structureId: structureId,
                                 name: structureDetails.nome || structureDetails.name,
                                 targetName: targetName,
                                 regionId: regionId,
-                                targetCoords: targetCoords,
+                                targetCoords: finalTargetCoords,
                                 status: isBuilding ? 'building' : 'built',
                                 owner: ws.username,
                                 buildTime: Date.now(),
