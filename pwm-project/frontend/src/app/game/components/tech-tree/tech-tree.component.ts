@@ -13,7 +13,9 @@ import { IonicModule } from '@ionic/angular';
 export class TechTreeComponent implements OnInit {
   @Input() gameRules: any;
   @Input() playerResources: any;
+  @Input() userTechnologies: string[] = [];
   @Output() close = new EventEmitter<void>();
+  @Output() research = new EventEmitter<string>();
   
   activeBranch = 'hq';
   selectedNode: any = null;
@@ -194,11 +196,40 @@ export class TechTreeComponent implements OnInit {
   }
 
   hasResources(node: any): boolean {
-    return this.playerResources.denaro >= (node.costo_denaro || 0);
+    if (!this.playerResources) return false;
+    
+    const costs = [
+      { req: node.costo_denaro || 0, avail: this.playerResources.denaro || 0 },
+      { req: node.costo_legno || 0, avail: this.playerResources.legno || 0 },
+      { req: node.costo_mattoni || 0, avail: this.playerResources.mattoni || 0 },
+      { req: node.costo_acciaio || 0, avail: this.playerResources.acciaio || 0 },
+      { req: node.costo_petrolio || 0, avail: this.playerResources.petrolio || 0 },
+      { req: (node.costo_piombo || node.costo_piombio) || 0, avail: this.playerResources.piombo || 0 },
+      { req: node.costo_gas || 0, avail: this.playerResources.gas_naturale || 0 },
+      { req: node.costo_uranio || 0, avail: this.playerResources.uranio || 0 },
+      { req: node.costo_oro || 0, avail: this.playerResources.oro || 0 }
+    ];
+
+    for (let c of costs) {
+      if (c.avail < c.req) return false;
+    }
+    return true;
+  }
+
+  isUnlocked(node: any): boolean {
+    const tier = node.tier || 1;
+    if (tier === 1) return true;
+    const id = node.id_struttura || node.id_extractor;
+    return this.userTechnologies.includes(id);
   }
 
   canUnlock(node: any): boolean {
-    // Qui andrebbe la logica per controllare se la tech precedente è sbloccata
+    const tier = node.tier || 1;
+    if (tier <= 2) return true;
+    const reqPrevStructure = node.richiede_struttura || node.richiede_estrattore;
+    if (reqPrevStructure) {
+      return this.userTechnologies.includes(reqPrevStructure);
+    }
     return true; 
   }
 
@@ -207,8 +238,9 @@ export class TechTreeComponent implements OnInit {
   }
 
   confirmResearch(node: any) {
-    console.log("Inizio Ricerca:", node.nome || node.name);
-    // Logica di avvio...
+    const id = node.id_struttura || node.id_extractor;
+    this.research.emit(id);
+    this.selectedNode = null;
   }
 
   closeModal() {

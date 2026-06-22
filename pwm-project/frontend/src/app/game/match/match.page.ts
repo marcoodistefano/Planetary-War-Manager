@@ -112,8 +112,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   troopsDropdownX = 0;
   troopsDropdownY = 0;
 
+  activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
   selectedStructureForBuild: any = null;
   buildPreviewMarker: any = null;
+  userTechnologies: string[] = [];
   matchStructures: any[] = [];
   structureMarkers = new Map<string, any>();
 
@@ -297,8 +299,6 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       }
     });
   }
-
-  activeBuildCategory: 'risorse' | 'armamenti' = 'risorse';
 
   // --- 3. DATI DI GIOCO E REGOLE ---
   gameRules: any = null;
@@ -525,6 +525,25 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             }
             if (parsed.payload?.regionsResources) {
               this.regionsResources = parsed.payload.regionsResources;
+            }
+            if (parsed.payload?.technologies) {
+              this.userTechnologies = parsed.payload.technologies;
+            }
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'RESEARCH_SUCCESS') {
+            this.toastCtrl.create({
+              message: 'Ricerca completata! Hai sbloccato una nuova tecnologia.',
+              duration: 3000,
+              position: 'bottom',
+              color: 'success'
+            }).then(t => t.present());
+            if (parsed.payload?.technologies) {
+              this.userTechnologies = parsed.payload.technologies;
+            }
+            if (parsed.payload?.risorse) {
+              this.playerResources = parsed.payload.risorse;
             }
             this.ngZone.run(() => this.cdr.detectChanges());
           }
@@ -1235,7 +1254,19 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.isMarketModalOpen = false;
       this.isArmyModalOpen = false;
     }
-    this.closeMobileMenu();
+  }
+
+  onResearchTech(structureId: string) {
+    console.log('[FRONTEND] Sending RESEARCH_TECH for:', structureId);
+    if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
+      console.log('[FRONTEND] Socket is OPEN, sending payload...');
+      this.matchSocket.send(JSON.stringify({
+        action: 'RESEARCH_TECH',
+        payload: { structureId }
+      }));
+    } else {
+      console.error('[FRONTEND] Socket is NOT OPEN!', this.matchSocket?.readyState);
+    }
   }
 
   // Assicurati che gli altri toggle chiudano isTechModalOpen
@@ -1307,12 +1338,18 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   getFilteredBuildItems() {
-    if (!this.gameRules || !this.gameRules.sheets) return [];
+    let items = [];
     if (this.activeBuildCategory === 'risorse') {
-      return this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
+      items = this.gameRules?.sheets?.find((s: any) => s.name === 'Estrattori')?.lines || [];
     } else {
-      return this.gameRules.sheets.find((s: any) => s.name === 'Strutture')?.lines || [];
+      items = this.gameRules?.sheets?.find((s: any) => s.name === 'Strutture')?.lines || [];
     }
+    
+    return items.filter((item: any) => {
+      const tier = item.tier || 1;
+      const id = item.id_extractor || item.id_struttura;
+      return tier === 1 || this.userTechnologies.includes(id);
+    });
   }
 
   startConstruction(item: any) {

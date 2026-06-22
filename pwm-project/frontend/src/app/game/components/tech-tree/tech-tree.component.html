@@ -54,9 +54,10 @@
               <div class="connector-line" *ngIf="i > 0"></div>
 
               <div class="tech-node" 
-                   [class.locked]="!canUnlock(node)" 
-                   [class.affordable]="hasResources(node)"
-                   (click)="selectNode(node)">
+                   [class.locked]="!isUnlocked(node) && !canUnlock(node)" 
+                   [class.affordable]="!isUnlocked(node) && canUnlock(node) && hasResources(node)"
+                   [class.unlocked]="isUnlocked(node)"
+                   (click)="(!isUnlocked(node) && canUnlock(node) && hasResources(node)) ? confirmResearch(node) : selectNode(node)">
                 
                 <div class="node-header">
                   <span class="node-name">{{ node.name || node.nome }}</span>
@@ -70,6 +71,14 @@
                   <span class="cost-unit" *ngIf="node.costo_acciaio > 0">🏗️ {{ node.costo_acciaio | number }}</span>
                   <span class="cost-unit" *ngIf="node.costo_petrolio > 0">🛢️ {{ node.costo_petrolio | number }}</span>
                   <span class="cost-unit" *ngIf="node.costo_piombo > 0 || node.costo_piombio > 0">🔘 {{ (node.costo_piombo || node.costo_piombio) | number }}</span>
+                </div>
+
+                <div class="inline-research-text" *ngIf="!isUnlocked(node)">
+                  <span class="status-text" [class.can-buy]="canUnlock(node) && hasResources(node)">
+                    <ion-icon name="lock-closed-outline" *ngIf="!hasResources(node) || !canUnlock(node)"></ion-icon>
+                    <ion-icon name="flask-outline" *ngIf="hasResources(node) && canUnlock(node)"></ion-icon>
+                    {{ (!hasResources(node) || !canUnlock(node)) ? 'RICERCA BLOCCATA' : 'CLICCA PER RICERCARE' }}
+                  </span>
                 </div>
 
                 <div class="unlocked-units" *ngIf="getUnitsForTech(node).length > 0">
@@ -94,16 +103,15 @@
          <p>REQUISITI DI RICERCA / COSTRUZIONE</p>
        </div>
        <div class="details-body">
-         <div class="requirement-item" [class.met]="hasResources(selectedNode)">
-            <label>BUDGET NECESSARIO</label>
-            <span>💵 {{ selectedNode.costo_denaro || 0 }} / {{ playerResources.denaro }}</span>
+         <div class="requirement-item" [class.met]="hasResources(selectedNode)" *ngIf="!isUnlocked(selectedNode)">
+            <label>BUDGET</label>
+            <span>Vedi costi nel riquadro</span>
+         </div>
+         <div class="requirement-item met" *ngIf="isUnlocked(selectedNode)">
+            <label>STATO RICERCA</label>
+            <span>✅ Sbloccata</span>
          </div>
        </div>
-       <button class="research-btn" 
-               [disabled]="!hasResources(selectedNode)"
-               (click)="confirmResearch(selectedNode)">
-         AVVIA RICERCA
-       </button>
     </div>
 
   </div>

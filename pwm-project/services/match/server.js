@@ -112,10 +112,10 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                     const matchData = await getMatch(ws.matchId);
 
                     let armies = [];
-                    let nations = [];
-                    let resources = translateRedisToFe({});
+                    let nations = [];                    let resources = translateRedisToFe({});
                     let production = translateRedisToFe({});
                     let structures = [];
+                    let technologies = [];
 
                     if (matchData && matchData.match && matchData.match.player) {
                         nations = matchData.match.player;
@@ -131,17 +131,17 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             if (p.username === ws.username) {
                                 resources = translateRedisToFe(p.risorse);
                                 production = translateRedisToFe(p.produzione);
+                                technologies = p.technologies || [];
                             }
                         }
                     }
-
                     const actualMatchId = matchData.match.id_partita_hash;
                     const regionsResourcesStr = await redis.get(`match:${actualMatchId}:regions_resources`);
                     const regionsResources = regionsResourcesStr ? JSON.parse(regionsResourcesStr) : {};
 
                     ws.send(JSON.stringify({
                         type: 'INITIAL_STATE',
-                        payload: { armies, nations, resources, production, structures, regionsResources }
+                        payload: { armies, nations, resources, production, structures, regionsResources, technologies }
                     }));
                     return;
                 }
@@ -490,6 +490,104 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         }
                     }
                 }
+                if (payload.action === 'RESEARCH_TECH') {
+                    const { structureId } = payload.payload;
+                    try {
+                        const rulesRawBase64 = await redis.get("assets:game_rules.json");
+                        let structureDetails = null;
+                        if (rulesRawBase64) {
+                            const rules = JSON.parse(Buffer.from(rulesRawBase64, "base64").toString("utf-8"));
+                            const estrattoriSheet = rules.sheets.find(s => s.name === "Estrattori");
+                            const struttureSheet = rules.sheets.find(s => s.name === "Strutture");
+                            const estrattoriLines = estrattoriSheet ? estrattoriSheet.lines : [];
+                            const struttureLines = struttureSheet ? struttureSheet.lines : [];
+                            structureDetails = estrattoriLines.find(l => l.id_extractor === structureId) || struttureLines.find(l => l.id_struttura === structureId);
+                        }
+                        if (!structureDetails) {
+                            return ws.send(JSON.stringify({ type: 'ERROR', error: 'Tecnologia sconosciuta' }));
+                        }
+                        
+                        const reqPrevStructure = structureDetails.richiede_struttura || structureDetails.richiede_estrattore;
+                        const tier = structureDetails.tier || 1;
+                        if (tier === 1) {
+                            return ws.send(JSON.stringify({ type: 'ERROR', error: 'Le tecnologie di livello 1 sono già sbloccate di default' }));
+                        }
+                        
+                        const researchCost = (structureDetails.costo_denaro || 0) * tier;
+                        
+                        const updRes = await updateMatch(ws.matchId, async (matchObj) => {
+                            if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false, data: { error: 'Partita non trovata' } };
+                            
+                            const player = matchObj.match.player.find(p => p.username === ws.username);
+                            if (!player) return { save: false, data: { error: 'Giocatore non trovato' } };
+                            
+                            player.technologies = player.technologies || [];
+                            
+                            if (player.technologies.includes(structureId)) {
+                                return { save: false, data: { error: 'Tecnologia già ricercata' } };
+                            }
+                            
+                            if (tier > 2 && reqPrevStructure && !player.technologies.includes(reqPrevStructure)) {
+                                return { save: false, data: { error: `Devi prima ricercare ${reqPrevStructure}` } };
+                            }
+                            const reqDenaro = structureDetails.costo_denaro || 0;
+                            const reqLegno = structureDetails.costo_legno || 0;
+                            const reqMattoni = structureDetails.costo_mattoni || 0;
+                            const reqAcciaio = structureDetails.costo_acciaio || 0;
+                            const reqPetrolio = structureDetails.costo_petrolio || 0;
+                            const reqPiombo = (structureDetails.costo_piombo || structureDetails.costo_piombio) || 0;
+                            const reqGas = structureDetails.costo_gas || 0;
+                            const reqUranio = structureDetails.costo_uranio || 0;
+                            const reqOro = structureDetails.costo_oro || 0;
+
+                            if (
+                                (player.risorse.denaro || 0) < reqDenaro ||
+                                (player.risorse.legno || 0) < reqLegno ||
+                                (player.risorse.mattoni || 0) < reqMattoni ||
+                                (player.risorse.acciaio || 0) < reqAcciaio ||
+                                (player.risorse.petrolio || 0) < reqPetrolio ||
+                                (player.risorse.piombo || 0) < reqPiombo ||
+                                (player.risorse.gas_naturale || 0) < reqGas ||
+                                (player.risorse.uranio || 0) < reqUranio ||
+                                (player.risorse.oro || 0) < reqOro
+                            ) {
+                                return { save: false, data: { error: 'Risorse insufficienti per la ricerca' } };
+                            }
+
+                            player.risorse.denaro -= reqDenaro;
+                            player.risorse.legno -= reqLegno;
+                            player.risorse.mattoni -= reqMattoni;
+                            player.risorse.acciaio -= reqAcciaio;
+                            player.risorse.petrolio -= reqPetrolio;
+                            player.risorse.piombo -= reqPiombo;
+                            player.risorse.gas_naturale -= reqGas;
+                            player.risorse.uranio -= reqUranio;
+                            player.risorse.oro -= reqOro;
+
+                            player.technologies.push(structureId);
+
+                            return { save: true, matchObj, data: { success: true, technologies: player.technologies, risorse: player.risorse } };
+                        });
+                        
+                        console.log(`[RESEARCH_TECH] Result for ${ws.username}:`, updRes);
+
+                        if (updRes && updRes.error) {
+                            ws.send(JSON.stringify({ type: 'ERROR', error: updRes.error }));
+                        } else if (updRes && updRes.success) {
+                            ws.send(JSON.stringify({
+                                type: 'RESEARCH_SUCCESS',
+                                payload: { structureId, technologies: updRes.technologies, risorse: updRes.risorse }
+                            }));
+                            // Comunica anche in broadcast il cambio risorse? La UI dovrebbe aggiornarsi già dal RESEARCH_SUCCESS.
+                            const broadcastPayload = { matchId: ws.matchId, payload: { type: 'MATCH_UPDATE', data: { action: 'resource_sync' } } };
+                            await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+                        }
+                    } catch (e) {
+                        console.error("[SYS_ERR] Errore in RESEARCH_TECH:", e);
+                        ws.send(JSON.stringify({ type: 'ERROR', error: 'Errore interno del server durante la ricerca' }));
+                    }
+                }
+
                 if (payload.action === 'BUILD_STRUCTURE') {
                     console.log(`[WS_MATCH] Richiesta costruzione struttura ricevuta:`, payload.payload);
                     const { structureId, targetName, targetCoords } = payload.payload;
@@ -541,6 +639,12 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             const player = matchObj.match.player.find(p => p.username === ws.username);
                             if (!player || (!player.territori?.includes(regionId) && !Object.values(player.territori_dict || {}).some(list => list.includes(regionId)))) {
                                 return { save: false, data: { error: 'Puoi costruire solo sui tuoi territori' } };
+                            }
+
+                            const tier = structureDetails.tier || 1;
+                            const playerTechs = player.technologies || [];
+                            if (tier > 1 && !playerTechs.includes(structureId)) {
+                                return { save: false, data: { error: "Devi prima ricercare questa tecnologia nell'Albero Tecnologico!" } };
                             }
 
                             let strutture = player.strutture || [];

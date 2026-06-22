@@ -284,7 +284,7 @@
 
     <ion-modal [isOpen]="isTechModalOpen" (didDismiss)="isTechModalOpen = false" cssClass="desktop-transparent-modal">
       <ng-template>
-        <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" (close)="isTechModalOpen = false"></app-tech-tree>
+        <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" [userTechnologies]="userTechnologies" (close)="isTechModalOpen = false" (research)="onResearchTech($event)"></app-tech-tree>
       </ng-template>
     </ion-modal>
 

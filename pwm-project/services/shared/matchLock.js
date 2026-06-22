@@ -30,9 +30,17 @@ async function withMatchLock(matchId, callback) {
         }
         return result.data;
     } finally {
-        const currentLock = await redis.get(lockKey);
-        if (currentLock === lockVal) {
-            await redis.del(lockKey);
+        const script = `
+            if redis.call("get", KEYS[1]) == ARGV[1] then
+                return redis.call("del", KEYS[1])
+            else
+                return 0
+            end
+        `;
+        try {
+            await redis.eval(script, 1, lockKey, lockVal);
+        } catch (err) {
+            console.error("Errore rilascio lock Lua in withMatchLock:", err);
         }
     }
 }

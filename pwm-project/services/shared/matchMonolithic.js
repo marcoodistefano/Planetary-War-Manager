@@ -112,9 +112,10 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 30) {
     }
 
     const lockKey = `lock:updateMatch:${actualKey}`;
+    const lockVal = Date.now() + Math.random().toString();
 
     for (let retry = 0; retry < maxRetries; retry++) {
-        const lockAcquired = await redis.set(lockKey, 'locked', 'NX', 'PX', 5000);
+        const lockAcquired = await redis.set(lockKey, lockVal, 'NX', 'PX', 5000);
         if (!lockAcquired) {
             await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
             continue;
@@ -230,7 +231,18 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 30) {
 
             return result.data;
         } finally {
-            await redis.del(lockKey);
+            const script = `
+                if redis.call("get", KEYS[1]) == ARGV[1] then
+                    return redis.call("del", KEYS[1])
+                else
+                    return 0
+                end
+            `;
+            try {
+                await redis.eval(script, 1, lockKey, lockVal);
+            } catch (err) {
+                console.error("Errore rilascio lock Lua in updateMatch:", err);
+            }
         }
     }
     
@@ -268,6 +280,7 @@ function createEmptyPlayer(username, nationId, nationName) {
         id_alleanza: "",
         ruolo: "",
         is_leader: false,
+        technologies: [],
         territori: [],
         territori_dict: {},
         strutture: [],
