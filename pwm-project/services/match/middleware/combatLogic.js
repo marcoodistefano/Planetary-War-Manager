@@ -648,12 +648,17 @@ const processActiveCombats = async () => {
                             attNation.territori.push(actualRegionToTransfer);
 
                             if (defNation.strutture && defNation.strutture.length > 0) {
-                                const capturedStructures = defNation.strutture.filter(s => s.regionId === actualRegionToTransfer || s.targetName === actualRegionToTransfer);
-                                if (capturedStructures.length > 0) {
-                                    capturedStructures.forEach(s => s.owner = attNation.username);
+                                const allCaptured = defNation.strutture.filter(s => s.regionId === actualRegionToTransfer || s.targetName === actualRegionToTransfer);
+                                if (allCaptured.length > 0) {
+                                    const builtStructures = allCaptured.filter(s => s.status !== 'building');
+                                    builtStructures.forEach(s => s.owner = attNation.username);
+                                    
                                     defNation.strutture = defNation.strutture.filter(s => s.regionId !== actualRegionToTransfer && s.targetName !== actualRegionToTransfer);
-                                    if (!attNation.strutture) attNation.strutture = [];
-                                    attNation.strutture.push(...capturedStructures);
+                                    
+                                    if (builtStructures.length > 0) {
+                                        if (!attNation.strutture) attNation.strutture = [];
+                                        attNation.strutture.push(...builtStructures);
+                                    }
                                 }
                             }
                         }

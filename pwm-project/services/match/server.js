@@ -135,7 +135,8 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         }
                     }
 
-                    const regionsResourcesStr = await redis.get(`match:${ws.matchId}:regions_resources`);
+                    const actualMatchId = matchData.match.id_partita_hash;
+                    const regionsResourcesStr = await redis.get(`match:${actualMatchId}:regions_resources`);
                     const regionsResources = regionsResourcesStr ? JSON.parse(regionsResourcesStr) : {};
 
                     ws.send(JSON.stringify({
@@ -520,7 +521,8 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                         const regionId = getRegionIdByName(targetName);
 
-                        const regionsResourcesStr = await redis.get(`match:${ws.matchId}:regions_resources`);
+                        const actualMatchId = matchObj.match.id_partita_hash;
+                        const regionsResourcesStr = await redis.get(`match:${actualMatchId}:regions_resources`);
                         const regionsResources = regionsResourcesStr ? JSON.parse(regionsResourcesStr) : {};
                         const myRegionRes = regionsResources[regionId];
 
@@ -581,6 +583,16 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             resources.piombo -= reqPiombo;
                             resources.petrolio -= reqPetrolio;
 
+                            let multiplier = 1;
+                            try {
+                                const decodedMatch = Eru.decode_match(matchObj.match.struttura_partita);
+                                multiplier = decodedMatch.multiplierValue || 1;
+                            } catch (err) {}
+
+                            const tempoCostruzioneHours = structureDetails.tempo_costruzione || 0;
+                            const buildEtaMs = (tempoCostruzioneHours * 60 * 60 * 1000) / multiplier;
+                            const isBuilding = buildEtaMs > 0;
+
                             const newStructure = {
                                 id: require('crypto').randomUUID(),
                                 structureId: structureId,
@@ -588,9 +600,10 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                                 targetName: targetName,
                                 regionId: regionId,
                                 targetCoords: targetCoords,
-                                status: 'built',
+                                status: isBuilding ? 'building' : 'built',
                                 owner: ws.username,
-                                buildTime: Date.now()
+                                buildTime: Date.now(),
+                                completionTime: isBuilding ? Date.now() + buildEtaMs : null
                             };
 
                             if (replacedStructureId) strutture = strutture.filter(s => s.id !== replacedStructureId);
@@ -692,6 +705,57 @@ if (!fs.existsSync(MINIMUM_PATH_FILE)) {
 } else {
     console.log("[SYSTEM] File minimum_path.json trovato. Salto la generazione.");
 }
+const startConstructionEngine = () => {
+    setInterval(async () => {
+        try {
+            const lockAcquired = await redis.set('engine_lock:constructionEngine', 'locked', 'NX', 'PX', 2000);
+            if (!lockAcquired) return;
+
+            const activeMatchesKeys = await redis.keys('match:*:base');
+            for (const key of activeMatchesKeys) {
+                const matchIdHash = key.split(':')[1];
+                let shouldSave = false;
+
+                await updateMatch(matchIdHash, (mObj) => {
+                    if (!mObj || !mObj.match || !mObj.match.player) return { save: false };
+
+                    const now = Date.now();
+                    const completedStructures = [];
+
+                    for (const p of mObj.match.player) {
+                        if (p.strutture && p.strutture.length > 0) {
+                            for (const s of p.strutture) {
+                                if (s.status === 'building' && s.completionTime && now >= s.completionTime) {
+                                    s.status = 'built';
+                                    completedStructures.push({ structure: s, owner: p.username });
+                                    shouldSave = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (shouldSave) {
+                        return { save: true, matchObj: mObj, data: { completedStructures } };
+                    }
+                    return { save: false };
+                }).then(async (updRes) => {
+                    if (updRes && updRes.completedStructures && updRes.completedStructures.length > 0) {
+                        for (const item of updRes.completedStructures) {
+                            const broadcastStructurePayload = {
+                                matchId: matchIdHash,
+                                payload: { type: 'STRUCTURE_COMPLETED', data: item.structure }
+                            };
+                            await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastStructurePayload));
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("Errore nel construction engine:", e);
+        }
+    }, 2000);
+};
+
 const startArrivalEngine = () => {
     setInterval(async () => {
         try {
@@ -939,6 +1003,7 @@ loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(async () => {
         startCombatTriggerEngine();
         startSnapshotEngine();
         startArrivalEngine();
+        startConstructionEngine();
     });
 }).catch(err => {
     console.error("[SYS_ERR] Errore caricamento routing in Redis:", err);

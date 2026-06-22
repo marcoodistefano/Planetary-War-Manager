@@ -332,3 +332,19 @@ body.static-bg {
   }
 }
 
+
+/* Structure Hover Popup */
+.structure-hover-popup .maplibregl-popup-content {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    color: white;
+    border-radius: 8px;
+    padding: 10px 15px;
+    pointer-events: none;
+}
+.structure-hover-popup .maplibregl-popup-tip {
+    border-top-color: rgba(15, 23, 42, 0.85);
+}

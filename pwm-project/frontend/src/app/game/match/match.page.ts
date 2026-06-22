@@ -770,8 +770,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
 
           if (parsed.type === 'BUILD_SUCCESS') {
+            const isBuilding = parsed.payload.status === 'building';
             this.toastCtrl.create({
-              message: `Struttura ${parsed.payload.name} costruita con successo!`,
+              message: isBuilding ? `Costruzione di ${parsed.payload.name} avviata!` : `Struttura ${parsed.payload.name} costruita con successo!`,
               duration: 3000,
               position: 'top',
               color: 'success'
@@ -799,6 +800,26 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               setTimeout(() => this.renderStructures(), 100);
               this.ngZone.run(() => this.cdr.detectChanges());
             }
+          }
+
+          if (parsed.type === 'STRUCTURE_COMPLETED') {
+            const structureId = parsed.data.id;
+            const existingIndex = this.matchStructures.findIndex(s => s.id === structureId);
+            if (existingIndex !== -1) {
+              this.matchStructures[existingIndex].status = 'built';
+            } else {
+              this.matchStructures.push(parsed.data);
+            }
+            if (parsed.data.owner === this.userProfile.username) {
+              this.toastCtrl.create({
+                message: `Struttura ${parsed.data.name} completata!`,
+                duration: 3000,
+                position: 'top',
+                color: 'success'
+              }).then(t => t.present());
+            }
+            setTimeout(() => this.renderStructures(), 100);
+            this.ngZone.run(() => this.cdr.detectChanges());
           }
 
           if (parsed.type === 'ERROR') {
@@ -1553,6 +1574,53 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   // --- RENDERING STRUTTURE SU MAPPA ---
 
+  getStructureTooltipHTML(structure: any): string {
+    let html = `<div style="text-align: center; font-family: 'Rajdhani', sans-serif;">`;
+    html += `<strong style="font-size: 1.1em; color: #60a5fa;">${structure.name}</strong> <span style="color:#a1a1aa; font-size:0.9em">(${structure.owner})</span><br/>`;
+    
+    if (structure.status === 'building') {
+      if (structure.completionTime) {
+        const timeLeftMs = Math.max(0, structure.completionTime - Date.now());
+        const mins = Math.floor(timeLeftMs / 60000);
+        const secs = Math.floor((timeLeftMs % 60000) / 1000);
+        html += `<span style="color:#eab308; font-weight:bold;">IN COSTRUZIONE</span><br/><span style="font-size:0.9em; opacity:0.8;">Fine in: ${mins}m ${secs}s</span>`;
+      } else {
+        html += `<span style="color:#eab308; font-weight:bold;">IN COSTRUZIONE</span>`;
+      }
+    } else {
+      if (this.gameRules && this.gameRules.sheets) {
+        const estrattori = this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
+        const strutture = this.gameRules.sheets.find((s: any) => s.name === 'Strutture')?.lines || [];
+        const risorse = this.gameRules.sheets.find((s: any) => s.name === 'Risorse')?.lines || [];
+        
+        const extDetails = estrattori.find((s: any) => s.id_extractor === structure.structureId);
+        if (extDetails) {
+          const baseRes = risorse.find((r: any) => r.id === extDetails.risorsa_estratta);
+          if (baseRes && baseRes.risorsa_per_ora) {
+            const rulesMultiplier = this.gameRules.sheets.find((s: any) => s.name === 'Regole Generali')?.lines?.find((r: any) => r.id === 'strutture_multiplier')?.value || 1;
+            const amount = baseRes.risorsa_per_ora * (extDetails.efficienza || 1) * rulesMultiplier;
+            html += `<span style="color:#4ade80;">Estrae: ${amount} ${baseRes.name}/h</span>`;
+          } else if (extDetails.risorsa_estratta) {
+            html += `<span style="color:#4ade80;">Estrae: ${extDetails.risorsa_estratta}/h</span>`;
+          }
+        } else {
+          const strDetails = strutture.find((s: any) => s.id_struttura === structure.structureId);
+          if (strDetails) {
+            if (strDetails.categoria === 1) {
+              html += `<span style="color:#f87171;">Addestramento truppe (Tier ${strDetails.tier})</span>`;
+            } else if (strDetails.categoria === 0) {
+              html += `<span style="color:#fb923c;">Produzione veicoli (Tier ${strDetails.tier})</span>`;
+            } else if (strDetails.categoria === 2) {
+              html += `<span style="color:#38bdf8;">Difesa territorio (HP: ${strDetails.HP})</span>`;
+            }
+          }
+        }
+      }
+    }
+    html += `</div>`;
+    return html;
+  }
+
   getStructureImage(name: string): string {
     let png = 'fabbrica.png';
     name = (name || '').toLowerCase();
@@ -1637,7 +1705,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         container.style.justifyContent = 'center';
         container.style.cursor = 'pointer';
 
-        const png = this.getStructureImage(structure.name);
+        let png = this.getStructureImage(structure.name);
+        if (structure.status === 'building') {
+            png = 'workinprogress.png';
+        }
 
         const img = document.createElement('img');
         img.src = `assets/2Dmodels/Buildings/${png}`;
@@ -1645,7 +1716,28 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         img.style.height = '100%';
         img.style.objectFit = 'contain';
         img.style.filter = isMine ? 'drop-shadow(0 0 5px #60a5fa)' : 'drop-shadow(0 0 5px #ef4444)';
-        img.title = `${structure.name} (${structure.owner})`;
+        
+        if (structure.status === 'building') {
+            img.style.opacity = '0.5';
+        }
+        
+        img.removeAttribute('title'); // Remove native tooltip
+        
+        const popup = new maplibregl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            offset: 20,
+            className: 'structure-hover-popup'
+        });
+
+        img.addEventListener('mouseenter', () => {
+            popup.setHTML(this.getStructureTooltipHTML(structure))
+                 .setLngLat(coords as [number, number])
+                 .addTo(this.map);
+        });
+        img.addEventListener('mouseleave', () => {
+            popup.remove();
+        });
 
         container.appendChild(img);
         el.appendChild(container);
@@ -1654,10 +1746,32 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           .setLngLat(coords)
           .addTo(this.map);
 
+        // Store popup reference on the DOM element so we can update/remove it later
+        (img as any)._structurePopup = popup;
+
         this.structureMarkers.set(structure.id, marker);
       } else {
         const marker = this.structureMarkers.get(structure.id);
         marker.setLngLat(coords);
+        const img = marker.getElement().querySelector('img') as HTMLImageElement;
+        if (img) {
+            let png = this.getStructureImage(structure.name);
+            if (structure.status === 'building') {
+                png = 'workinprogress.png';
+            }
+            img.src = `assets/2Dmodels/Buildings/${png}`;
+            img.style.opacity = structure.status === 'building' ? '0.5' : '1';
+            
+            // Re-assign listeners
+            const existingPopup = (img as any)._structurePopup;
+            if (existingPopup) {
+                img.onmouseenter = () => {
+                    existingPopup.setHTML(this.getStructureTooltipHTML(structure))
+                         .setLngLat(coords as [number, number])
+                         .addTo(this.map);
+                };
+            }
+        }
       }
     });
 
