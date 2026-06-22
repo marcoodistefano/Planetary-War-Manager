@@ -315,10 +315,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     avatar: this.avatarPath(1)
   };
 
-  playerTroops: any = {
-    "Fante": 150, "Veicolo Leggero": 20, "Fanteria Speciale": 10,
-    "Carro Armato": 5, "Caccia": 2, "Missile Balistico": 1
-  };
+  playerTroops: any = {};
 
   // --- 4. CONFIGURAZIONI STATICHE ---
   resourceConfig = [
@@ -1805,8 +1802,28 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.updateStructureMarkersScale();
   }
 
+  recalculatePlayerTroops() {
+    const totals: Record<string, number> = {};
+    if (this.matchArmies && this.userProfile && this.userProfile.username) {
+      const currentUsername = this.userProfile.username.toLowerCase();
+      for (const army of this.matchArmies) {
+        if (army.owner && army.owner.toLowerCase() === currentUsername && army.composition) {
+          for (const [troopName, count] of Object.entries(army.composition)) {
+            totals[troopName] = (totals[troopName] || 0) + (count as number);
+          }
+        }
+      }
+    }
+    
+    // Create sorted object so the dropdown looks nice
+    const sortedTotals: Record<string, number> = {};
+    Object.keys(totals).sort().forEach(k => sortedTotals[k] = totals[k]);
+    this.playerTroops = sortedTotals;
+  }
+
   // --- RENDERING ARMATE SU MAPPA ---
   renderArmies() {
+    this.recalculatePlayerTroops();
     console.log('[DEBUG_MAP] renderArmies richiamato. Mappa pronta?', !!this.map, 'Armate in memoria:', this.matchArmies.length);
     if (!this.map) return;
 
