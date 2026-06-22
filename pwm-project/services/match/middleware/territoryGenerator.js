@@ -182,8 +182,8 @@ const generateNations = async (matchId, maxPlayers) => {
                 less_common: less
             };
             
-            // Inizializza gli HP base della città a 100
-            citiesHpMap[regId] = 100;
+            // Inizializza gli HP base della città a 1000
+            citiesHpMap[regId] = 1000;
         }
         await redis.set(`match:${matchId}:regions_resources`, JSON.stringify(regionsResources));
         

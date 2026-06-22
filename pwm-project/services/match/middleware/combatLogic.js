@@ -394,7 +394,7 @@ const processActiveCombats = async () => {
             }
 
             const existingCityHpStr = await redis.hGet(`match:${id_partita_hash}:cities_hp`, id_target_citta || 'none');
-            const existingCityHp = existingCityHpStr ? parseInt(existingCityHpStr, 10) : 100;
+            const existingCityHp = existingCityHpStr ? parseInt(existingCityHpStr, 10) : 1000;
             const cityAlreadyFallen = id_target_citta && existingCityHp <= 0;
 
             if (cityAlreadyFallen && currentTargetArmataId && defenderArmy) {
@@ -506,7 +506,7 @@ const processActiveCombats = async () => {
             if ((damageToCity > 0 || (id_target_citta && existingCityHp <= 0)) && id_target_citta) {
                 const cityHpKey = `match:${id_partita_hash}:cities_hp`;
                 let cityHpStr = await redis.hGet(cityHpKey, id_target_citta);
-                let cityHp = cityHpStr ? parseInt(cityHpStr, 10) : 100;
+                let cityHp = cityHpStr ? parseInt(cityHpStr, 10) : 1000;
                 cityHp -= damageToCity;
 
                 if (cityHp <= 0) {
@@ -690,7 +690,7 @@ const processActiveCombats = async () => {
                     };
                     await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
                     await emitCombatEvent(id_partita_hash, attackerName, id_target_citta, damageToCity, 'distrutta', [attackerPlayer]);
-                    await redis.hSet(`match:${id_partita_hash}:cities_hp`, id_target_citta, '100');
+                    await redis.hSet(`match:${id_partita_hash}:cities_hp`, id_target_citta, '500');
                     
                     if (!attackerDied) {
                         await updateMatch(id_partita_hash, (mObj) => {

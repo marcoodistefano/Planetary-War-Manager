@@ -1,221 +1,260 @@
 {
-  "match": {
-    "id_partita": "",
-    "id_partita_hash": "",
-    "id_visualizzato": "",
-    "caratteristiche": {
-      "nome": "",
-      "stato": "",
-      "is_squad": "",
-      "alleanze_consentite": [""],
-      "ranked": "",
-      "alleanze_win": [""],
-      "random_spawn": "",
-      "max_players": 0,
-      "duration": 0,
-      "moltiplicatore_temporale": 0,
-      "modalita": "",
-      "regioni": [""]
-    },
-    "altre_caratteristiche": {
-      "mappa": "",
-      "condizioni_vittoria": "",
-      "regole_speciali": ""
-    },
-    "player": [
-      {
-        "id_user": "",
-        "username": "",
-        "relazioni_diplomatiche":{
-            "id_user":{
-                "messaggi":[""],
-                "relazione": "",
-                "scambi":[""]
-            }
-        },
-        "id_alleanza": "",
-        "ruolo": "",
-        "is_leader": "",
-        "nationId": 0,
-        "nationName": "",
-        "inWar": false,
-        "isOccupied": true,
-        "territori": [""],
-        "territori_dict": {
-            "Region": [""]
-        },
-        "strutture": [
-          {
-            "id": "",
-            "structureId": "",
-            "name": "",
-            "targetName": "",
-            "regionId": "",
-            "targetCoords": [0, 0],
-            "status": "",
-            "owner": "",
-            "buildTime": 0
-          }
-        ],
-        "armate": {
-          "id_armata": {
-            "id": "",
-            "owner": "",
-            "truppeIds": [""],
-            "currentLocation": {"x": 0, "y": 0},
-            "status": "",
-            "hp": 0
-          }
-        },
-        "truppe": {
-          "id_truppa": {
-            "id": "",
-            "id_armata": "",
-            "hp": 0,
-            "type": ""
-          }
-        },
-        "risorse": {
-          "denaro": 0,
-          "legno": 0,
-          "mattone": 0,
-          "gas": 0,
-          "petrolio": 0,
-          "piombo": 0,
-          "acciaio": 0,
-          "uranio": 0,
-          "oro": 0
-        },
-        "ricerche": [
-          {
-            "estrattore_piombo": {
-              "livello": 0,
-              "costo": {
-                "denaro": 0,
-                "legno": 0,
-                "mattone": 0,
-                "gas": 0,
-                "petrolio": 0,
-                "piombo": 0,
-                "acciaio": 0,
-                "uranio": 0,
-                "oro": 0
-              },
-              "tempo_costruzione": 0
-            },
-            "caserma": {
-              "livello": 0,
-              "costo": {
-                "denaro": 0,
-                "legno": 0,
-                "mattone": 0,
-                "gas": 0,
-                "petrolio": 0,
-                "piombo": 0,
-                "acciaio": 0,
-                "uranio": 0,
-                "oro": 0
-              },
-              "tempo_costruzione": 0
-            }
-          }
-        ],
-        "truppe_sbloccate": [
-          {
-            "fanteria": {
-              "costo": {
-                "denaro": 0,
-                "legno": 0,
-                "mattone": 0,
-                "gas": 0,
-                "petrolio": 0,
-                "piombo": 0,
-                "acciaio": 0,
-                "uranio": 0,
-                "oro": 0
-              },
-              "tempo_addestramento": 0
-            },
-            "carro_armato": {
-              "costo": {
-                "denaro": 0,
-                "legno": 0,
-                "mattone": 0,
-                "gas": 0,
-                "petrolio": 0,
-                "piombo": 0,
-                "acciaio": 0,
-                "uranio": 0,
-                "oro": 0
-              },
-              "tempo_addestramento": 0
-            }
-          }
-        ],
-        "intelligence": {
-          "spia_1": {
-            "id_spia": "",
-            "tipo": "",
-            "posizione": "",
-            "durata": 0,
-            "payed": "",
-            "scope": "",
-            "dati_rilevati": [
-              {
-                "1": {
-                  "tipo": "",
-                  "posizione": "",
-                  "messaggio": "",
-                  "data_rilevamento": ""
-                },
-                "2": {
-                  "tipo": "",
-                  "posizione": "",
-                  "messaggio": "",
-                  "data_rilevamento": ""
-                }
-              }
-            ]
-          }
-        },
-        "coda_mosse": [
-          {
-            "1": {
-              "id_mossa": "",
-              "tipo": "",
-              "origine": "",
-              "destinazione": "",
-              "unità_coinvolte": [""],
-              "data_inizio": "",
-              "data_fine": "",
-              "esito": ""
-            }
-          }
-        ],
-        "messaggi": [
-          {
-            "id_destinatario_1": [
-              {
-                "id_mex": "",
-                "id_user_send": "",
-                "content": "",
-                "timestamp": ""
-              }
-            ],
-            "id_destinatario_2": [
-              {
-                "id_mex": "",
-                "id_user_send": "",
-                "content": "",
-                "timestamp": ""
-              }
-            ]
-          }
-        ]
+  "match:{id_partita_hash}:base": {
+    "type": "STRING (JSON)",
+    "description": "Contiene i metadati generali della partita, escludendo l'array dei giocatori.",
+    "content": {
+      "id_partita": "",
+      "id_partita_hash": "",
+      "id_visualizzato": "",
+      "struttura_partita": "",
+      "caratteristiche": {
+        "nome": "",
+        "stato": "",
+        "is_squad": "",
+        "alleanze_consentite": [""],
+        "ranked": "",
+        "alleanze_win": [""],
+        "random_spawn": "",
+        "max_players": 0,
+        "duration": 0,
+        "moltiplicatore_temporale": 0,
+        "modalita": "",
+        "regioni": [""]
+      },
+      "altre_caratteristiche": {
+        "mappa": "",
+        "condizioni_vittoria": "",
+        "regole_speciali": ""
       }
-    ]
+    }
+  },
+  "match:{id_partita_hash}:players": {
+    "type": "SET",
+    "description": "Set di username dei giocatori che partecipano alla partita.",
+    "content": ["username1", "username2"]
+  },
+  "match:{id_partita_hash}:cities_hp": {
+    "type": "HASH",
+    "description": "Hash contenente gli HP correnti delle città/territori. Chiave: id_citta o id_territorio, Valore: Stringa numerica HP.",
+    "content": {
+      "{id_citta}": "1000"
+    }
+  },
+  "match:{id_partita_hash}:player:{username}:base": {
+    "type": "STRING (JSON)",
+    "description": "Dati principali del giocatore, escludendo risorse, territori, armate e truppe (che sono frammentati).",
+    "content": {
+      "id_user": "",
+      "username": "",
+      "relazioni_diplomatiche": {
+        "id_user": {
+          "messaggi": [""],
+          "relazione": "",
+          "scambi": [""]
+        }
+      },
+      "id_alleanza": "",
+      "ruolo": "",
+      "is_leader": "",
+      "nationId": 0,
+      "nationName": "",
+      "inWar": false,
+      "isOccupied": true,
+      "strutture": [
+        {
+          "id": "",
+          "structureId": "",
+          "name": "",
+          "targetName": "",
+          "regionId": "",
+          "targetCoords": [0, 0],
+          "status": "",
+          "owner": "",
+          "buildTime": 0
+        }
+      ],
+      "ricerche": [
+        {
+          "estrattore_piombo": {
+            "livello": 0,
+            "costo": {
+              "denaro": 0,
+              "legno": 0,
+              "mattone": 0,
+              "gas": 0,
+              "petrolio": 0,
+              "piombo": 0,
+              "acciaio": 0,
+              "uranio": 0,
+              "oro": 0
+            },
+            "tempo_costruzione": 0
+          },
+          "caserma": {
+            "livello": 0,
+            "costo": {
+              "denaro": 0,
+              "legno": 0,
+              "mattone": 0,
+              "gas": 0,
+              "petrolio": 0,
+              "piombo": 0,
+              "acciaio": 0,
+              "uranio": 0,
+              "oro": 0
+            },
+            "tempo_costruzione": 0
+          }
+        }
+      ],
+      "truppe_sbloccate": [
+        {
+          "fanteria": {
+            "costo": {
+              "denaro": 0,
+              "legno": 0,
+              "mattone": 0,
+              "gas": 0,
+              "petrolio": 0,
+              "piombo": 0,
+              "acciaio": 0,
+              "uranio": 0,
+              "oro": 0
+            },
+            "tempo_addestramento": 0
+          },
+          "carro_armato": {
+            "costo": {
+              "denaro": 0,
+              "legno": 0,
+              "mattone": 0,
+              "gas": 0,
+              "petrolio": 0,
+              "piombo": 0,
+              "acciaio": 0,
+              "uranio": 0,
+              "oro": 0
+            },
+            "tempo_addestramento": 0
+          }
+        }
+      ],
+      "intelligence": {
+        "spia_1": {
+          "id_spia": "",
+          "tipo": "",
+          "posizione": "",
+          "durata": 0,
+          "payed": "",
+          "scope": "",
+          "dati_rilevati": [
+            {
+              "1": {
+                "tipo": "",
+                "posizione": "",
+                "messaggio": "",
+                "data_rilevamento": ""
+              },
+              "2": {
+                "tipo": "",
+                "posizione": "",
+                "messaggio": "",
+                "data_rilevamento": ""
+              }
+            }
+          ]
+        }
+      },
+      "coda_mosse": [
+        {
+          "1": {
+            "id_mossa": "",
+            "tipo": "",
+            "origine": "",
+            "destinazione": "",
+            "unità_coinvolte": [""],
+            "data_inizio": "",
+            "data_fine": "",
+            "esito": ""
+          }
+        }
+      ],
+      "messaggi": [
+        {
+          "id_destinatario_1": [
+            {
+              "id_mex": "",
+              "id_user_send": "",
+              "content": "",
+              "timestamp": ""
+            }
+          ],
+          "id_destinatario_2": [
+            {
+              "id_mex": "",
+              "id_user_send": "",
+              "content": "",
+              "timestamp": ""
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "match:{id_partita_hash}:player:{username}:territori": {
+    "type": "STRING (JSON)",
+    "description": "Territori posseduti dal giocatore.",
+    "content": {
+      "territori": [""],
+      "territori_dict": {
+        "Region": [""]
+      }
+    }
+  },
+  "match:{id_partita_hash}:player:{username}:risorse": {
+    "type": "STRING (JSON)",
+    "description": "Risorse possedute dal giocatore.",
+    "content": {
+      "denaro": 0,
+      "legno": 0,
+      "mattone": 0,
+      "gas": 0,
+      "petrolio": 0,
+      "piombo": 0,
+      "acciaio": 0,
+      "uranio": 0,
+      "oro": 0
+    }
+  },
+  "match:{id_partita_hash}:player:{username}:armate": {
+    "type": "HASH",
+    "description": "Hash contenente le armate del giocatore. Chiave: id_armata, Valore: Dati armata serializzati in JSON.",
+    "content": {
+      "{id_armata}": {
+        "id": "",
+        "owner": "",
+        "truppeIds": [""],
+        "currentLocation": {"x": 0, "y": 0},
+        "status": "",
+        "hp": 0
+      }
+    }
+  },
+  "match:{id_partita_hash}:player:{username}:truppe": {
+    "type": "HASH",
+    "description": "Hash contenente le truppe del giocatore. Chiave: id_truppa, Valore: Dati truppa serializzati in JSON.",
+    "content": {
+      "{id_truppa}": {
+        "id": "",
+        "id_armata": "",
+        "hp": 0,
+        "type": ""
+      }
+    }
+  },
+  "match:{alias_id}": {
+    "type": "STRING",
+    "description": "Alias che punta all'id_partita_hash principale della partita.",
+    "content": "ALIAS:{id_partita_hash}"
   }
 }
-
-
-

@@ -170,7 +170,12 @@
             <div class="build-cost">
               <span class="cost-unit" *ngIf="item.risorsa_estratta" style="color: #4ade80; text-transform: uppercase;">{{ getResourceIcon(item.risorsa_estratta) }} {{ item.risorsa_estratta }}</span>
               <span class="cost-unit" *ngIf="item.costo_denaro > 0">💵 {{ item.costo_denaro | number }}</span>
+              <span class="cost-unit" *ngIf="item.tempo_costruzione > 0">⏳ {{ item.tempo_costruzione }}h</span>
+              <span class="cost-unit" *ngIf="item.costo_legno > 0">🪵 {{ item.costo_legno | number }}</span>
+              <span class="cost-unit" *ngIf="item.costo_mattoni > 0">🧱 {{ item.costo_mattoni | number }}</span>
               <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio | number }}</span>
+              <span class="cost-unit" *ngIf="item.costo_petrolio > 0">🛢️ {{ item.costo_petrolio | number }}</span>
+              <span class="cost-unit" *ngIf="item.costo_piombo > 0 || item.costo_piombio > 0">🔘 {{ (item.costo_piombo || item.costo_piombio) | number }}</span>
             </div>
           </div>
         </div>
