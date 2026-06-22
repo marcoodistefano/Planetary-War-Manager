@@ -57,7 +57,7 @@
                    [class.locked]="!isUnlocked(node) && !canUnlock(node)" 
                    [class.affordable]="!isUnlocked(node) && canUnlock(node) && hasResources(node)"
                    [class.unlocked]="isUnlocked(node)"
-                   (click)="(!isUnlocked(node) && canUnlock(node) && hasResources(node)) ? confirmResearch(node) : selectNode(node)">
+                   (mouseup)="onNodeClick(node)">
                 
                 <div class="node-header">
                   <span class="node-name">{{ node.name || node.nome }}</span>

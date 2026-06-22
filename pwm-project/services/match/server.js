@@ -540,14 +540,18 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             const reqUranio = structureDetails.costo_uranio || 0;
                             const reqOro = structureDetails.costo_oro || 0;
 
+                            console.log(`[DEBUG RESEARCH] Player: ${ws.username}, Structure: ${structureId}`);
+                            console.log(`[DEBUG RESEARCH] Risorse:`, player.risorse);
+                            console.log(`[DEBUG RESEARCH] Requisiti:`, { reqDenaro, reqLegno, reqMattoni, reqAcciaio, reqPetrolio, reqPiombo, reqGas, reqUranio, reqOro });
+
                             if (
                                 (player.risorse.denaro || 0) < reqDenaro ||
                                 (player.risorse.legno || 0) < reqLegno ||
-                                (player.risorse.mattoni || 0) < reqMattoni ||
+                                (player.risorse.mattone || 0) < reqMattoni ||
                                 (player.risorse.acciaio || 0) < reqAcciaio ||
                                 (player.risorse.petrolio || 0) < reqPetrolio ||
                                 (player.risorse.piombo || 0) < reqPiombo ||
-                                (player.risorse.gas_naturale || 0) < reqGas ||
+                                (player.risorse.gas || 0) < reqGas ||
                                 (player.risorse.uranio || 0) < reqUranio ||
                                 (player.risorse.oro || 0) < reqOro
                             ) {
@@ -556,11 +560,11 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                             player.risorse.denaro -= reqDenaro;
                             player.risorse.legno -= reqLegno;
-                            player.risorse.mattoni -= reqMattoni;
+                            player.risorse.mattone -= reqMattoni;
                             player.risorse.acciaio -= reqAcciaio;
                             player.risorse.petrolio -= reqPetrolio;
                             player.risorse.piombo -= reqPiombo;
-                            player.risorse.gas_naturale -= reqGas;
+                            player.risorse.gas -= reqGas;
                             player.risorse.uranio -= reqUranio;
                             player.risorse.oro -= reqOro;
 
@@ -576,7 +580,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         } else if (updRes && updRes.success) {
                             ws.send(JSON.stringify({
                                 type: 'RESEARCH_SUCCESS',
-                                payload: { structureId, technologies: updRes.technologies, risorse: updRes.risorse }
+                                payload: { structureId, technologies: updRes.technologies, risorse: translateRedisToFe(updRes.risorse) }
                             }));
                             // Comunica anche in broadcast il cambio risorse? La UI dovrebbe aggiornarsi già dal RESEARCH_SUCCESS.
                             const broadcastPayload = { matchId: ws.matchId, payload: { type: 'MATCH_UPDATE', data: { action: 'resource_sync' } } };
@@ -619,7 +623,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                         const regionId = getRegionIdByName(targetName);
 
-                        const actualMatchId = matchObj.match.id_partita_hash;
+                        const actualMatchId = ws.matchId;
                         const regionsResourcesStr = await redis.get(`match:${actualMatchId}:regions_resources`);
                         const regionsResources = regionsResourcesStr ? JSON.parse(regionsResourcesStr) : {};
                         const myRegionRes = regionsResources[regionId];
