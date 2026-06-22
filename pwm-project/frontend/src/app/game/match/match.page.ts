@@ -1575,8 +1575,29 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   // --- RENDERING STRUTTURE SU MAPPA ---
 
   getStructureTooltipHTML(structure: any): string {
+    let tierDisplay = '';
+    let extDetails: any = null;
+    let strDetails: any = null;
+    let risorse: any[] = [];
+    
+    if (this.gameRules && this.gameRules.sheets) {
+        const estrattori = this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
+        const strutture = this.gameRules.sheets.find((s: any) => s.name === 'Strutture')?.lines || [];
+        risorse = this.gameRules.sheets.find((s: any) => s.name === 'Risorse')?.lines || [];
+        
+        extDetails = estrattori.find((s: any) => s.id_extractor === structure.structureId);
+        if (extDetails && extDetails.tier !== undefined) {
+            tierDisplay = ` <span style="color:#fcd34d; font-size:0.85em; margin-left: 5px;">[T${extDetails.tier}]</span>`;
+        } else {
+            strDetails = strutture.find((s: any) => s.id_struttura === structure.structureId);
+            if (strDetails && strDetails.tier !== undefined) {
+                tierDisplay = ` <span style="color:#fcd34d; font-size:0.85em; margin-left: 5px;">[T${strDetails.tier}]</span>`;
+            }
+        }
+    }
+
     let html = `<div style="text-align: center; font-family: 'Rajdhani', sans-serif;">`;
-    html += `<strong style="font-size: 1.1em; color: #60a5fa;">${structure.name}</strong> <span style="color:#a1a1aa; font-size:0.9em">(${structure.owner})</span><br/>`;
+    html += `<strong style="font-size: 1.1em; color: #60a5fa;">${structure.name}</strong>${tierDisplay} <span style="color:#a1a1aa; font-size:0.9em">(${structure.owner})</span><br/>`;
     
     if (structure.status === 'building') {
       if (structure.completionTime) {
@@ -1588,32 +1609,22 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         html += `<span style="color:#eab308; font-weight:bold;">IN COSTRUZIONE</span>`;
       }
     } else {
-      if (this.gameRules && this.gameRules.sheets) {
-        const estrattori = this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
-        const strutture = this.gameRules.sheets.find((s: any) => s.name === 'Strutture')?.lines || [];
-        const risorse = this.gameRules.sheets.find((s: any) => s.name === 'Risorse')?.lines || [];
-        
-        const extDetails = estrattori.find((s: any) => s.id_extractor === structure.structureId);
-        if (extDetails) {
-          const baseRes = risorse.find((r: any) => r.id === extDetails.risorsa_estratta);
-          if (baseRes && baseRes.risorsa_per_ora) {
-            const rulesMultiplier = this.gameRules.sheets.find((s: any) => s.name === 'Regole Generali')?.lines?.find((r: any) => r.id === 'strutture_multiplier')?.value || 1;
-            const amount = baseRes.risorsa_per_ora * (extDetails.efficienza || 1) * rulesMultiplier;
-            html += `<span style="color:#4ade80;">Estrae: ${amount} ${baseRes.name}/h</span>`;
-          } else if (extDetails.risorsa_estratta) {
-            html += `<span style="color:#4ade80;">Estrae: ${extDetails.risorsa_estratta}/h</span>`;
-          }
-        } else {
-          const strDetails = strutture.find((s: any) => s.id_struttura === structure.structureId);
-          if (strDetails) {
-            if (strDetails.categoria === 1) {
-              html += `<span style="color:#f87171;">Addestramento truppe (Tier ${strDetails.tier})</span>`;
-            } else if (strDetails.categoria === 0) {
-              html += `<span style="color:#fb923c;">Produzione veicoli (Tier ${strDetails.tier})</span>`;
-            } else if (strDetails.categoria === 2) {
-              html += `<span style="color:#38bdf8;">Difesa territorio (HP: ${strDetails.HP})</span>`;
-            }
-          }
+      if (extDetails) {
+        const baseRes = risorse.find((r: any) => r.id === extDetails.risorsa_estratta);
+        if (baseRes && baseRes.risorsa_per_ora) {
+          const rulesMultiplier = this.gameRules.sheets.find((s: any) => s.name === 'Regole Generali')?.lines?.find((r: any) => r.id === 'strutture_multiplier')?.value || 1;
+          const amount = baseRes.risorsa_per_ora * (extDetails.efficienza || 1) * rulesMultiplier;
+          html += `<span style="color:#4ade80;">Estrae: ${amount} ${baseRes.name}/h</span>`;
+        } else if (extDetails.risorsa_estratta) {
+          html += `<span style="color:#4ade80;">Estrae: ${extDetails.risorsa_estratta}/h</span>`;
+        }
+      } else if (strDetails) {
+        if (strDetails.categoria === 1) {
+          html += `<span style="color:#f87171;">Addestramento truppe</span>`;
+        } else if (strDetails.categoria === 0) {
+          html += `<span style="color:#fb923c;">Produzione veicoli</span>`;
+        } else if (strDetails.categoria === 2) {
+          html += `<span style="color:#38bdf8;">Difesa territorio (HP: ${strDetails.HP})</span>`;
         }
       }
     }
@@ -1621,9 +1632,25 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     return html;
   }
 
-  getStructureImage(name: string): string {
+  getStructureImage(name: string, structureId?: string): string {
     let png = 'fabbrica.png';
     name = (name || '').toLowerCase();
+
+    if (structureId && this.gameRules && this.gameRules.sheets) {
+        const estrattori = this.gameRules.sheets.find((s: any) => s.name === 'Estrattori')?.lines || [];
+        const extDetails = estrattori.find((s: any) => s.id_extractor === structureId);
+        if (extDetails && extDetails.risorsa_estratta) {
+            const resType = extDetails.risorsa_estratta.toLowerCase();
+            if (resType === 'legno') return 'segheria.png';
+            if (resType === 'mattoni') return 'mattonificio.png';
+            if (resType === 'acciaio') return 'acciaieria.png';
+            if (resType === 'petrolio') return 'petrolio.png';
+            if (resType === 'piombo') return 'carbone.png'; // Fallback per miniere senza icona dedicata
+            if (resType === 'oro') return 'miniera_oro.png';
+            if (resType === 'uranio') return 'arricchimento_uranio.png';
+            if (resType === 'gas_naturale') return 'gas.png';
+        }
+    }
 
     if (name.includes('segheria') || name.includes('boschivo')) png = 'segheria.png';
     else if (name.includes('miniera') || name.includes('scavo') || name.includes('carbone')) {
@@ -1705,7 +1732,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         container.style.justifyContent = 'center';
         container.style.cursor = 'pointer';
 
-        let png = this.getStructureImage(structure.name);
+        let png = this.getStructureImage(structure.name, structure.structureId);
         if (structure.status === 'building') {
             png = 'workinprogress.png';
         }
@@ -1755,7 +1782,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         marker.setLngLat(coords);
         const img = marker.getElement().querySelector('img') as HTMLImageElement;
         if (img) {
-            let png = this.getStructureImage(structure.name);
+            let png = this.getStructureImage(structure.name, structure.structureId);
             if (structure.status === 'building') {
                 png = 'workinprogress.png';
             }
@@ -2780,7 +2807,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         container.style.pointerEvents = 'none';
 
         const name = this.selectedStructureForBuild.name || this.selectedStructureForBuild.nome || '';
-        const png = this.getStructureImage(name);
+        const structureId = this.selectedStructureForBuild.id_extractor || this.selectedStructureForBuild.id_struttura;
+        const png = this.getStructureImage(name, structureId);
 
         const img = document.createElement('img');
         img.src = `assets/2Dmodels/Buildings/${png}`;
