@@ -881,7 +881,15 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             player.strutture = strutture;
                             player.risorse = resources;
 
-                            return { save: true, matchObj, data: { success: true, newStructure, replacedStructureId, resources } };
+                            let targetUsers = [userId];
+                            const myAllianceId = player.id_alleanza;
+                            if (myAllianceId) {
+                                targetUsers = matchObj.match.player
+                                    .filter(p => String(p.id_alleanza) === String(myAllianceId))
+                                    .map(p => p.id_user);
+                            }
+
+                            return { save: true, matchObj, data: { success: true, newStructure, replacedStructureId, resources, targetUsers } };
                         });
 
                         if (!updRes || updRes.error) {
@@ -900,6 +908,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                             const broadcastStructurePayload = {
                                 matchId: ws.matchId,
+                                targetUsers: updRes.targetUsers,
                                 payload: { type: 'STRUCTURE_BUILT', data: updRes.newStructure, replacedStructureId: updRes.replacedStructureId }
                             };
                             await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastStructurePayload));
@@ -997,7 +1006,14 @@ const startConstructionEngine = () => {
                             for (const s of p.strutture) {
                                 if (s.status === 'building' && s.completionTime && now >= s.completionTime) {
                                     s.status = 'built';
-                                    completedStructures.push({ structure: s, owner: p.username });
+                                    let targetUsers = [p.id_user];
+                                    const myAllianceId = p.id_alleanza;
+                                    if (myAllianceId) {
+                                        targetUsers = mObj.match.player
+                                            .filter(x => String(x.id_alleanza) === String(myAllianceId))
+                                            .map(x => x.id_user);
+                                    }
+                                    completedStructures.push({ structure: s, owner: p.username, targetUsers });
                                     shouldSave = true;
                                 }
                             }
@@ -1013,6 +1029,7 @@ const startConstructionEngine = () => {
                         for (const item of updRes.completedStructures) {
                             const broadcastStructurePayload = {
                                 matchId: matchIdHash,
+                                targetUsers: item.targetUsers,
                                 payload: { type: 'STRUCTURE_COMPLETED', data: item.structure }
                             };
                             await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastStructurePayload));

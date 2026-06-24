@@ -42,8 +42,8 @@ const AVATAR_ASSET_VERSION = '20260517';
   ]
 })
 export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
-
   @ViewChild(ArmyModalComponent) armyModalComponent!: ArmyModalComponent;
+  @ViewChild(InGameChatComponent) chatComponent!: InGameChatComponent;
   // --- 1. PROPRIETÀ E STATO DELLA MAPPA ---
   map: any;
   isGlobe = false;
@@ -2781,9 +2781,41 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       case 'CONQUISTA':
         // Logica combattimento
         break;
+      case 'DIPLOMAZIA':
+        this.openChatWithRegionOwner();
+        break;
     }
 
     this.isRadialMenuVisible = false;
+  }
+
+  openChatWithRegionOwner() {
+    if (!this.selectedPointName) {
+      this.toggleDiplomacyModal();
+      return;
+    }
+
+    const feature = this.regionsGeoData?.features?.find((f: any) =>
+      (f.properties.name?.toUpperCase() === this.selectedPointName) ||
+      (f.properties.ADMIN?.toUpperCase() === this.selectedPointName) ||
+      (f.properties.adm1_code?.toUpperCase() === this.selectedPointName) ||
+      (f.id === this.selectedPointName)
+    );
+    const provId = feature ? (feature.properties.adm1_code || feature.properties.name || feature.id) : this.selectedPointName;
+
+    const nation = this.matchNations?.find((n: any) => n.territori && n.territori.includes(provId));
+
+    if (nation && nation.isOccupied && !String(nation.username || '').toLowerCase().includes('bot') && nation.username !== this.userProfile?.username) {
+      this.isChatOpen = true;
+      this.cdr.detectChanges();
+      setTimeout(() => {
+        if (this.chatComponent) {
+          this.chatComponent.startDirectConversation(nation.username);
+        }
+      }, 50);
+    } else {
+      this.toggleDiplomacyModal();
+    }
   }
 
   async showTerritoryInfoBanner() {
