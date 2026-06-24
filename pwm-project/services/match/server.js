@@ -406,7 +406,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             const movingPlayer = matchObj.match.player.find(n => n.username === ws.username);
                             const movingAllianceId = movingPlayer ? movingPlayer.id_alleanza : null;
                             const defenderAllianceId = targetNation.id_alleanza || null;
-                            const isAlly = movingAllianceId && defenderAllianceId && movingAllianceId === defenderAllianceId;
+                            const isAlly = movingAllianceId && defenderAllianceId && String(movingAllianceId) === String(defenderAllianceId);
 
                             if (isAlly) {
                                 return { save: false, data: { error: 'Non puoi attaccare un membro della tua alleanza!' } };
@@ -425,7 +425,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                                     const movingPlayer = matchObj.match.player.find(x => x.username === ws.username);
                                     const movingAllianceId = movingPlayer ? movingPlayer.id_alleanza : null;
                                     const defAllianceId = n.id_alleanza || null;
-                                    if (movingAllianceId && defAllianceId && movingAllianceId === defAllianceId) {
+                                    if (movingAllianceId && defAllianceId && String(movingAllianceId) === String(defAllianceId)) {
                                         return { save: false, data: { error: 'Non puoi attaccare un membro della tua alleanza!' } };
                                     }
                                     isAttack = true;
@@ -477,8 +477,9 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         await redis.publish('match_ws_broadcast_channel', JSON.stringify(updRes.warBroadcast));
                     }
 
-                    if (updRes && updRes.data && updRes.data.error) {
-                        ws.send(JSON.stringify({ type: 'ERROR', error: updRes.data.error }));
+                    if (updRes && (updRes.error || (updRes.data && updRes.data.error))) {
+                        const errMessage = updRes.error || updRes.data.error;
+                        ws.send(JSON.stringify({ type: 'ERROR', error: errMessage }));
                         return;
                     }
 
@@ -1059,7 +1060,7 @@ const startArrivalEngine = () => {
                         const attackerAllianceId = attackerPlayer ? attackerPlayer.id_alleanza : null;
                         const defenderAllianceId = targetNation.id_alleanza || null;
 
-                        if (attackerAllianceId && defenderAllianceId && attackerAllianceId === defenderAllianceId) {
+                        if (attackerAllianceId && defenderAllianceId && String(attackerAllianceId) === String(defenderAllianceId)) {
                             isAlliedTerritory = true;
                         }
                     }

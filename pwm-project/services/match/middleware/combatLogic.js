@@ -300,7 +300,7 @@ const processActiveCombats = async () => {
 
                 for (const p of matchObj.match.player) {
                     if (p.username === attackerPlayer) continue;
-                    if (attackerAllianceId && p.id_alleanza === attackerAllianceId) continue;
+                    if (attackerAllianceId && String(p.id_alleanza) === String(attackerAllianceId)) continue;
                     if (p.armate) {
                         for (const [aid, a] of Object.entries(p.armate)) {
                             if (a.status === 'dead') continue;
@@ -548,7 +548,7 @@ const processActiveCombats = async () => {
                                 if (pl.username === attackerPlayer) continue;
                                 
                                 let isEnemy = true;
-                                if (attackerAllianceId && pl.id_alleanza === attackerAllianceId) {
+                                if (attackerAllianceId && String(pl.id_alleanza) === String(attackerAllianceId)) {
                                     isEnemy = false;
                                 }
                                 if (!isEnemy) continue;
@@ -829,7 +829,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
 
             // Inibisce il combattimento se il target è un alleato
             const defenderAllianceId = targetNation.id_alleanza || null;
-            if (attackerAllianceId && defenderAllianceId && attackerAllianceId === defenderAllianceId) {
+            if (attackerAllianceId && defenderAllianceId && String(attackerAllianceId) === String(defenderAllianceId)) {
                 console.log(`[COMBAT] Attacco bloccato: ${attackerUsername} e ${targetNation.username} sono nella stessa alleanza.`);
                 army.status = 'standby';
                 delete army.next_round_time;
@@ -857,7 +857,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
                                     if (n.username === attackerUsername) continue;
                                     if (n.armate && n.armate[target_node]) {
                                         let isEnemy = true;
-                                        if (attackerAllianceId && n.id_alleanza === attackerAllianceId) {
+                                        if (attackerAllianceId && String(n.id_alleanza) === String(attackerAllianceId)) {
                                             isEnemy = false;
                                         }
                                         if (!isEnemy) continue; // Salta armate alleate
