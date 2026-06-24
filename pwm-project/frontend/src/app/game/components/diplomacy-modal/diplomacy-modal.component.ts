@@ -69,8 +69,8 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
     return this.matchNations
       .filter(n => n.isOccupied)
       .map(n => {
-        const name = String(n.name || 'NAZIONE SCONOSCIUTA').toUpperCase();
-        const rawOwner = String(n.playerId || '');
+        const name = String(n.nationName || n.name || 'NAZIONE SCONOSCIUTA').toUpperCase();
+        const rawOwner = String(n.username || n.playerId || '');
         const isBot = rawOwner.toLowerCase().includes('bot');
         const owner = isBot ? rawOwner.replace(/_bot/gi, '') : rawOwner;
         return {
