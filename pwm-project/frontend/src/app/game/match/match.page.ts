@@ -311,6 +311,46 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     mattoni: 0, petrolio: 0, gas_naturale: 0, uranio: 0, oro: 0
   };
 
+  resourceAnimations: { [key: string]: { id: number, amount: number, active: boolean }[] } = {};
+  private animationIdCounter = 0;
+
+  updatePlayerResources(newResources: any) {
+    if (!newResources) return;
+    
+    // Controlla se le risorse precedenti non erano a 0 (per evitare animazioni al primo caricamento/refresh)
+    const hasInitialValues = this.playerResources && this.playerResources['denaro'] > 0;
+
+    if (hasInitialValues) {
+      for (const key of Object.keys(newResources)) {
+        const oldVal = this.playerResources[key] || 0;
+        const newVal = newResources[key] || 0;
+        const diff = newVal - oldVal;
+        
+        if (diff < -5) { // Evita micro fluttuazioni, cattura solo spese reali
+          this.triggerResourceAnimation(key, diff);
+        }
+      }
+    }
+    
+    // Clona l'oggetto per forzare la change detection di Angular
+    this.playerResources = { ...newResources };
+  }
+
+  triggerResourceAnimation(resourceId: string, amount: number) {
+    if (!this.resourceAnimations[resourceId]) {
+      this.resourceAnimations[resourceId] = [];
+    }
+    const animId = this.animationIdCounter++;
+    this.resourceAnimations[resourceId].push({ id: animId, amount, active: true });
+    
+    setTimeout(() => {
+      if (this.resourceAnimations[resourceId]) {
+        this.resourceAnimations[resourceId] = this.resourceAnimations[resourceId].filter(a => a.id !== animId);
+        this.cdr.detectChanges();
+      }
+    }, 2000);
+  }
+
   userProfile = {
     username: 'Caricamento...',
     rank: 'Generale di Brigata',
@@ -517,7 +557,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.applyTerritoryColors();
             }
             if (parsed.payload?.resources) {
-              this.playerResources = parsed.payload.resources;
+              this.updatePlayerResources(parsed.payload.resources);
             }
             if (parsed.payload?.production) {
               this.resourceProduction = parsed.payload.production;
@@ -549,7 +589,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.userTechnologies = parsed.payload.technologies;
             }
             if (parsed.payload?.risorse) {
-              this.playerResources = parsed.payload.risorse;
+              this.updatePlayerResources(parsed.payload.risorse);
             }
             this.ngZone.run(() => this.cdr.detectChanges());
           }
@@ -559,14 +599,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.playerTrainings = parsed.payload.trainings;
             }
             if (parsed.payload?.resources) {
-              this.playerResources = parsed.payload.resources;
+              this.updatePlayerResources(parsed.payload.resources);
             }
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
           if (parsed.type === 'RESOURCES_UPDATED') {
             if (parsed.data?.resources) {
-              this.playerResources = parsed.data.resources;
+              this.updatePlayerResources(parsed.data.resources);
             }
             if (parsed.data?.production) {
               this.resourceProduction = parsed.data.production;

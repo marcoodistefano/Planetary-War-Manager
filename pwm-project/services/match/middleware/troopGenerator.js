@@ -18,6 +18,14 @@ const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, ho
         const adjData = await redis.get('map_data:regions_adjacency');
         const adj = adjData ? JSON.parse(adjData) : {};
 
+        // Costruiamo un indice O(1) per lookup per id_territorio
+        const adjById = {};
+        for (const key in adj) {
+            if (adj[key] && adj[key].id) {
+                adjById[adj[key].id] = adj[key];
+            }
+        }
+
         const client = await db.connect();
 
         try {
@@ -48,15 +56,8 @@ const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, ho
                 // Generiamo un'armata per ogni territorio
                 for (const admin in nation.territori_dict) {
                     for (const prov of nation.territori_dict[admin]) {
-                        // Troviamo il territorio in adj (prov è l'ID testuale o index?)
-                        // nation.territories contiene un array di adj[idx].id. Per trovare lat e lng cerchiamo nell'object adj
-                        let region = null;
-                        for (const key in adj) {
-                            if (adj[key].id === prov) {
-                                region = adj[key];
-                                break;
-                            }
-                        }
+                        // Troviamo il territorio nell'indice O(1)
+                        let region = adjById[prov] || null;
 
                         if (!region) continue;
 

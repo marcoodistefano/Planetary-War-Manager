@@ -431,6 +431,8 @@ const processActiveCombats = async () => {
                     });
                     await db.query(`DELETE FROM mosse WHERE id_armata = $1`, [currentTargetArmataId]);
                     await emitCombatEvent(id_partita_hash, attackerName, defenderName, damageToArmy, 'distrutta', [attackerPlayer, defenderPlayer]);
+                    const { updateElo } = require('./eloEngine.js');
+                    await updateElo(id_partita_hash, attackerPlayer, defenderPlayer);
                     
                     if (!id_target_citta) {
                         combatEnded = true;
@@ -474,6 +476,8 @@ const processActiveCombats = async () => {
                         await db.query(`DELETE FROM mosse WHERE id_armata = $1`, [id_attaccante]);
                         combatEnded = true;
                         await emitCombatEvent(id_partita_hash, defenderName, attackerName, counterDmg, 'distrutta', [attackerPlayer, defenderPlayer]);
+                        const { updateElo } = require('./eloEngine.js');
+                        await updateElo(id_partita_hash, defenderPlayer, attackerPlayer);
                     } else {
                         const deadAttackerTroops = {};
                         for (const troop in oldAttackerComposition) {
@@ -695,6 +699,10 @@ const processActiveCombats = async () => {
                     };
                     await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
                     await emitCombatEvent(id_partita_hash, attackerName, id_target_citta, damageToCity, 'distrutta', [attackerPlayer]);
+                    if (conquestData && conquestData.defNation && conquestData.defNation.username !== attackerPlayer) {
+                        const { updateElo } = require('./eloEngine.js');
+                        await updateElo(id_partita_hash, attackerPlayer, conquestData.defNation.username);
+                    }
                     await redis.hSet(`match:${id_partita_hash}:cities_hp`, id_target_citta, '500');
                     
                     if (!attackerDied) {

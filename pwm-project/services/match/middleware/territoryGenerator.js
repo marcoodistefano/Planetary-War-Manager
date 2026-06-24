@@ -60,16 +60,12 @@ const generateNations = async (matchId, maxPlayers) => {
                         queue.push(...newNeighbors);
                     }
                 } else {
-                    const toRad = x => x * Math.PI / 180;
-                    const haversineDistance = (lat1, lon1, lat2, lon2) => {
+                    // Approssimazione euclidea equirettangolare per massima velocità O(1) invece di Haversine
+                    const fastDistance = (lat1, lon1, lat2, lon2) => {
                         if (!lat1 || !lon1 || !lat2 || !lon2) return 99999;
-                        const R = 6371; 
-                        const dLat = toRad(lat2 - lat1);
-                        const dLon = toRad(lon2 - lon1);
-                        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                                  Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-                                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                        const dLat = lat2 - lat1;
+                        const dLon = (lon2 - lon1) * Math.cos(lat1 * Math.PI / 180);
+                        return Math.sqrt(dLat * dLat + dLon * dLon) * 111; // Ritorna circa in KM
                     };
 
                     let jumped = false;
@@ -82,7 +78,7 @@ const generateNations = async (matchId, maxPlayers) => {
                         const candidate = adj[regIdx];
                         let dist = 0;
                         if (lastRegion && candidate) {
-                            dist = haversineDistance(lastRegion.lat, lastRegion.lng, candidate.lat, candidate.lng);
+                            dist = fastDistance(lastRegion.lat, lastRegion.lng, candidate.lat, candidate.lng);
                         }
                         const penalty = candidate.admin === targetAdmin ? 0 : 5000;
                         if (dist + penalty < minDistance) {

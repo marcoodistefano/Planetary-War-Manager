@@ -19,6 +19,7 @@ const { startCombatLoop } = require("./middleware/combatLogic.js");
 const { startFogOfWarEngine } = require("./middleware/fogOfWarEngine.js");
 const { startCombatTriggerEngine } = require("./middleware/combatTriggerEngine.js");
 const { startSnapshotEngine } = require("./middleware/snapshotEngine.js");
+const { startMatchStateEngine } = require("./middleware/matchStateEngine.js");
 const Eru = require('./middleware/Eru.js');
 
 function translateRedisToFe(resources) {
@@ -134,6 +135,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                                 production = translateRedisToFe(p.produzione);
                                 technologies = p.technologies || [];
                                 trainings = p.addestramenti || [];
+                                console.log(`[WS_MATCH] INITIAL_STATE per ${ws.username}: risorse=`, resources);
                             }
                         }
                     }
@@ -1187,6 +1189,7 @@ loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(async () => {
         startFogOfWarEngine();
         startCombatTriggerEngine();
         startSnapshotEngine();
+        startMatchStateEngine();
         startArrivalEngine();
         startConstructionEngine();
     });

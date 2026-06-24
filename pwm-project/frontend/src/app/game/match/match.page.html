@@ -86,6 +86,13 @@
               <span class="t-val">{{ troop.value }}</span>
             </div>
           </div>
+
+          <!-- Animazione fluttuante spesa -->
+          <div *ngIf="resourceAnimations[res.id]">
+            <span *ngFor="let anim of resourceAnimations[res.id]" class="floating-damage">
+              {{ anim.amount | number }}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -131,6 +138,13 @@
             <span class="t-key">{{ troop.key }}</span>
             <span class="t-val">{{ troop.value }}</span>
           </div>
+        </div>
+
+        <!-- Animazione fluttuante spesa (Mobile) -->
+        <div *ngIf="resourceAnimations[res.id]">
+          <span *ngFor="let anim of resourceAnimations[res.id]" class="floating-damage">
+            {{ anim.amount | number }}
+          </span>
         </div>
       </div>
     </div>

@@ -374,18 +374,45 @@ const Eru = {
     }
   },
 
+  decode_duration_ms: (bits) => {
+    const HOUR = 3600000;
+    const DAY = 86400000;
+    switch (bits) {
+      case DURATION_MAX.RUSH: return 1 * HOUR;
+      case DURATION_MAX.CRAZY: return 6 * HOUR;
+      case DURATION_MAX.INSANE: return 12 * HOUR;
+      case DURATION_MAX.FAST: return 1 * DAY;
+      case DURATION_MAX.SHORT: return 3 * DAY;
+      case DURATION_MAX.MEDIUM: return 5 * DAY;
+      case DURATION_MAX.DEFAULT: return 7 * DAY;
+      case DURATION_MAX.MEDIUM_LONG: return 10 * DAY;
+      case DURATION_MAX.LONG: return 14 * DAY;
+      case DURATION_MAX.CHILL: return 32 * DAY;
+      case DURATION_MAX.VERY_LONG: return 60 * DAY;
+      case DURATION_MAX.HARD: return 90 * DAY;
+      case DURATION_MAX.MAX: return 120 * DAY;
+      case DURATION_MAX.UNLIMITED: return Infinity;
+      case DURATION_MAX.CONTROLLO: return 1 * HOUR; // Default per controllo
+      default: return Infinity;
+    }
+  },
+
   decode_match: (binaryString) => {
     const matchReg = typeof binaryString === "string" ? BigInt("0b" + binaryString) : BigInt(binaryString);
     const statoBits = (matchReg >> 54n) & 0b11n;
     const isSquadBits = (matchReg >> 53n) & 0b1n;
+    const alleanzeWinBits = (matchReg >> 50n) & 0b1n;
     const maxPlayersBits = (matchReg >> 46n) & 0b111n;
+    const durationBits = (matchReg >> 42n) & 0b1111n;
     const multiplierBits = (matchReg >> 38n) & 0b1111n;
 
     return {
       stato: Eru.decode_stato(statoBits),
       is_squad: isSquadBits === SQUAD.SQUAD,
+      alleanze_win: alleanzeWinBits === ALLEANZE_WIN.ALLIANCES_CAN_WIN,
       maxPlayers: Eru.decode_max_players(maxPlayersBits, isSquadBits),
       maxPlayersCount: Eru.decode_max_players_count(maxPlayersBits, isSquadBits),
+      durationMs: Eru.decode_duration_ms(durationBits),
       multiplierValue: Eru.decode_moltiplicatore_temporale_value(multiplierBits)
     };
   },
