@@ -1,4 +1,4 @@
-import { Component, Output, EventEmitter, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Output, EventEmitter, Input, OnInit, OnDestroy, OnChanges, SimpleChanges, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
@@ -33,7 +33,7 @@ interface ArmyMissionRequest {
   standalone: true,
   imports: [CommonModule, IonicModule, FormsModule]
 })
-export class ArmyModalComponent implements OnInit, OnDestroy {
+export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   @Output() close = new EventEmitter<void>();
   @Output() playerTroopsChange = new EventEmitter<{ [key: string]: number }>();
   @Output() armiesChange = new EventEmitter<ArmyGroup[]>();
@@ -78,7 +78,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
   trainingTimers: { [index: number]: string } = {};
   private timerInterval: any;
 
-  constructor(private homeService: HomeService) {}
+  constructor(private homeService: HomeService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit() {
     this.syncFromInputs(true);
@@ -156,6 +156,10 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
       this.syncFromInputs(false);
       this.updateValidStructuresCache();
     }
+    if (changes['trainings']) {
+       this.updateValidStructuresCache();
+       this.cdr.detectChanges();
+    }
   }
 
   updateValidStructuresCache() {
@@ -191,9 +195,8 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
     const newCatalog = [];
     for (const unit of truppeSheet.lines) {
       if (!unit.id_truppa) continue;
-      if (unit.id_truppa === 'fante') continue;
       // Filtriamo solo le truppe di terra (prodotte in caserma o fabbrica, no aria o mare per ora)
-      if (unit.prodotta_in && (unit.prodotta_in.startsWith('caserma') || unit.prodotta_in.startsWith('fabbrica'))) {
+      if (unit.prodotta_in && (unit.prodotta_in.startsWith('caserma') || unit.prodotta_in.startsWith('fabbrica') || unit.prodotta_in.startsWith('tenda'))) {
         newCatalog.push({
           id: unit.id_truppa,
           name: unit.nome || unit.id_truppa,
@@ -338,42 +341,51 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
   createArmy() {
     const troopKey = String(this.selectedTroopKey || '').trim();
     const troopCount = Math.max(1, Math.floor(Number(this.selectedTroopCount) || 0));
-    const availableCount = Number(this.availableTroops[troopKey] || 0);
 
-    if (!troopKey || availableCount < troopCount) {
-      return;
+    if (!troopKey) return;
+
+    // Trova un'armata sorgente che contenga la truppa
+    let sourceArmy = null;
+    if (this.selectedTargetName) {
+        sourceArmy = this.armies.find(a => 
+            (a.currentLocation === this.selectedTargetName || a.targetName === this.selectedTargetName || a.currentLocation === this.selectedTargetCoords) 
+            && a.composition && a.composition[troopKey] >= troopCount
+        );
+    }
+    
+    // Se non la trova nel target selezionato, cerca una qualsiasi armata
+    if (!sourceArmy) {
+        sourceArmy = this.armies.find(a => a.composition && a.composition[troopKey] >= troopCount);
     }
 
-    const nextTroops = { ...this.availableTroops };
-    const remaining = availableCount - troopCount;
-
-    if (remaining > 0) {
-      nextTroops[troopKey] = remaining;
-    } else {
-      delete nextTroops[troopKey];
+    if (!sourceArmy) {
+        console.warn('Non hai truppe sufficienti di questo tipo in una singola armata per formare il gruppo.');
+        return;
     }
 
-    let spawnCoords: any = undefined;
-    if (this.selectedTargetCoords && this.selectedTargetCoords !== '--') {
-      spawnCoords = this.selectedTargetCoords;
-    } else if (this.selectedTargetName) {
-      spawnCoords = this.selectedTargetName;
+    // Sottrai la truppa dall'armata sorgente
+    sourceArmy.composition[troopKey] -= troopCount;
+    if (sourceArmy.composition[troopKey] <= 0) {
+        delete sourceArmy.composition[troopKey];
+    }
+    
+    let armiesToKeep = this.armies;
+    if (Object.keys(sourceArmy.composition).length === 0) {
+        armiesToKeep = this.armies.filter(a => a.id !== sourceArmy.id);
     }
 
     const nextArmy: ArmyGroup = {
       id: this.generateUUID(),
-      name: this.armyName.trim() || `Armata ${this.armies.length + 1}`,
+      name: this.armyName.trim() || `Armata ${armiesToKeep.length + 1}`,
       composition: { [troopKey]: troopCount },
       status: 'standby',
-      currentLocation: spawnCoords
+      currentLocation: sourceArmy.currentLocation
     };
 
-    this.availableTroops = nextTroops;
-    this.armies = [nextArmy, ...this.armies];
+    this.armies = [nextArmy, ...armiesToKeep];
     this.activeArmyId = nextArmy.id;
     this.armyName = '';
     this.selectedTroopCount = 1;
-    this.playerTroopsChange.emit(this.availableTroops);
     this.armiesChange.emit(this.armies);
     this.activeTab = 'management';
   }
@@ -509,7 +521,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy {
       const selectedStruct = this.selectedRecruitLocations[unit.id];
       if (selectedStruct) {
          targetName = selectedStruct.locationName;
-         targetCoords = selectedStruct.coords ? `${selectedStruct.coords[0]}, ${selectedStruct.coords[1]}` : '--';
+         targetCoords = selectedStruct.targetCoords ? `${selectedStruct.targetCoords[0]}, ${selectedStruct.targetCoords[1]}` : '--';
       }
     }
 

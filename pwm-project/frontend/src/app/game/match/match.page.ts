@@ -596,7 +596,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
           if (parsed.type === 'RECRUIT_UNIT_SUCCESS') {
             if (parsed.payload?.trainings) {
-              this.playerTrainings = parsed.payload.trainings;
+              this.playerTrainings = [...parsed.payload.trainings];
             }
             if (parsed.payload?.resources) {
               this.updatePlayerResources(parsed.payload.resources);
@@ -913,6 +913,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
 
           if (parsed.type === 'ERROR') {
+            console.error("[WS ERROR RICEVUTO]:", parsed);
             this.toastCtrl.create({
               message: parsed.error || 'Si è verificato un errore',
               duration: 3000,

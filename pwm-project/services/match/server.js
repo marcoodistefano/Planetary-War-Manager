@@ -151,69 +151,75 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                 }
 
                 if (payload.action === 'RECRUIT_UNIT') {
-                    console.log("[RECRUIT_UNIT] Inizio elaborazione", payload);
-                    const { unitId, targetName, targetCoords, costMoney, costSteel, trainTime } = payload;
-                    
-                    await updateMatch(ws.matchId, async (matchObj) => {
-                        if (!matchObj || !matchObj.match || !matchObj.match.player) {
-                            console.log("[RECRUIT_UNIT] Partita o player mancanti");
-                            return { save: false };
-                        }
+                    try {
+                        console.log("[RECRUIT_UNIT] Inizio elaborazione", payload);
+                        const { unitId, targetName, targetCoords, costMoney, costSteel, trainTime } = payload;
+                        
+                        const result = await updateMatch(ws.matchId, async (matchObj) => {
+                            if (!matchObj || !matchObj.match || !matchObj.match.player) {
+                                console.log("[RECRUIT_UNIT] Partita o player mancanti");
+                                return { save: false };
+                            }
 
-                        let player = matchObj.match.player.find(p => p.username === ws.username);
-                        if (!player) {
-                            console.log("[RECRUIT_UNIT] Player non trovato per", ws.username);
-                            return { save: false };
-                        }
+                            let player = matchObj.match.player.find(p => p.username === ws.username);
+                            if (!player) {
+                                console.log("[RECRUIT_UNIT] Player non trovato per", ws.username);
+                                return { save: false };
+                            }
 
-                        if (unitId !== 'fante' && player.addestramenti && player.addestramenti.length > 0) {
-                            console.log("[RECRUIT_UNIT] Addestramento già in corso");
-                            ws.send(JSON.stringify({ type: 'ERROR', error: 'Coda di addestramento occupata.' }));
-                            return { save: false };
-                        }
-                        
-                        let resources = player.risorse || { denaro: 0, acciaio: 0 };
-                        
-                        if (resources.denaro < costMoney || resources.acciaio < (costSteel || 0)) {
-                            console.log("[RECRUIT_UNIT] Risorse insufficienti");
-                            ws.send(JSON.stringify({ type: 'ERROR', error: 'Risorse insufficienti per il reclutamento.' }));
-                            return { save: false };
-                        }
-                        
-                        resources.denaro -= costMoney;
-                        if (costSteel) resources.acciaio -= costSteel;
-                        player.risorse = resources;
-                        
-                        let multiplier = 1;
-                        if (matchObj.match.struttura_partita) {
-                            try {
-                                const decodedMatch = Eru.decode_match(matchObj.match.struttura_partita);
-                                multiplier = decodedMatch.multiplierValue || 1;
-                            } catch (err) {}
-                        }
-                        const trainTimeMs = (trainTime / multiplier) * 3600 * 1000;
-                        const endTime = Date.now() + trainTimeMs;
-                        
-                        if (!player.addestramenti) player.addestramenti = [];
-                        player.addestramenti.push({
-                            troopId: unitId,
-                            targetName: targetName,
-                            spawnCoords: targetCoords,
-                            count: 1,
-                            endTime: endTime
+                            if (unitId !== 'fante' && player.addestramenti && player.addestramenti.some(t => t.targetName === targetName)) {
+                                console.log("[RECRUIT_UNIT] Addestramento già in corso in questa struttura");
+                                ws.send(JSON.stringify({ type: 'ERROR', error: 'Coda di addestramento occupata in questa struttura.' }));
+                                return { save: false };
+                            }
+                            
+                            let resources = player.risorse || { denaro: 0, acciaio: 0 };
+                            
+                            if (resources.denaro < costMoney || resources.acciaio < (costSteel || 0)) {
+                                console.log("[RECRUIT_UNIT] Risorse insufficienti");
+                                ws.send(JSON.stringify({ type: 'ERROR', error: 'Risorse insufficienti per il reclutamento.' }));
+                                return { save: false };
+                            }
+                            
+                            resources.denaro -= costMoney;
+                            if (costSteel) resources.acciaio -= costSteel;
+                            player.risorse = resources;
+                            
+                            let multiplier = 1;
+                            if (matchObj.match.struttura_partita) {
+                                try {
+                                    const decodedMatch = Eru.decode_match(matchObj.match.struttura_partita);
+                                    multiplier = decodedMatch.multiplierValue || 1;
+                                } catch (err) {}
+                            }
+                            const trainTimeMs = (trainTime / multiplier) * 3600 * 1000;
+                            const endTime = Date.now() + trainTimeMs;
+                            
+                            if (!player.addestramenti) player.addestramenti = [];
+                            player.addestramenti.push({
+                                troopId: unitId,
+                                targetName: targetName,
+                                spawnCoords: targetCoords,
+                                count: 1,
+                                endTime: endTime
+                            });
+                            console.log(`[RECRUIT_UNIT] Salvataggio addestramento di ${unitId} per ${ws.username}`);
+                            return { save: true, matchObj, data: { trainings: player.addestramenti, resources: player.risorse } };
                         });
-                        console.log(`[RECRUIT_UNIT] Salvataggio addestramento di ${unitId} per ${ws.username}`);
-                        return { save: true, matchObj, data: true };
-                    });
-                    
-                    const trainTimeMs = (trainTime / 1) * 3600 * 1000;
-                    ws.send(JSON.stringify({
-                        type: 'RECRUIT_UNIT_SUCCESS',
-                        payload: {
-                            trainings: player.addestramenti,
-                            resources: player.risorse
+                        
+                        if (result) {
+                            ws.send(JSON.stringify({
+                                type: 'RECRUIT_UNIT_SUCCESS',
+                                payload: {
+                                    trainings: result.trainings,
+                                    resources: translateRedisToFe(result.resources)
+                                }
+                            }));
                         }
-                    }));
+                    } catch (e) {
+                        console.error("[SYS_ERR] Errore in RECRUIT_UNIT:", e);
+                        ws.send(JSON.stringify({ type: 'ERROR', error: `Errore RECRUIT_UNIT: ${e.message}` }));
+                    }
                     return;
                 }
 
@@ -229,6 +235,64 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         }
                         return { save: false };
                     });
+
+                    // Sync PostgreSQL
+                    try {
+                        const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1`, [ws.matchId]);
+                        if (partitaRes.rows.length > 0) {
+                            const partitaId = partitaRes.rows[0].id_partita;
+                            const userRes = await db.query(`SELECT id_user FROM utenti WHERE username = $1`, [ws.username]);
+                            if (userRes.rows.length > 0) {
+                                const userId = userRes.rows[0].id_user;
+                                
+                                const dbArmiesRes = await db.query(`SELECT id_istanza_armata FROM armata WHERE partita_id = $1 AND user_id = $2`, [partitaId, userId]);
+                                const dbArmies = new Set(dbArmiesRes.rows.map(r => r.id_istanza_armata));
+                                const uiArmies = new Set(Object.keys(dict));
+
+                                // Trova armate da inserire
+                                const toInsert = [...uiArmies].filter(id => !dbArmies.has(id));
+                                for (const id of toInsert) {
+                                    const a = dict[id];
+                                    const comp = a.composition || {};
+                                    const troopType = Object.keys(comp)[0] || 'fante';
+                                    const count = comp[troopType] || 1;
+                                    
+                                    let spawnX = 0, spawnY = 0;
+                                    if (a.currentLocation && typeof a.currentLocation === 'string' && a.currentLocation.includes(',')) {
+                                        const pts = a.currentLocation.split(',');
+                                        spawnX = parseFloat(pts[0]);
+                                        spawnY = parseFloat(pts[1]);
+                                    }
+
+                                    const hp = 100 * count; // Base HP
+                                    const dmg = 10 * count; // Base DMG
+                                    
+                                    await db.query(
+                                        `INSERT INTO armata (id_istanza_armata, partita_id, user_id, id_modello, x, y, hp_tot, are_they_in_the_same_position, dmg_tot, max_range_atck, speed) 
+                                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT DO NOTHING`,
+                                        [id, partitaId, userId, troopType, spawnX, spawnY, hp, true, dmg, 1, 1]
+                                    );
+                                    
+                                    const crypto = require('crypto');
+                                    await db.query(
+                                        `INSERT INTO truppe (id_istanza_truppa, partita_id, user_id, id_modello, id_armata, x, y, hp) 
+                                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING`,
+                                        [crypto.randomUUID(), partitaId, userId, troopType, id, spawnX, spawnY, hp]
+                                    );
+                                }
+
+                                // Trova armate da eliminare
+                                const toDelete = [...dbArmies].filter(id => !uiArmies.has(id));
+                                for (const id of toDelete) {
+                                    await db.query(`DELETE FROM armata WHERE id_istanza_armata = $1`, [id]);
+                                    await db.query(`DELETE FROM truppe WHERE id_armata = $1`, [id]);
+                                }
+                            }
+                        }
+                    } catch (dbErr) {
+                        console.error("[SAVE_ARMIES] Errore sync PostgreSQL:", dbErr);
+                    }
+
                     return;
                 }
 

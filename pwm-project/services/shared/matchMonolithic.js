@@ -98,7 +98,7 @@ async function getMatch(matchId) {
 // ==========================================
 // UPDATE MATCH (DIFF ENGINE)
 // ==========================================
-async function updateMatch(matchId, updaterCallback, maxRetries = 30) {
+async function updateMatch(matchId, updaterCallback, maxRetries = 100) {
     let actualKey = `match:${matchId}`;
     let aliasCheck = await redis.get(actualKey);
     if (aliasCheck && aliasCheck.startsWith('ALIAS:')) {

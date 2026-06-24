@@ -106,6 +106,7 @@ async function generateResources() {
           gas_naturale: 250
         };
         let estrattoriRules = {};
+        let truppeRules = {};
         if (rulesRawBase64) {
           try {
             const rules = JSON.parse(Buffer.from(rulesRawBase64, "base64").toString("utf-8"));
@@ -124,6 +125,19 @@ async function generateResources() {
                         estrattoriRules[line.id_extractor] = {
                             risorsa_estratta: line.risorsa_estratta,
                             efficienza: parseFloat(line.efficienza) || 1
+                        };
+                    }
+                });
+            }
+            const truppeSheet = rules.sheets.find(s => s.name === "Truppe");
+            if (truppeSheet && truppeSheet.lines) {
+                truppeSheet.lines.forEach(line => {
+                    if (line.id_truppa) {
+                        truppeRules[line.id_truppa] = {
+                            hp: line.HP || 100,
+                            dmg: line.danno_base || 10,
+                            speed: line.velocita || 1,
+                            range: line.raggio_attacco || 1
                         };
                     }
                 });
@@ -241,8 +255,9 @@ async function generateResources() {
                             const uuidv4 = require('crypto').randomUUID; // Assicuriamoci di averlo
                             
                             const spawnName = `Armata ${add.troopId}`;
+                            const newArmyId = uuidv4();
                             const newArmy = {
-                                id: uuidv4(),
+                                id: newArmyId,
                                 name: spawnName,
                                 composition: { [add.troopId]: add.count || 1 },
                                 status: 'standby',
@@ -253,13 +268,43 @@ async function generateResources() {
                             
                             if (!player.armate) player.armate = [];
                             // Controlla se è un array o un dizionario. Nel frontend `armate` è spesso un array, ma in redis?
-                            // Wait, nel DB è dict o array? `server.js` lo tratta come dict: `player.armate[armyId]`? No, nel frontend è Array. `matchObj.match.player.armate` is an array?
                             if (Array.isArray(player.armate)) {
                                 player.armate.push(newArmy);
                             } else {
                                 player.armate[newArmy.id] = newArmy;
                             }
                             nuoveArmate = true;
+
+                            // Inserimento DB PostgreSQL
+                            if (userId) {
+                                let hp = 100, dmg = 10, speed = 1, range = 1;
+                                if (typeof truppeRules !== 'undefined' && truppeRules[add.troopId]) {
+                                    hp = truppeRules[add.troopId].hp || 100;
+                                    dmg = truppeRules[add.troopId].dmg || 10;
+                                    speed = truppeRules[add.troopId].speed || 1;
+                                    range = truppeRules[add.troopId].range || 1;
+                                }
+
+                                let spawnX = 0, spawnY = 0;
+                                if (add.spawnCoords && typeof add.spawnCoords === 'string' && add.spawnCoords.includes(',')) {
+                                    const pts = add.spawnCoords.split(',');
+                                    spawnX = parseFloat(pts[0]);
+                                    spawnY = parseFloat(pts[1]);
+                                }
+
+                                const truppaId = uuidv4();
+                                db.query(
+                                    `INSERT INTO armata (id_istanza_armata, partita_id, user_id, id_modello, x, y, hp_tot, are_they_in_the_same_position, dmg_tot, max_range_atck, speed) 
+                                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                                    [newArmy.id, matchDbId, userId, add.troopId, spawnX, spawnY, hp * (add.count || 1), true, dmg * (add.count || 1), range, speed]
+                                ).then(() => {
+                                    db.query(
+                                        `INSERT INTO truppe (id_istanza_truppa, partita_id, user_id, id_modello, id_armata, x, y, hp) 
+                                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                                        [truppaId, matchDbId, userId, add.troopId, newArmy.id, spawnX, spawnY, hp * (add.count || 1)]
+                                    ).catch(err => console.error("[RESOURCE_GEN] Errore inserimento truppa in DB:", err));
+                                }).catch(err => console.error("[RESOURCE_GEN] Errore inserimento armata in DB:", err));
+                            }
                         } else {
                             addestramentiRimasti.push(add);
                         }

@@ -725,16 +725,38 @@ const processActiveCombats = async () => {
                 await db.query(`UPDATE attacco SET status = 'ended' WHERE id_attacco = $1`, [id_attacco]);
                 await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
                 
-                const activeWarsRes = await db.query(
-                    `SELECT 1 FROM attacco 
+                const allActiveWarsRes = await db.query(
+                    `SELECT id_attaccante, id_target_armata, id_target_citta FROM attacco 
                      WHERE partita_id = $1 
                        AND status = 'active'
-                       AND id_attacco != $2
-                       AND ((attacker = $3 AND defender = $4) OR (attacker = $4 AND defender = $3))
-                     LIMIT 1`,
-                    [partita_id, id_attacco, attackerPlayer, defenderPlayer]
+                       AND id_attacco != $2`,
+                    [partita_id, id_attacco]
                 );
-                const stillAtWar = activeWarsRes.rows.length > 0;
+                let stillAtWar = false;
+                for (const row of allActiveWarsRes.rows) {
+                    let aPlayer = null;
+                    let dPlayer = null;
+                    if (matchObj && matchObj.match && matchObj.match.player) {
+                        for (const p of matchObj.match.player) {
+                            if (p.armate && p.armate[row.id_attaccante]) aPlayer = p.username;
+                            if (row.id_target_armata && p.armate && p.armate[row.id_target_armata]) dPlayer = p.username;
+                            if (!dPlayer && row.id_target_citta && p.territori && p.territori.includes(row.id_target_citta)) dPlayer = p.username;
+                            if (!dPlayer && row.id_target_citta && p.territori_dict) {
+                                for (const list of Object.values(p.territori_dict)) {
+                                    if (list.includes(row.id_target_citta)) {
+                                        dPlayer = p.username;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if ((aPlayer === attackerPlayer && dPlayer === defenderPlayer) || 
+                        (aPlayer === defenderPlayer && dPlayer === attackerPlayer)) {
+                        stillAtWar = true;
+                        break;
+                    }
+                }
 
                 await updateMatch(id_partita_hash, (mObj) => {
                     const att = mObj.match.player.find(x => x.username === attackerPlayer);

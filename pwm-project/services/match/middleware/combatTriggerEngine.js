@@ -70,7 +70,10 @@ const checkCombatTriggers = async () => {
                         targetCoords = getArmyLocation(enemyArmy);
                     } else if (targetName) {
                         // Controlla se targetName è una città
-                        const cityFeature = nodesFeatures.find(f => (f.properties.name || f.properties.ADMIN || f.id).toLowerCase() === targetName.toLowerCase());
+                        const cityFeature = nodesFeatures.find(f => {
+                            const val = f.properties.name || f.properties.ADMIN || f.id;
+                            return val && val.toLowerCase() === targetName.toLowerCase();
+                        });
                         if (cityFeature && cityFeature.geometry && cityFeature.geometry.coordinates) {
                             targetCoords = cityFeature.geometry.coordinates;
                         } else {
