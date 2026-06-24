@@ -148,16 +148,36 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   getArmyModelAssetUrl(army: any, direction: 'front' | 'back' | 'side' | 'side-flip'): string {
     let modelName = 'Soldier';
     let folder = 'Land_troops';
+
     if (army.composition) {
-      if (army.composition['Carro Armato']) { modelName = 'Tank'; folder = 'Land_troops'; }
-      else if (army.composition['Veicolo Leggero']) { modelName = 'LMV'; folder = 'Land_troops'; }
-      else if (army.composition['APC']) { modelName = 'APC'; folder = 'Land_troops'; }
-      else if (army.composition['Caccia']) { modelName = 'Aircraft'; folder = 'Sea_troops'; }
+      if (army.composition['carro_armato']) { modelName = 'Tank'; folder = 'Land_troops'; }
+      else if (army.composition['apc']) { modelName = 'APC'; folder = 'Land_troops'; }
+      else if (army.composition['sam_mobile']) { modelName = 'SAM'; folder = 'Land_troops'; }
+      else if (army.composition['lmv']) { modelName = 'LMV'; folder = 'Land_troops'; }
+      else if (army.composition['speciali']) { modelName = 'Special'; folder = 'Land_troops'; }
+      else if (army.composition['artiglieria']) { modelName = 'Tank'; folder = 'Land_troops'; }
+      else if (army.composition['cacciatorpediniere']) { modelName = 'Cacciatorpediniere'; folder = 'Sea_troops'; }
+      else if (army.composition['fregata']) { modelName = 'Fregata'; folder = 'Sea_troops'; }
+      else if (army.composition['corvetta']) { modelName = 'Corvetta'; folder = 'Sea_troops'; }
+      else if (army.composition['cargo_navale']) { modelName = 'CargoBoat'; folder = 'Sea_troops'; }
+      else if (army.composition['caccia']) { modelName = 'F35'; folder = 'Air_troops'; }
     }
+
     if (army.id_modello) {
-      if (army.id_modello.includes('Tank')) { modelName = 'Tank'; folder = 'Land_troops'; }
-      else if (army.id_modello.includes('Aircraft')) { modelName = 'Aircraft'; folder = 'Sea_troops'; }
+      const mod = army.id_modello.toLowerCase();
+      if (mod.includes('tank') || mod.includes('carro_armato')) { modelName = 'Tank'; folder = 'Land_troops'; }
+      else if (mod.includes('apc')) { modelName = 'APC'; folder = 'Land_troops'; }
+      else if (mod.includes('sam')) { modelName = 'SAM'; folder = 'Land_troops'; }
+      else if (mod.includes('lmv')) { modelName = 'LMV'; folder = 'Land_troops'; }
+      else if (mod.includes('special')) { modelName = 'Special'; folder = 'Land_troops'; }
+      else if (mod.includes('artiglieria')) { modelName = 'Tank'; folder = 'Land_troops'; }
+      else if (mod.includes('cacciatorpediniere')) { modelName = 'Cacciatorpediniere'; folder = 'Sea_troops'; }
+      else if (mod.includes('fregata')) { modelName = 'Fregata'; folder = 'Sea_troops'; }
+      else if (mod.includes('corvetta')) { modelName = 'Corvetta'; folder = 'Sea_troops'; }
+      else if (mod.includes('cargo')) { modelName = 'CargoBoat'; folder = 'Sea_troops'; }
+      else if (mod.includes('caccia') || mod.includes('aircraft')) { modelName = 'F35'; folder = 'Air_troops'; }
     }
+
     const suffix = '_' + direction.replace('-flip', '') + '.png';
     if (modelName === 'Soldier') {
       return `/assets/2Dmodels/Land_troops/Soldier/soldier${suffix}`;
@@ -2495,36 +2515,22 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     if (!this.map) return;
     const currentZoom = this.map.getZoom();
 
-    const disappearZoomThreshold = 4.0; // Sotto questo livello gli edifici scompaiono per non ingombrare
-
-    // Scala esponenzialmente (base 2) come fa la mappa, in modo che l'edificio sembri "ancorato" al suolo.
-    // A zoom 10 la dimensione target è 120px.
-    const referenceZoom = 10.0;
-    const sizeAtReferenceZoom = 120;
-    
-    let dynamicSize = sizeAtReferenceZoom * Math.pow(2, currentZoom - referenceZoom);
-    
-    // Fissiamo un limite inferiore e superiore
-    const minSize = 15; // Non più piccolo di 15px per rimanere visibile
-    const maxSize = 300; // Fino a 300px per zoom molto vicini
-    
-    dynamicSize = Math.max(minSize, Math.min(maxSize, dynamicSize));
+    const minSize = 32;
+    const maxSize = 80;
+    const scaleFactor = Math.min(Math.max((currentZoom - 3) / (10 - 3), 0), 1);
+    let dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
 
     const scaleMarker = (marker: any) => {
       const el = marker.getElement();
+      if (!el) return;
       const container = el.querySelector('.structure-container') as HTMLElement;
-      if (!container) return;
-
-      if (currentZoom < disappearZoomThreshold) {
-        el.style.display = 'none';
-      } else {
-        el.style.display = 'block';
+      if (container) {
         container.style.width = `${dynamicSize}px`;
         container.style.height = `${dynamicSize}px`;
       }
     };
 
-    this.structureMarkers.forEach(scaleMarker);
+    this.structureMarkers.forEach((item: any) => scaleMarker(item.marker));
     if (this.buildPreviewMarker) {
       scaleMarker(this.buildPreviewMarker);
     }
