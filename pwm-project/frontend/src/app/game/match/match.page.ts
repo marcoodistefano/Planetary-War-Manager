@@ -819,13 +819,32 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.applyTerritoryColors();
 
               if (parsed.type === 'TERRITORY_CONQUERED') {
-                let updatedStructures: any[] = [];
+                // Aggiorniamo i proprietari delle strutture già visibili senza leakare quelle nemiche
+                for (const visibleStr of this.matchStructures) {
+                   for (const n of this.matchNations) {
+                      if (n.strutture && n.strutture.some((s: any) => s.id === visibleStr.id)) {
+                         visibleStr.owner = n.username;
+                      }
+                   }
+                }
+                
+                // Aggiungiamo eventuali strutture che sono passate a noi o ai nostri alleati
+                const myPlayer = this.matchNations.find(p => p.username === this.userProfile.username);
+                const myAllianceId = myPlayer ? myPlayer.id_alleanza : null;
+                
                 for (const n of this.matchNations) {
-                  if (n.strutture) {
-                    updatedStructures = updatedStructures.concat(n.strutture.map((s: any) => ({ ...s, owner: n.username })));
+                  const isAlly = myAllianceId && String(n.id_alleanza) === String(myAllianceId);
+                  if (n.username === this.userProfile.username || isAlly) {
+                    if (n.strutture) {
+                      for (const s of n.strutture) {
+                        if (!this.matchStructures.some((ms: any) => ms.id === s.id)) {
+                          this.matchStructures.push({ ...s, owner: n.username });
+                        }
+                      }
+                    }
                   }
                 }
-                this.matchStructures = updatedStructures;
+                
                 this.renderStructures();
               }
             }
@@ -2478,14 +2497,18 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     const disappearZoomThreshold = 4.0; // Sotto questo livello gli edifici scompaiono per non ingombrare
 
-    // Scala proporzionalmente (più lo zoom è alto, più l'edificio è grande)
-    const minSize = 25;
-    const maxSize = 120;
-    const minZoom = 4.0;
-    const maxZoom = 10.0;
-
-    const scaleFactor = Math.min(Math.max((currentZoom - minZoom) / (maxZoom - minZoom), 0), 1);
-    const dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
+    // Scala esponenzialmente (base 2) come fa la mappa, in modo che l'edificio sembri "ancorato" al suolo.
+    // A zoom 10 la dimensione target è 120px.
+    const referenceZoom = 10.0;
+    const sizeAtReferenceZoom = 120;
+    
+    let dynamicSize = sizeAtReferenceZoom * Math.pow(2, currentZoom - referenceZoom);
+    
+    // Fissiamo un limite inferiore e superiore
+    const minSize = 15; // Non più piccolo di 15px per rimanere visibile
+    const maxSize = 300; // Fino a 300px per zoom molto vicini
+    
+    dynamicSize = Math.max(minSize, Math.min(maxSize, dynamicSize));
 
     const scaleMarker = (marker: any) => {
       const el = marker.getElement();
