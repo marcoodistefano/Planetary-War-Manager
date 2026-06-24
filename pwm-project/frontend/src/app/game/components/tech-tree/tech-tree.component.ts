@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, HostListener } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, HostListener, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule, ToastController } from '@ionic/angular';
 
@@ -9,7 +9,7 @@ import { IonicModule, ToastController } from '@ionic/angular';
   standalone: true,
   imports: [CommonModule, IonicModule]
 })
-export class TechTreeComponent implements OnInit {
+export class TechTreeComponent implements OnInit, OnChanges {
   @Input() gameRules: any;
   @Input() playerResources: any;
   @Input() userTechnologies: string[] = [];
@@ -18,6 +18,7 @@ export class TechTreeComponent implements OnInit {
   
   activeBranch = 'hq';
   selectedNode: any = null;
+  filteredTracks: any[] = [];
 
   constructor(private toastCtrl: ToastController) {}
 
@@ -80,17 +81,26 @@ export class TechTreeComponent implements OnInit {
 
   ngOnInit() {
     console.log("Academy OS: Analisi database game_rules...");
+    this.updateTracks();
   }
 
-
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['gameRules'] || changes['activeBranch']) {
+      this.updateTracks();
+    }
+  }
 
   setBranch(branch: string) {
     this.activeBranch = branch;
+    this.updateTracks();
   }
 
   // Organizza i dati del CDB in tracce T1 -> T2 -> T3
-  getFilteredTracks() {
-    if (!this.gameRules) return [];
+  updateTracks() {
+    if (!this.gameRules) {
+      this.filteredTracks = [];
+      return;
+    }
     
     const tracks: any[] = [];
 
@@ -203,13 +213,18 @@ export class TechTreeComponent implements OnInit {
       });
     }
 
-    return tracks;
-  }
+    // Pre-calculate units for each node
+    tracks.forEach(track => {
+      if (track.steps) {
+        track.steps.forEach((node: any) => {
+          const id = node.id_struttura || node.id_extractor;
+          const truppeSheet = this.gameRules.sheets.find((s: any) => s.name === 'Truppe');
+          node.units = truppeSheet ? truppeSheet.lines.filter((t: any) => t.prodotta_in === id) : [];
+        });
+      }
+    });
 
-  getUnitsForTech(node: any) {
-    if(!this.gameRules) return [];
-    const id = node.id_struttura || node.id_extractor;
-    return this.gameRules.sheets.find((s: any) => s.name === 'Truppe').lines.filter((t: any) => t.prodotta_in === id);
+    this.filteredTracks = tracks;
   }
 
   hasResources(node: any): boolean {

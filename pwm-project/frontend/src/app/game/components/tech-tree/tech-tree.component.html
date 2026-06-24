@@ -45,7 +45,7 @@
          
       <div class="tree-container">
         
-        <div class="tech-track" *ngFor="let track of getFilteredTracks()">
+        <div class="tech-track" *ngFor="let track of filteredTracks">
           <div class="track-label">{{ track.name }}</div>
           
           <div class="nodes-row">
@@ -81,8 +81,8 @@
                   </span>
                 </div>
 
-                <div class="unlocked-units" *ngIf="getUnitsForTech(node).length > 0">
-                  <div class="unit-dot" *ngFor="let unit of getUnitsForTech(node)" [title]="unit.nome">
+                <div class="unlocked-units" *ngIf="node.units && node.units.length > 0">
+                  <div class="unit-dot" *ngFor="let unit of node.units" [title]="unit.nome">
                     <ion-icon name="airplane-outline" *ngIf="unit.dominio === 0"></ion-icon>
                     <ion-icon name="accessibility-outline" *ngIf="unit.dominio === 1"></ion-icon>
                     <ion-icon name="boat-outline" *ngIf="unit.dominio === 2"></ion-icon>

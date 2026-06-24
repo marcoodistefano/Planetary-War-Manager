@@ -690,7 +690,7 @@ const join_Match = async (playerId, id_partita_hash) => {
           return { save: false };
       });
       
-      if (!updRes || !updRes.data) {
+      if (!updRes) {
           throw { customStatus: "400", message: "Nessuna nazione disponibile per unirsi." };
       }
 
