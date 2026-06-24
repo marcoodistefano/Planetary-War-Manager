@@ -246,6 +246,9 @@ const getMatch = async (req, res) => {
       player_count: (matchData.match.player || []).filter(p => p.isOccupied).length,
       players: (matchData.match.player || []).map(p => ({
         username: p.username,
+        playerId: p.username,
+        name: p.nationName || p.username,
+        isBot: String(p.username).toLowerCase().includes('bot'),
         isOccupied: p.isOccupied || false,
         id_alleanza: p.id_alleanza || null,
       })),

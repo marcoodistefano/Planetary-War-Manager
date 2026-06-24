@@ -794,6 +794,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
+          if (parsed.type === 'FOG_OF_WAR_STRUCTURES_UPDATE') {
+            if (parsed.payload && Array.isArray(parsed.payload.visibleStructures)) {
+              this.matchStructures = parsed.payload.visibleStructures;
+              setTimeout(() => this.renderStructures(), 100);
+              this.ngZone.run(() => this.cdr.detectChanges());
+            }
+          }
+
           if (parsed.type === 'PLAYER_JOINED') {
             console.log(`[WS_MATCH] Un nuovo giocatore si è unito: ${parsed.payload.newPlayer}`);
             if (parsed.payload?.nations) {

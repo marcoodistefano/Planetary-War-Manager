@@ -866,21 +866,22 @@ const getMatchPlayers = async (matchId) => {
   try {
     const cachedPlayers = await redis.get(`match:${matchId}:players`);
     if (cachedPlayers) {
-      console.log(
-        `[SYS_CACHE] Players per match ${matchId} recuperati da Redis.`,
-      );
+      console.log(`[SYS_CACHE] Players per match ${matchId} recuperati da Redis.`);
       return { status: "200", players: JSON.parse(cachedPlayers) };
-    } else {
-      const query = `
-        SELECT u.username, u.avatar_id
-        FROM partecipanti_partite pp
-        INNER JOIN utenti u ON pp.user_id = u.id_user
-        INNER JOIN partite p ON pp.partita_id = p.id_partita
-        WHERE p.id_partita = (SELECT id_partita FROM partite WHERE id_partita_visualizzato = $1);
-      `;
-      const { rows } = await db.query(query, [matchId]);
-      return { status: "200", players: rows };
     }
+    
+    const { getMatch } = require('../shared/matchMonolithic.js');
+    const matchData = await getMatch(matchId);
+    if (matchData && matchData.match && matchData.match.player) {
+      const mapped = matchData.match.player.map(p => ({
+          username: p.username,
+          name: p.nationName || p.username,
+          isBot: String(p.username).toLowerCase().includes('bot')
+      }));
+      return { status: "200", players: mapped };
+    }
+
+    return { status: "200", players: [] };
   } catch (error) {
     console.error("[SYS_ERR] Errore durante getMatchPlayers:", error);
     return {
@@ -1121,6 +1122,17 @@ const createAlliance = async (playerId, matchId, allianceName) => {
 
       await client.query("COMMIT");
 
+      const { updateMatch } = require('../shared/matchMonolithic.js');
+      await updateMatch(matchId, async (matchObj) => {
+        if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+        const player = matchObj.match.player.find(p => p.id_user === playerId || p.username === playerId);
+        if (player) {
+          player.id_alleanza = allianceId;
+          return { save: true, matchObj };
+        }
+        return { save: false };
+      });
+
       const resolveState = await resolveMatchState(matchId);
       const resolvedPartitaId = resolveState?.state?.id_partita || partitaId;
 
@@ -1330,6 +1342,18 @@ const joinAlliance = async (playerId, matchId, allianceId) => {
       }
 
       await client.query("COMMIT");
+
+      const { updateMatch } = require('../shared/matchMonolithic.js');
+      await updateMatch(matchId, async (matchObj) => {
+        if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+        const player = matchObj.match.player.find(p => p.id_user === playerId || p.username === playerId);
+        if (player) {
+          player.id_alleanza = alliancePk;
+          return { save: true, matchObj };
+        }
+        return { save: false };
+      });
+
       const nextCount = countPlayer + 1;
       try {
         // Ensure cached alliances listing is invalidated so frontend sees update
@@ -1531,6 +1555,17 @@ const removeAllianceMember = async ({
     }
 
     await client.query("COMMIT");
+
+    const { updateMatch } = require('../shared/matchMonolithic.js');
+    await updateMatch(matchId, async (matchObj) => {
+      if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
+      const player = matchObj.match.player.find(p => p.id_user === targetPlayerId || p.username === targetPlayerId);
+      if (player) {
+        player.id_alleanza = null;
+        return { save: true, matchObj };
+      }
+      return { save: false };
+    });
 
     const leaveTimestamp = Date.now();
     await invalidateMatchAllianceCache(matchId, allianceState.alliance.id_alleanza);

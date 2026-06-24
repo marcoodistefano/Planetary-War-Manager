@@ -5,9 +5,9 @@ setlocal enabledelayedexpansion
 set "BUILD_FLAG="
 if "%~1"=="--build" (
     set "BUILD_FLAG=--build"
-    echo Starting Planetary War Manager (PWM) Microservices... [modalita BUILD]
+    echo Starting Planetary War Manager ^(PWM^) Microservices... [modalita BUILD]
 ) else (
-    echo Starting Planetary War Manager (PWM) Microservices... [avvio veloce, usa --build per rebuilddare]
+    echo Starting Planetary War Manager ^(PWM^) Microservices... [avvio veloce, usa --build per rebuilddare]
 )
 
 :: Controlla se host-downloader.js è in esecuzione cercando nei processi in background
@@ -30,11 +30,11 @@ echo.
 
 echo Recupero il link pubblico da Cloudflare Tunnel in corso...
 :: Attendiamo qualche secondo per dare il tempo a Cloudflare di generare il link
-timeout /t 4 /nobreak >nul
+ping 127.0.0.1 -n 5 >nul
 
 set "CLOUDFLARE_URL="
 :: Uso di powershell per estrarre il link esatto usando le regex (equivalente di grep -o e tail -n 1)
-for /f "usebackq tokens=*" %%i in (`powershell -Command "$logs = docker-compose logs cloudflare-tunnel 2>$null; $matches = [regex]::Matches($logs, 'https://[a-zA-Z0-9-]*\.trycloudflare\.com'); if ($matches.Count -gt 0) { $matches[$matches.Count - 1].Value }"`) do (
+for /f "usebackq tokens=*" %%i in (`powershell -Command "$logs = docker-compose logs cloudflare-tunnel 2>$null; if ($logs) { $matches = [regex]::Matches($logs, 'https://[a-zA-Z0-9-]*\.trycloudflare\.com'); if ($matches.Count -gt 0) { $matches[$matches.Count - 1].Value } }"`) do (
     set "CLOUDFLARE_URL=%%i"
 )
 

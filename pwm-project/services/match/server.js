@@ -121,14 +121,20 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                     if (matchData && matchData.match && matchData.match.player) {
                         nations = matchData.match.player;
+                        const myPlayer = nations.find(p => p.username === ws.username);
+                        const myAllianceId = myPlayer ? myPlayer.id_alleanza : null;
+
                         for (const p of nations) {
                             if (p.armate) {
                                 const playerArmies = Object.values(p.armate).map(a => ({ ...a, owner: p.username }));
                                 armies = armies.concat(playerArmies);
                             }
                             if (p.strutture) {
-                                const playerStr = p.strutture.map(s => ({ ...s, owner: p.username }));
-                                structures = structures.concat(playerStr);
+                                const isAlly = myAllianceId && String(p.id_alleanza) === String(myAllianceId);
+                                if (p.username === ws.username || isAlly) {
+                                    const playerStr = p.strutture.map(s => ({ ...s, owner: p.username }));
+                                    structures = structures.concat(playerStr);
+                                }
                             }
                             if (p.username === ws.username) {
                                 resources = translateRedisToFe(p.risorse);
@@ -793,12 +799,24 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             const hasSameBaseIdx = strutture.findIndex(s => s.structureId.split('_t')[0] === baseName && (s.regionId === regionId || s.targetName === targetName));
 
                             if (reqPrevStructure) {
-                                const prevIdx = strutture.findIndex(s => s.structureId === reqPrevStructure && (s.regionId === regionId || s.targetName === targetName));
+                                const reqPrevBaseName = reqPrevStructure.split('_t')[0];
+                                const reqPrevTierMatch = reqPrevStructure.match(/_t(\d+)/);
+                                const reqPrevTier = reqPrevTierMatch ? parseInt(reqPrevTierMatch[1], 10) : 1;
+
+                                const prevIdx = strutture.findIndex(s => {
+                                    if (s.regionId !== regionId && s.targetName !== targetName) return false;
+                                    const sBaseName = s.structureId.split('_t')[0];
+                                    if (sBaseName !== reqPrevBaseName) return false;
+                                    const sTierMatch = s.structureId.match(/_t(\d+)/);
+                                    const sTier = sTierMatch ? parseInt(sTierMatch[1], 10) : 1;
+                                    return sTier >= reqPrevTier;
+                                });
+
                                 if (prevIdx === -1) {
-                                    return { save: false, data: { error: `Devi prima costruire ${reqPrevStructure} in questa regione.` } };
+                                    return { save: false, data: { error: `Devi prima avere ${reqPrevBaseName} di livello almeno ${reqPrevTier} in questa regione.` } };
                                 }
 
-                                const prevBaseName = reqPrevStructure.split('_t')[0];
+                                const prevBaseName = reqPrevBaseName;
                                 if (prevBaseName === baseName) {
                                     replacedStructureId = strutture[prevIdx].id;
                                 } else {
