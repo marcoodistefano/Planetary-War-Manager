@@ -204,31 +204,35 @@ ion-modal.chat-modal {
 /* ==========================================================================
    MENU A TENDINA TATTICI (POPOVER)
    ========================================================================== */
-.tactical-popover-menu {
-  --background: rgba(5, 10, 20, 0.95);
-  --color: #fff;
-  --min-width: 250px;
-  border: 1px solid #58a6ff;
-  border-radius: 8px;
-  box-shadow: 0 0 20px rgba(88, 166, 255, 0.2);
+ion-popover.tactical-popover-menu {
+  --background: rgba(5, 10, 20, 0.98) !important;
+  --color: #fff !important;
+  --min-width: 250px !important;
+
+  &::part(content) {
+    background: rgba(5, 10, 20, 0.98) !important;
+    border: 1px solid #58a6ff !important;
+    border-radius: 8px !important;
+    box-shadow: 0 0 20px rgba(88, 166, 255, 0.2) !important;
+  }
 
   /* Stile delle singole opzioni */
   ion-item {
-    --background: transparent;
-    --color: #fff;
+    --background: transparent !important;
+    --color: #fff !important;
     font-family: 'Courier New', Courier, monospace;
     font-size: 0.85rem;
     font-weight: bold;
 
     &:hover {
-      --background: rgba(88, 166, 255, 0.15);
+      --background: rgba(88, 166, 255, 0.15) !important;
     }
   }
 
   /* Colore della spunta o del radio button */
   ion-radio {
-    --color: #58a6ff;
-    --color-checked: #58a6ff;
+    --color: #58a6ff !important;
+    --color-checked: #58a6ff !important;
   }
 }
 

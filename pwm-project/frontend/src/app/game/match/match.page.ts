@@ -3708,6 +3708,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     if (this.map.getSource('regioni')) {
       if (!this.previousColorMap) this.previousColorMap = new Map<number, string>();
 
+      const isLoaded = this.map.isSourceLoaded('regioni');
+      if (isLoaded && !(this as any)._initialColorsApplied) {
+        (this as any)._initialColorsApplied = true;
+        this.previousColorMap.clear();
+      }
+
       // Remove states that are no longer active
       for (const [numericId, oldColor] of this.previousColorMap.entries()) {
         if (!newColorMap.has(numericId)) {
