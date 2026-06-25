@@ -690,6 +690,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             }
             if (parsed.data?.armies_updated && parsed.data?.armies) {
               this.matchArmies = parsed.data.armies;
+              this.renderArmies();
             }
             if (parsed.data?.addestramenti) {
               this.playerTrainings = parsed.data.addestramenti;

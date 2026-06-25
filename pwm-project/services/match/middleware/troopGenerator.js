@@ -94,9 +94,9 @@ const generateInitialTroopsForMatch = async (matchHashId, matchIdStr, hostId, ho
                         // Salvataggio in Postgres SOLO per i player reali (i bot non esistono in "partecipanti_partite")
                         if (!isBot && realUserId) {
                             await client.query(
-                                `INSERT INTO armata (id_istanza_armata, partita_id, user_id, x, y, hp_tot, are_they_in_the_same_position, dmg_tot, max_range_atck, speed) 
-                                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                                [idArmata, matchIdStr, realUserId, x, y, 1000, true, 10, 1, 1]
+                                `INSERT INTO armata (id_istanza_armata, partita_id, user_id, id_modello, x, y, hp_tot, are_they_in_the_same_position, dmg_tot, max_range_atck, speed) 
+                                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                                [idArmata, matchIdStr, realUserId, 'fante', x, y, 1000, true, 10, 1, 1]
                             );
 
                             await client.query(
