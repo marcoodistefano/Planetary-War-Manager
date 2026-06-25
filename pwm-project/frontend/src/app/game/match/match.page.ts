@@ -1839,6 +1839,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       png = 'train_station.png';
     }
     else if (name.includes('hangar')) png = 'hangar.png';
+    else if (name.includes('artiglieria') || name.includes('costiera')) png = 'difesa_costiera.png';
     else if (name.includes('sampt') || name.includes('missil') || name.includes('difes')) png = 'sampt.png';
 
     return png;

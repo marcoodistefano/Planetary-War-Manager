@@ -141,6 +141,21 @@ export class TechTreeComponent implements OnInit, OnChanges {
         name: 'SUPREMAZIA AEROSPAZIALE', 
         steps: allStr.filter((l: any) => l.id_struttura.startsWith('aeroporto')).sort((a: any, b: any) => a.tier - b.tier) 
       });
+
+      tracks.push({ 
+        name: 'FABBRICA ARMAMENTI', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('fabbrica')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+
+      tracks.push({ 
+        name: 'DIFESA ANTI AEREA (SAMPT)', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('sampt')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+
+      tracks.push({ 
+        name: 'DIFESA COSTIERA', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('artiglieria_costiera')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
     }
 
     if (this.activeBranch === 'logistics') {
@@ -160,6 +175,16 @@ export class TechTreeComponent implements OnInit, OnChanges {
       tracks.push({ 
         name: 'HANGAR', 
         steps: allStr.filter((l: any) => l.id_struttura.startsWith('hangar')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+
+      tracks.push({ 
+        name: 'RADAR TERRESTRE', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('radar_terrestre')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+
+      tracks.push({ 
+        name: 'RADAR ANTI AEREO', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('radar_anti_aereo')).sort((a: any, b: any) => a.tier - b.tier) 
       });
     }
 
@@ -210,6 +235,31 @@ export class TechTreeComponent implements OnInit, OnChanges {
       tracks.push({ 
         name: 'HANGAR', 
         steps: allStr.filter((l: any) => l.id_struttura.startsWith('hangar')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+
+      tracks.push({ 
+        name: 'FABBRICA ARMAMENTI', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('fabbrica')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+
+      tracks.push({ 
+        name: 'DIFESA ANTI AEREA (SAMPT)', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('sampt')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+
+      tracks.push({ 
+        name: 'DIFESA COSTIERA', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('artiglieria_costiera')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+
+      tracks.push({ 
+        name: 'RADAR TERRESTRE', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('radar_terrestre')).sort((a: any, b: any) => a.tier - b.tier) 
+      });
+
+      tracks.push({ 
+        name: 'RADAR ANTI AEREO', 
+        steps: allStr.filter((l: any) => l.id_struttura.startsWith('radar_anti_aereo')).sort((a: any, b: any) => a.tier - b.tier) 
       });
     }
 
