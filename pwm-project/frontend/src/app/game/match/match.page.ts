@@ -3555,20 +3555,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   applyTerritoryColors() {
     if (!this.regionsGeoData || !this.matchNations || !this.map || !this.map.getSource('regioni')) return;
 
-    if (!this.map.isSourceLoaded('regioni')) {
-      if (!(this as any)._waitingForRegioni) {
-        (this as any)._waitingForRegioni = true;
-        const onSourceData = (e: any) => {
-          if (e.sourceId === 'regioni' && e.isSourceLoaded) {
-            this.map.off('sourcedata', onSourceData);
-            (this as any)._waitingForRegioni = false;
-            this.applyTerritoryColors();
-          }
-        };
-        this.map.on('sourcedata', onSourceData);
-      }
-      return;
-    }
+
 
     if ((this as any)._applyTerritoryColorsTimer) {
       clearTimeout((this as any)._applyTerritoryColorsTimer);
