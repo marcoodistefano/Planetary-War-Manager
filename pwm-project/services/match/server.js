@@ -20,6 +20,7 @@ const { startFogOfWarEngine } = require("./middleware/fogOfWarEngine.js");
 const { startCombatTriggerEngine } = require("./middleware/combatTriggerEngine.js");
 const { startSnapshotEngine } = require("./middleware/snapshotEngine.js");
 const { startMatchStateEngine } = require("./middleware/matchStateEngine.js");
+const { startLeaderboardEngine } = require("./middleware/leaderboardEngine.js");
 const Eru = require('./middleware/Eru.js');
 
 function translateRedisToFe(resources) {
@@ -149,9 +150,12 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                     const regionsResourcesStr = await redis.get(`match:${actualMatchId}:regions_resources`);
                     const regionsResources = regionsResourcesStr ? JSON.parse(regionsResourcesStr) : {};
 
+                    const leaderboardStr = await redis.get(`match:${actualMatchId}:leaderboard`);
+                    const leaderboard = leaderboardStr ? JSON.parse(leaderboardStr) : [];
+
                     ws.send(JSON.stringify({
                         type: 'INITIAL_STATE',
-                        payload: { armies, nations, resources, production, structures, regionsResources, technologies, trainings }
+                        payload: { armies, nations, resources, production, structures, regionsResources, technologies, trainings, leaderboard }
                     }));
                     return;
                 }
@@ -1290,6 +1294,7 @@ loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(async () => {
         startCombatTriggerEngine();
         startSnapshotEngine();
         startMatchStateEngine();
+        startLeaderboardEngine();
         startArrivalEngine();
         startConstructionEngine();
     });

@@ -139,6 +139,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   currentMatchId = '';
   matchPlayers: string[] = [];
   matchAlliances: any[] = [];
+  matchLeaderboard: any[] = [];
   selectedArmyId = '';
   selectedArmiesForMovement: string[] = [];
   previousSelectedArmiesForMovement: string[] = [];
@@ -600,12 +601,20 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             if (parsed.payload?.regionsResources) {
               this.regionsResources = parsed.payload.regionsResources;
             }
+            if (parsed.payload?.leaderboard) {
+              this.matchLeaderboard = parsed.payload.leaderboard;
+            }
             if (parsed.payload?.technologies) {
               this.userTechnologies = parsed.payload.technologies;
             }
             if (parsed.payload?.trainings) {
               this.playerTrainings = parsed.payload.trainings;
             }
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'LEADERBOARD_UPDATE') {
+            this.matchLeaderboard = parsed.data;
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 

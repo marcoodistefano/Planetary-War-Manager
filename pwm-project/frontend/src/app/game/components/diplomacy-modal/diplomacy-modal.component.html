@@ -21,6 +21,9 @@
         <div class="nav-item" [class.active]="activeTab === 'players'" (click)="activeTab = 'players'">
           <ion-icon name="globe-outline"></ion-icon><span>PARTECIPANTI</span>
         </div>
+        <div class="nav-item" [class.active]="activeTab === 'leaderboard'" (click)="activeTab = 'leaderboard'">
+          <ion-icon name="trophy-outline"></ion-icon><span>CLASSIFICA</span>
+        </div>
       </nav>
       <div class="sidebar-footer">
         <button class="exit-btn" (click)="close.emit()">
@@ -219,6 +222,26 @@
           </div>
           <ng-template #noNations>
             <div class="empty-state">Nessuna nazione attualmente occupata sulla mappa globale.</div>
+          </ng-template>
+        </ng-container>
+
+        <ng-container *ngIf="activeTab === 'leaderboard'">
+          <p class="track-label">Classifica di Partita</p>
+          <div class="sensor-grid" *ngIf="leaderboard && leaderboard.length; else noLeaderboard">
+            <div class="sensor-row" *ngFor="let p of leaderboard; let i = index">
+              <span style="display: flex; flex-direction: column;">
+                <span style="font-weight: bold; font-size: 1.1rem;" [style.color]="i === 0 ? 'var(--success-green)' : (i === 1 || i === 2) ? 'var(--gold-accent)' : '#fff'">
+                  #{{ i + 1 }} {{ p.username }}
+                </span>
+                <span style="font-size: 10px; opacity: 0.7;">Alleanza: {{ p.alliance || 'Nessuna' }}</span>
+              </span>
+              <span class="sensor-val" style="color: var(--cyan-glow); font-weight: bold; font-size: 1.2rem;">
+                {{ p.territories }} Terr.
+              </span>
+            </div>
+          </div>
+          <ng-template #noLeaderboard>
+            <div class="empty-state">La classifica non è ancora stata elaborata.</div>
           </ng-template>
         </ng-container>
       </div>

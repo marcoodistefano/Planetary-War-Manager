@@ -37,8 +37,9 @@ export class DiplomacyModalComponent implements OnInit, OnChanges {
   @Input() matchNations: any[] = [];
   @Input() currentUser = '';
   @Input() matchId = '';
+  @Input() leaderboard: any[] = [];
 
-  activeTab: 'status' | 'manage' | 'search' | 'players' = 'status';
+  activeTab: 'status' | 'manage' | 'search' | 'players' | 'leaderboard' = 'status';
 
   selectedAllianceIndex = 0;
   allianceActionError = '';
