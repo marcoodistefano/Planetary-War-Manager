@@ -3528,14 +3528,29 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     if (!this.regionsGeoData || !this.matchNations || !this.map || !this.map.getSource('regioni')) return;
 
     if (!this.map.isSourceLoaded('regioni')) {
-      this.map.once('sourcedata', (e: any) => {
-        if (e.sourceId === 'regioni' && e.isSourceLoaded) {
-          this.applyTerritoryColors();
-        }
-      });
+      if (!(this as any)._waitingForRegioni) {
+        (this as any)._waitingForRegioni = true;
+        const onSourceData = (e: any) => {
+          if (e.sourceId === 'regioni' && e.isSourceLoaded) {
+            this.map.off('sourcedata', onSourceData);
+            (this as any)._waitingForRegioni = false;
+            this.applyTerritoryColors();
+          }
+        };
+        this.map.on('sourcedata', onSourceData);
+      }
       return;
     }
 
+    if ((this as any)._applyTerritoryColorsTimer) {
+      clearTimeout((this as any)._applyTerritoryColorsTimer);
+    }
+    (this as any)._applyTerritoryColorsTimer = setTimeout(() => {
+      this._doApplyTerritoryColors();
+    }, 100);
+  }
+
+  _doApplyTerritoryColors() {
     if (!this.nationMarkers) this.nationMarkers = [];
     const usedNationUsernames = new Set<string>();
 
