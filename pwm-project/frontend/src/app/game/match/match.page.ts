@@ -522,9 +522,16 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     if (this.map) {
       this.map.remove();
     }
+    
+    (this as any)._initialColorsApplied = false;
   }
 
   ionViewWillEnter() {
+    (this as any)._initialColorsApplied = false;
+    if (this.previousColorMap) {
+      this.previousColorMap.clear();
+    }
+    
     this.loadGameRules();
     this.loadUserProfile();
     this.loadMatchContext();
