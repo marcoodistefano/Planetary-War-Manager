@@ -53,24 +53,43 @@ const applyDamageToArmy = (army, damage) => {
     const totalMaxHp = getArmyMaxHp(army);
     if (totalMaxHp === 0) return true;
     
-    if (damage >= totalMaxHp) {
+    // Inizializza hp se mancante o errato
+    if (typeof army.hp !== 'number' || army.hp > totalMaxHp) {
+        army.hp = totalMaxHp;
+    }
+    
+    army.hp -= damage;
+    
+    if (army.hp <= 0) {
         army.hp = 0;
         army.composition = {};
         return true;
     }
     
-    let remainingDamage = damage;
+    let accumulatedDamage = totalMaxHp - army.hp;
     let troopTypes = Object.keys(army.composition).filter(id => army.composition[id] > 0);
     
-    while (remainingDamage > 0 && troopTypes.length > 0) {
-        const idx = Math.floor(Math.random() * troopTypes.length);
-        const tId = troopTypes[idx];
+    let canKill = true;
+    while (canKill && troopTypes.length > 0) {
+        let killableTypes = troopTypes.filter(id => {
+            const stats = getTroopStats(id);
+            const hp = stats ? (stats.HP || 10) : 10;
+            return accumulatedDamage >= hp;
+        });
+        
+        if (killableTypes.length === 0) {
+            canKill = false;
+            break;
+        }
+        
+        const idx = Math.floor(Math.random() * killableTypes.length);
+        const tId = killableTypes[idx];
         
         const stats = getTroopStats(tId);
         const hpPerTroop = stats ? (stats.HP || 10) : 10;
         
         army.composition[tId] -= 1;
-        remainingDamage -= hpPerTroop;
+        accumulatedDamage -= hpPerTroop;
         
         if (army.composition[tId] <= 0) {
             delete army.composition[tId];
@@ -83,7 +102,6 @@ const applyDamageToArmy = (army, damage) => {
         return true;
     }
     
-    army.hp = getArmyMaxHp(army);
     return false;
 };
 
