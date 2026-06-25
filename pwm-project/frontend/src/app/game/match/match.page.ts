@@ -300,7 +300,18 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         const marker = this.armyMarkers.get(army.id);
         if (marker) {
-          marker.setLngLat(currentLngLat);
+          let finalLngLat = [...currentLngLat] as [number, number];
+          if (army.id) {
+            let hash = 0;
+            for (let i = 0; i < army.id.length; i++) {
+              hash = army.id.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            // Offset deterministico ma pseudo-casuale basato sull'ID dell'armata
+            const offsetX = ((Math.abs(hash) % 11) - 5) * 0.005; // ~500m jitter
+            const offsetY = ((Math.abs(hash >> 4) % 11) - 5) * 0.005;
+            finalLngLat = [currentLngLat[0] + offsetX, currentLngLat[1] + offsetY];
+          }
+          marker.setLngLat(finalLngLat);
           const el = marker.getElement();
 
           let imgDiv = (marker as any).imgDiv;
