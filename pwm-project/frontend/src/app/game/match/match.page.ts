@@ -3607,13 +3607,23 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   applyTerritoryColors() {
-    if (!this.regionsGeoData || !this.matchNations || !this.map || !this.map.getSource('regioni')) return;
-
-
-
     if ((this as any)._applyTerritoryColorsTimer) {
       clearTimeout((this as any)._applyTerritoryColorsTimer);
     }
+
+    // Se i dati non sono ancora pronti, pianifica un retry automatico invece di uscire silenziosamente.
+    // Questo risolve la race condition tra il fetch del GeoJSON e l'arrivo dell'INITIAL_STATE via WS.
+    const ready = this.map &&
+      this.regionsGeoData &&
+      this.regionIdMap.size > 0 &&
+      this.matchNations?.length > 0 &&
+      this.map.getSource('regioni');
+
+    if (!ready) {
+      (this as any)._applyTerritoryColorsTimer = setTimeout(() => this.applyTerritoryColors(), 300);
+      return;
+    }
+
     (this as any)._applyTerritoryColorsTimer = setTimeout(() => {
       this._doApplyTerritoryColors();
     }, 100);
@@ -3787,6 +3797,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async ionViewWillLeave() {
+    // Cancella il retry timer per evitare chiamate zombie dopo aver lasciato la pagina
+    if ((this as any)._applyTerritoryColorsTimer) {
+      clearTimeout((this as any)._applyTerritoryColorsTimer);
+      (this as any)._applyTerritoryColorsTimer = null;
+    }
+
     try {
       // Controlla se c'è una modale attualmente in cima allo stack visivo
       const topModal = await this.modalCtrl.getTop();
