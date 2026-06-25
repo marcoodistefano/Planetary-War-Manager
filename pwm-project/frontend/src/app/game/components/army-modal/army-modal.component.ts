@@ -516,7 +516,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
 
     // Blocca solo se la caserma SPECIFICA selezionata per questa unit ha già un addestramento
     const selectedStruct = this.selectedRecruitLocations[unit.id];
-    const targetName = selectedStruct?.locationName || this.selectedTargetName;
+    const targetName = selectedStruct?.targetName || selectedStruct?.regionId || this.selectedTargetName;
     return !this.isTrainingInProgress(targetName);
   }
 
@@ -532,7 +532,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
     if (unit.requiredBuilding) {
       const selectedStruct = this.selectedRecruitLocations[unit.id];
       if (selectedStruct) {
-         targetName = selectedStruct.locationName;
+         targetName = selectedStruct.targetName || selectedStruct.regionId;
          targetCoords = selectedStruct.targetCoords ? `${selectedStruct.targetCoords[0]}, ${selectedStruct.targetCoords[1]}` : '--';
       }
     }
