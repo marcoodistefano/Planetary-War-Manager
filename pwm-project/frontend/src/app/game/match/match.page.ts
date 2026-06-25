@@ -131,6 +131,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   matchNations: any[] = [];
   regionsGeoData: any = null;
   regionIdMap: Map<string, number> = new Map();
+  previousColorMap: Map<number, string> = new Map();
   nationMarkers: any[] = [];
   regionsResources: any = {};
   citiesHp: { [cityId: string]: number } = {};
@@ -3687,25 +3688,41 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       });
     }
 
-    // Remove old feature states to reset colors
-    if (this.map.getSource('regioni')) {
-      this.map.removeFeatureState({ source: 'regioni' });
+    // Create the final numeric map for this pass
+    const newColorMap = new Map<number, string>();
 
-      // Apply ownership colors
-      for (const [pId, color] of Object.entries(colorMap)) {
-        const numericId = this.regionIdMap.get(pId.toLowerCase());
-        if (numericId !== undefined) {
-          this.map.setFeatureState({ source: 'regioni', id: numericId }, { color: color });
+    for (const [pId, color] of Object.entries(colorMap)) {
+      const numericId = this.regionIdMap.get(pId.toLowerCase());
+      if (numericId !== undefined) {
+        newColorMap.set(numericId, color);
+      }
+    }
+
+    attackedTerritories.forEach(pId => {
+      const numericId = this.regionIdMap.get(pId.toLowerCase());
+      if (numericId !== undefined) {
+        newColorMap.set(numericId, '#ef4444');
+      }
+    });
+
+    if (this.map.getSource('regioni')) {
+      if (!this.previousColorMap) this.previousColorMap = new Map<number, string>();
+
+      // Remove states that are no longer active
+      for (const [numericId, oldColor] of this.previousColorMap.entries()) {
+        if (!newColorMap.has(numericId)) {
+          this.map.removeFeatureState({ source: 'regioni', id: numericId });
         }
       }
 
-      // Overwrite with attacked colors
-      attackedTerritories.forEach(pId => {
-        const numericId = this.regionIdMap.get(pId.toLowerCase());
-        if (numericId !== undefined) {
-          this.map.setFeatureState({ source: 'regioni', id: numericId }, { color: '#ef4444' });
+      // Add or update changed states
+      for (const [numericId, newColor] of newColorMap.entries()) {
+        if (this.previousColorMap.get(numericId) !== newColor) {
+          this.map.setFeatureState({ source: 'regioni', id: numericId }, { color: newColor });
         }
-      });
+      }
+
+      this.previousColorMap = newColorMap;
     }
 
     this.updateNationBannersVisibility();
