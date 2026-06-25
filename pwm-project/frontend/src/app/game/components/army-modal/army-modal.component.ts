@@ -173,6 +173,10 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
     }
   }
 
+  compareStructures(s1: any, s2: any): boolean {
+    return s1 && s2 ? s1.id === s2.id : s1 === s2;
+  }
+
   buildRecruitmentCatalog() {
     if (!this.gameRules) return;
     const truppeSheet = this.gameRules.sheets.find((s: any) => s.name === 'Truppe');

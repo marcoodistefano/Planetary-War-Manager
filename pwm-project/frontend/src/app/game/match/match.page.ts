@@ -44,6 +44,7 @@ const AVATAR_ASSET_VERSION = '20260517';
 export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild(ArmyModalComponent) armyModalComponent!: ArmyModalComponent;
   @ViewChild(InGameChatComponent) chatComponent!: InGameChatComponent;
+  @ViewChild('mapContainer', { static: true }) mapContainer!: ElementRef;
   // --- 1. PROPRIETÀ E STATO DELLA MAPPA ---
   map: any;
   isGlobe = false;
@@ -1562,7 +1563,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   initMap() {
     this.map = new maplibregl.Map({
-      container: 'map-container',
+      container: this.mapContainer.nativeElement,
       style: {
         version: 8,
         sources: {
@@ -3618,7 +3619,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.regionsGeoData &&
       this.regionIdMap.size > 0 &&
       this.matchNations?.length > 0 &&
-      this.map.getSource('regioni');
+      this.map.getSource('regioni') &&
+      this.map.isStyleLoaded();
 
     if (!ready) {
       (this as any)._applyTerritoryColorsTimer = setTimeout(() => this.applyTerritoryColors(), 300);

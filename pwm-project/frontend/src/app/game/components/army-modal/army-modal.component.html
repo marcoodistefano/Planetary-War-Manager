@@ -337,7 +337,7 @@
                 </span>
                 <span *ngIf="hasRequiredStructure(unit) && unit.requiredBuilding" style="display: block; margin-top: 8px; margin-bottom: 8px;">
                   <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">LUOGO SCHIERAMENTO:</label>
-                  <select [(ngModel)]="selectedRecruitLocations[unit.id]" style="width: 100%; background: #1e293b; color: #fff; border: 1px solid #334155; padding: 5px; border-radius: 4px; font-family: inherit;">
+                  <select [(ngModel)]="selectedRecruitLocations[unit.id]" [compareWith]="compareStructures" style="width: 100%; background: #1e293b; color: #fff; border: 1px solid #334155; padding: 5px; border-radius: 4px; font-family: inherit;">
                     <option [ngValue]="undefined" disabled>Seleziona una base...</option>
                     <option *ngFor="let s of validStructuresCache[unit.id]" [ngValue]="s">
                       {{ s.name || s.structureId }} ({{ s.targetName || s.regionId }})
