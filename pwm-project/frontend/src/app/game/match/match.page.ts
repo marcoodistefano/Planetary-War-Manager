@@ -1556,6 +1556,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       });
 
       this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 0, 24);
+
+      this.map.on('sourcedata', (e: any) => {
+        if (e.sourceId === 'regioni' && e.isSourceLoaded) {
+          if (!this.map.isSourceLoaded('regioni')) return;
+          this.applyTerritoryColors();
+        }
+      });
       this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
       this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 24);
 
@@ -3613,9 +3620,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       }
 
       if (Array.isArray(nation.territori) && nation.territori.length > 0) {
-        const firstProvId = nation.territori[0];
+        const searchId = String(nation.territori[0]).toLowerCase();
         const feature = this.regionsGeoData.features.find((f: any) =>
-          (f.properties.adm1_code === firstProvId) || (f.id === firstProvId) || (f.properties.name === firstProvId)
+          (f.properties?.adm1_code && f.properties.adm1_code.toLowerCase() === searchId) ||
+          (String(f.id).toLowerCase() === searchId) ||
+          (f.properties?.name && f.properties.name.toLowerCase() === searchId)
         );
         if (feature && feature.geometry && feature.geometry.coordinates) {
           let coords = feature.geometry.coordinates;

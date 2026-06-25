@@ -78,6 +78,17 @@ const calculateAndBroadcastLeaderboard = async (matchId) => {
 
         // Ordina decrescente per territori
         leaderboard.sort((a, b) => b.territories - a.territories);
+        
+        // Calcola il ranking denso (1, 1, 2, 3...)
+        let currentRank = 1;
+        let lastTerritories = -1;
+        leaderboard.forEach(p => {
+            if (lastTerritories !== -1 && p.territories < lastTerritories) {
+                currentRank++;
+            }
+            p.rank = currentRank;
+            lastTerritories = p.territories;
+        });
 
         // Salva in Redis
         await redis.set(`match:${matchId}:leaderboard`, JSON.stringify(leaderboard));
