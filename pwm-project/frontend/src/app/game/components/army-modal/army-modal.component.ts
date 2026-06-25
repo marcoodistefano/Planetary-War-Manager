@@ -481,17 +481,25 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
     });
   }
 
-  isTrainingInProgress(): boolean {
-    return this.trainings && this.trainings.length > 0;
+  /**
+   * Controlla se è già in corso un addestramento nella struttura (targetName) specificata.
+   * Se targetName è omesso, controlla qualsiasi struttura (usato solo per i fanti).
+   */
+  isTrainingInProgress(targetName?: string): boolean {
+    if (!this.trainings || this.trainings.length === 0) return false;
+    if (!targetName) return this.trainings.length > 0;
+    return this.trainings.some((t: any) => t.targetName === targetName);
   }
 
-  getInProgressTrainingTime(): string {
+  getInProgressTrainingTime(targetName?: string): string {
     if (!this.trainings || this.trainings.length === 0) return '';
-    // Find the first training that is not complete
     for (let i = 0; i < this.trainings.length; i++) {
-       if (this.trainingTimers[i] && this.trainingTimers[i] !== 'Completato') {
-           return this.trainingTimers[i];
-       }
+      const t = this.trainings[i];
+      // Se è specificato un targetName, mostra il timer solo per quella struttura
+      if (targetName && t.targetName !== targetName) continue;
+      if (this.trainingTimers[i] && this.trainingTimers[i] !== 'Completato') {
+        return this.trainingTimers[i];
+      }
     }
     return '';
   }
@@ -503,10 +511,13 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   canRecruit(unit: any): boolean {
-    if (unit.id !== 'fante' && this.isTrainingInProgress()) {
-      return false;
-    }
-    return this.hasRequiredStructure(unit);
+    if (!this.hasRequiredStructure(unit)) return false;
+    if (unit.id === 'fante') return true; // i fanti non usano caserme dedicate
+
+    // Blocca solo se la caserma SPECIFICA selezionata per questa unit ha già un addestramento
+    const selectedStruct = this.selectedRecruitLocations[unit.id];
+    const targetName = selectedStruct?.locationName || this.selectedTargetName;
+    return !this.isTrainingInProgress(targetName);
   }
 
   recruitUnit(unit: any) {

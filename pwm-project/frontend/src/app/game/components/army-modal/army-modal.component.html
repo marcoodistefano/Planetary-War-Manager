@@ -332,8 +332,8 @@
                 <span *ngIf="!hasRequiredStructure(unit)" style="color: #f87171; display: block; margin-bottom: 4px;">
                   <ion-icon name="warning"></ion-icon> Richiede: {{ unit.requiredBuilding | uppercase }}
                 </span>
-                <span *ngIf="isTrainingInProgress()" style="color: #f59e0b; display: block; margin-bottom: 4px;">
-                  <ion-icon name="time"></ion-icon> Un altro addestramento è in corso ({{ getInProgressTrainingTime() }})
+                <span *ngIf="unit.id !== 'fante' && isTrainingInProgress(selectedRecruitLocations[unit.id]?.locationName || selectedTargetName)" style="color: #f59e0b; display: block; margin-bottom: 4px;">
+                  <ion-icon name="time"></ion-icon> Caserma occupata ({{ getInProgressTrainingTime(selectedRecruitLocations[unit.id]?.locationName || selectedTargetName) }})
                 </span>
                 <span *ngIf="hasRequiredStructure(unit) && unit.requiredBuilding" style="display: block; margin-top: 8px; margin-bottom: 8px;">
                   <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">LUOGO SCHIERAMENTO:</label>
