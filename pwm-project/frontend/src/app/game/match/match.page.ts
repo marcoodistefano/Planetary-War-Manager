@@ -132,6 +132,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   regionsGeoData: any = null;
   regionIdMap: Map<string, number> = new Map();
   previousColorMap: Map<number, string> = new Map();
+  private initialColorsApplied = false;
+  private loadedMapMatchId = '';
   nationMarkers: any[] = [];
   regionsResources: any = {};
   citiesHp: { [cityId: string]: number } = {};
@@ -509,33 +511,52 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy() {
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     this.shouldReconnect = false;
-    if (this.reconnectTimer) {
-      window.clearTimeout(this.reconnectTimer);
-    }
+    if (this.reconnectTimer) window.clearTimeout(this.reconnectTimer);
     this.matchSocket?.close();
+    if (this.avatarSub) this.avatarSub.unsubscribe();
 
-    if (this.avatarSub) {
-      this.avatarSub.unsubscribe();
-    }
-
-    // Fix: Previeni Memory Leak del WebGL Context
-    if (this.map) {
-      this.map.remove();
-    }
-    
-    (this as any)._initialColorsApplied = false;
+    // Rimuovi la mappa e resetta tutti i flag di sessione
+    if (this.map) this.map.remove();
+    this.initialColorsApplied = false;
+    this.loadedMapMatchId = '';
+    this.previousColorMap.clear();
   }
 
   ionViewWillEnter() {
-    (this as any)._initialColorsApplied = false;
-    if (this.previousColorMap) {
-      this.previousColorMap.clear();
-    }
-    
+    // Leggi il matchId dalla route ogni volta: potrebbe essere cambiato
+    const routeMatchId = this.route.snapshot.paramMap.get('id')
+      || localStorage.getItem('pwm_last_joined_match')
+      || '';
+    this.currentMatchId = routeMatchId;
+
+    // Reset completo dello stato grafico
+    this.initialColorsApplied = false;
+    this.previousColorMap.clear();
+
+    // Ricarica dati
     this.loadGameRules();
     this.loadUserProfile();
     this.loadMatchContext();
     this.preloadTroopImages();
+
+    // Riconnetti sempre il socket (chiudendo quello vecchio se necessario)
+    this.shouldReconnect = true;
+    if (this.reconnectTimer) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (
+      this.matchSocket &&
+      (this.matchSocket.readyState === WebSocket.OPEN ||
+        this.matchSocket.readyState === WebSocket.CONNECTING)
+    ) {
+      this.shouldReconnect = false; // blocca l'auto-reconnect dell'onclose
+      this.matchSocket.close();
+      this.shouldReconnect = true;
+    }
+    if (this.currentMatchId) {
+      this.connectMatchSocket();
+    }
   }
 
   private preloadTroopImages() {
@@ -556,6 +577,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   private connectMatchSocket() {
     if (!this.currentMatchId) return;
+    // Evita doppie connessioni: se il socket è già aperto non ne aprire uno nuovo
+    if (this.matchSocket?.readyState === WebSocket.OPEN) return;
 
     const wsBaseUrl = this.getGatewayWsBaseUrl();
     const wsUrl = `${wsBaseUrl}/match/${encodeURIComponent(this.currentMatchId)}`;
@@ -1217,23 +1240,30 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     // Chiudiamo menu se rimasti aperti
     this.menuCtrl.close('mobile-tactical-menu').catch(() => { });
 
-    // Inizializza la mappa SOLO se non esiste già
-    if (!this.map) {
+    // Se la mappa non esiste, o se la match è cambiato, ri-crea la mappa da zero
+    const needsRebuild = !this.map || this.loadedMapMatchId !== this.currentMatchId;
+
+    if (needsRebuild) {
+      // Distruggi la mappa precedente per evitare contesti WebGL orfani
+      if (this.map) {
+        try { this.map.remove(); } catch (_) { /* già distrutta */ }
+        this.map = null as any;
+      }
+      this.loadedMapMatchId = this.currentMatchId;
+
       this.ngZone.runOutsideAngular(() => {
         setTimeout(() => {
           this.initMap();
-
-          // Un singolo resize assicurativo post-rendering
-          setTimeout(() => {
-            if (this.map) {
-              this.map.resize();
-            }
-          }, 200);
+          // Resize assicurativo post-rendering
+          setTimeout(() => { if (this.map) this.map.resize(); }, 200);
         }, 50);
       });
     } else {
-      // Se esisteva già (es. da cache del router), forza il resize
+      // Mappa già viva per lo stesso match: resize + ri-applicazione colori
       this.map.resize();
+      if (this.matchNations?.length > 0) {
+        this.applyTerritoryColors();
+      }
     }
   }
 
@@ -3716,8 +3746,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       if (!this.previousColorMap) this.previousColorMap = new Map<number, string>();
 
       const isLoaded = this.map.isSourceLoaded('regioni');
-      if (isLoaded && !(this as any)._initialColorsApplied) {
-        (this as any)._initialColorsApplied = true;
+      if (isLoaded && !this.initialColorsApplied) {
+        this.initialColorsApplied = true;
         this.previousColorMap.clear();
       }
 
