@@ -3368,7 +3368,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         this.regionsGeoData = geoData;
       }
 
-      this.map.addSource(sourceId, { type: 'geojson', data: geoData });
+      this.map.addSource(sourceId, { 
+        type: 'geojson', 
+        data: geoData,
+        maxzoom: 6,
+        tolerance: 1.5
+      });
 
       const paintConfig = layerId === 'regioni-layer' ? {
         'fill-color': [
@@ -3431,7 +3436,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
       allFeatures = allFeatures.concat(Array.from(featureMap.values()));
       const mergedGeoData = { type: 'FeatureCollection', features: allFeatures };
-      this.map.addSource(sourceId, { type: 'geojson', data: mergedGeoData, generateId: true });
+      this.map.addSource(sourceId, { 
+        type: 'geojson', 
+        data: mergedGeoData, 
+        generateId: true,
+        maxzoom: 6,
+        tolerance: 1.5
+      });
       this.map.addLayer({
         id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
         paint: {
@@ -3467,7 +3478,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
 
-      this.map.addSource(sourceId, { type: 'geojson', data: geoData, generateId: true });
+      this.map.addSource(sourceId, { 
+        type: 'geojson', 
+        data: geoData, 
+        generateId: true,
+        maxzoom: 6,
+        tolerance: 1.5
+      });
 
       this.map.addLayer({
         id: pointsLayerId,
