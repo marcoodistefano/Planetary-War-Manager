@@ -336,7 +336,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   updatePlayerResources(newResources: any) {
     if (!newResources) return;
-    
+
     // Controlla se le risorse precedenti non erano a 0 (per evitare animazioni al primo caricamento/refresh)
     const hasInitialValues = this.playerResources && this.playerResources['denaro'] > 0;
 
@@ -345,13 +345,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const oldVal = this.playerResources[key] || 0;
         const newVal = newResources[key] || 0;
         const diff = newVal - oldVal;
-        
+
         if (diff < -5) { // Evita micro fluttuazioni, cattura solo spese reali
           this.triggerResourceAnimation(key, diff);
         }
       }
     }
-    
+
     // Clona l'oggetto per forzare la change detection di Angular
     this.playerResources = { ...newResources };
   }
@@ -362,7 +362,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
     const animId = this.animationIdCounter++;
     this.resourceAnimations[resourceId].push({ id: animId, amount, active: true });
-    
+
     setTimeout(() => {
       if (this.resourceAnimations[resourceId]) {
         this.resourceAnimations[resourceId] = this.resourceAnimations[resourceId].filter(a => a.id !== animId);
@@ -841,17 +841,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               if (parsed.type === 'TERRITORY_CONQUERED') {
                 // Aggiorniamo i proprietari delle strutture già visibili senza leakare quelle nemiche
                 for (const visibleStr of this.matchStructures) {
-                   for (const n of this.matchNations) {
-                      if (n.strutture && n.strutture.some((s: any) => s.id === visibleStr.id)) {
-                         visibleStr.owner = n.username;
-                      }
-                   }
+                  for (const n of this.matchNations) {
+                    if (n.strutture && n.strutture.some((s: any) => s.id === visibleStr.id)) {
+                      visibleStr.owner = n.username;
+                    }
+                  }
                 }
-                
+
                 // Aggiungiamo eventuali strutture che sono passate a noi o ai nostri alleati
                 const myPlayer = this.matchNations.find(p => p.username === this.userProfile.username);
                 const myAllianceId = myPlayer ? myPlayer.id_alleanza : null;
-                
+
                 for (const n of this.matchNations) {
                   const isAlly = myAllianceId && String(n.id_alleanza) === String(myAllianceId);
                   if (n.username === this.userProfile.username || isAlly) {
@@ -864,7 +864,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                     }
                   }
                 }
-                
+
                 this.renderStructures();
               }
             }
@@ -2514,25 +2514,38 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   updateStructureMarkersScale() {
     if (!this.map) return;
     const currentZoom = this.map.getZoom();
+    const visibilityThreshold = 6;
+    const visible = currentZoom >= visibilityThreshold;
 
-    const minSize = 32;
-    const maxSize = 80;
+    const minSize = 40;  // truppe: 32
+    const maxSize = 90;  // truppe: 80
     const scaleFactor = Math.min(Math.max((currentZoom - 3) / (10 - 3), 0), 1);
-    let dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
+    const dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
 
-    const scaleMarker = (marker: any) => {
+    // structureMarkers salva i marker direttamente (non in oggetti wrapper)
+    this.structureMarkers.forEach((marker: any) => {
       const el = marker.getElement();
       if (!el) return;
-      const container = el.querySelector('.structure-container') as HTMLElement;
-      if (container) {
-        container.style.width = `${dynamicSize}px`;
-        container.style.height = `${dynamicSize}px`;
+      el.style.display = visible ? 'block' : 'none';
+      if (visible) {
+        const container = el.querySelector('.structure-container') as HTMLElement;
+        if (container) {
+          container.style.width = `${dynamicSize}px`;
+          container.style.height = `${dynamicSize}px`;
+        }
       }
-    };
+    });
 
-    this.structureMarkers.forEach((item: any) => scaleMarker(item.marker));
+    // Il build preview marker è sempre visibile (feedback interattivo)
     if (this.buildPreviewMarker) {
-      scaleMarker(this.buildPreviewMarker);
+      const el = this.buildPreviewMarker.getElement();
+      if (el) {
+        const container = el.querySelector('.structure-container') as HTMLElement;
+        if (container) {
+          container.style.width = `${dynamicSize}px`;
+          container.style.height = `${dynamicSize}px`;
+        }
+      }
     }
   }
 

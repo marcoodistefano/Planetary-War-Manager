@@ -196,6 +196,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
     for (const unit of truppeSheet.lines) {
       if (!unit.id_truppa) continue;
       // Filtriamo solo le truppe di terra (prodotte in caserma o fabbrica, no aria o mare per ora)
+      if (unit.id_truppa === 'fante') continue; // I fanti vengono generati passivamente ogni ora
       if (unit.prodotta_in && (unit.prodotta_in.startsWith('caserma') || unit.prodotta_in.startsWith('fabbrica') || unit.prodotta_in.startsWith('tenda'))) {
         newCatalog.push({
           id: unit.id_truppa,

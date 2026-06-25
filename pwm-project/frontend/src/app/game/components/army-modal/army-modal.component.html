@@ -332,7 +332,7 @@
                 <span *ngIf="!hasRequiredStructure(unit)" style="color: #f87171; display: block; margin-bottom: 4px;">
                   <ion-icon name="warning"></ion-icon> Richiede: {{ unit.requiredBuilding | uppercase }}
                 </span>
-                <span *ngIf="isTrainingInProgress() && unit.id !== 'fante'" style="color: #f59e0b; display: block; margin-bottom: 4px;">
+                <span *ngIf="isTrainingInProgress()" style="color: #f59e0b; display: block; margin-bottom: 4px;">
                   <ion-icon name="time"></ion-icon> Un altro addestramento è in corso ({{ getInProgressTrainingTime() }})
                 </span>
                 <span *ngIf="hasRequiredStructure(unit) && unit.requiredBuilding" style="display: block; margin-top: 8px; margin-bottom: 8px;">
