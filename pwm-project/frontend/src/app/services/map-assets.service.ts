@@ -2,14 +2,24 @@ import { Injectable } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
 export class MapAssetsService {
-  private cache = new Map<string, any>();
+  private cache = new Map<string, Promise<string>>();
 
-  async getText(url: string): Promise<string> {
-    const hit = this.cache.get(url);
-    if (hit) return hit;
-    const res = await fetch(url, { cache: 'force-cache' });
-    const data = await res.text();
-    this.cache.set(url, data);
-    return data;
+  getText(url: string): Promise<string> {
+    if (this.cache.has(url)) {
+      return this.cache.get(url)!;
+    }
+
+    const fetchPromise = fetch(url, { cache: 'force-cache' }).then(res => {
+      if (!res.ok) {
+        throw new Error(`Failed to fetch map asset: ${res.statusText}`);
+      }
+      return res.text();
+    }).catch(err => {
+      this.cache.delete(url); // Remove from cache on failure
+      throw err;
+    });
+
+    this.cache.set(url, fetchPromise);
+    return fetchPromise;
   }
 }

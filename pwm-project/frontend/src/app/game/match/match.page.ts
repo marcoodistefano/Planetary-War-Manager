@@ -1799,6 +1799,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       const pos = this.calculateCurrentPosition(army.path, army.startTime, army.etaMs);
       if (pos) return [pos.lng, pos.lat];
     }
+    if (army.status === 'in_battaglia' && army.path && army.path.length > 0) {
+      return [army.path[army.path.length - 1][0], army.path[army.path.length - 1][1]];
+    }
     if (!army.currentLocation) return null;
     if (typeof army.currentLocation === 'string') {
       if (army.currentLocation.includes(',')) {

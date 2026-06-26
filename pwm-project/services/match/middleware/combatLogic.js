@@ -782,15 +782,6 @@ const processActiveCombats = async () => {
                         att.armate[id_attaccante].status = 'standby';
                     }
 
-                    if (!stillAtWar && defenderPlayer) {
-                        const def = mObj.match.player.find(x => x.username === defenderPlayer);
-                        if (att && att.inWarWith) {
-                            att.inWarWith = att.inWarWith.filter(u => u !== defenderPlayer);
-                        }
-                        if (def && def.inWarWith) {
-                            def.inWarWith = def.inWarWith.filter(u => u !== attackerPlayer);
-                        }
-                    }
                     return { save: true, matchObj: mObj };
                 });
             } else {
