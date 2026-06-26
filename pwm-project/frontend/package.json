@@ -29,9 +29,11 @@
     "@capacitor/keyboard": "8.0.3",
     "@capacitor/status-bar": "8.0.2",
     "@ionic/angular": "^8.0.0",
+    "@types/topojson-client": "^3.1.5",
     "ionic-selectable": "^5.0.3",
     "ionicons": "^7.0.0",
     "rxjs": "~7.8.0",
+    "topojson-client": "^3.1.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"
   },

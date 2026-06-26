@@ -135,6 +135,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   previousColorMap: Map<number, string> = new Map();
   private initialColorsApplied = false;
   private loadedMapMatchId = '';
+  private _regionsReadyResolve?: () => void;
+  private _regionsReady = new Promise<void>(resolve => {
+    this._regionsReadyResolve = resolve;
+  });
+  private topoWorker?: Worker;
   nationMarkers: any[] = [];
   regionsResources: any = {};
   citiesHp: { [cityId: string]: number } = {};
@@ -533,6 +538,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     // Reset completo dello stato grafico
     this.initialColorsApplied = false;
     this.previousColorMap.clear();
+
+    this._regionsReady = new Promise<void>(resolve => {
+      this._regionsReadyResolve = resolve;
+    });
 
     // Ricarica dati
     this.loadGameRules();
@@ -1219,7 +1228,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         }
 
         this.cdr.detectChanges();
-        this.applyTerritoryColors();
+        if (this.matchNations?.length > 0) this.applyTerritoryColors();
       },
       error: (error) => {
         console.error('Errore nel recupero del profilo utente per il match:', error);
@@ -3420,63 +3429,77 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   loadTopoJsonLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
     const fetchUrl = url;
     fetch(fetchUrl).then(res => res.json()).then(topology => {
-      const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
+      const onGeoDataReady = (geoData: any) => {
+        if (layerId === 'regioni-layer') {
+          let nextId = 1;
+          this.regionIdMap = new Map<string, number>();
+          geoData.features.forEach((f: any) => {
+            f.id = nextId++;
+            const pId = f.properties.adm1_code || f.properties.name;
+            if (pId) {
+              this.regionIdMap.set(String(pId).toLowerCase(), f.id);
+            }
+          });
+          this.regionsGeoData = geoData;
+        }
 
-      if (layerId === 'regioni-layer') {
-        let nextId = 1;
-        this.regionIdMap = new Map<string, number>();
-        geoData.features.forEach((f: any) => {
-          f.id = nextId++;
-          const pId = f.properties.adm1_code || f.properties.name;
-          if (pId) {
-            this.regionIdMap.set(String(pId).toLowerCase(), f.id);
-          }
+        this.map.addSource(sourceId, { 
+          type: 'geojson', 
+          data: geoData,
+          maxzoom: 6,
+          tolerance: 1.5
         });
-        this.regionsGeoData = geoData;
-      }
 
-      this.map.addSource(sourceId, { 
-        type: 'geojson', 
-        data: geoData,
-        maxzoom: 6,
-        tolerance: 1.5
-      });
+        const paintConfig = layerId === 'regioni-layer' ? {
+          'fill-color': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false], '#00ccffff',
+            ['!=', ['feature-state', 'color'], null], ['feature-state', 'color'],
+            ['has', 'fillColor'], ['get', 'fillColor'],
+            'rgba(150, 150, 150, 0.2)'
+          ],
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false], 0.25,
+            ['!=', ['feature-state', 'color'], null], 0.45,
+            ['has', 'fillColor'], 0.45,
+            0.1
+          ]
+        } : {
+          'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
+          'fill-opacity': 0.3
+        };
 
-      const paintConfig = layerId === 'regioni-layer' ? {
-        'fill-color': [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false], '#00ccffff',
-          ['!=', ['feature-state', 'color'], null], ['feature-state', 'color'],
-          ['has', 'fillColor'], ['get', 'fillColor'],
-          'rgba(150, 150, 150, 0.2)'
-        ],
-        'fill-opacity': [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false], 0.25,
-          ['!=', ['feature-state', 'color'], null], 0.45,
-          ['has', 'fillColor'], 0.45,
-          0.1
-        ]
-      } : {
-        'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
-        'fill-opacity': 0.3
+        this.map.addLayer({
+          id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+          paint: paintConfig
+        });
+
+        if (layerId === 'regioni-layer') {
+          this.map.addLayer({
+            id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+            paint: {
+              'line-color': '#000000',
+              'line-width': 0.2,
+              'line-opacity': 0.4
+            }
+          });
+          this.applyTerritoryColors();
+          this._regionsReadyResolve?.(); // Notifica: source pronta
+        }
       };
 
-      this.map.addLayer({
-        id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-        paint: paintConfig
-      });
-
-      if (layerId === 'regioni-layer') {
-        this.map.addLayer({
-          id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-          paint: {
-            'line-color': '#000000',
-            'line-width': 0.2,
-            'line-opacity': 0.4
-          }
-        });
-        this.applyTerritoryColors();
+      if (typeof Worker !== 'undefined') {
+        if (!this.topoWorker) {
+          this.topoWorker = new Worker(new URL('./topojson.worker', import.meta.url), { type: 'module' });
+        }
+        this.topoWorker.onmessage = ({ data }) => {
+          onGeoDataReady(data.geoData);
+        };
+        this.topoWorker.postMessage({ topology, id: layerId });
+      } else {
+        const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
+        onGeoDataReady(geoData);
       }
     });
   }
@@ -3609,27 +3632,18 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   applyTerritoryColors() {
-    if ((this as any)._applyTerritoryColorsTimer) {
-      clearTimeout((this as any)._applyTerritoryColorsTimer);
-    }
+    if (!this.matchNations?.length) return; // Nulla da fare
 
-    // Se i dati non sono ancora pronti, pianifica un retry automatico invece di uscire silenziosamente.
-    // Questo risolve la race condition tra il fetch del GeoJSON e l'arrivo dell'INITIAL_STATE via WS.
-    const ready = this.map &&
-      this.regionsGeoData &&
-      this.regionIdMap.size > 0 &&
-      this.matchNations?.length > 0 &&
-      this.map.getSource('regioni') &&
-      this.map.isStyleLoaded();
-
-    if (!ready) {
-      (this as any)._applyTerritoryColorsTimer = setTimeout(() => this.applyTerritoryColors(), 300);
-      return;
-    }
-
-    (this as any)._applyTerritoryColorsTimer = setTimeout(() => {
-      this._doApplyTerritoryColors();
-    }, 100);
+    this._regionsReady.then(() => {
+      if ((this as any)._applyTerritoryColorsTimer) {
+        clearTimeout((this as any)._applyTerritoryColorsTimer);
+      }
+      
+      // Debounce 80ms per i burst
+      (this as any)._applyTerritoryColorsTimer = setTimeout(() => {
+        this._doApplyTerritoryColors();
+      }, 80);
+    });
   }
 
   _doApplyTerritoryColors() {
