@@ -77,12 +77,6 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     this.loadJoinableMatches();
     this.loadCountryFlags();
     
-    // Effettua un fetch ogni 2 minuti (120000 ms)
-    this.pollingInterval = setInterval(() => {
-      this.loadDashboardData();
-      this.loadJoinableMatches();
-    }, 120000);
-
     // Sottoscrizione per aggiornare l'avatar non appena viene cambiato
     this.avatarSub = this.userState.avatarId$.subscribe((id) => {
       if (id) this.currentPlayer.avatar = this.avatarPath(id);
@@ -93,6 +87,24 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     this.refreshLastJoinedMatch();
     this.loadDashboardData();
     this.loadJoinableMatches();
+    this.startPolling();
+  }
+
+
+
+  private startPolling() {
+    this.stopPolling();
+    this.pollingInterval = setInterval(() => {
+      this.loadDashboardData(true);
+      this.loadJoinableMatches();
+    }, 120000);
+  }
+
+  private stopPolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
   }
 
   private refreshLastJoinedMatch() {
@@ -104,17 +116,15 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy() {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-    }
+    this.stopPolling();
     if (this.avatarSub) this.avatarSub.unsubscribe();
   }
 
   /**
    * Recupera i dati dal backend tramite il Service
    */
-  loadDashboardData() {
-    this.homeService.getDashboardData().subscribe({
+  loadDashboardData(forceRefresh = false) {
+    this.homeService.getDashboardData(forceRefresh).subscribe({
       next: (response) => {
         // Ora TypeScript sa che 'response' ha una proprietà 'data' di tipo 'HomeData'
         const info = response.data; 
@@ -337,18 +347,17 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   async loadCountryFlags() {
+    const CACHE_KEY = 'pwm_country_flags';
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) { this.countryFlagsMap = JSON.parse(cached); return; }
     try {
-      const response = await fetch('https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/index.json');
-      const data = await response.json();
+      const res = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,translations');
+      const data = await res.json();
       const newMap: Record<string, string> = {};
-      for (const c of data) {
-        const code = (c.code || '').toLowerCase();
-        if (!code) continue;
-        newMap[code] = code;
-        if (c.name) {
-          newMap[c.name.toLowerCase()] = code;
-        }
-      }
+      data.forEach((country: any) => {
+        newMap[country.cca2] = country.translations?.ita?.common || country.name.common;
+      });
+      localStorage.setItem(CACHE_KEY, JSON.stringify(newMap));
       this.countryFlagsMap = newMap;
     } catch (error) {
       console.error('Errore nel caricamento delle nazioni per la homepage:', error);
@@ -516,6 +525,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   async ionViewWillLeave() {
+    this.stopPolling();
     const topModal = await this.modalCtrl.getTop();
     if (topModal) await this.modalCtrl.dismiss();
   }

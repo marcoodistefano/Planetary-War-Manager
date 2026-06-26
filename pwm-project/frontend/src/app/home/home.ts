@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { shareReplay } from 'rxjs/operators';
 import { ApiResponse } from './home-data.model';
 import { environment } from '../../environments/environment';
 
@@ -12,8 +13,15 @@ export class HomeService {
   constructor(private http: HttpClient) { }
 
   // Tipizza il ritorno come ApiResponse
-  getDashboardData(): Observable<ApiResponse> {
-    return this.http.get<ApiResponse>(this.apiUrl, { withCredentials: true });
+  private dashboardData$: Observable<ApiResponse> | null = null;
+
+  getDashboardData(forceRefresh = false): Observable<ApiResponse> {
+    if (!this.dashboardData$ || forceRefresh) {
+      this.dashboardData$ = this.http.get<ApiResponse>(this.apiUrl, { withCredentials: true }).pipe(
+        shareReplay(1)
+      );
+    }
+    return this.dashboardData$;
   }
 
   getActiveMatchesBrowserData(): Observable<ApiResponse> {

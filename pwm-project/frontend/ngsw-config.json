@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.html",
+  "assetGroups": [
+    {
+      "name": "map-and-models",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/assets/map/**",
+          "/assets/profile_icons/**",
+          "/assets/2Dmodels/**"
+        ]
+      }
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { MapAssetsService } from '../../services/map-assets.service';
 import { Component, OnInit, AfterViewInit, OnDestroy, ChangeDetectorRef, ViewChild, NgZone, HostListener, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -135,10 +136,20 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   previousColorMap: Map<number, string> = new Map();
   private initialColorsApplied = false;
   private loadedMapMatchId = '';
-  private _regionsReadyResolve?: () => void;
-  private _regionsReady = new Promise<void>(resolve => {
-    this._regionsReadyResolve = resolve;
-  });
+  private regionsSourceReady = false;
+
+  private markRegionsReady() {
+    this.regionsSourceReady = true;
+    this._lastTerritorySignature = '';
+    this.requestTerritoryColors();
+  }
+
+  private resetTerritoryState() {
+    this.regionsSourceReady = false;
+    this._lastTerritorySignature = '';
+    this.previousColorMap.clear();
+    this.initialColorsApplied = false;
+  }
   private topoWorker?: Worker;
   private _lastApply = 0;
   private _lastTerritorySignature = '';
@@ -484,6 +495,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     private toastCtrl: ToastController,
     private actionSheetCtrl: ActionSheetController,
     private route: ActivatedRoute,
+    private mapAssets: MapAssetsService,
     private homeService: HomeService,
     private authApi: AuthApiService,
     private userState: UserStateService,
@@ -547,9 +559,6 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.initialColorsApplied = false;
     this.previousColorMap.clear();
 
-    this._regionsReady = new Promise<void>(resolve => {
-      this._regionsReadyResolve = resolve;
-    });
 
     // Ricarica dati
     this.loadGameRules();
@@ -635,7 +644,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             }
             if (parsed.payload?.nations) {
               this.matchNations = parsed.payload.nations;
-              this.applyTerritoryColors();
+              this.requestTerritoryColors();
             }
             if (parsed.payload?.resources) {
               this.updatePlayerResources(parsed.payload.resources);
@@ -742,7 +751,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             }
             console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
             this.renderArmies();
-            this.applyTerritoryColors(); // <-- Re-added to fix red layout on attack
+            this.requestTerritoryColors(); // <-- Re-added to fix red layout on attack
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
@@ -880,7 +889,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.matchArmies = newArmies;
             this.renderArmies();
             this.renderCitiesHp();
-            this.applyTerritoryColors();
+            this.requestTerritoryColors();
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
@@ -896,7 +905,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             console.log(`[WS_MATCH] Un nuovo giocatore si è unito: ${parsed.payload.newPlayer}`);
             if (parsed.payload?.nations) {
               this.matchNations = parsed.payload.nations;
-              this.applyTerritoryColors();
+              this.requestTerritoryColors();
             }
             this.ngZone.run(() => this.cdr.detectChanges());
           }
@@ -906,7 +915,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             const updatedNations = parsed.nations || parsed.payload?.nations;
             if (updatedNations) {
               this.matchNations = updatedNations;
-              this.applyTerritoryColors();
+              this.requestTerritoryColors();
 
               if (parsed.type === 'TERRITORY_CONQUERED') {
                 // Aggiorniamo i proprietari delle strutture già visibili senza leakare quelle nemiche
@@ -1100,19 +1109,19 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   reloadMatchAlliances() {
     if (!this.currentMatchId) {
       this.matchAlliances = [];
-      this.applyTerritoryColors();
+      this.requestTerritoryColors();
       return;
     }
 
     this.homeService.getMatchAlliance(this.currentMatchId).subscribe({
       next: (response: any) => {
         this.matchAlliances = Array.isArray(response?.alliances) ? response.alliances : [];
-        this.applyTerritoryColors();
+        this.requestTerritoryColors();
         this.cdr.detectChanges();
       },
       error: () => {
         this.matchAlliances = [];
-        this.applyTerritoryColors();
+        this.requestTerritoryColors();
         this.cdr.detectChanges();
       }
     });
@@ -1236,7 +1245,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         }
 
         this.cdr.detectChanges();
-        if (this.matchNations?.length > 0) this.applyTerritoryColors();
+        if (this.matchNations?.length > 0) this.requestTerritoryColors();
       },
       error: (error) => {
         console.error('Errore nel recupero del profilo utente per il match:', error);
@@ -1269,6 +1278,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         this.map = null as any;
       }
       this.loadedMapMatchId = this.currentMatchId;
+      this.resetTerritoryState();
 
       this.ngZone.runOutsideAngular(() => {
         setTimeout(() => {
@@ -1280,11 +1290,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     } else {
       // Mappa già viva per lo stesso match: resize + ri-applicazione colori
       this.map.resize();
-      if (this.map.getSource('regioni') && this.map.isSourceLoaded('regioni')) {
-        this._regionsReadyResolve?.(); // sblocca il .then() pendente
-      }
       if (this.matchNations?.length > 0) {
-        this.applyTerritoryColors();
+        this.requestTerritoryColors();
       }
     }
   }
@@ -1621,7 +1628,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         if (e.sourceId !== 'regioni' || !e.isSourceLoaded) return;
         if (!this.map.isSourceLoaded('regioni')) return;
         this.map.off('sourcedata', onFirstSourceReady); // applica una sola volta
-        this.applyTerritoryColors();
+        this.requestTerritoryColors();
       };
       this.map.on('sourcedata', onFirstSourceReady);
       this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
@@ -3440,7 +3447,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   loadTopoJsonLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
     const fetchUrl = url;
-    fetch(fetchUrl).then(res => res.text()).then(topologyText => {
+    this.mapAssets.getText(fetchUrl).then((topologyText: string) => {
       const onGeoDataReady = (geoData: any) => {
         if (layerId === 'regioni-layer') {
           let nextId = 1;
@@ -3500,8 +3507,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               'line-opacity': 0.4
             }
           });
-          this.applyTerritoryColors();
-          this._regionsReadyResolve?.(); // Notifica: source pronta
+          this.markRegionsReady();
         }
       };
 
@@ -3523,7 +3529,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   loadTopoJsonArchsLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
     const fetchUrl = url;
-    fetch(fetchUrl).then(res => res.text()).then(topologyText => {
+    this.mapAssets.getText(fetchUrl).then((topologyText: string) => {
       const onGeoDataReady = (mergedGeoData: any) => {
         this.map.addSource(sourceId, { 
           type: 'geojson', 
@@ -3587,7 +3593,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   loadTopoJsonCitiesLayer(url: string, sourceId: string, pointsLayerId: string, labelsLayerId: string, minZ: number, maxZ: number) {
     const fetchUrl = url;
-    fetch(fetchUrl).then(res => res.text()).then(topologyText => {
+    this.mapAssets.getText(fetchUrl).then((topologyText: string) => {
       const onGeoDataReady = (geoData: any) => {
         if (!geoData) return;
 
@@ -3665,7 +3671,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const geoData = topojson.feature(topology, topology.objects[objectName]);
         onGeoDataReady(geoData);
       }
-    }).catch(err => console.error('Errore fetch cities.json', err));
+    }).catch((err: any) => console.error('Errore fetch cities.json', err));
   }
 
   changeBasemap(event: any) {
@@ -3683,22 +3689,16 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  applyTerritoryColors() {
-    if (!this.matchNations?.length) return; // Nulla da fare
-
-    this._regionsReady.then(() => {
-      const now = Date.now();
-      const elapsed = now - this._lastApply;
-      if ((this as any)._applyTerritoryColorsTimer) {
-        clearTimeout((this as any)._applyTerritoryColorsTimer);
-      }
-      
-      const delay = elapsed > 250 ? 0 : 80;
-      (this as any)._applyTerritoryColorsTimer = setTimeout(() => {
-        this._lastApply = Date.now();
-        this._doApplyTerritoryColors();
-      }, delay);
-    });
+  requestTerritoryColors() {
+    if (!this.regionsSourceReady) return;     // source non ancora pronta
+    if (!this.matchNations?.length) return;   // nazioni non ancora arrivate
+    const elapsed = Date.now() - this._lastApply;
+    if ((this as any)._applyTerritoryColorsTimer) clearTimeout((this as any)._applyTerritoryColorsTimer);
+    const delay = elapsed > 250 ? 0 : 80;
+    (this as any)._applyTerritoryColorsTimer = setTimeout(() => {
+      this._lastApply = Date.now();
+      this._doApplyTerritoryColors();
+    }, delay);
   }
 
   _doApplyTerritoryColors() {

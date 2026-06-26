@@ -68,12 +68,6 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
   ngOnInit() {
     this.titleService.setTitle('PWM | Leaderboard');
     this.loadCountryFlags();
-    this.loadData();
-
-    this.pollingInterval = setInterval(() => {
-      this.loadData();
-    }, 120000);
-
     this.avatarSub = this.userState.avatarId$.subscribe(() => undefined);
   }
 
@@ -82,22 +76,34 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy() {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-    }
-
-    if (this.avatarSub) {
-      this.avatarSub.unsubscribe();
-    }
+    this.stopPolling();
+    this.avatarSub?.unsubscribe();
   }
 
   ionViewDidEnter() {
     this.playBackgroundVideo();
   }
 
+  ionViewWillEnter() {
+    this.loadData();
+    this.startPolling();
+  }
+
   ionViewWillLeave() {
+    this.stopPolling();
+  }
+
+  private startPolling() {
+    this.stopPolling();
+    this.pollingInterval = setInterval(() => {
+      this.loadData(true);
+    }, 120000);
+  }
+
+  private stopPolling() {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
     }
   }
 
@@ -105,8 +111,8 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
     this.router.navigate(['/home']);
   }
 
-  loadData() {
-    this.homeService.getDashboardData().subscribe({
+  loadData(forceRefresh = false) {
+    this.homeService.getDashboardData(forceRefresh).subscribe({
       next: (response: ApiResponse) => {
         const info = response.data;
         this.currentUsername = info.user_profile?.username || '';
@@ -353,25 +359,20 @@ export class LeaderboardPage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   async loadCountryFlags() {
+    const CACHE_KEY = 'pwm_country_flags';
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) { this.dynamicRegionMap = JSON.parse(cached); this.loadData(); return; }
     try {
-      const response = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,translations');
-      const data = await response.json();
+      const res = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,translations');
+      const data = await res.json();
       const newMap: Record<string, string> = {};
-      for (const c of data) {
-        const code = (c.cca2 || '').toUpperCase();
-        if (!code) continue;
-        if (c.translations?.ita?.common) {
-          newMap[c.translations.ita.common.toLowerCase()] = code;
-        }
-        if (c.name?.common) {
-          newMap[c.name.common.toLowerCase()] = code;
-        }
-      }
+      data.forEach((country: any) => {
+        newMap[country.cca2] = country.translations?.ita?.common || country.name.common;
+      });
+      localStorage.setItem(CACHE_KEY, JSON.stringify(newMap));
       this.dynamicRegionMap = newMap;
       this.loadData();
-    } catch (error) {
-      console.error('Errore nel caricamento delle nazioni per la leaderboard:', error);
-    }
+    } catch (e) { console.error('Errore bandiere:', e); this.loadData(); }
   }
 
   private regionFullName(region: string, code?: string): string {
