@@ -10,11 +10,7 @@ if "%~1"=="--build" (
     echo Starting Planetary War Manager ^(PWM^) Microservices... [avvio veloce, usa --build per rebuilddare]
 )
 
-:: Controlla se host-downloader.js è in esecuzione cercando nei processi in background
-wmic process where "commandline like '%%host-downloader.js%%'" get processid | findstr /R "[0-9]" >nul 2>&1
-if %errorlevel% neq 0 (
-    start /b node services\ripristina\host-downloader.js > "%TEMP%\pwm-host-downloader.log" 2>&1
-)
+
 
 docker-compose up -d %BUILD_FLAG%
 

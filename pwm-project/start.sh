@@ -9,9 +9,6 @@ else
   echo "Starting Planetary War Manager (PWM) Microservices... [avvio veloce, usa --build per rebuilddare]"
 fi
 
-if ! pgrep -f "services/ripristina/host-downloader.js" >/dev/null 2>&1; then
-	nohup node services/ripristina/host-downloader.js > /tmp/pwm-host-downloader.log 2>&1 &
-fi
 
 docker-compose up -d $BUILD_FLAG
 
