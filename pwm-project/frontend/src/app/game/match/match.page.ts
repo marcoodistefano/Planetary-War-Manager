@@ -272,7 +272,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     if (!this.map || this.matchArmies.length === 0) return;
     const now = Date.now();
     this.matchArmies.forEach(army => {
-      if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
+      if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto alla conquista") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
         const elapsed = now - army.startTime;
         const progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
 
@@ -880,7 +880,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                 if (!newA.path && oldA.path) newA.path = oldA.path;
                 if (!newA.etaMs && oldA.etaMs) newA.etaMs = oldA.etaMs;
                 if (!newA.startTime && oldA.startTime) newA.startTime = oldA.startTime;
-                if (oldA.status === 'moving' || oldA.status === 'moving_to_border' || oldA.status === "Pronto all'attacco") {
+                if (oldA.status === 'moving' || oldA.status === 'moving_to_border' || oldA.status === "Pronto alla conquista") {
                   if (newA.status !== oldA.status) newA.status = oldA.status;
                 }
               }
@@ -1378,7 +1378,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         } else {
           timeInfo = `<div style="margin-top: 6px; color: #f87171; font-weight: bold;">Attacco in corso...</div>`;
         }
-      } else if ((currentArmy.status === 'moving' || currentArmy.status === 'moving_to_border' || currentArmy.status === "Pronto all'attacco") && currentArmy.startTime && currentArmy.etaMs) {
+      } else if ((currentArmy.status === 'moving' || currentArmy.status === 'moving_to_border' || currentArmy.status === "Pronto alla conquista") && currentArmy.startTime && currentArmy.etaMs) {
         const endMovementTime = currentArmy.startTime + currentArmy.etaMs;
         const diff = endMovementTime - now;
         if (diff > 0) {
@@ -1795,11 +1795,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
 
   getArmyCoordinates(army: any): [number, number] | null {
-    if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
+    if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto alla conquista") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
       const pos = this.calculateCurrentPosition(army.path, army.startTime, army.etaMs);
       if (pos) return [pos.lng, pos.lat];
     }
-    if (army.status === 'in_battaglia' && army.path && army.path.length > 0) {
+    if (['in_battaglia', 'in combattimento'].includes(army.status) && army.path && army.path.length > 0) {
       return [army.path[army.path.length - 1][0], army.path[army.path.length - 1][1]];
     }
     if (!army.currentLocation) return null;
@@ -2153,7 +2153,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
       const totalTroops = (Object.values(army.composition || {}) as number[]).reduce((a, b) => a + b, 0) as number;
 
-      if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco") && army.path && army.path.length > 0) {
+      if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto alla conquista") && army.path && army.path.length > 0) {
         let progress = 0;
         if (army.startTime && army.etaMs) {
           const elapsed = Date.now() - army.startTime;
@@ -2222,7 +2222,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       if (this.armyMarkers.has(army.id)) {
         // Aggiorna posizione se necessario
         const marker = this.armyMarkers.get(army.id);
-        if (army.status !== 'moving' && army.status !== 'moving_to_border' && army.status !== "Pronto all'attacco") {
+        if (army.status !== 'moving' && army.status !== 'moving_to_border' && army.status !== "Pronto alla conquista") {
           marker.setLngLat([markerCoords[0], markerCoords[1]]);
         }
         const badgeEl = marker.getElement().querySelector('.army-badge') as HTMLElement;
@@ -2283,7 +2283,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         badgeDiv.style.fontWeight = 'bold';
         badgeDiv.style.border = '1px solid #9ca3af';
         if (army.owner !== this.userProfile.username) {
-          if (army.status === "Pronto all'attacco" || army.status === 'in_battaglia' || army.status === 'moving_to_border') {
+          if (army.status === "Pronto alla conquista" || ['in_battaglia', 'in combattimento'].includes(army.status) || army.status === 'moving_to_border') {
             imgDiv.style.filter = 'drop-shadow(0 0 5px red)';
             badgeDiv.style.border = '2px solid red';
           } else {
@@ -2304,7 +2304,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         container.addEventListener('mouseenter', () => {
           const currentArmy = this.matchArmies.find(a => a.id === army.id) || army;
-          if ((currentArmy.status === 'moving' || currentArmy.status === 'moving_to_border' || currentArmy.status === "Pronto all'attacco") && currentArmy.path && currentArmy.path.length > 0) {
+          if ((currentArmy.status === 'moving' || currentArmy.status === 'moving_to_border' || currentArmy.status === "Pronto alla conquista") && currentArmy.path && currentArmy.path.length > 0) {
             const hoverSource: any = this.map?.getSource('hovered-troop-path-source');
             if (hoverSource) {
               hoverSource.setData({

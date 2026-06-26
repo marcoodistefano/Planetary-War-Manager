@@ -109,7 +109,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
         delete this.combatTimers[army.id];
       }
 
-      if ((army.status === 'moving' || (army as any).status === 'moving_to_border' || (army as any).status === "Pronto all'attacco") && (army as any).startTime && (army as any).etaMs) {
+      if ((army.status === 'moving' || (army as any).status === 'moving_to_border' || (army as any).status === "Pronto alla conquista") && (army as any).startTime && (army as any).etaMs) {
         const endMovementTime = (army as any).startTime + (army as any).etaMs;
         const diff = endMovementTime - now;
         if (diff > 0) {
@@ -336,7 +336,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   isArmyMoving(army: any): boolean {
-    return army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto all'attacco" || army.status === 'in combattimento';
+    return army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto alla conquista" || army.status === 'in combattimento';
   }
 
   cancelMovement(armyId: string) {
@@ -449,7 +449,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   getArmyStatusLabel(army: ArmyGroup) {
-    if (army.status === 'moving' || (army as any).status === 'moving_to_border' || (army as any).status === "Pronto all'attacco") {
+    if (army.status === 'moving' || (army as any).status === 'moving_to_border' || (army as any).status === "Pronto alla conquista") {
       return 'IN MOVIMENTO';
     }
 
@@ -461,7 +461,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   getArmyStatusIcon(army: ArmyGroup) {
-    if (army.status === 'moving' || (army as any).status === 'moving_to_border' || (army as any).status === "Pronto all'attacco") {
+    if (army.status === 'moving' || (army as any).status === 'moving_to_border' || (army as any).status === "Pronto alla conquista") {
       return 'navigate-outline';
     }
 
