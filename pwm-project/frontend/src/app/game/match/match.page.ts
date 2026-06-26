@@ -3515,9 +3515,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         if (!this.topoWorker) {
           this.topoWorker = new Worker(new URL('./topojson.worker', import.meta.url), { type: 'module' });
         }
-        this.topoWorker.onmessage = ({ data }) => {
-          onGeoDataReady(data.geoData);
+        const handler = ({ data }: any) => {
+          if (data.id === layerId) {
+            this.topoWorker?.removeEventListener('message', handler);
+            onGeoDataReady(data.geoData);
+          }
         };
+        this.topoWorker.addEventListener('message', handler);
         this.topoWorker.postMessage({ topologyText, id: layerId, layerType: 'regions' });
       } else {
         const topology = JSON.parse(topologyText);
