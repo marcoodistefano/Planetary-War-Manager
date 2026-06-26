@@ -140,6 +140,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this._regionsReadyResolve = resolve;
   });
   private topoWorker?: Worker;
+  private _lastApply = 0;
+  private _lastTerritorySignature = '';
+  private territorySignature(): string {
+    return JSON.stringify(this.matchNations.map(n => [
+      n.username, n.isOccupied, n.inWarWith, n.territori
+    ])) + '|' + this.currentAllianceId;
+  }
+  regionFeatureByKey = new Map<string, any>();
   nationMarkers: any[] = [];
   regionsResources: any = {};
   citiesHp: { [cityId: string]: number } = {};
@@ -1272,6 +1280,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     } else {
       // Mappa già viva per lo stesso match: resize + ri-applicazione colori
       this.map.resize();
+      if (this.map.getSource('regioni') && this.map.isSourceLoaded('regioni')) {
+        this._regionsReadyResolve?.(); // sblocca il .then() pendente
+      }
       if (this.matchNations?.length > 0) {
         this.applyTerritoryColors();
       }
@@ -1586,7 +1597,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           { id: 'carto-light', type: 'raster', source: 'carto-light-tiles', layout: { visibility: 'none' } }
         ]
       },
-      center: [12.5, 41.9], zoom: 3, minZoom: 1.5, maxZoom: 14, renderWorldCopies: true, projection: { type: 'mercator' }
+      center: [12.5, 41.9], zoom: 3, minZoom: 1.5, maxZoom: 14, renderWorldCopies: false, projection: { type: 'mercator' }
     });
 
     this.map.dragRotate.disable();
@@ -1606,12 +1617,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
       this.loadTopoJsonLayer('/assets/map/regions.json', 'regioni', 'regioni-layer', 0, 24);
 
-      this.map.on('sourcedata', (e: any) => {
-        if (e.sourceId === 'regioni' && e.isSourceLoaded) {
-          if (!this.map.isSourceLoaded('regioni')) return;
-          this.applyTerritoryColors();
-        }
-      });
+      const onFirstSourceReady = (e: any) => {
+        if (e.sourceId !== 'regioni' || !e.isSourceLoaded) return;
+        if (!this.map.isSourceLoaded('regioni')) return;
+        this.map.off('sourcedata', onFirstSourceReady); // applica una sola volta
+        this.applyTerritoryColors();
+      };
+      this.map.on('sourcedata', onFirstSourceReady);
       this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
       this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 24);
 
@@ -3428,17 +3440,21 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   loadTopoJsonLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
     const fetchUrl = url;
-    fetch(fetchUrl).then(res => res.json()).then(topology => {
+    fetch(fetchUrl).then(res => res.text()).then(topologyText => {
       const onGeoDataReady = (geoData: any) => {
         if (layerId === 'regioni-layer') {
           let nextId = 1;
           this.regionIdMap = new Map<string, number>();
+          this.regionFeatureByKey = new Map<string, any>();
           geoData.features.forEach((f: any) => {
             f.id = nextId++;
             const pId = f.properties.adm1_code || f.properties.name;
             if (pId) {
               this.regionIdMap.set(String(pId).toLowerCase(), f.id);
             }
+            const keys = [f.properties?.adm1_code, f.properties?.name, String(f.id)]
+              .filter(Boolean).map((k: string) => String(k).toLowerCase());
+            keys.forEach(k => this.regionFeatureByKey.set(k, f));
           });
           this.regionsGeoData = geoData;
         }
@@ -3496,8 +3512,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         this.topoWorker.onmessage = ({ data }) => {
           onGeoDataReady(data.geoData);
         };
-        this.topoWorker.postMessage({ topology, id: layerId });
+        this.topoWorker.postMessage({ topologyText, id: layerId, layerType: 'regions' });
       } else {
+        const topology = JSON.parse(topologyText);
         const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
         onGeoDataReady(geoData);
       }
@@ -3506,113 +3523,148 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   loadTopoJsonArchsLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
     const fetchUrl = url;
-    fetch(fetchUrl).then(res => res.json()).then(topology => {
-      let allFeatures: any[] = [];
-      const featureMap = new Map<string, any>();
-
-      Object.keys(topology.objects).forEach(objKey => {
-        const geoData: any = topojson.feature(topology, topology.objects[objKey]);
-        const features = geoData?.features || (geoData?.type === 'Feature' ? [geoData] : []);
-
-        features.forEach((f: any) => {
-          const id = f.properties?.id || f.id;
-          if (id) {
-            featureMap.set(id, f);
-          } else {
-            allFeatures.push(f);
+    fetch(fetchUrl).then(res => res.text()).then(topologyText => {
+      const onGeoDataReady = (mergedGeoData: any) => {
+        this.map.addSource(sourceId, { 
+          type: 'geojson', 
+          data: mergedGeoData, 
+          generateId: true,
+          maxzoom: 6,
+          tolerance: 1.5
+        });
+        this.map.addLayer({
+          id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+          paint: {
+            'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
+            'fill-opacity': 0.3
           }
         });
-      });
+        this.map.addLayer({
+          id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+          paint: {
+            'line-color': '#ff6b6b',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.6, 6, 2.0, 10, 3.6],
+            'line-opacity': 0.9
+          }
+        });
+        this.reorderMapLayers();
+      };
 
-      allFeatures = allFeatures.concat(Array.from(featureMap.values()));
-      const mergedGeoData = { type: 'FeatureCollection', features: allFeatures };
-      this.map.addSource(sourceId, { 
-        type: 'geojson', 
-        data: mergedGeoData, 
-        generateId: true,
-        maxzoom: 6,
-        tolerance: 1.5
-      });
-      this.map.addLayer({
-        id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-        paint: {
-          'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
-          'fill-opacity': 0.3
+      if (typeof Worker !== 'undefined') {
+        if (!this.topoWorker) {
+          this.topoWorker = new Worker(new URL('./topojson.worker', import.meta.url), { type: 'module' });
         }
-      });
-      this.map.addLayer({
-        id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-        paint: {
-          'line-color': '#ff6b6b',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.6, 6, 2.0, 10, 3.6],
-          'line-opacity': 0.9
-        }
-      });
-
-      this.reorderMapLayers();
+        const handler = ({ data }: any) => {
+          if (data.id === layerId) {
+            this.topoWorker?.removeEventListener('message', handler);
+            onGeoDataReady(data.geoData);
+          }
+        };
+        this.topoWorker.addEventListener('message', handler);
+        this.topoWorker.postMessage({ topologyText, id: layerId, layerType: 'archs' });
+      } else {
+        const topology = JSON.parse(topologyText);
+        let allFeatures: any[] = [];
+        const featureMap = new Map<string, any>();
+        Object.keys(topology.objects).forEach(objKey => {
+          const geoData: any = topojson.feature(topology, topology.objects[objKey]);
+          const features = geoData?.features || (geoData?.type === 'Feature' ? [geoData] : []);
+          features.forEach((f: any) => {
+            const id = f.properties?.id || f.id;
+            if (id) {
+              featureMap.set(id, f);
+            } else {
+              allFeatures.push(f);
+            }
+          });
+        });
+        allFeatures = allFeatures.concat(Array.from(featureMap.values()));
+        const mergedGeoData = { type: 'FeatureCollection', features: allFeatures };
+        onGeoDataReady(mergedGeoData);
+      }
     });
   }
 
   loadTopoJsonCitiesLayer(url: string, sourceId: string, pointsLayerId: string, labelsLayerId: string, minZ: number, maxZ: number) {
     const fetchUrl = url;
-    fetch(fetchUrl).then(res => res.json()).then(topology => {
-      const objectName = Object.keys(topology.objects || {})[0];
-      if (!objectName) {
-        return;
-      }
+    fetch(fetchUrl).then(res => res.text()).then(topologyText => {
+      const onGeoDataReady = (geoData: any) => {
+        if (!geoData) return;
 
-      const geoData = topojson.feature(topology, topology.objects[objectName]);
-
-      if (this.map.getSource(sourceId)) {
-        (this.map.getSource(sourceId) as any).setData(geoData);
-        return;
-      }
-
-      this.map.addSource(sourceId, { 
-        type: 'geojson', 
-        data: geoData, 
-        generateId: true,
-        maxzoom: 6,
-        tolerance: 1.5
-      });
-
-      this.map.addLayer({
-        id: pointsLayerId,
-        type: 'circle',
-        source: sourceId,
-        minzoom: minZ,
-        maxzoom: maxZ,
-        paint: {
-          'circle-color': '#ffd84d',
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 1.8, 4, 2.8, 7, 4.6],
-          'circle-stroke-color': '#1a1402',
-          'circle-stroke-width': 1,
-          'circle-opacity': 0.95
+        if (this.map.getSource(sourceId)) {
+          (this.map.getSource(sourceId) as any).setData(geoData);
+          return;
         }
-      });
 
-      this.map.addLayer({
-        id: labelsLayerId,
-        type: 'symbol',
-        source: sourceId,
-        minzoom: minZ,
-        maxzoom: maxZ,
-        layout: {
-          'text-field': ['coalesce', ['get', 'NAME'], ''],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 2, 9, 6, 11],
-          'text-anchor': 'top',
-          'text-offset': [0, 0.9],
-          'text-allow-overlap': false,
-          'text-ignore-placement': false,
-          'visibility': 'visible'
-        },
-        paint: {
-          'text-color': '#fff4b0',
-          'text-halo-color': '#000000',
-          'text-halo-width': 1.2,
-          'text-halo-blur': 0.5
+        this.map.addSource(sourceId, { 
+          type: 'geojson', 
+          data: geoData, 
+          generateId: true,
+          maxzoom: 6,
+          tolerance: 1.5
+        });
+
+        this.map.addLayer({
+          id: pointsLayerId,
+          type: 'circle',
+          source: sourceId,
+          minzoom: minZ,
+          maxzoom: maxZ,
+          paint: {
+            'circle-color': '#ffd84d',
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 1.8, 4, 2.8, 7, 4.6],
+            'circle-stroke-color': '#1a1402',
+            'circle-stroke-width': 1,
+            'circle-opacity': 0.95
+          }
+        });
+
+        this.map.addLayer({
+          id: labelsLayerId,
+          type: 'symbol',
+          source: sourceId,
+          minzoom: minZ,
+          maxzoom: maxZ,
+          layout: {
+            'text-field': ['coalesce', ['get', 'NAME'], ''],
+            'text-size': ['interpolate', ['linear'], ['zoom'], 2, 9, 6, 11],
+            'text-anchor': 'top',
+            'text-offset': [0, 0.9],
+            'text-allow-overlap': false,
+            'text-ignore-placement': false,
+            'visibility': 'visible'
+          },
+          paint: {
+            'text-color': '#fff4b0',
+            'text-halo-color': '#000000',
+            'text-halo-width': 1.2,
+            'text-halo-blur': 0.5
+          }
+        });
+      };
+
+      if (typeof Worker !== 'undefined') {
+        if (!this.topoWorker) {
+          this.topoWorker = new Worker(new URL('./topojson.worker', import.meta.url), { type: 'module' });
         }
-      });
+        const handler = ({ data }: any) => {
+          if (data.id === pointsLayerId) {
+            this.topoWorker?.removeEventListener('message', handler);
+            onGeoDataReady(data.geoData);
+          }
+        };
+        this.topoWorker.addEventListener('message', handler);
+        this.topoWorker.postMessage({ topologyText, id: pointsLayerId, layerType: 'cities' });
+      } else {
+        const topology = JSON.parse(topologyText);
+        const objectName = Object.keys(topology.objects || {})[0];
+        if (!objectName) {
+          onGeoDataReady(null);
+          return;
+        }
+        const geoData = topojson.feature(topology, topology.objects[objectName]);
+        onGeoDataReady(geoData);
+      }
     }).catch(err => console.error('Errore fetch cities.json', err));
   }
 
@@ -3635,18 +3687,25 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     if (!this.matchNations?.length) return; // Nulla da fare
 
     this._regionsReady.then(() => {
+      const now = Date.now();
+      const elapsed = now - this._lastApply;
       if ((this as any)._applyTerritoryColorsTimer) {
         clearTimeout((this as any)._applyTerritoryColorsTimer);
       }
       
-      // Debounce 80ms per i burst
+      const delay = elapsed > 250 ? 0 : 80;
       (this as any)._applyTerritoryColorsTimer = setTimeout(() => {
+        this._lastApply = Date.now();
         this._doApplyTerritoryColors();
-      }, 80);
+      }, delay);
     });
   }
 
   _doApplyTerritoryColors() {
+    const sig = this.territorySignature();
+    if (sig === this._lastTerritorySignature) return;
+    this._lastTerritorySignature = sig;
+
     if (!this.nationMarkers) this.nationMarkers = [];
     const usedNationUsernames = new Set<string>();
 
@@ -3686,11 +3745,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
       if (Array.isArray(nation.territori) && nation.territori.length > 0) {
         const searchId = String(nation.territori[0]).toLowerCase();
-        const feature = this.regionsGeoData.features.find((f: any) =>
-          (f.properties?.adm1_code && f.properties.adm1_code.toLowerCase() === searchId) ||
-          (String(f.id).toLowerCase() === searchId) ||
-          (f.properties?.name && f.properties.name.toLowerCase() === searchId)
-        );
+        const feature = this.regionFeatureByKey.get(searchId);
         if (feature && feature.geometry && feature.geometry.coordinates) {
           let coords = feature.geometry.coordinates;
           while (coords.length && Array.isArray(coords[0][0])) {
