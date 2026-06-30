@@ -1,15 +1,16 @@
 <ion-menu side="start" menuId="mobile-tactical-menu" contentId="main-map-content" type="overlay">
   <ion-content class="mobile-sidebar-content">
-    
+
     <div class="sidebar-header">
       <div class="title-block compact" style="margin-bottom: 20px;">
         <p class="eyebrow">Strategic Command</p>
         <h2>PLANETARY WAR<br>MANAGER</h2>
       </div>
-      
+
       <div class="profile-trigger" (click)="setOpenProfile(true); closeMobileMenu()">
         <div class="profile-avatar-circle">
-          <img *ngIf="userProfile.avatar; else mobileAvatarFallback" [src]="userProfile.avatar" [alt]="userProfile.username" class="profile-avatar-image">
+          <img *ngIf="userProfile.avatar; else mobileAvatarFallback" [src]="userProfile.avatar"
+            [alt]="userProfile.username" class="profile-avatar-image">
           <ng-template #mobileAvatarFallback>
             <span class="user-symbol">👤</span>
           </ng-template>
@@ -20,7 +21,7 @@
         </div>
       </div>
     </div>
-    
+
     <div class="hud-separator"></div>
 
     <div class="sidebar-actions">
@@ -30,10 +31,12 @@
       <button class="nav-action-btn primary-glow" [class.active]="isArmyModalOpen" (click)="toggleArmyModal()">
         <ion-icon name="people-outline"></ion-icon> <span>GESTIONE ARMATE</span>
       </button>
-      <button class="nav-action-btn primary-glow" [class.active]="isDiplomacyModalOpen" (click)="toggleDiplomacyModal()">
+      <button class="nav-action-btn primary-glow" [class.active]="isDiplomacyModalOpen"
+        (click)="toggleDiplomacyModal()">
         <ion-icon name="shield-half-outline"></ion-icon> <span>DIPLOMAZIA</span>
       </button>
-      <button class="nav-action-btn primary-glow" [class.active]="isIntelligenceModalOpen" (click)="toggleIntelligenceModal()">
+      <button class="nav-action-btn primary-glow" [class.active]="isIntelligenceModalOpen"
+        (click)="toggleIntelligenceModal()">
         <ion-icon name="eye-outline"></ion-icon> <span>INTELLIGENCE</span>
       </button>
       <button class="nav-action-btn primary-glow" [class.active]="isBuildPanelOpen" (click)="toggleBuildPanel()">
@@ -56,29 +59,28 @@
 
 <div class="ion-page" id="main-map-content">
   <ion-content [fullscreen]="true" class="transparent-bg" [scrollY]="false">
-    
+
     <div class="hud-panel top-navbar desktop-only">
-      
+
       <div class="nav-group-left">
         <button class="pwm-logo-btn" (click)="goToHome()">PWM</button>
       </div>
 
       <div class="resource-bar">
-        <div *ngFor="let res of resourceConfig" 
-             class="res-item" 
-             [class.premium]="res.id === 'oro'" 
-                [class.trigger-item]="res.isTrigger"
-                [class.open]="res.isTrigger && isTroopsDropdownOpen"
-            (click)="res.isTrigger && toggleTroopsDropdown($event)">
-          
+        <div *ngFor="let res of resourceConfig" class="res-item" [class.premium]="res.id === 'oro'"
+          [class.trigger-item]="res.isTrigger" [class.open]="res.isTrigger && isTroopsDropdownOpen"
+          (click)="res.isTrigger && toggleTroopsDropdown($event)">
+
           <span class="res-icon">{{ res.icon }}</span>
           <div class="res-data">
             <span class="res-label">{{ res.label }}</span>
-            <span class="res-val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number }}</span>
-            <span class="res-prod" *ngIf="!res.isTrigger && resourceProduction[res.id] > 0"> +{{ resourceProduction[res.id] | number }}/h </span>
+            <span class="res-val" *ngIf="!res.isTrigger">{{ playerResources[res.id] !== undefined ?
+              (playerResources[res.id] | number) : '--' }}</span>
+            <span class="res-prod" *ngIf="!res.isTrigger && resourceProduction[res.id] > 0"> +{{
+              resourceProduction[res.id] | number }}/h </span>
             <span class="res-val" *ngIf="res.isTrigger">STATUS</span>
           </div>
-          
+
           <div class="troops-dropdown" *ngIf="res.isTrigger && !useFloatingDropdown">
             <div class="dropdown-header">ARMATA DISPIEGATA</div>
             <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
@@ -103,7 +105,8 @@
             <span class="p-name">{{ userProfile.username }}</span>
           </div>
           <div class="profile-avatar-circle">
-            <img *ngIf="userProfile.avatar; else desktopAvatarFallback" [src]="userProfile.avatar" [alt]="userProfile.username" class="profile-avatar-image">
+            <img *ngIf="userProfile.avatar; else desktopAvatarFallback" [src]="userProfile.avatar"
+              [alt]="userProfile.username" class="profile-avatar-image">
             <ng-template #desktopAvatarFallback>
               <span class="user-symbol">👤</span>
             </ng-template>
@@ -117,20 +120,19 @@
         <button class="holographic-menu-btn" (click)="openMobileMenu()">
           <ion-icon name="menu-outline"></ion-icon>
         </button>
-        <span class="chat-badge menu-badge" *ngIf="chatUnreadCount > 0">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
+        <span class="chat-badge menu-badge" *ngIf="chatUnreadCount > 0">{{ chatUnreadCount > 99 ? '99+' :
+          chatUnreadCount }}</span>
       </div>
       <div class="mobile-logo">PWM</div>
     </div>
 
     <div class="vertical-resource-bar mobile-only scrollable-y-hidden" [class.is-hidden]="isChatOpen">
-      <div *ngFor="let res of resourceConfig"
-           class="mini-res-item"
-           [class.premium]="res.id === 'oro'"
-           [class.trigger-item]="res.isTrigger"
-           [class.open]="res.isTrigger && isTroopsDropdownOpen"
-           (click)="res.isTrigger && toggleTroopsDropdown($event)">
+      <div *ngFor="let res of resourceConfig" class="mini-res-item" [class.premium]="res.id === 'oro'"
+        [class.trigger-item]="res.isTrigger" [class.open]="res.isTrigger && isTroopsDropdownOpen"
+        (click)="res.isTrigger && toggleTroopsDropdown($event)">
         <span class="icon">{{ res.icon }}</span>
-        <span class="val" *ngIf="!res.isTrigger">{{ playerResources[res.id] | number: '1.0-0' }}</span>
+        <span class="val" *ngIf="!res.isTrigger">{{ playerResources[res.id] !== undefined ? (playerResources[res.id] |
+          number: '1.0-0') : '--' }}</span>
         <span class="val" *ngIf="res.isTrigger">INFO</span>
         <div class="troops-dropdown" *ngIf="res.isTrigger && !useFloatingDropdown">
           <div class="dropdown-header">ARMATA DISPIEGATA</div>
@@ -149,11 +151,8 @@
       </div>
     </div>
 
-    <div
-      *ngIf="isTroopsDropdownOpen && useFloatingDropdown"
-      class="troops-dropdown troops-dropdown-float"
-      [style.left.px]="troopsDropdownX"
-      [style.top.px]="troopsDropdownY">
+    <div *ngIf="isTroopsDropdownOpen && useFloatingDropdown" class="troops-dropdown troops-dropdown-float"
+      [style.left.px]="troopsDropdownX" [style.top.px]="troopsDropdownY">
       <div class="dropdown-header">ARMATA DISPIEGATA</div>
       <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
         <span class="t-key">{{ troop.key }}</span>
@@ -164,15 +163,18 @@
     <div #mapContainer id="map-container"></div>
 
     <div class="hud-stack-left">
-      
-      <div class="hud-panel build-panel" *ngIf="isBuildPanelOpen" style="margin-bottom: 15px; display: flex; flex-direction: column; max-height: 50vh;">
+
+      <div class="hud-panel build-panel" *ngIf="isBuildPanelOpen"
+        style="margin-bottom: 15px; display: flex; flex-direction: column; max-height: 50vh;">
         <div class="title-block compact" style="margin-bottom: 20px;">
           <p class="eyebrow">Ingegneria di Campo</p>
           <h2 style="font-size: 1.5rem;">COSTRUZIONE</h2>
         </div>
         <div class="category-toggle">
-          <button [class.active]="activeBuildCategory === 'risorse'" (click)="setBuildCategory('risorse')">RISORSE</button>
-          <button [class.active]="activeBuildCategory === 'armamenti'" (click)="setBuildCategory('armamenti')">ARMAMENTI</button>
+          <button [class.active]="activeBuildCategory === 'risorse'"
+            (click)="setBuildCategory('risorse')">RISORSE</button>
+          <button [class.active]="activeBuildCategory === 'armamenti'"
+            (click)="setBuildCategory('armamenti')">ARMAMENTI</button>
         </div>
         <div class="hud-separator"></div>
         <div class="build-grid scrollable-y">
@@ -182,14 +184,17 @@
               <span class="item-tier">TIER {{ item.tier }}</span>
             </div>
             <div class="build-cost">
-              <span class="cost-unit" *ngIf="item.risorsa_estratta" style="color: #4ade80; text-transform: uppercase;">{{ getResourceIcon(item.risorsa_estratta) }} {{ item.risorsa_estratta }}</span>
+              <span class="cost-unit" *ngIf="item.risorsa_estratta"
+                style="color: #4ade80; text-transform: uppercase;">{{ getResourceIcon(item.risorsa_estratta) }} {{
+                item.risorsa_estratta }}</span>
               <span class="cost-unit" *ngIf="item.costo_denaro > 0">💵 {{ item.costo_denaro | number }}</span>
               <span class="cost-unit" *ngIf="item.tempo_costruzione > 0">⏳ {{ item.tempo_costruzione }}h</span>
               <span class="cost-unit" *ngIf="item.costo_legno > 0">🪵 {{ item.costo_legno | number }}</span>
               <span class="cost-unit" *ngIf="item.costo_mattoni > 0">🧱 {{ item.costo_mattoni | number }}</span>
               <span class="cost-unit" *ngIf="item.costo_acciaio > 0">🏗️ {{ item.costo_acciaio | number }}</span>
               <span class="cost-unit" *ngIf="item.costo_petrolio > 0">🛢️ {{ item.costo_petrolio | number }}</span>
-              <span class="cost-unit" *ngIf="item.costo_piombo > 0 || item.costo_piombio > 0">🔘 {{ (item.costo_piombo || item.costo_piombio) | number }}</span>
+              <span class="cost-unit" *ngIf="item.costo_piombo > 0 || item.costo_piombio > 0">🔘 {{ (item.costo_piombo
+                || item.costo_piombio) | number }}</span>
             </div>
           </div>
         </div>
@@ -205,10 +210,12 @@
       </div>
 
       <div class="tactical-actions-row secondary-actions desktop-only">
-        <button class="nav-action-btn primary-glow" [class.active]="isDiplomacyModalOpen" (click)="toggleDiplomacyModal()">
+        <button class="nav-action-btn primary-glow" [class.active]="isDiplomacyModalOpen"
+          (click)="toggleDiplomacyModal()">
           <ion-icon name="shield-half-outline"></ion-icon> <span>DIPLOMAZIA</span>
         </button>
-        <button class="nav-action-btn primary-glow" [class.active]="isIntelligenceModalOpen" (click)="toggleIntelligenceModal()">
+        <button class="nav-action-btn primary-glow" [class.active]="isIntelligenceModalOpen"
+          (click)="toggleIntelligenceModal()">
           <ion-icon name="eye-outline"></ion-icon> <span>INTELLIGENCE</span>
         </button>
       </div>
@@ -254,108 +261,98 @@
               <h2>SENSOR FEED</h2>
             </div>
             <div class="sensor-grid">
-              <div class="sensor-row"><span>TER:</span><span class="sensor-val">{{ isTouchLayout ? (selectedPointName || currentHoveredName || '--') : (currentHoveredName || '--') }}</span></div>
-              <div class="sensor-row"><span>POS:</span><span id="out-coords" class="sensor-val">{{ isTouchLayout ? selectedPointCoords : '--' }}</span></div>
+              <div class="sensor-row"><span>TER:</span><span class="sensor-val">{{ isTouchLayout ? (selectedPointName ||
+                  currentHoveredName || '--') : (currentHoveredName || '--') }}</span></div>
+              <div class="sensor-row"><span>POS:</span><span id="out-coords" class="sensor-val">{{ isTouchLayout ?
+                  selectedPointCoords : '--' }}</span></div>
               <div class="sensor-row"><span>ALT:</span><span id="out-alt" class="sensor-val">--</span></div>
-              <div class="sensor-row"><span>COM:</span><span id="out-res-com" class="sensor-val res-glow">--</span></div>
+              <div class="sensor-row"><span>COM:</span><span id="out-res-com" class="sensor-val res-glow">--</span>
+              </div>
             </div>
           </div>
-        </div> 
-      </div> 
-    </div> 
+        </div>
+      </div>
+    </div>
 
     <div class="hud-stack-right">
       <ion-modal [isOpen]="isChatOpen" (didDismiss)="isChatOpen = false" cssClass="chat-modal centered-modal">
-      <ng-template>
-        <app-in-game-chat
-          [currentUser]="userProfile.username"
-          [matchId]="currentMatchId"
-          [playersInMatch]="matchPlayers"
-          [allianceId]="currentAllianceId"
-          [allianceLabel]="currentAllianceLabel"
-          [panelVisible]="isChatOpen"
-          (unreadCountChange)="chatUnreadCount = $event"
-          (close)="isChatOpen = false">
-        </app-in-game-chat>
-      </ng-template>
-    </ion-modal>
+        <ng-template>
+          <app-in-game-chat [currentUser]="userProfile.username" [matchId]="currentMatchId"
+            [playersInMatch]="matchPlayers" [allianceId]="currentAllianceId" [allianceLabel]="currentAllianceLabel"
+            [panelVisible]="isChatOpen" (unreadCountChange)="chatUnreadCount = $event" (close)="isChatOpen = false">
+          </app-in-game-chat>
+        </ng-template>
+      </ion-modal>
       <div class="tactical-actions-row desktop-only">
         <button class="nav-action-btn primary-glow chat-counter" [class.active]="isChatOpen" (click)="toggleChat()">
           <ion-icon name="chatbubbles-outline"></ion-icon>
           <span>COMUNICAZIONI</span>
-          <span class="chat-badge" *ngIf="chatUnreadCount > 0">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
+          <span class="chat-badge" *ngIf="chatUnreadCount > 0">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount
+            }}</span>
         </button>
       </div>
     </div>
 
-    <ion-modal [isOpen]="isProfileModalOpen" (didDismiss)="setOpenProfile(false)" [breakpoints]="isTouchLayout ? [0, 0.9] : undefined" [initialBreakpoint]="isTouchLayout ? 0.9 : undefined" [cssClass]="isTouchLayout ? '' : 'desktop-transparent-modal'">
+    <ion-modal [isOpen]="isProfileModalOpen" (didDismiss)="setOpenProfile(false)"
+      [breakpoints]="isTouchLayout ? [0, 0.9] : undefined" [initialBreakpoint]="isTouchLayout ? 0.9 : undefined"
+      [cssClass]="isTouchLayout ? '' : 'desktop-transparent-modal'">
       <ng-template>
         <app-profile-modal [profile]="userProfile" (close)="setOpenProfile(false)"></app-profile-modal>
       </ng-template>
     </ion-modal>
-    
+
 
 
     <ion-modal [isOpen]="isTechModalOpen" (didDismiss)="isTechModalOpen = false" cssClass="desktop-transparent-modal">
       <ng-template>
-        <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources" [userTechnologies]="userTechnologies" (close)="isTechModalOpen = false" (research)="onResearchTech($event)"></app-tech-tree>
+        <app-tech-tree *ngIf="isTechModalOpen" [gameRules]="gameRules" [playerResources]="playerResources"
+          [userTechnologies]="userTechnologies" (close)="isTechModalOpen = false"
+          (research)="onResearchTech($event)"></app-tech-tree>
       </ng-template>
     </ion-modal>
 
-    <ion-modal [isOpen]="isDiplomacyModalOpen" (didDismiss)="isDiplomacyModalOpen = false" cssClass="desktop-transparent-modal">
+    <ion-modal [isOpen]="isDiplomacyModalOpen" (didDismiss)="isDiplomacyModalOpen = false"
+      cssClass="desktop-transparent-modal">
       <ng-template>
-        <app-diplomacy-modal
-          *ngIf="isDiplomacyModalOpen"
-          [alliances]="matchAlliances"
-          [matchPlayers]="matchPlayers"
-          [matchNations]="matchNations"
-          [matchId]="currentMatchId"
-          [currentUser]="userProfile.username"
-          [leaderboard]="matchLeaderboard"
-          (alliancesChanged)="reloadMatchAlliances()"
+        <app-diplomacy-modal *ngIf="isDiplomacyModalOpen" [alliances]="matchAlliances" [matchPlayers]="matchPlayers"
+          [matchNations]="matchNations" [matchId]="currentMatchId" [currentUser]="userProfile.username"
+          [leaderboard]="matchLeaderboard" (alliancesChanged)="reloadMatchAlliances()"
           (close)="isDiplomacyModalOpen = false"></app-diplomacy-modal>
       </ng-template>
     </ion-modal>
 
-    <ion-modal [isOpen]="isIntelligenceModalOpen" (didDismiss)="isIntelligenceModalOpen = false" cssClass="desktop-transparent-modal">
+    <ion-modal [isOpen]="isIntelligenceModalOpen" (didDismiss)="isIntelligenceModalOpen = false"
+      cssClass="desktop-transparent-modal">
       <ng-template>
-        <app-intelligence-modal *ngIf="isIntelligenceModalOpen" (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
+        <app-intelligence-modal *ngIf="isIntelligenceModalOpen"
+          (close)="isIntelligenceModalOpen = false"></app-intelligence-modal>
       </ng-template>
     </ion-modal>
 
-    <ion-modal [isOpen]="isMarketModalOpen" (didDismiss)="isMarketModalOpen = false" cssClass="desktop-transparent-modal">
+    <ion-modal [isOpen]="isMarketModalOpen" (didDismiss)="isMarketModalOpen = false"
+      cssClass="desktop-transparent-modal">
       <ng-template>
-        <app-market-modal *ngIf="isMarketModalOpen" [playerResources]="playerResources" (close)="isMarketModalOpen = false"></app-market-modal>
+        <app-market-modal *ngIf="isMarketModalOpen" [playerResources]="playerResources"
+          (close)="isMarketModalOpen = false"></app-market-modal>
       </ng-template>
     </ion-modal>
 
     <ion-modal [isOpen]="isArmyModalOpen" (didDismiss)="isArmyModalOpen = false" cssClass="desktop-transparent-modal">
       <ng-template>
-        <app-army-modal 
-          *ngIf="isArmyModalOpen" 
-          [playerTroops]="playerTroops" 
-          [armies]="matchArmies"
-          [fantiRate]="fantiRate"
-          [trainings]="playerTrainings"
-          [matchStructures]="matchStructures"
-          [gameRules]="gameRules"
-          [selectedTargetName]="selectedPointName" 
-          [selectedTargetCoords]="selectedPointCoords" 
-          [selectedArmyId]="selectedArmyId"
-          [initialTab]="armyModalInitialTab"
-          [currentMatchId]="currentMatchId"
-          [currentUsername]="userProfile.username"
-          (playerTroopsChange)="playerTroops = $event; saveArmiesToBackend()"
+        <app-army-modal *ngIf="isArmyModalOpen" [playerTroops]="playerTroops" [armies]="matchArmies"
+          [fantiRate]="fantiRate" [trainings]="playerTrainings" [matchStructures]="matchStructures"
+          [gameRules]="gameRules" [selectedTargetName]="selectedPointName" [selectedTargetCoords]="selectedPointCoords"
+          [selectedArmyId]="selectedArmyId" [initialTab]="armyModalInitialTab" [currentMatchId]="currentMatchId"
+          [currentUsername]="userProfile.username" (playerTroopsChange)="playerTroops = $event; saveArmiesToBackend()"
           (armiesChange)="matchArmies = $event; saveArmiesToBackend()"
-          (recruitUnitRequest)="onRecruitUnitRequest($event)"
-          (missionRequested)="onArmyMissionRequested($event)"
-          (centerOnArmy)="centerMapOnArmy($event)"
-          (close)="isArmyModalOpen = false"> 
+          (recruitUnitRequest)="onRecruitUnitRequest($event)" (missionRequested)="onArmyMissionRequested($event)"
+          (centerOnArmy)="centerMapOnArmy($event)" (close)="isArmyModalOpen = false">
         </app-army-modal>
       </ng-template>
     </ion-modal>
 
-    <div class="radial-menu-container" *ngIf="isRadialMenuVisible" [style.left.px]="radialMenuX" [style.top.px]="radialMenuY">
+    <div class="radial-menu-container" *ngIf="isRadialMenuVisible" [style.left.px]="radialMenuX"
+      [style.top.px]="radialMenuY">
       <div class="radial-menu-wrapper">
         <div class="radial-center-trigger" (click)="$event.stopPropagation(); handleRadialAction('TRUPPE')">
           <ion-icon name="locate"></ion-icon>
@@ -377,7 +374,9 @@
 
     <div class="construction-instruction-banner" *ngIf="selectedStructureForBuild">
       <ion-icon name="hammer-outline"></ion-icon>
-      <span>Seleziona la regione per <strong>{{ selectedStructureForBuild.name || selectedStructureForBuild.nome }}</strong><br><small style="color: #a1a1aa; font-size: 0.75rem;">Premi <strong>ESC</strong> o clicca su annulla</small></span>
+      <span>Seleziona la regione per <strong>{{ selectedStructureForBuild.name || selectedStructureForBuild.nome
+          }}</strong><br><small style="color: #a1a1aa; font-size: 0.75rem;">Premi <strong>ESC</strong> o clicca su
+          annulla</small></span>
       <button (click)="cancelConstruction()">ANNULLA</button>
     </div>
 

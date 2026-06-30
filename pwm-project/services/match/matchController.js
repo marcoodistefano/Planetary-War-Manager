@@ -445,6 +445,93 @@ const getGraveyard = async (req, res) => {
   }
 };
 
+const translateRedisToFe = (resources) => {
+  return {
+    denaro: (resources && resources.denaro) || 0,
+    legno: (resources && resources.legno) || 0,
+    piombo: (resources && resources.piombo) || 0,
+    acciaio: (resources && resources.acciaio) || 0,
+    mattoni: (resources && resources.mattone) || 0,
+    petrolio: (resources && resources.petrolio) || 0,
+    gas_naturale: (resources && resources.gas) || 0,
+    uranio: (resources && resources.uranio) || 0,
+    oro: (resources && resources.oro) || 0
+  };
+};
+
+const getInitialState = async (req, res) => {
+  try {
+    const matchId = req.params.id;
+    if (!matchId) return res.status(400).json({ error: "Match id mancante." });
+
+    const auth = await getAuthContextFromRequest(req);
+    const username = auth ? auth.username : null;
+
+    const matchData = await getMatchFromRedis(matchId);
+    if (!matchData || !matchData.match) {
+      return res.status(404).json({ error: "Partita non trovata." });
+    }
+
+    let armies = [];
+    let nations = [];
+    let resources = translateRedisToFe({});
+    let production = translateRedisToFe({});
+    let structures = [];
+    let technologies = [];
+    let trainings = [];
+
+    if (matchData && matchData.match && matchData.match.player) {
+      nations = matchData.match.player;
+      const myPlayer = nations.find(p => p.username === username);
+      const myAllianceId = myPlayer ? myPlayer.id_alleanza : null;
+
+      for (const p of nations) {
+        if (p.armate) {
+          const playerArmies = Object.values(p.armate).map(a => ({ ...a, owner: p.username }));
+          armies = armies.concat(playerArmies);
+        }
+        if (p.strutture) {
+          const isAlly = myAllianceId && String(p.id_alleanza) === String(myAllianceId);
+          if (p.username === username || isAlly) {
+            const playerStr = p.strutture.map(s => ({ ...s, owner: p.username }));
+            structures = structures.concat(playerStr);
+          }
+        }
+        if (p.username === username) {
+          resources = translateRedisToFe(p.risorse);
+          production = translateRedisToFe(p.produzione);
+          technologies = p.technologies || [];
+          trainings = p.addestramenti || [];
+        }
+      }
+    }
+
+    const actualMatchId = matchData.match.id_partita_hash;
+    const regionsResourcesStr = await redis.get(`match:${actualMatchId}:regions_resources`);
+    const regionsResources = regionsResourcesStr ? JSON.parse(regionsResourcesStr) : {};
+
+    const leaderboardStr = await redis.get(`match:${actualMatchId}:leaderboard`);
+    const leaderboard = leaderboardStr ? JSON.parse(leaderboardStr) : [];
+
+    return res.status(200).json({
+      data: {
+        armies,
+        nations,
+        resources,
+        production,
+        structures,
+        regionsResources,
+        technologies,
+        trainings,
+        leaderboard
+      }
+    });
+  } catch (error) {
+    console.error("[SYS_ERR] getInitialState:", error);
+    return res.status(500).json({ error: "Errore interno", details: error.message });
+  }
+};
+
 module.exports = {
   create,
   join,
@@ -460,5 +547,6 @@ module.exports = {
   JoinAlliance,
   LeaveAlliance,
   KickAlliance,
-  getGraveyard
+  getGraveyard,
+  getInitialState
 };

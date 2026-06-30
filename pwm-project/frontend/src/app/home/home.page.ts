@@ -85,7 +85,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
 
   ionViewWillEnter() {
     this.refreshLastJoinedMatch();
-    this.loadDashboardData();
+    this.loadDashboardData(true);
     this.loadJoinableMatches();
     this.startPolling();
   }
@@ -461,7 +461,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
       });
       await toast.present();
       
-      this.loadDashboardData();
+      this.loadDashboardData(true);
       this.loadJoinableMatches();
       return;
     }
@@ -496,7 +496,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
         this.filteredNewGames = this.filteredNewGames.filter((g: any) => g.joinId !== game.joinId);
 
         // Ricarica i dati dalla dashboard: la partita comparirà in "partite attive"
-        this.loadDashboardData();
+        this.loadDashboardData(true);
       },
       error: (error) => {
         console.error('Errore durante il join della partita:', error);

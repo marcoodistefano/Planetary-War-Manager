@@ -994,9 +994,11 @@ const startConstructionEngine = () => {
             const lockAcquired = await redis.set('engine_lock:constructionEngine', 'locked', 'NX', 'PX', 2000);
             if (!lockAcquired) return;
 
-            const activeMatchesKeys = await redis.keys('match:*:base');
-            for (const key of activeMatchesKeys) {
-                const matchIdHash = key.split(':')[1];
+            const activeMatchesRes = await db.query(
+                "SELECT id_partita_hash FROM partite WHERE substring(struttura_partita::text from 1 for 2) = '01'"
+            );
+            const activeMatchIds = activeMatchesRes.rows.map(r => r.id_partita_hash);
+            for (const matchIdHash of activeMatchIds) {
                 let shouldSave = false;
 
                 await updateMatch(matchIdHash, (mObj) => {

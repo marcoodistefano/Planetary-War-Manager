@@ -8,6 +8,7 @@ router.post("/join", matchController.join);
 router.get("/joinable", matchController.joinable);
 router.post("/:id/join", matchController.join);
 router.get("/:id", matchController.getMatch);
+router.get("/:id/initial-state", matchController.getInitialState);
 router.post("/:id/leave", matchController.leave);
 router.get("/:id/players", matchController.getPlayers);
 router.get("/:id/status", matchController.getStatus);

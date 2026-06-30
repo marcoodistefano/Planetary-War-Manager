@@ -366,10 +366,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   // --- 3. DATI DI GIOCO E REGOLE ---
   gameRules: any = null;
 
-  playerResources: any = {
-    denaro: 0, legno: 0, piombo: 0, acciaio: 0,
-    mattoni: 0, petrolio: 0, gas_naturale: 0, uranio: 0, oro: 0
-  };
+  playerResources: any = {};
 
   resourceAnimations: { [key: string]: { id: number, amount: number, active: boolean }[] } = {};
   private animationIdCounter = 0;
@@ -506,8 +503,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.startAnimationLoop();
     this.currentMatchId = this.route.snapshot.paramMap.get('id') || localStorage.getItem('pwm_last_joined_match') || '';
     this.loadGameRules();
-    this.loadUserProfile();
-    this.loadMatchContext();
+    this.loadUserProfile(() => {
+      this.loadMatchContext();
+    });
     this.isTouchLayout = this.isTouchViewport();
     this.avatarSub = this.userState.avatarId$.subscribe((avatarId) => {
       this.userProfile = {
@@ -562,8 +560,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     // Ricarica dati
     this.loadGameRules();
-    this.loadUserProfile();
-    this.loadMatchContext();
+    this.loadUserProfile(() => {
+      this.loadMatchContext();
+    });
     this.preloadTroopImages();
 
     // Riconnetti sempre il socket (chiudendo quello vecchio se necessario)
@@ -617,7 +616,6 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         this.matchSocket.onopen = () => {
           console.log('[WS_MATCH] Connessione al server di gioco stabilita.');
-          this.matchSocket?.send(JSON.stringify({ action: 'GET_INITIAL_STATE' }));
           this.ngZone.run(() => this.cdr.detectChanges());
         };
 
@@ -1069,6 +1067,53 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   private loadMatchContext() {
     this.reloadMatchAlliances();
 
+    if (this.currentMatchId) {
+      this.homeService.getMatchInitialState(this.currentMatchId).subscribe({
+        next: (response: any) => {
+          const state = response?.data;
+          if (state) {
+            if (state.nations) {
+              this.matchNations = state.nations;
+              this.requestTerritoryColors();
+            }
+            if (state.regionsResources) {
+              this.regionsResources = state.regionsResources;
+            }
+            if (state.armies) {
+              this.matchArmies = state.armies.filter((a: any) => a.owner === this.userProfile?.username);
+              this.matchArmies.forEach((a: any) => {
+                if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
+              });
+              this.renderArmies();
+            }
+            if (state.resources) {
+              this.updatePlayerResources(state.resources);
+            }
+            if (state.production) {
+              this.resourceProduction = state.production;
+            }
+            if (state.structures) {
+              this.matchStructures = state.structures;
+              setTimeout(() => this.renderStructures(), 100);
+            }
+            if (state.leaderboard) {
+              this.matchLeaderboard = state.leaderboard;
+            }
+            if (state.technologies) {
+              this.userTechnologies = state.technologies;
+            }
+            if (state.trainings) {
+              this.playerTrainings = state.trainings;
+            }
+            this.cdr.detectChanges();
+          }
+        },
+        error: (err) => {
+          console.error('Error fetching initial state via HTTP:', err);
+        }
+      });
+    }
+
     this.homeService.getDashboardData().subscribe({
       next: (response: any) => {
         const info = response?.data;
@@ -1219,11 +1264,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     return [...new Set(names)];
   }
 
-  private loadUserProfile() {
+  private loadUserProfile(callback?: () => void) {
     this.authApi.getProfile().subscribe({
       next: (response: any) => {
         const profile = response?.data?.profile || response?.data?.user_profile || response?.profile || response?.user_profile;
         if (!profile?.username) {
+          if (callback) callback();
           return;
         }
 
@@ -1245,9 +1291,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         }
 
         this.cdr.detectChanges();
+        if (callback) callback();
         if (this.matchNations?.length > 0) this.requestTerritoryColors();
       },
       error: (error) => {
+        if (callback) callback();
         console.error('Errore nel recupero del profilo utente per il match:', error);
         if (error?.status === 401) {
           this.router.navigate(['/login']);
@@ -1604,7 +1652,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           { id: 'carto-light', type: 'raster', source: 'carto-light-tiles', layout: { visibility: 'none' } }
         ]
       },
-      center: [12.5, 41.9], zoom: 3, minZoom: 1.5, maxZoom: 14, renderWorldCopies: false, projection: { type: 'mercator' }
+      center: [12.5, 41.9], zoom: 3, minZoom: 1.5, maxZoom: 14, renderWorldCopies: true, projection: { type: 'mercator' }
     });
 
     this.map.dragRotate.disable();
@@ -3392,8 +3440,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.map.getCanvas().style.cursor = 'pointer';
 
       let resourceText = '--';
-      if (this.regionsResources && this.regionsResources[f.id]) {
-        const res = this.regionsResources[f.id];
+      const pId = f.properties.adm1_code || f.properties.name;
+      if (this.regionsResources && pId && this.regionsResources[pId]) {
+        const res = this.regionsResources[pId];
         resourceText = res.more_common;
         if (res.ultra_rare) {
           resourceText += ` + ${res.ultra_rare}`;
@@ -3449,59 +3498,66 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadTopoJsonLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
-    const fetchUrl = url;
-    this.mapAssets.getText(fetchUrl).then((topologyText: string) => {
-      const onGeoDataReady = (geoData: any) => {
-        if (layerId === 'regioni-layer') {
-          let nextId = 1;
-          this.regionIdMap = new Map<string, number>();
-          this.regionFeatureByKey = new Map<string, any>();
-          geoData.features.forEach((f: any) => {
-            f.id = nextId++;
-            const pId = f.properties.adm1_code || f.properties.name;
-            if (pId) {
-              this.regionIdMap.set(String(pId).toLowerCase(), f.id);
-            }
-            const keys = [f.properties?.adm1_code, f.properties?.name, String(f.id)]
-              .filter(Boolean).map((k: string) => String(k).toLowerCase());
-            keys.forEach(k => this.regionFeatureByKey.set(k, f));
-          });
-          this.regionsGeoData = geoData;
-        }
+    const onGeoDataReady = (geoData: any) => {
+      if (layerId === 'regioni-layer') {
+        let nextId = 1;
+        this.regionIdMap = new Map<string, number>();
+        this.regionFeatureByKey = new Map<string, any>();
+        geoData.features.forEach((f: any) => {
+          f.id = nextId++;
+          const pId = f.properties.adm1_code || f.properties.name;
+          if (pId) {
+            this.regionIdMap.set(String(pId).toLowerCase(), f.id);
+          }
+          const keys = [f.properties?.adm1_code, f.properties?.name, String(f.id)]
+            .filter(Boolean).map((k: string) => String(k).toLowerCase());
+          keys.forEach(k => this.regionFeatureByKey.set(k, f));
+        });
+        this.regionsGeoData = geoData;
+      }
 
-        this.map.addSource(sourceId, { 
-          type: 'geojson', 
+      try {
+        this.map.addSource(sourceId, {
+          type: 'geojson',
           data: geoData,
           maxzoom: 6,
           tolerance: 1.5
         });
+      } catch (err) {
+        console.error(`Error adding source ${sourceId}:`, err);
+      }
 
-        const paintConfig = layerId === 'regioni-layer' ? {
-          'fill-color': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false], '#00ccffff',
-            ['!=', ['feature-state', 'color'], null], ['feature-state', 'color'],
-            ['has', 'fillColor'], ['get', 'fillColor'],
-            'rgba(150, 150, 150, 0.2)'
-          ],
-          'fill-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false], 0.25,
-            ['!=', ['feature-state', 'color'], null], 0.45,
-            ['has', 'fillColor'], 0.45,
-            0.1
-          ]
-        } : {
-          'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
-          'fill-opacity': 0.3
-        };
+      const paintConfig = layerId === 'regioni-layer' ? {
+        'fill-color': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false], '#00ccffff',
+          ['!=', ['feature-state', 'color'], null], ['feature-state', 'color'],
+          ['has', 'fillColor'], ['get', 'fillColor'],
+          'rgba(150, 150, 150, 0.2)'
+        ],
+        'fill-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false], 0.25,
+          ['!=', ['feature-state', 'color'], null], 0.45,
+          ['has', 'fillColor'], 0.45,
+          0.1
+        ]
+      } : {
+        'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
+        'fill-opacity': 0.3
+      };
 
+      try {
         this.map.addLayer({
           id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
           paint: paintConfig
         });
+      } catch (err) {
+        console.error(`Error adding layer ${layerId}:`, err);
+      }
 
-        if (layerId === 'regioni-layer') {
+      if (layerId === 'regioni-layer') {
+        try {
           this.map.addLayer({
             id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
             paint: {
@@ -3510,10 +3566,21 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               'line-opacity': 0.4
             }
           });
-          this.markRegionsReady();
+        } catch (err) {
+          console.error(`Error adding borders layer:`, err);
         }
-      };
+        this.markRegionsReady();
+      }
+    };
 
+    const cachedGeoData = this.mapAssets.getGeoJson(layerId);
+    if (cachedGeoData) {
+      onGeoDataReady(cachedGeoData);
+      return;
+    }
+
+    const fetchUrl = url;
+    this.mapAssets.getText(fetchUrl).then((topologyText: string) => {
       if (typeof Worker !== 'undefined') {
         if (!this.topoWorker) {
           this.topoWorker = new Worker(new URL('./topojson.worker', import.meta.url), { type: 'module' });
@@ -3521,6 +3588,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const handler = ({ data }: any) => {
           if (data.id === layerId) {
             this.topoWorker?.removeEventListener('message', handler);
+            this.mapAssets.setGeoJson(layerId, data.geoData);
             onGeoDataReady(data.geoData);
           }
         };
@@ -3529,40 +3597,49 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       } else {
         const topology = JSON.parse(topologyText);
         const geoData = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
+        this.mapAssets.setGeoJson(layerId, geoData);
         onGeoDataReady(geoData);
       }
+    }).catch(err => {
+      console.error(`Error fetching/parsing layerId: ${layerId}:`, err);
     });
   }
 
   loadTopoJsonArchsLayer(url: string, sourceId: string, layerId: string, minZ: number, maxZ: number) {
+    const onGeoDataReady = (mergedGeoData: any) => {
+      this.map.addSource(sourceId, {
+        type: 'geojson',
+        data: mergedGeoData,
+        generateId: true,
+        maxzoom: 6,
+        tolerance: 1.5
+      });
+      this.map.addLayer({
+        id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+        paint: {
+          'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
+          'fill-opacity': 0.3
+        }
+      });
+      this.map.addLayer({
+        id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
+        paint: {
+          'line-color': '#ff6b6b',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.6, 6, 2.0, 10, 3.6],
+          'line-opacity': 0.9
+        }
+      });
+      this.reorderMapLayers();
+    };
+
+    const cachedGeoData = this.mapAssets.getGeoJson(layerId);
+    if (cachedGeoData) {
+      onGeoDataReady(cachedGeoData);
+      return;
+    }
+
     const fetchUrl = url;
     this.mapAssets.getText(fetchUrl).then((topologyText: string) => {
-      const onGeoDataReady = (mergedGeoData: any) => {
-        this.map.addSource(sourceId, { 
-          type: 'geojson', 
-          data: mergedGeoData, 
-          generateId: true,
-          maxzoom: 6,
-          tolerance: 1.5
-        });
-        this.map.addLayer({
-          id: layerId, type: 'fill', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-          paint: {
-            'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], '#00f2ff', 'transparent'],
-            'fill-opacity': 0.3
-          }
-        });
-        this.map.addLayer({
-          id: layerId + '-borders', type: 'line', source: sourceId, minzoom: minZ, maxzoom: maxZ,
-          paint: {
-            'line-color': '#ff6b6b',
-            'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.6, 6, 2.0, 10, 3.6],
-            'line-opacity': 0.9
-          }
-        });
-        this.reorderMapLayers();
-      };
-
       if (typeof Worker !== 'undefined') {
         if (!this.topoWorker) {
           this.topoWorker = new Worker(new URL('./topojson.worker', import.meta.url), { type: 'module' });
@@ -3570,6 +3647,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const handler = ({ data }: any) => {
           if (data.id === layerId) {
             this.topoWorker?.removeEventListener('message', handler);
+            this.mapAssets.setGeoJson(layerId, data.geoData);
             onGeoDataReady(data.geoData);
           }
         };
@@ -3593,69 +3671,76 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         });
         allFeatures = allFeatures.concat(Array.from(featureMap.values()));
         const mergedGeoData = { type: 'FeatureCollection', features: allFeatures };
+        this.mapAssets.setGeoJson(layerId, mergedGeoData);
         onGeoDataReady(mergedGeoData);
       }
     });
   }
 
   loadTopoJsonCitiesLayer(url: string, sourceId: string, pointsLayerId: string, labelsLayerId: string, minZ: number, maxZ: number) {
+    const onGeoDataReady = (geoData: any) => {
+      if (!geoData) return;
+
+      if (this.map.getSource(sourceId)) {
+        (this.map.getSource(sourceId) as any).setData(geoData);
+        return;
+      }
+
+      this.map.addSource(sourceId, {
+        type: 'geojson',
+        data: geoData,
+        generateId: true,
+        maxzoom: 6,
+        tolerance: 1.5
+      });
+
+      this.map.addLayer({
+        id: pointsLayerId,
+        type: 'circle',
+        source: sourceId,
+        minzoom: minZ,
+        maxzoom: maxZ,
+        paint: {
+          'circle-color': '#ffd84d',
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 1.8, 4, 2.8, 7, 4.6],
+          'circle-stroke-color': '#1a1402',
+          'circle-stroke-width': 1,
+          'circle-opacity': 0.95
+        }
+      });
+
+      this.map.addLayer({
+        id: labelsLayerId,
+        type: 'symbol',
+        source: sourceId,
+        minzoom: minZ,
+        maxzoom: maxZ,
+        layout: {
+          'text-field': ['coalesce', ['get', 'NAME'], ''],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 2, 9, 6, 11],
+          'text-anchor': 'top',
+          'text-offset': [0, 0.9],
+          'text-allow-overlap': false,
+          'text-ignore-placement': false,
+          'visibility': 'visible'
+        },
+        paint: {
+          'text-color': '#fff4b0',
+          'text-halo-color': '#000000',
+          'text-halo-width': 1.2,
+          'text-halo-blur': 0.5
+        }
+      });
+    };
+
+    const cachedGeoData = this.mapAssets.getGeoJson(pointsLayerId);
+    if (cachedGeoData) {
+      onGeoDataReady(cachedGeoData);
+      return;
+    }
+
     const fetchUrl = url;
     this.mapAssets.getText(fetchUrl).then((topologyText: string) => {
-      const onGeoDataReady = (geoData: any) => {
-        if (!geoData) return;
-
-        if (this.map.getSource(sourceId)) {
-          (this.map.getSource(sourceId) as any).setData(geoData);
-          return;
-        }
-
-        this.map.addSource(sourceId, { 
-          type: 'geojson', 
-          data: geoData, 
-          generateId: true,
-          maxzoom: 6,
-          tolerance: 1.5
-        });
-
-        this.map.addLayer({
-          id: pointsLayerId,
-          type: 'circle',
-          source: sourceId,
-          minzoom: minZ,
-          maxzoom: maxZ,
-          paint: {
-            'circle-color': '#ffd84d',
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 1.8, 4, 2.8, 7, 4.6],
-            'circle-stroke-color': '#1a1402',
-            'circle-stroke-width': 1,
-            'circle-opacity': 0.95
-          }
-        });
-
-        this.map.addLayer({
-          id: labelsLayerId,
-          type: 'symbol',
-          source: sourceId,
-          minzoom: minZ,
-          maxzoom: maxZ,
-          layout: {
-            'text-field': ['coalesce', ['get', 'NAME'], ''],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 2, 9, 6, 11],
-            'text-anchor': 'top',
-            'text-offset': [0, 0.9],
-            'text-allow-overlap': false,
-            'text-ignore-placement': false,
-            'visibility': 'visible'
-          },
-          paint: {
-            'text-color': '#fff4b0',
-            'text-halo-color': '#000000',
-            'text-halo-width': 1.2,
-            'text-halo-blur': 0.5
-          }
-        });
-      };
-
       if (typeof Worker !== 'undefined') {
         if (!this.topoWorker) {
           this.topoWorker = new Worker(new URL('./topojson.worker', import.meta.url), { type: 'module' });
@@ -3663,6 +3748,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const handler = ({ data }: any) => {
           if (data.id === pointsLayerId) {
             this.topoWorker?.removeEventListener('message', handler);
+            this.mapAssets.setGeoJson(pointsLayerId, data.geoData);
             onGeoDataReady(data.geoData);
           }
         };
@@ -3676,6 +3762,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           return;
         }
         const geoData = topojson.feature(topology, topology.objects[objectName]);
+        this.mapAssets.setGeoJson(pointsLayerId, geoData);
         onGeoDataReady(geoData);
       }
     }).catch((err: any) => console.error('Errore fetch cities.json', err));

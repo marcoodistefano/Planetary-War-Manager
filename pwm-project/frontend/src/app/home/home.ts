@@ -68,6 +68,10 @@ export class HomeService {
     );
   }
 
+  getMatchInitialState(matchId: string): Observable<any> {
+    return this.http.get<any>(`${this.matchApiUrl}/${matchId}/initial-state`, { withCredentials: true });
+  }
+
   getGraveyard(matchId: string, username: string): Observable<any> {
     return this.http.get<any>(`${this.matchApiUrl}/${matchId}/player/${username}/graveyard`, { withCredentials: true });
   }
