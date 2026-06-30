@@ -616,6 +616,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         this.matchSocket.onopen = () => {
           console.log('[WS_MATCH] Connessione al server di gioco stabilita.');
+          this.matchSocket?.send(JSON.stringify({ action: 'GET_INITIAL_STATE' }));
           this.ngZone.run(() => this.cdr.detectChanges());
         };
 

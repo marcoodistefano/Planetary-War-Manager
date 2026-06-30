@@ -440,7 +440,6 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   async openCreateMatch() {
-    const isMobile = window.innerWidth <= 1024;
     const modal = await this.modalCtrl.create({
       component: CreateMatchComponent,
       cssClass: 'home-modal',
@@ -452,15 +451,22 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     const { data } = await modal.onDidDismiss();
 
     if (data?.created) {
+      // Salva il matchId se disponibile
+      if (data.matchId) {
+        localStorage.setItem('pwm_last_joined_match', data.matchId);
+        this.lastJoinedMatchId = data.matchId;
+      }
+
       const toast = await this.toastCtrl.create({
-        message: 'La partita è stata creata con successo',
+        message: 'La partita è stata creata con successo!',
         duration: 5000,
         position: 'top',
         cssClass: 'tactical-toast tactical-toast-success',
         icon: 'checkmark-circle-outline'
       });
       await toast.present();
-      
+
+      // Refresh completo della homepage
       this.loadDashboardData(true);
       this.loadJoinableMatches();
       return;
@@ -486,7 +492,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     if (!game?.joinId) return;
 
     this.homeService.joinMatch(game.joinId).subscribe({
-      next: () => {
+      next: async () => {
         const routeId = game.routeId || game.joinId;
         localStorage.setItem('pwm_last_joined_match', routeId);
         this.lastJoinedMatchId = routeId;
@@ -495,11 +501,31 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
         this.newGames = this.newGames.filter((g: any) => g.joinId !== game.joinId);
         this.filteredNewGames = this.filteredNewGames.filter((g: any) => g.joinId !== game.joinId);
 
-        // Ricarica i dati dalla dashboard: la partita comparirà in "partite attive"
+        // Mostra toast di conferma
+        const toast = await this.toastCtrl.create({
+          message: `Sei entrato nella partita "${game.name || game.joinId}" con successo!`,
+          duration: 4000,
+          position: 'top',
+          cssClass: 'tactical-toast tactical-toast-success',
+          icon: 'checkmark-circle-outline'
+        });
+        await toast.present();
+
+        // Ricarica sia la dashboard sia la lista partite disponibili
         this.loadDashboardData(true);
+        this.loadJoinableMatches();
       },
-      error: (error) => {
+      error: async (error) => {
         console.error('Errore durante il join della partita:', error);
+        const msg = error?.error?.message || 'Impossibile partecipare alla partita. Riprova.';
+        const toast = await this.toastCtrl.create({
+          message: msg,
+          duration: 4000,
+          position: 'top',
+          cssClass: 'tactical-toast tactical-toast-error',
+          icon: 'alert-circle-outline'
+        });
+        await toast.present();
       }
     });
   }
