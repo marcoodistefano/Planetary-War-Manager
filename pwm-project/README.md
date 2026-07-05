@@ -1,6 +1,4 @@
 # Progetto PWM (Planetary War Manager)
-![Leonida](./Leonida.jpeg)
-
 ## Introduzione
 Questo repository contiene l'intero ecosistema del progetto PWM, un'applicazione web complessa distribuita con architettura a microservizi. Il sistema gestisce utenti, chat in tempo reale e partite (match), il tutto sorretto da tecnologie moderne quali Node.js, Redis, PostgreSQL e un frontend SPA (Angular/Ionic). 
 
