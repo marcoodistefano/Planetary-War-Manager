@@ -1,5 +1,4 @@
 # Progetto PWM (Planetary War Manager)
-![Leonida](./pwm-project/Leonida.jpeg)
 
 ## Introduzione
 Questo repository contiene l'intero ecosistema del progetto PWM, un'applicazione web complessa distribuita con architettura a microservizi. Tutto il codice sorgente del progetto si trova all'interno della cartella `pwm-project/`.
