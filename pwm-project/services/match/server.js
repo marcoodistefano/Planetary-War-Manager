@@ -306,6 +306,103 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                     return;
                 }
 
+                if (payload.action === 'PREVIEW_MISSIONS') {
+                    const missions = payload.payload.missions;
+                    const matchData = await getMatch(ws.matchId);
+                    if (!matchData || !matchData.match || !matchData.match.player) return;
+                    const player = matchData.match.player.find(p => p.username === ws.username);
+                    if (!player || !player.armate) return;
+
+                    const results = [];
+                    for (const mission of missions) {
+                        const { armyId, targetName, targetCoords } = mission;
+                        const armata = player.armate[armyId];
+                        if (!armata) continue;
+
+                        let startLng, startLat;
+                        let loc = armata.currentLocation;
+                        if (loc && typeof loc === 'string') {
+                            if (loc.includes(',')) {
+                                const pts = loc.split(',').map(s => parseFloat(s.trim()));
+                                if (pts.length === 2 && !isNaN(pts[0]) && !isNaN(pts[1])) { startLng = pts[0]; startLat = pts[1]; }
+                            } else {
+                                const nodeCoords = getNodeCoords(loc);
+                                if (nodeCoords) { startLng = nodeCoords[0]; startLat = nodeCoords[1]; }
+                            }
+                        } else if (loc && loc.x !== undefined && loc.y !== undefined) {
+                            startLng = loc.x; startLat = loc.y;
+                        } else if (Array.isArray(loc) && loc.length >= 2) {
+                            startLng = loc[0]; startLat = loc[1];
+                        }
+
+                        let currentPathInfo = null;
+                        const armyState = armata.status;
+                        if ((armyState === 'moving' || armyState === 'moving_to_border' || armyState === "Pronto alla conquista") && armata.path && armata.path.length > 1 && armata.startTime && armata.etaMs) {
+                            const currentPos = calculateCurrentPosition(armata.path, armata.startTime, armata.etaMs);
+                            if (currentPos) {
+                                startLng = currentPos.lng;
+                                startLat = currentPos.lat;
+                                currentPathInfo = { path: armata.path, currentIndex: currentPos.currentIndex };
+                            }
+                        }
+
+                        let targetLng, targetLat;
+                        if (typeof targetCoords === 'string') {
+                            const pts = targetCoords.split(',').map(s => parseFloat(s.trim()));
+                            if (pts.length === 2 && !isNaN(pts[0]) && !isNaN(pts[1])) { targetLng = pts[0]; targetLat = pts[1]; }
+                        } else if (Array.isArray(targetCoords) && targetCoords.length === 2) {
+                            targetLng = parseFloat(targetCoords[0]); targetLat = parseFloat(targetCoords[1]);
+                        }
+                        if (targetLng === undefined && targetName) {
+                            const nodeCoords = getNodeCoords(targetName);
+                            if (nodeCoords) { targetLng = nodeCoords[0]; targetLat = nodeCoords[1]; }
+                        }
+
+                        if (startLng !== undefined && startLat !== undefined && targetLng !== undefined && targetLat !== undefined) {
+                            let unitSpeedMultiplier = 1;
+                            if (armata.composition) {
+                                const types = Object.keys(armata.composition);
+                                const gameRulesStr = await redis.get("map_data:game_rules");
+                                if (gameRulesStr) {
+                                    try {
+                                        const rules = JSON.parse(gameRulesStr);
+                                        let minSpeed = Infinity;
+                                        for (const type of types) {
+                                            const uRule = rules.units.find(r => r.id === type);
+                                            if (uRule && uRule.speed < minSpeed) minSpeed = uRule.speed;
+                                        }
+                                        if (minSpeed !== Infinity && minSpeed > 0) unitSpeedMultiplier = 1 / minSpeed;
+                                    } catch (e) {}
+                                }
+                            }
+
+                            let matchMultiplier = 1;
+                            if (matchData.match.struttura_partita) {
+                                try {
+                                    const decodedMatch = Eru.decode_match(matchData.match.struttura_partita);
+                                    matchMultiplier = decodedMatch.multiplierValue || 1;
+                                } catch (err) {}
+                            }
+
+                            try {
+                                const { pathCoords, distanceKm, etaMs } = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, unitSpeedMultiplier, currentPathInfo, matchMultiplier);
+                                results.push({
+                                    armyId,
+                                    path: pathCoords,
+                                    etaMs,
+                                    distanceKm,
+                                    originalMission: mission
+                                });
+                            } catch(e) {
+                                console.error("[PREVIEW_MISSIONS] Errore calcolo:", e);
+                            }
+                        }
+                    }
+
+                    ws.send(JSON.stringify({ type: 'PATH_PREVIEW_RESULT', data: results }));
+                    return;
+                }
+
                 if (payload.action === 'MOVE_TROOPS') {
                     const { armyId, targetName, targetCoords } = payload.payload;
 
@@ -378,19 +475,36 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         ws.send(JSON.stringify({ type: 'ERROR', error: 'Coordinate di destinazione invalide' })); return;
                     }
 
-                    let multiplier = 1;
+                    let matchMultiplier = 1;
                     if (matchData.match.struttura_partita) {
                         try {
                             const decodedMatch = Eru.decode_match(matchData.match.struttura_partita);
-                            multiplier = decodedMatch.multiplierValue || 1;
+                            matchMultiplier = decodedMatch.multiplierValue || 1;
                         } catch (err) {
                             console.warn("[SYS_WARN] Errore decodifica match:", err.message);
                         }
                     }
 
+                    let unitSpeedMultiplier = 1;
+                    if (armata.composition) {
+                        const types = Object.keys(armata.composition);
+                        const gameRulesStr = await redis.get("map_data:game_rules");
+                        if (gameRulesStr) {
+                            try {
+                                const rules = JSON.parse(gameRulesStr);
+                                let minSpeed = Infinity;
+                                for (const type of types) {
+                                    const uRule = rules.units.find(r => r.id === type);
+                                    if (uRule && uRule.speed < minSpeed) minSpeed = uRule.speed;
+                                }
+                                if (minSpeed !== Infinity && minSpeed > 0) unitSpeedMultiplier = 1 / minSpeed;
+                            } catch (e) {}
+                        }
+                    }
+
                     let pathInfo = { isValid: false, distance: 0, etaMs: 0, path: [] };
                     try {
-                        pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, multiplier, currentPathInfo);
+                        pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, unitSpeedMultiplier, currentPathInfo, matchMultiplier);
                     } catch (e) {
                         console.error("Errore durante calculatePath:", e);
                     }
@@ -1247,17 +1361,34 @@ const restoreActiveMoves = async () => {
                 continue;
             }
 
-            let multiplier = 1;
+            let matchMultiplier = 1;
             if (row.struttura_partita) {
                 try {
                     const decodedMatch = Eru.decode_match(row.struttura_partita);
-                    multiplier = decodedMatch.multiplierValue || 1;
+                    matchMultiplier = decodedMatch.multiplierValue || 1;
                 } catch (err) { }
+            }
+
+            let unitSpeedMultiplier = 1;
+            if (army.composition) {
+                const types = Object.keys(army.composition);
+                const gameRulesStr = await redis.get("map_data:game_rules");
+                if (gameRulesStr) {
+                    try {
+                        const rules = JSON.parse(gameRulesStr);
+                        let minSpeed = Infinity;
+                        for (const type of types) {
+                            const uRule = rules.units.find(r => r.id === type);
+                            if (uRule && uRule.speed < minSpeed) minSpeed = uRule.speed;
+                        }
+                        if (minSpeed !== Infinity && minSpeed > 0) unitSpeedMultiplier = 1 / minSpeed;
+                    } catch (e) {}
+                }
             }
 
             // Ricalcola il percorso
             try {
-                const pathInfo = await calculatePath(startLng, startLat, row.target_node, row.x_dest, row.y_dest, multiplier);
+                const pathInfo = await calculatePath(startLng, startLat, row.target_node, row.x_dest, row.y_dest, unitSpeedMultiplier, null, matchMultiplier);
 
                 army.status = 'moving';
                 army.targetCoords = [parseFloat(row.x_dest), parseFloat(row.y_dest)];

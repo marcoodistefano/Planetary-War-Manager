@@ -1,0 +1,245 @@
+package main
+
+import (
+	"container/heap"
+	"math"
+)
+
+type Point struct {
+	X int
+	Y int
+}
+
+type Node struct {
+	Pt       Point
+	Cost     float64
+	Priority float64
+	Index    int
+}
+
+type PriorityQueue []*Node
+
+func (pq PriorityQueue) Len() int { return len(pq) }
+
+func (pq PriorityQueue) Less(i, j int) bool {
+	return pq[i].Priority < pq[j].Priority
+}
+
+func (pq PriorityQueue) Swap(i, j int) {
+	pq[i], pq[j] = pq[j], pq[i]
+	pq[i].Index = i
+	pq[j].Index = j
+}
+
+func (pq *PriorityQueue) Push(x any) {
+	n := len(*pq)
+	item := x.(*Node)
+	item.Index = n
+	*pq = append(*pq, item)
+}
+
+func (pq *PriorityQueue) Pop() any {
+	old := *pq
+	n := len(old)
+	item := old[n-1]
+	old[n-1] = nil
+	item.Index = -1
+	*pq = old[0 : n-1]
+	return item
+}
+
+func lngLatToIndex(lng, lat float64) Point {
+	x := int(math.Floor((lng + 180.0) / Resolution))
+	y := int(math.Floor((90.0 - lat) / Resolution))
+
+	if x < 0 { x = 0 }
+	if x >= Width { x = Width - 1 }
+	if y < 0 { y = 0 }
+	if y >= Height { y = Height - 1 }
+
+	return Point{X: x, Y: y}
+}
+
+func indexToLngLat(pt Point) (float64, float64) {
+	lng := -180.0 + (float64(pt.X)+0.5)*Resolution
+	lat := 90.0 - (float64(pt.Y)+0.5)*Resolution
+	return lng, lat
+}
+
+var TerrainKeyMap = map[uint8]string{
+	1:  "forest_needle_eve",
+	2:  "forest_needle_dec",
+	3:  "forest_broad_eve",
+	4:  "forest_broad_dec",
+	5:  "forest_mixed",
+	6:  "shrubland_closed",
+	7:  "shrubland_open",
+	8:  "savanna_woody",
+	9:  "savanna",
+	10: "grassland",
+	11: "wetlands",
+	12: "cropland",
+	13: "urban",
+	14: "cropland_mosaic",
+	15: "snow_ice",
+	16: "barren_desert",
+}
+
+func getCost(pt Point) float64 {
+	idx := pt.Y*Width + pt.X
+	if idx < 0 || idx >= len(EtopoData) {
+		return math.Inf(1)
+	}
+
+	elevation := EtopoData[idx]
+	if elevation <= 0 {
+		return math.Inf(1) // Acqua
+	}
+
+	multiplier := 1.0
+	if LandCoverData != nil && TerrainCosts != nil {
+		lcClass := LandCoverData[idx]
+		terrainKey, ok := TerrainKeyMap[lcClass]
+		if ok {
+			speedMult, hasCost := TerrainCosts[terrainKey]
+			if hasCost && speedMult > 0 {
+				multiplier = 1.0 / speedMult
+			}
+		}
+	}
+	return multiplier
+}
+
+func heuristic(a, b Point) float64 {
+	dx := math.Abs(float64(a.X - b.X))
+	dy := math.Abs(float64(a.Y - b.Y))
+	return math.Max(dx, dy)
+}
+
+func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64) ([][2]float64, float64) {
+	start := lngLatToIndex(startLng, startLat)
+	end := lngLatToIndex(endLng, endLat)
+
+	fallbackPath := [][2]float64{{startLng, startLat}, {endLng, endLat}}
+
+	if math.IsInf(getCost(start), 1) || math.IsInf(getCost(end), 1) {
+		return fallbackPath, 0.0
+	}
+
+	pq := make(PriorityQueue, 0)
+	heap.Init(&pq)
+
+	cameFrom := make(map[Point]Point)
+	gScore := make(map[Point]float64)
+
+	gScore[start] = 0
+	heap.Push(&pq, &Node{
+		Pt:       start,
+		Cost:     0,
+		Priority: heuristic(start, end),
+	})
+
+	nodesVisited := 0
+	// Limite più alto rispetto a Node.js grazie a Go
+	maxNodes := 250000 
+
+	for pq.Len() > 0 {
+		nodesVisited++
+		if nodesVisited > maxNodes {
+			break
+		}
+
+		current := heap.Pop(&pq).(*Node)
+		currPt := current.Pt
+
+		if currPt == end {
+			return reconstructPath(cameFrom, currPt, startLng, startLat, endLng, endLat), current.Cost * multiplier
+		}
+
+		neighbors := []Point{
+			{X: currPt.X, Y: currPt.Y - 1}, {X: currPt.X, Y: currPt.Y + 1},
+			{X: currPt.X - 1, Y: currPt.Y}, {X: currPt.X + 1, Y: currPt.Y},
+			{X: currPt.X - 1, Y: currPt.Y - 1}, {X: currPt.X + 1, Y: currPt.Y - 1},
+			{X: currPt.X - 1, Y: currPt.Y + 1}, {X: currPt.X + 1, Y: currPt.Y + 1},
+		}
+
+		for _, n := range neighbors {
+			if n.X < 0 || n.X >= Width || n.Y < 0 || n.Y >= Height {
+				continue
+			}
+
+			cost := getCost(n)
+			if math.IsInf(cost, 1) {
+				continue
+			}
+
+			dist := 1.0
+			if n.X != currPt.X && n.Y != currPt.Y {
+				dist = 1.414
+			}
+
+			tentativeGScore := gScore[currPt] + (dist * cost)
+			
+			gScoreN, exists := gScore[n]
+			if !exists || tentativeGScore < gScoreN {
+				cameFrom[n] = currPt
+				gScore[n] = tentativeGScore
+				priority := tentativeGScore + heuristic(n, end)
+				heap.Push(&pq, &Node{
+					Pt:       n,
+					Cost:     tentativeGScore,
+					Priority: priority,
+				})
+			}
+		}
+	}
+
+	return fallbackPath, 0.0
+}
+
+func reconstructPath(cameFrom map[Point]Point, current Point, exactStartLng, exactStartLat, exactEndLng, exactEndLat float64) [][2]float64 {
+	var path [][2]float64
+	path = append(path, [2]float64{exactEndLng, exactEndLat})
+
+	curr := current
+	for {
+		prev, ok := cameFrom[curr]
+		if !ok {
+			break
+		}
+		curr = prev
+		lng, lat := indexToLngLat(curr)
+		// prepend
+		path = append([][2]float64{{lng, lat}}, path...)
+	}
+
+	if len(path) > 0 {
+		path[0] = [2]float64{exactStartLng, exactStartLat}
+	}
+
+	return simplifyPath(path)
+}
+
+func simplifyPath(path [][2]float64) [][2]float64 {
+	if len(path) <= 2 {
+		return path
+	}
+	simplified := [][2]float64{path[0]}
+
+	for i := 1; i < len(path)-1; i++ {
+		p1 := path[i-1]
+		p2 := path[i]
+		p3 := path[i+1]
+
+		dx1 := p2[0] - p1[0]
+		dy1 := p2[1] - p1[1]
+		dx2 := p3[0] - p2[0]
+		dy2 := p3[1] - p2[1]
+
+		if math.Abs(dx1*dy2-dy1*dx2) > 0.0001 {
+			simplified = append(simplified, p2)
+		}
+	}
+	simplified = append(simplified, path[len(path)-1])
+	return simplified
+}

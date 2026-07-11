@@ -298,7 +298,6 @@ const loadMapDataForBackend = async () => {
     const ENABLED_MAP_FILES = [
       "archs.json",
       "map.json",
-      "minimum_path.json",
       "regions.json",
       "nations.json"
     ];
@@ -314,39 +313,7 @@ const loadMapDataForBackend = async () => {
       const absolutePath = path.join(mapDir, entry.name);
       const baseName = path.basename(entry.name, ".json");
 
-      if (entry.name === "minimum_path.json") {
-        console.log(`[CACHE_WARMUP] Caricamento in stream di ${entry.name} per il backend...`);
-        const rl = readline.createInterface({
-          input: createReadStream(absolutePath),
-          crlfDelay: Infinity
-        });
 
-        for await (const line of rl) {
-          const trimmed = line.trim();
-          if (trimmed === "{" || trimmed === "}") continue;
-
-          let jsonStr = trimmed;
-          if (jsonStr.endsWith(",")) jsonStr = jsonStr.slice(0, -1);
-          if (!jsonStr) continue;
-
-          try {
-            const obj = JSON.parse(`{${jsonStr}}`);
-            const city = Object.keys(obj)[0];
-            const paths = obj[city];
-
-            multi.set(`map_data:minimum_path:${city}`, JSON.stringify(paths));
-            batchedCommands++;
-
-            if (batchedCommands > 1000) {
-              await multi.exec();
-              multi = redis.multi();
-              batchedCommands = 0;
-            }
-          } catch (e) {
-            console.error(`[CACHE_WARMUP] Errore parsing riga in minimum_path:`, e.message);
-          }
-        }
-      } else {
         const content = await fs.readFile(absolutePath, "utf-8");
         multi.set(`map_data:${baseName}`, content);
         batchedCommands++;
@@ -414,13 +381,49 @@ const loadMapDataForBackend = async () => {
             console.error(`[CACHE_WARMUP] Errore nel parsing di regions.json:`, parseError.message);
           }
         }
-      }
 
       if (batchedCommands > 0) {
         await multi.exec();
       }
+      console.log("[CACHE_WARMUP] Dati della mappa json per il backend caricati su Redis con successo.");
+    }
 
-      console.log("[CACHE_WARMUP] Dati della mappa per il backend caricati su Redis con successo.");
+    // Caricamento dei file Raster ETOPO e Landing Cover
+    for (const entry of entries) {
+        if (entry.isDirectory()) continue;
+        const absolutePath = path.join(mapDir, entry.name);
+        
+        if (entry.name.startsWith("ETOPO") || entry.name.startsWith("lc_mcd12")) {
+          console.log(`[CACHE_WARMUP] Lettura del file raster di grandi dimensioni: ${entry.name}...`);
+          try {
+            const buffer = await fs.readFile(absolutePath);
+            // Salva direttamente come buffer senza passare dal multi per evitare picchi di memoria
+            await redis.set(`map_data:raster:${entry.name}`, buffer);
+            console.log(`[CACHE_WARMUP] Raster ${entry.name} caricato su Redis (${(buffer.length / 1024 / 1024).toFixed(2)} MB).`);
+          } catch (err) {
+            console.error(`[CACHE_WARMUP] Errore caricamento raster ${entry.name}:`, err.message);
+          }
+        }
+      }
+
+      // Estrazione costi dei terreni da game_rules.json
+      const gameRulesPath = path.join(assetRoot, "game_rules.json");
+      try {
+        const gameRulesContent = await fs.readFile(gameRulesPath, "utf-8");
+        const gameRules = JSON.parse(gameRulesContent);
+        const terreniSheet = gameRules.sheets?.find(s => s.name === "Terreni" || s.name === "terreni");
+        if (terreniSheet && terreniSheet.lines) {
+          const terrainCosts = {};
+          for (const line of terreniSheet.lines) {
+             if (line.id_terreno) {
+                 terrainCosts[line.id_terreno] = parseFloat(line.moltiplicatore_velocita) || 1.0;
+             }
+          }
+          await redis.set(`map_data:terrain_costs`, JSON.stringify(terrainCosts));
+          console.log(`[CACHE_WARMUP] Costi dei terreni estratti da game_rules.json e salvati su Redis.`);
+        }
+      } catch (err) {
+        console.error(`[CACHE_WARMUP] Errore estrazione costi dei terreni da game_rules.json:`, err.message);
     }
   } catch (err) {
     console.error("[CACHE_WARMUP] Errore durante il caricamento dei dati mappa per il backend:", err.message);

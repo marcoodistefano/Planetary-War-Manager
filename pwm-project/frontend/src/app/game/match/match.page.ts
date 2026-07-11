@@ -9,6 +9,8 @@ import { HomeService } from '../../home/home';
 import { AuthApiService } from '../../auth/auth-api.service';
 import { UserStateService } from '../../user-state.service';
 import { environment } from '../../../environments/environment';
+import { MatchStateService } from '../../services/match-state.service';
+import { ChangeDetectionStrategy } from '@angular/core';
 
 import { ProfileModalComponent } from '../components/profile-modal/profile-modal.component';
 import { DiplomacyModalComponent } from '../components/diplomacy-modal/diplomacy-modal.component';
@@ -29,6 +31,7 @@ const AVATAR_ASSET_VERSION = '20260517';
   templateUrl: './match.page.html',
   styleUrls: ['./match.page.scss'],
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     IonicModule,
     CommonModule,
@@ -43,6 +46,10 @@ const AVATAR_ASSET_VERSION = '20260517';
   ]
 })
 export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
+  public pendingMissions: any[] = [];
+  public showPreviewModal: boolean = false;
+  public totalPreviewEta: number = 0;
+  public totalPreviewDistance: number = 0;
   @ViewChild(ArmyModalComponent) armyModalComponent!: ArmyModalComponent;
   @ViewChild(InGameChatComponent) chatComponent!: InGameChatComponent;
   @ViewChild('mapContainer', { static: true }) mapContainer!: ElementRef;
@@ -60,6 +67,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   // WebSocket State
   matchSocket?: WebSocket;
+  // Managed by MatchStateService
   private reconnectTimer: number | null = null;
   private shouldReconnect: boolean = true;
 
@@ -93,6 +101,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   private touchTimer: any;
   private avatarSub?: Subscription;
+  private matchSub?: Subscription;
   isTouchLayout = false;
 
   // --- 2. STATO DELL'INTERFACCIA (UI) ---
@@ -492,10 +501,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     private toastCtrl: ToastController,
     private actionSheetCtrl: ActionSheetController,
     private route: ActivatedRoute,
-    private mapAssets: MapAssetsService,
     private homeService: HomeService,
     private authApi: AuthApiService,
     private userState: UserStateService,
+    private mapAssets: MapAssetsService,
+    public matchState: MatchStateService,
     private ngZone: NgZone
   ) { }
 
@@ -536,8 +546,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     this.shouldReconnect = false;
     if (this.reconnectTimer) window.clearTimeout(this.reconnectTimer);
-    this.matchSocket?.close();
+    this.matchState.disconnect();
     if (this.avatarSub) this.avatarSub.unsubscribe();
+    if (this.matchSub) this.matchSub.unsubscribe();
 
     // Rimuovi la mappa e resetta tutti i flag di sessione
     if (this.map) this.map.remove();
@@ -577,7 +588,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         this.matchSocket.readyState === WebSocket.CONNECTING)
     ) {
       this.shouldReconnect = false; // blocca l'auto-reconnect dell'onclose
-      this.matchSocket.close();
+      this.matchState.disconnect();
       this.shouldReconnect = true;
     }
     if (this.currentMatchId) {
@@ -603,32 +614,19 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   private connectMatchSocket() {
     if (!this.currentMatchId) return;
-    // Evita doppie connessioni: se il socket è già aperto non ne aprire uno nuovo
-    if (this.matchSocket?.readyState === WebSocket.OPEN) return;
 
     const wsBaseUrl = this.getGatewayWsBaseUrl();
     const wsUrl = `${wsBaseUrl}/match/${encodeURIComponent(this.currentMatchId)}`;
 
     try {
-      console.log(`[WS_MATCH] Tentativo di connessione a ${wsUrl}`);
-      this.ngZone.runOutsideAngular(() => {
-        this.matchSocket = new WebSocket(wsUrl);
+        console.log(`[WS_MATCH] Tentativo di connessione a ${wsUrl}`);
+        this.matchState.connect(wsUrl);
 
-        this.matchSocket.onopen = () => {
-          console.log('[WS_MATCH] Connessione al server di gioco stabilita.');
-          this.matchSocket?.send(JSON.stringify({ action: 'GET_INITIAL_STATE' }));
-          this.ngZone.run(() => this.cdr.detectChanges());
-        };
+        if (this.matchSub) return; // Fix memory leak su reconnect multipli
 
-        this.matchSocket.onmessage = (event) => {
-          let parsed;
-          try {
-            parsed = JSON.parse(event.data);
-          } catch (e) {
-            return;
-          }
-
-          console.log('[WS_MATCH] Evento ricevuoto:', parsed);
+        this.ngZone.runOutsideAngular(() => {
+          this.matchSub = this.matchState.messages$.subscribe((parsed: any) => {
+          console.log('[WS_MATCH] Evento ricevuto:', parsed);
 
           if (parsed.type === 'INITIAL_STATE') {
             if (parsed.payload?.armies) {
@@ -949,6 +947,37 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
+          if (parsed.type === 'PATH_PREVIEW_RESULT') {
+            const results = parsed.data;
+            if (results && results.length > 0) {
+              this.totalPreviewDistance = results.reduce((acc: number, r: any) => acc + (r.distanceKm || 0), 0);
+              this.totalPreviewEta = results.reduce((acc: number, r: any) => acc + (r.etaMs || 0), 0);
+              
+              const features: any[] = [];
+              results.forEach((r: any) => {
+                if (r.path && r.path.length > 1) {
+                  features.push({
+                    type: 'Feature',
+                    properties: {},
+                    geometry: { type: 'LineString', coordinates: r.path }
+                  });
+                }
+              });
+
+              if (this.map && this.map.getSource('preview-troop-paths-source')) {
+                (this.map.getSource('preview-troop-paths-source') as any).setData({
+                  type: 'FeatureCollection',
+                  features: features
+                });
+              }
+
+              this.showPreviewModal = true;
+            } else {
+              this.toastCtrl.create({ message: 'Impossibile calcolare il percorso', duration: 2000 }).then(t => t.present());
+            }
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
           if (parsed.type === 'ALLIANCE_UPDATED') {
             console.log(`[WS_MATCH] Aggiornamento alleanze (${parsed.type})`);
             this.reloadMatchAlliances();
@@ -1046,19 +1075,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               color: 'danger'
             }).then(t => t.present());
           }
-        };
+        }); // Chiude la sottoscrizione ai messaggi
 
-        this.matchSocket.onerror = (error) => {
-          console.error('[WS_MATCH] Errore di connessione:', error);
-        };
-
-        this.matchSocket.onclose = (event) => {
-          console.log('[WS_MATCH] Connessione chiusa', event.code, event.reason);
-          if (this.shouldReconnect) {
+        this.matchState.connectionStatus$.subscribe(isConnected => {
+          if (!isConnected && this.shouldReconnect) {
             console.log('[WS_MATCH] Riconnessione in corso tra 3 secondi...');
             this.reconnectTimer = window.setTimeout(() => this.connectMatchSocket(), 3000);
           }
-        };
+        });
       }); // Close ngZone.runOutsideAngular
     } catch (error) {
       console.error('[WS_MATCH] Eccezione durante la connessione:', error);
@@ -1516,9 +1540,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   onResearchTech(structureId: string) {
     console.log('[FRONTEND] Sending RESEARCH_TECH for:', structureId);
-    if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
+    if (true) {
       console.log('[FRONTEND] Socket is OPEN, sending payload...');
-      this.matchSocket.send(JSON.stringify({
+      this.matchState.send(JSON.stringify({
         action: 'RESEARCH_TECH',
         payload: { structureId }
       }));
@@ -1680,7 +1704,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         this.requestTerritoryColors();
       };
       this.map.on('sourcedata', onFirstSourceReady);
-      this.loadTopoJsonArchsLayer('/assets/map/archs.json', 'archi', 'archi-layer', 0, 24);
+      // rimosso archs layer
       this.loadTopoJsonCitiesLayer('/assets/map/cities.json', 'cities', 'cities-points', 'cities-labels', 5, 24);
 
       // --- SETUP TETHERS SOURCE & LAYER ---
@@ -1714,6 +1738,23 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           'line-color': '#eab308', // Giallo
           'line-width': 3,
           'line-opacity': 0.8
+        }
+      });
+
+      // --- PERCORSO DI ANTEPRIMA ---
+      this.map.addSource('preview-troop-paths-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+      this.map.addLayer({
+        id: 'preview-troop-paths-layer',
+        type: 'line',
+        source: 'preview-troop-paths-source',
+        paint: {
+          'line-color': '#06b6d4', // Ciano
+          'line-width': 3,
+          'line-opacity': 0.9,
+          'line-dasharray': [2, 2]
         }
       });
 
@@ -3103,16 +3144,16 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   onArmyMissionRequested(event: any) {
     console.log('Ordine armata emesso:', event);
-    if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
+    if (true) {
       if (event.mode === 'cancel') {
-        this.matchSocket.send(JSON.stringify({
+        this.matchState.send(JSON.stringify({
           action: 'CANCEL_MISSION',
           payload: {
             armyId: event.armyId
           }
         }));
       } else {
-        this.matchSocket.send(JSON.stringify({
+        this.matchState.send(JSON.stringify({
           action: 'MOVE_TROOPS',
           payload: {
             armyId: event.armyId,
@@ -3130,8 +3171,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   onRecruitUnitRequest(event: any) {
     console.log("Inviando richiesta RECRUIT_UNIT", event);
-    if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
-      this.matchSocket.send(JSON.stringify({
+    if (true) {
+      this.matchState.send(JSON.stringify({
         action: 'RECRUIT_UNIT',
         matchId: this.currentMatchId,
         unitId: event.unitId,
@@ -3159,8 +3200,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   saveArmiesToBackend() {
-    if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
-      this.matchSocket.send(JSON.stringify({
+    if (true) {
+      this.matchState.send(JSON.stringify({
         action: 'SAVE_ARMIES',
         payload: {
           armies: this.matchArmies,
@@ -3307,25 +3348,65 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   private sendMissionOrder(mode: 'conquer' | 'move', targetName: string, targetCoords: string) {
     if (this.selectedArmiesForMovement.length === 0) return;
 
-    this.selectedArmiesForMovement.forEach(armyId => {
+    const missions = this.selectedArmiesForMovement.map(armyId => {
       const army = this.matchArmies.find(a => a.id === armyId);
       if (army) {
-        this.onArmyMissionRequested({
+        return {
           armyId: army.id,
           mode: mode,
           targetName: targetName,
           targetCoords: targetCoords,
           composition: army.composition
-        });
+        };
       }
+      return null;
+    }).filter(m => m !== null);
+
+    if (missions.length > 0) {
+      this.pendingMissions = missions;
+      this.matchState.send({
+        action: 'PREVIEW_MISSIONS',
+        payload: { missions }
+      });
+    }
+
+    this.toastCtrl.create({
+      message: `Calcolo percorso in corso per ${missions.length} armate...`,
+      duration: 2000,
+      position: 'top',
+      color: 'tertiary'
+    }).then(t => t.present());
+    
+    // Non azzeriamo ancora this.selectedArmiesForMovement finché non conferma
+  }
+
+  confirmPendingMissions() {
+    if (!this.pendingMissions || this.pendingMissions.length === 0) return;
+    
+    this.pendingMissions.forEach(missionData => {
+      this.onArmyMissionRequested(missionData);
     });
 
     this.toastCtrl.create({
-      message: `Ordine di ${mode === 'conquer' ? 'conquista' : 'movimento'} inviato per ${this.selectedArmiesForMovement.length} armate.`,
+      message: `Ordine inviato per ${this.pendingMissions.length} armate.`,
       duration: 2000,
       position: 'top',
       color: 'success'
     }).then(t => t.present());
+
+    this.cancelPendingMissions();
+  }
+
+  cancelPendingMissions() {
+    this.pendingMissions = [];
+    this.showPreviewModal = false;
+    this.totalPreviewEta = 0;
+    this.totalPreviewDistance = 0;
+    
+    if (this.map && this.map.getSource('preview-troop-paths-source')) {
+      (this.map.getSource('preview-troop-paths-source') as any).setData({ type: 'FeatureCollection', features: [] });
+    }
+    
     this.selectedArmiesForMovement = [];
     this.previousSelectedArmiesForMovement = [];
   }
@@ -3356,7 +3437,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       // Ownership validation is done by the backend (which safely resolves region names to IDs).
 
       // Invio websocket
-      if (this.matchSocket && this.matchSocket.readyState === WebSocket.OPEN) {
+      if (true) {
         const payload = {
           action: 'BUILD_STRUCTURE',
           payload: {
@@ -3365,7 +3446,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             targetCoords: targetCoords
           }
         };
-        this.matchSocket.send(JSON.stringify(payload));
+        this.matchState.send(JSON.stringify(payload));
       }
 
       this.selectedStructureForBuild = null;

@@ -10,9 +10,23 @@ const app = express();
 app.use(express.json());
 
 const TARGET_DIR = path.join(__dirname, 'assets');
+const MAP_DIR = path.join(TARGET_DIR, 'map');
 const STAGING_DIR = path.join(__dirname, '.restore-staging');
 
 dns.setDefaultResultOrder('ipv4first');
+
+let restoreState = {
+    active: false,
+    state: 'idle',
+    progressPercent: 0,
+    currentFile: null,
+    currentFileBytes: 0,
+    currentFileTotalBytes: 0,
+    totalBytes: 0,
+    completedBytes: 0,
+    files: [],
+    message: 'Nessun ripristino in corso.'
+};
 
 const ASSET_SOURCES = [
     {
@@ -44,6 +58,30 @@ function getDownloadedFileName(source, response) {
 
 function downloadAsset(source, redirectDepth = 0) {
     const MAX_REDIRECTS = 5;
+
+    // Check if it already exists in MAP_DIR to speed up
+    const urlName = path.basename(new URL(source.url).pathname);
+    const existingPath = path.join(MAP_DIR, urlName);
+    try {
+        const stats = fs.statSync(existingPath);
+        if (stats.size > 10 * 1024 * 1024) { // > 10MB
+            console.log(`Skipping download, file already exists in MAP_DIR: ${urlName}`);
+            restoreState.totalBytes += stats.size;
+            restoreState.completedBytes += stats.size;
+            if (restoreState.totalBytes > 0) {
+                restoreState.progressPercent = Math.floor((restoreState.completedBytes / restoreState.totalBytes) * 100);
+            }
+            const currentFileObj = restoreState.files.find(f => f.name === source.name);
+            if (currentFileObj) {
+                currentFileObj.progressPercent = 100;
+            }
+            // Copy it to staging dir so it gets moved later without breaking the flow
+            fs.copySync(existingPath, path.join(STAGING_DIR, urlName));
+            return Promise.resolve(path.join(STAGING_DIR, urlName));
+        }
+    } catch (err) {
+        // File does not exist, proceed with download
+    }
 
     return new Promise((resolve, reject) => {
         const requestUrl = new URL(source.url);
@@ -85,12 +123,29 @@ function downloadAsset(source, redirectDepth = 0) {
                     return;
                 }
 
+                const contentLength = parseInt(response.headers['content-length'] || '0', 10);
+                restoreState.currentFileTotalBytes = contentLength;
+                restoreState.totalBytes += contentLength;
+
                 const downloadedFileName = getDownloadedFileName(source, response);
                 const destinationPath = path.join(STAGING_DIR, downloadedFileName);
 
                 try {
                     await fs.ensureDir(path.dirname(destinationPath));
                     const fileStream = fs.createWriteStream(destinationPath);
+                    
+                    response.on('data', (chunk) => {
+                        restoreState.currentFileBytes += chunk.length;
+                        restoreState.completedBytes += chunk.length;
+                        if (restoreState.totalBytes > 0) {
+                            restoreState.progressPercent = Math.floor((restoreState.completedBytes / restoreState.totalBytes) * 100);
+                        }
+                        const currentFileObj = restoreState.files.find(f => f.name === source.name);
+                        if (currentFileObj && restoreState.currentFileTotalBytes > 0) {
+                            currentFileObj.progressPercent = Math.floor((restoreState.currentFileBytes / restoreState.currentFileTotalBytes) * 100);
+                        }
+                    });
+
                     await pipeline(response, fileStream);
                     resolve(destinationPath);
                 } catch (error) {
@@ -105,28 +160,72 @@ function downloadAsset(source, redirectDepth = 0) {
     });
 }
 
-app.post('/restore', async (req, res) => {
-    try {
-        console.log('Iniziando il ripristino degli asset...');
-
-        await fs.emptyDir(STAGING_DIR);
-
-        for (const source of ASSET_SOURCES) {
-            console.log(`Scaricamento ${source.name} da ${source.url}`);
-
-            await downloadAsset(source);
-        }
-
-        await fs.emptyDir(TARGET_DIR);
-        await fs.copy(STAGING_DIR, TARGET_DIR);
-        await fs.remove(STAGING_DIR);
-
-        console.log('Ripristino completato con successo.');
-        res.json({ success: true, message: 'Ripristino completato con successo.' });
-    } catch (error) {
-        console.error('Errore durante il ripristino:', error);
-        res.status(500).json({ success: false, error: error.message });
+app.post('/restore', (req, res) => {
+    if (restoreState.active) {
+        return res.status(409).json({ success: false, message: 'Un ripristino è già in corso.' });
     }
+
+    restoreState = {
+        active: true,
+        state: 'downloading',
+        progressPercent: 0,
+        currentFile: null,
+        currentFileBytes: 0,
+        currentFileTotalBytes: 0,
+        totalBytes: 0,
+        completedBytes: 0,
+        files: ASSET_SOURCES.map(s => ({ name: s.name, url: s.url, progressPercent: 0 })),
+        message: 'Inizio download...'
+    };
+
+    // Run async
+    (async () => {
+        try {
+            console.log('Iniziando il ripristino degli asset in parallelo...');
+            await fs.emptyDir(STAGING_DIR);
+
+            await Promise.all(ASSET_SOURCES.map(source => {
+                console.log(`Avvio scaricamento ${source.name} da ${source.url}`);
+                return downloadAsset(source);
+            }));
+
+            restoreState.message = 'Download completato, spostamento file...';
+            await fs.ensureDir(MAP_DIR);
+
+            // Wipe SOLO dei raster ETOPO e lc_mcd12
+            const mapFiles = await fs.readdir(MAP_DIR).catch(() => []);
+            for (const file of mapFiles) {
+                if (file.startsWith('ETOPO') || file.startsWith('lc_mcd12')) {
+                    await fs.remove(path.join(MAP_DIR, file));
+                }
+            }
+
+            // Sposta i nuovi file dal folder di staging al folder map
+            const stagedFiles = await fs.readdir(STAGING_DIR);
+            for (const file of stagedFiles) {
+                await fs.copy(path.join(STAGING_DIR, file), path.join(MAP_DIR, file));
+            }
+
+            await fs.remove(STAGING_DIR);
+
+            restoreState.state = 'completed';
+            restoreState.progressPercent = 100;
+            restoreState.message = 'Ripristino completato con successo.';
+            restoreState.active = false;
+            console.log('Ripristino completato con successo.');
+        } catch (error) {
+            console.error('Errore durante il ripristino:', error);
+            restoreState.state = 'error';
+            restoreState.message = `Errore: ${error.message}`;
+            restoreState.active = false;
+        }
+    })();
+
+    res.status(202).json({ success: true, message: 'Ripristino avviato in background.' });
+});
+
+app.get('/status', (req, res) => {
+    res.json(restoreState);
 });
 
 const PORT = 3000;
