@@ -50,6 +50,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   public showPreviewModal: boolean = false;
   public totalPreviewEta: number = 0;
   public totalPreviewDistance: number = 0;
+  public selectedWaypoints: [number, number][] = [];
+  public waypointMarkers: any[] = [];
+  public destinationMarker: any = null;
+  public isPreviewValid: boolean = true;
+  public previewError: string | null = null;
+  public currentPreviewPath: [number, number][] = [];
   @ViewChild(ArmyModalComponent) armyModalComponent!: ArmyModalComponent;
   @ViewChild(InGameChatComponent) chatComponent!: InGameChatComponent;
   @ViewChild('mapContainer', { static: true }) mapContainer!: ElementRef;
@@ -59,6 +65,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   MAPTILER_KEY = 'PGAzmQH2OduY9E8gSi6n';
   hoveredState = { id: null as any, source: null as any };
   currentHoveredName = '';
+  hoveredArmyId: string | null = null;
   selectedPointName = '';
   selectedPointCoords = '--';
   selectedPointLngLat: [number, number] | null = null;
@@ -252,9 +259,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const cumDists: number[] = [0];
     let total = 0;
     for (let i = 0; i < army.path.length - 1; i++) {
-      const dx = army.path[i + 1][0] - army.path[i][0];
-      const dy = army.path[i + 1][1] - army.path[i][1];
-      const d = Math.sqrt(dx * dx + dy * dy);
+      const d = this.haversineDist(army.path[i][0], army.path[i][1], army.path[i + 1][0], army.path[i + 1][1]);
       segDists.push(d);
       total += d;
       cumDists.push(total);
@@ -280,6 +285,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   updateMovingArmies() {
     if (!this.map || this.matchArmies.length === 0) return;
     const now = Date.now();
+    const movingPathsFeatures: any[] = [];
+
     this.matchArmies.forEach(army => {
       if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto alla conquista") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
         const elapsed = now - army.startTime;
@@ -288,6 +295,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         let currentLngLat: [number, number] = army.path[army.path.length - 1];
         let prevLngLat: [number, number] = army.path[0];
         let direction: 'front' | 'back' | 'side' | 'side-flip' = 'front';
+        let remainingPath: [number, number][] = [];
 
         if (progress < 1) {
           army._hasVisuallyArrived = false;
@@ -313,6 +321,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               p1[0] + (p2[0] - p1[0]) * segProgress,
               p1[1] + (p2[1] - p1[1]) * segProgress
             ];
+
+            // Calcola il percorso rimanente
+            remainingPath.push(currentLngLat);
+            for (let i = segIdx + 1; i < army.path.length; i++) {
+              remainingPath.push(army.path[i] as [number, number]);
+            }
+          } else {
+            remainingPath = army.path;
           }
         } else {
           prevLngLat = army.path ? army.path[Math.max(0, army.path.length - 2)] : currentLngLat;
@@ -325,6 +341,36 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             delete army.startTime;
             delete army._pathCache; // Libera la cache
             setTimeout(() => this.renderArmies(), 0);
+          }
+        }
+
+        if (remainingPath.length > 1) {
+          movingPathsFeatures.push({
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: remainingPath
+            },
+            properties: { armyId: army.id }
+          });
+        }
+
+        // Se l'armata è in hover, aggiorniamo dinamicamente il suo percorso evidenziato
+        if (army.id === this.hoveredArmyId) {
+          const hoverSource: any = this.map.getSource('hovered-troop-path-source');
+          if (hoverSource) {
+            if (remainingPath.length > 1) {
+              hoverSource.setData({
+                type: 'FeatureCollection',
+                features: [{
+                  type: 'Feature',
+                  geometry: { type: 'LineString', coordinates: remainingPath },
+                  properties: { armyId: army.id }
+                }]
+              });
+            } else {
+              hoverSource.setData({ type: 'FeatureCollection', features: [] });
+            }
           }
         }
 
@@ -370,6 +416,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         }
       }
     });
+
+    if (this.map.getSource('moving-troops-paths-source')) {
+      (this.map.getSource('moving-troops-paths-source') as any).setData({
+        type: 'FeatureCollection',
+        features: movingPathsFeatures
+      });
+    }
   }
 
   // --- 3. DATI DI GIOCO E REGOLE ---
@@ -871,14 +924,27 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                 if (oldA._hasVisuallyArrived) newA._hasVisuallyArrived = oldA._hasVisuallyArrived;
 
                 // Conserva i parametri di movimento locale se per qualche motivo il FOW_UPDATE
-                // arriva prima che il DB abbia confermato il salvataggio dei nuovi dati
-                if (!newA.missionMode && oldA.missionMode) newA.missionMode = oldA.missionMode;
-                if (!newA.targetName && oldA.targetName) newA.targetName = oldA.targetName;
-                if (!newA.path && oldA.path) newA.path = oldA.path;
-                if (!newA.etaMs && oldA.etaMs) newA.etaMs = oldA.etaMs;
-                if (!newA.startTime && oldA.startTime) newA.startTime = oldA.startTime;
-                if (oldA.status === 'moving' || oldA.status === 'moving_to_border' || oldA.status === "Pronto alla conquista") {
-                  if (newA.status !== oldA.status) newA.status = oldA.status;
+                // arriva prima che il DB abbia confermato il salvataggio dei nuovi dati,
+                // MA solo se lo stato del server non è esplicitamente un combattimento o morte.
+                const isCombatOrDead = ['in combattimento', 'in_battaglia', 'dead'].includes(newA.status);
+
+                if (!isCombatOrDead) {
+                  if (!newA.missionMode && oldA.missionMode) newA.missionMode = oldA.missionMode;
+                  if (!newA.targetName && oldA.targetName) newA.targetName = oldA.targetName;
+                  if (!newA.path && oldA.path) newA.path = oldA.path;
+                  if (!newA.etaMs && oldA.etaMs) newA.etaMs = oldA.etaMs;
+                  if (!newA.startTime && oldA.startTime) newA.startTime = oldA.startTime;
+                  if (oldA.status === 'moving' || oldA.status === 'moving_to_border' || oldA.status === "Pronto alla conquista") {
+                    if (newA.status !== oldA.status) newA.status = oldA.status;
+                  }
+                } else {
+                  // Se siamo in combattimento o morti, rimuovi i parametri locali di movimento per fermare l'animazione
+                  delete newA.path;
+                  delete newA.etaMs;
+                  delete newA.startTime;
+                  delete newA.missionMode;
+                  delete newA.targetName;
+                  delete newA._pathCache;
                 }
               }
             });
@@ -952,10 +1018,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             if (results && results.length > 0) {
               this.totalPreviewDistance = results.reduce((acc: number, r: any) => acc + (r.distanceKm || 0), 0);
               this.totalPreviewEta = results.reduce((acc: number, r: any) => acc + (r.etaMs || 0), 0);
+              this.isPreviewValid = results.every((r: any) => r.isValid !== false);
+              this.previewError = results.find((r: any) => r.error)?.error || null;
               
               const features: any[] = [];
+              let allPathCoords: [number, number][] = [];
               results.forEach((r: any) => {
                 if (r.path && r.path.length > 1) {
+                  allPathCoords = allPathCoords.concat(r.path);
                   features.push({
                     type: 'Feature',
                     properties: {},
@@ -963,12 +1033,38 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                   });
                 }
               });
+              this.currentPreviewPath = allPathCoords;
 
               if (this.map && this.map.getSource('preview-troop-paths-source')) {
                 (this.map.getSource('preview-troop-paths-source') as any).setData({
                   type: 'FeatureCollection',
                   features: features
                 });
+              }
+
+              // Crea o aggiorna il marker di destinazione trascinabile
+              const lastResult = results[results.length - 1];
+              if (lastResult && lastResult.path && lastResult.path.length > 0 && this.map) {
+                const finalCoords = lastResult.path[lastResult.path.length - 1];
+                if (this.destinationMarker) {
+                  this.destinationMarker.setLngLat(finalCoords);
+                } else {
+                  const el = document.createElement('div');
+                  el.className = 'destination-marker';
+                  el.innerHTML = `<div style="background:#06b6d4; border:2px solid white; border-radius:50%; width:16px; height:16px; box-shadow:0 0 5px rgba(0,0,0,0.5); cursor: move;"></div>`;
+                  
+                  this.destinationMarker = new maplibregl.Marker({ element: el, draggable: true })
+                    .setLngLat(finalCoords)
+                    .addTo(this.map);
+                  
+                  this.destinationMarker.on('dragend', () => {
+                    const newLngLat = this.destinationMarker.getLngLat();
+                    this.pendingMissions.forEach((m: any) => {
+                      m.targetCoords = `${newLngLat.lng},${newLngLat.lat}`;
+                    });
+                    this.recalculatePreview();
+                  });
+                }
               }
 
               this.showPreviewModal = true;
@@ -1848,18 +1944,28 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  calculateCurrentPosition(path: number[][], startTime: number, etaMs: number): { lng: number, lat: number } | null {
+  haversineDist(lon1: number, lat1: number, lon2: number, lat2: number): number {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  calculateCurrentPosition(path: number[][], startTime: any, etaMs: number): { lng: number, lat: number } | null {
     if (!path || path.length < 2 || !etaMs || !startTime) return null;
-    const elapsed = Date.now() - startTime;
+    const startTs = (typeof startTime === 'string' || startTime instanceof Date) ? new Date(startTime).getTime() : Number(startTime);
+    if (isNaN(startTs)) return null;
+    const elapsed = Date.now() - startTs;
     const progress = Math.max(0, Math.min(1, elapsed / etaMs));
     if (progress >= 1) return { lng: path[path.length - 1][0], lat: path[path.length - 1][1] };
 
     let totalDistance = 0;
     const segmentDistances: number[] = [];
     for (let i = 0; i < path.length - 1; i++) {
-      const dx = path[i + 1][0] - path[i][0];
-      const dy = path[i + 1][1] - path[i][1];
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = this.haversineDist(path[i][0], path[i][1], path[i + 1][0], path[i + 1][1]);
       segmentDistances.push(dist);
       totalDistance += dist;
     }
@@ -2197,15 +2303,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const alliedArmies = this.matchArmies.filter(a => String(a.owner || '').trim().toLowerCase() === currentUser);
 
     // Funzione helper Haversine
-    const haversineDist = (lon1: number, lat1: number, lon2: number, lat2: number) => {
-      const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    };
+
 
     // Aggiungiamo o aggiorniamo i marker
     this.matchArmies.forEach(army => {
@@ -2250,11 +2348,33 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           progress = Math.max(0, Math.min(1, elapsed / army.etaMs));
         }
         if (progress < 1) {
+          let remainingPath = army.path;
+          if (!army._pathCache) {
+            this.precomputeArmyPathCache(army);
+          }
+          const cache = army._pathCache;
+          if (cache && cache.totalDistance > 0) {
+            const targetDistance = progress * cache.totalDistance;
+            const segIdx = this.findSegmentBinarySearch(cache.cumulativeDistances, targetDistance);
+            const segDist = cache.segmentDistances[segIdx];
+            const segProgress = segDist > 0 ? (targetDistance - cache.cumulativeDistances[segIdx]) / segDist : 0;
+            const p1 = army.path[segIdx];
+            const p2 = army.path[segIdx + 1] || p1;
+            const currentLngLat: [number, number] = [
+              p1[0] + (p2[0] - p1[0]) * segProgress,
+              p1[1] + (p2[1] - p1[1]) * segProgress
+            ];
+            
+            remainingPath = [currentLngLat];
+            for (let i = segIdx + 1; i < army.path.length; i++) {
+              remainingPath.push(army.path[i] as [number, number]);
+            }
+          }
           movingPathsFeatures.push({
             type: 'Feature',
             geometry: {
               type: 'LineString',
-              coordinates: army.path
+              coordinates: remainingPath
             },
             properties: { armyId: army.id }
           });
@@ -2395,13 +2515,37 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         container.addEventListener('mouseenter', () => {
           const currentArmy = this.matchArmies.find(a => a.id === army.id) || army;
           if ((currentArmy.status === 'moving' || currentArmy.status === 'moving_to_border' || currentArmy.status === "Pronto alla conquista") && currentArmy.path && currentArmy.path.length > 0) {
+            this.hoveredArmyId = currentArmy.id;
             const hoverSource: any = this.map?.getSource('hovered-troop-path-source');
             if (hoverSource) {
+              let remainingPath = currentArmy.path;
+              if (!currentArmy._pathCache) {
+                this.precomputeArmyPathCache(currentArmy);
+              }
+              const cache = currentArmy._pathCache;
+              if (cache && cache.totalDistance > 0 && currentArmy.startTime && currentArmy.etaMs) {
+                const elapsed = Date.now() - currentArmy.startTime;
+                const progress = Math.max(0, Math.min(1, elapsed / currentArmy.etaMs));
+                const targetDistance = progress * cache.totalDistance;
+                const segIdx = this.findSegmentBinarySearch(cache.cumulativeDistances, targetDistance);
+                const segDist = cache.segmentDistances[segIdx];
+                const segProgress = segDist > 0 ? (targetDistance - cache.cumulativeDistances[segIdx]) / segDist : 0;
+                const p1 = currentArmy.path[segIdx];
+                const p2 = currentArmy.path[segIdx + 1] || p1;
+                const currentLngLat: [number, number] = [
+                  p1[0] + (p2[0] - p1[0]) * segProgress,
+                  p1[1] + (p2[1] - p1[1]) * segProgress
+                ];
+                remainingPath = [currentLngLat];
+                for (let i = segIdx + 1; i < currentArmy.path.length; i++) {
+                  remainingPath.push(currentArmy.path[i] as [number, number]);
+                }
+              }
               hoverSource.setData({
                 type: 'FeatureCollection',
                 features: [{
                   type: 'Feature',
-                  geometry: { type: 'LineString', coordinates: currentArmy.path },
+                  geometry: { type: 'LineString', coordinates: remainingPath },
                   properties: { armyId: currentArmy.id }
                 }]
               });
@@ -2422,6 +2566,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         });
 
         container.addEventListener('mouseleave', () => {
+          this.hoveredArmyId = null;
           const hoverSource: any = this.map.getSource('hovered-troop-path-source');
           if (hoverSource) {
             hoverSource.setData({ type: 'FeatureCollection', features: [] });
@@ -3160,7 +3305,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             mode: event.mode,
             targetName: event.targetName,
             targetCoords: event.targetCoords,
-            composition: event.composition
+            composition: event.composition,
+            waypoints: event.waypoints || []
           }
         }));
       }
@@ -3356,7 +3502,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           mode: mode,
           targetName: targetName,
           targetCoords: targetCoords,
-          composition: army.composition
+          composition: army.composition,
+          waypoints: [...this.selectedWaypoints]
         };
       }
       return null;
@@ -3402,13 +3549,88 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.showPreviewModal = false;
     this.totalPreviewEta = 0;
     this.totalPreviewDistance = 0;
+    this.isPreviewValid = true;
+    this.previewError = null;
+    this.currentPreviewPath = [];
     
     if (this.map && this.map.getSource('preview-troop-paths-source')) {
       (this.map.getSource('preview-troop-paths-source') as any).setData({ type: 'FeatureCollection', features: [] });
     }
     
+    this.selectedWaypoints = [];
+    this.waypointMarkers.forEach(m => m.remove());
+    this.waypointMarkers = [];
+
+    if (this.destinationMarker) {
+      this.destinationMarker.remove();
+      this.destinationMarker = null;
+    }
+
     this.selectedArmiesForMovement = [];
     this.previousSelectedArmiesForMovement = [];
+  }
+
+  addWaypoint() {
+    if (!this.currentPreviewPath || this.currentPreviewPath.length < 2) return;
+    
+    // Trova la coordinata a metà del tracciato corrente
+    const midIndex = Math.floor(this.currentPreviewPath.length / 2);
+    const coords = this.currentPreviewPath[midIndex];
+    
+    if (coords && this.map) {
+      this.selectedWaypoints.push(coords);
+      
+      const el = document.createElement('div');
+      el.className = 'waypoint-marker';
+      el.innerHTML = `<div style="background:#eab308; border:2px solid white; border-radius:50%; width:14px; height:14px; box-shadow:0 0 5px rgba(0,0,0,0.5); cursor: move;" title="Trascina per spostare, clicca per eliminare"></div>`;
+      
+      const marker = new maplibregl.Marker({ element: el, draggable: true })
+        .setLngLat(coords)
+        .addTo(this.map);
+      this.waypointMarkers.push(marker);
+
+      marker.on('dragend', () => {
+        const newLngLat = marker.getLngLat();
+        const idx = this.waypointMarkers.indexOf(marker);
+        if (idx !== -1) {
+          this.selectedWaypoints[idx] = [newLngLat.lng, newLngLat.lat];
+          this.recalculatePreview();
+        }
+      });
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = this.waypointMarkers.indexOf(marker);
+        if (idx !== -1) {
+          marker.remove();
+          this.waypointMarkers.splice(idx, 1);
+          this.selectedWaypoints.splice(idx, 1);
+          this.recalculatePreview();
+          
+          this.toastCtrl.create({
+            message: 'Tappa rimossa',
+            duration: 1500,
+            position: 'top',
+            color: 'warning'
+          }).then(t => t.present());
+        }
+      });
+
+      // Ricalcola subito l'anteprima inserendo questa nuova tappa nel mezzo del percorso
+      this.recalculatePreview();
+      this.cdr.detectChanges();
+    }
+  }
+
+  recalculatePreview() {
+    if (!this.pendingMissions || this.pendingMissions.length === 0) return;
+    this.pendingMissions.forEach(m => {
+      m.waypoints = [...this.selectedWaypoints];
+    });
+    this.matchState.send({
+      action: 'PREVIEW_MISSIONS',
+      payload: { missions: this.pendingMissions }
+    });
   }
 
   handleMapPointSelect(e: any) {

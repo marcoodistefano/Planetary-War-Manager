@@ -10,7 +10,7 @@ const matchModel = require("./matchModel.js");
 const { getAuthContextFromRequest } = require("../shared/authContext.js");
 const { initDispatcher } = require("./Dispatcher/webDispatcher.js");
 const redis = require("../shared/redisClient.js");
-const { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, calculateCurrentPosition, getRegionIdByName } = require("./middleware/movementLogic.js");
+const { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, calculateCurrentPosition, getRegionIdByName, getRegionAtCoords } = require("./middleware/movementLogic.js");
 const { getMatch, updateMatch } = require('../shared/matchMonolithic.js');
 const db = require('../shared/postgresClient.js');
 const { startTroopGenerator } = require("./middleware/troopGenerator.js");
@@ -38,6 +38,99 @@ function translateRedisToFe(resources) {
         oro: (resources && resources.oro) || 0
     };
 }
+
+const validateSeaCrossing = async (player, armata, loc, startLng, startLat, targetLng, targetLat, targetName, isValid) => {
+    const rulesRawBase64 = await redis.get("assets:game_rules.json");
+    if (!rulesRawBase64) return;
+    const rulesObj = JSON.parse(Buffer.from(rulesRawBase64, 'base64').toString('utf8'));
+    const truppeSheet = rulesObj.sheets.find(s => s.name === "Truppe" || s.name === "truppe");
+    const truppeLines = truppeSheet ? truppeSheet.lines : [];
+
+    const LAND_UNIT_IDS = ['fante', 'lmv', 'apc', 'speciali', 'carro_armato', 'sam_mobile', 'artiglieria'];
+    let totalLandWeight = 0;
+    let hasLandUnits = false;
+    for (const [unitId, qty] of Object.entries(armata.composition || {})) {
+        const uRule = truppeLines.find(line => line.id_truppa === unitId);
+        if (uRule && uRule.dominio === 1) {
+            hasLandUnits = true;
+            totalLandWeight += qty * (uRule.peso_truppa || 0);
+        }
+    }
+
+    if (!hasLandUnits) return;
+
+    const crossesWater = !isValid && (startLng !== targetLng || startLat !== targetLat);
+
+    if (crossesWater) {
+        let startRegionId = null;
+        if (loc && typeof loc === 'string' && !loc.includes(',')) {
+            startRegionId = getRegionForNode(loc);
+        } else {
+            startRegionId = getRegionAtCoords(startLng, startLat);
+        }
+
+        if (!startRegionId) {
+            throw new Error("Impossibile determinare la regione di partenza.");
+        }
+
+        const adjData = await redis.get('map_data:regions_adjacency');
+        if (!adjData) {
+            throw new Error("Dati di adiacenza delle regioni non trovati.");
+        }
+        const adjacency = JSON.parse(adjData);
+
+        const startEntry = Object.values(adjacency).find(entry => entry.provCode === startRegionId || entry.id === startRegionId);
+        if (!startEntry) {
+            throw new Error("Impossibile trovare la configurazione della regione di partenza.");
+        }
+
+        const neighborCodes = startEntry.neighbors.map(neighborIndex => adjacency[neighborIndex].provCode || adjacency[neighborIndex].id);
+        const adjacentRegionIds = [startRegionId, ...neighborCodes];
+
+        const hasPort = player.strutture && player.strutture.some(s => 
+            s.status === 'built' && 
+            s.structureId.startsWith('porto_t') && 
+            adjacentRegionIds.includes(s.regionId)
+        );
+
+        if (!hasPort) {
+            throw new Error("Movimento via mare non consentito: nessun porto disponibile nella regione di partenza o limitrofe.");
+        }
+
+        let totalTransportCapacity = 0;
+        for (const army of Object.values(player.armate || {})) {
+            let armyRegionId = null;
+            let armyLoc = army.currentLocation;
+            if (armyLoc && typeof armyLoc === 'string') {
+                if (armyLoc.includes(',')) {
+                    const pts = armyLoc.split(',').map(s => parseFloat(s.trim()));
+                    if (pts.length === 2 && !isNaN(pts[0])) {
+                        armyRegionId = getRegionAtCoords(pts[0], pts[1]);
+                    }
+                } else {
+                    armyRegionId = getRegionForNode(armyLoc);
+                }
+            } else if (armyLoc && armyLoc.x !== undefined) {
+                armyRegionId = getRegionAtCoords(armyLoc.x, armyLoc.y);
+            } else if (Array.isArray(armyLoc) && armyLoc.length >= 2) {
+                armyRegionId = getRegionAtCoords(armyLoc[0], armyLoc[1]);
+            }
+
+            if (armyRegionId && adjacentRegionIds.includes(armyRegionId)) {
+                for (const [unitId, qty] of Object.entries(army.composition || {})) {
+                    const uRule = truppeLines.find(line => line.id_truppa === unitId);
+                    if (uRule && uRule.dominio === 2 && uRule.peso_trasportabile > 0) {
+                        totalTransportCapacity += qty * uRule.peso_trasportabile;
+                    }
+                }
+            }
+        }
+
+        if (totalTransportCapacity < totalLandWeight) {
+            throw new Error(`Capacità di trasporto insufficiente: necessiti di ${totalLandWeight} tonnellate, ma hai solo ${totalTransportCapacity} disponibili nei porti adiacenti.`);
+        }
+    }
+};
 
 
 const app = express();
@@ -102,6 +195,9 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
             let payload;
             try {
                 payload = JSON.parse(message.toString());
+                if (typeof payload === 'string') {
+                    payload = JSON.parse(payload);
+                }
             } catch (error) {
                 ws.send(JSON.stringify({ type: "ERROR", error: "Payload non valido" }));
                 return;
@@ -315,7 +411,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                     const results = [];
                     for (const mission of missions) {
-                        const { armyId, targetName, targetCoords } = mission;
+                        const { armyId, targetName, targetCoords, waypoints } = mission;
                         const armata = player.armate[armyId];
                         if (!armata) continue;
 
@@ -385,16 +481,28 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             }
 
                             try {
-                                const { pathCoords, distanceKm, etaMs } = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, unitSpeedMultiplier, currentPathInfo, matchMultiplier);
+                                const pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, unitSpeedMultiplier, currentPathInfo, matchMultiplier, player, waypoints || []);
+                                
+                                let isValid = true;
+                                let errorMessage = null;
+                                try {
+                                    await validateSeaCrossing(player, armata, loc, startLng, startLat, targetLng, targetLat, targetName, pathInfo.isValid);
+                                } catch (err) {
+                                    isValid = false;
+                                    errorMessage = err.message;
+                                }
+
                                 results.push({
                                     armyId,
-                                    path: pathCoords,
-                                    etaMs,
-                                    distanceKm,
+                                    path: pathInfo.path,
+                                    etaMs: pathInfo.etaMs,
+                                    distanceKm: pathInfo.distance,
+                                    isValid: isValid,
+                                    error: errorMessage,
                                     originalMission: mission
                                 });
                             } catch(e) {
-                                console.error("[PREVIEW_MISSIONS] Errore calcolo:", e);
+                                console.error("[PREVIEW_MISSIONS] Errore critico calcolo percorso:", e);
                             }
                         }
                     }
@@ -404,7 +512,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                 }
 
                 if (payload.action === 'MOVE_TROOPS') {
-                    const { armyId, targetName, targetCoords } = payload.payload;
+                    const { armyId, targetName, targetCoords, waypoints } = payload.payload;
 
                     const matchData = await getMatch(ws.matchId);
                     if (!matchData || !matchData.match || !matchData.match.player) {
@@ -447,8 +555,10 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                     let currentPathInfo = null;
                     const armyState = armata.status;
+                    console.log(`[MOVE_DEBUG] armyState: ${armyState}, hasPath: ${!!armata.path}, pathLen: ${armata.path ? armata.path.length : 0}, startTime: ${armata.startTime}, etaMs: ${armata.etaMs}`);
                     if ((armyState === 'moving' || armyState === 'moving_to_border' || armyState === "Pronto alla conquista") && armata.path && armata.path.length > 1 && armata.startTime && armata.etaMs) {
                         const currentPos = calculateCurrentPosition(armata.path, armata.startTime, armata.etaMs);
+                        console.log(`[MOVE_DEBUG] calculated currentPos:`, currentPos);
                         if (currentPos) {
                             startLng = currentPos.lng;
                             startLat = currentPos.lat;
@@ -502,11 +612,14 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         }
                     }
 
-                    let pathInfo = { isValid: false, distance: 0, etaMs: 0, path: [] };
+                    let pathInfo = { isValid: false, distance: 0, etaMs: 0, path: [], cost: 0 };
                     try {
-                        pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, unitSpeedMultiplier, currentPathInfo, matchMultiplier);
+                        pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, unitSpeedMultiplier, currentPathInfo, matchMultiplier, player, waypoints || []);
+                        await validateSeaCrossing(player, armata, loc, startLng, startLat, targetLng, targetLat, targetName, pathInfo.isValid);
                     } catch (e) {
-                        console.error("Errore durante calculatePath:", e);
+                        console.error("Errore durante calculatePath o validazione:", e);
+                        ws.send(JSON.stringify({ type: 'ERROR', error: e.message || 'Errore validazione percorso' }));
+                        return;
                     }
 
                     let targetPlayerId = null;
@@ -591,6 +704,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         p.armate[armyId].targetName = targetName;
                         p.armate[armyId].missionMode = payload.payload.mode;
                         p.armate[armyId].path = pathInfo.path;
+                        p.armate[armyId].waypoints = waypoints || [];
                         p.armate[armyId].startTime = Date.now();
                         p.armate[armyId].etaMs = pathInfo.etaMs;
 

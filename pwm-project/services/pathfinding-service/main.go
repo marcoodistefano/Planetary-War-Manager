@@ -109,8 +109,9 @@ func handleCalculatePath(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type PathResponse struct {
-		Path [][2]float64 `json:"path"`
-		Cost float64      `json:"cost"`
+		Path    [][2]float64 `json:"path"`
+		Cost    float64      `json:"cost"`
+		IsValid bool         `json:"isValid"`
 	}
 
 	var req PathRequest
@@ -122,7 +123,7 @@ func handleCalculatePath(w http.ResponseWriter, r *http.Request) {
 	if EtopoData == nil {
 		// Fallback se i dati non sono caricati
 		path := [][2]float64{{req.StartX, req.StartY}, {req.TargetX, req.TargetY}}
-		json.NewEncoder(w).Encode(PathResponse{Path: path, Cost: 0.0})
+		json.NewEncoder(w).Encode(PathResponse{Path: path, Cost: 0.0, IsValid: false})
 		return
 	}
 
@@ -131,10 +132,10 @@ func handleCalculatePath(w http.ResponseWriter, r *http.Request) {
 		multiplier = 1.0
 	}
 
-	path, cost := FindPath(req.StartX, req.StartY, req.TargetX, req.TargetY, multiplier)
+	path, cost, isValid := FindPath(req.StartX, req.StartY, req.TargetX, req.TargetY, multiplier)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(PathResponse{Path: path, Cost: cost})
+	json.NewEncoder(w).Encode(PathResponse{Path: path, Cost: cost, IsValid: isValid})
 }
 
 func main() {

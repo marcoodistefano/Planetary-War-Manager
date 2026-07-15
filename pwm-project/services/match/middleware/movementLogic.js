@@ -3,6 +3,7 @@ const path = require('path');
 const topojson = require('topojson-client');
 const turf = require('@turf/turf');
 const dynamicPathfinder = require('./dynamicPathfinder');
+const redis = require('../../shared/redisClient.js');
 
 let regionsFeatures = null;
 
@@ -30,12 +31,288 @@ function haversineDist(lon1, lat1, lon2, lat2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+const getAdjacentRegionIds = async (regionId) => {
+    try {
+        const adjData = await redis.get('map_data:regions_adjacency');
+        if (!adjData) return [regionId];
+        const adjacency = JSON.parse(adjData);
+        const startEntry = Object.values(adjacency).find(entry => entry.provCode === regionId || entry.id === regionId);
+        if (!startEntry) return [regionId];
+        const neighborCodes = startEntry.neighbors.map(neighborIndex => adjacency[neighborIndex].provCode || adjacency[neighborIndex].id);
+        return [regionId, ...neighborCodes];
+    } catch (e) {
+        return [regionId];
+    }
+};
+
+const checkPlayerTransportCapacity = async (player, regionId, domain, rulesObj) => {
+    if (!player) return 0;
+    const truppeSheet = rulesObj.sheets.find(s => s.name === "Truppe" || s.name === "truppe");
+    const truppeLines = truppeSheet ? truppeSheet.lines : [];
+    
+    const adjacentRegionIds = await getAdjacentRegionIds(regionId);
+    let totalCapacity = 0;
+    
+    for (const army of Object.values(player.armate || {})) {
+        let armyRegionId = null;
+        let armyLoc = army.currentLocation;
+        if (armyLoc && typeof armyLoc === 'string') {
+            if (armyLoc.includes(',')) {
+                const pts = armyLoc.split(',').map(s => parseFloat(s.trim()));
+                if (pts.length === 2 && !isNaN(pts[0])) {
+                    armyRegionId = getRegionAtCoords(pts[0], pts[1]);
+                }
+            } else {
+                armyRegionId = getRegionForNode(armyLoc);
+            }
+        } else if (armyLoc && armyLoc.x !== undefined) {
+            armyRegionId = getRegionAtCoords(armyLoc.x, armyLoc.y);
+        } else if (Array.isArray(armyLoc) && armyLoc.length >= 2) {
+            armyRegionId = getRegionAtCoords(armyLoc[0], armyLoc[1]);
+        }
+        
+        if (armyRegionId && adjacentRegionIds.includes(armyRegionId)) {
+            for (const [unitId, qty] of Object.entries(army.composition || {})) {
+                const uRule = truppeLines.find(line => line.id_truppa === unitId);
+                if (uRule && uRule.dominio === domain && uRule.peso_trasportabile > 0) {
+                    totalCapacity += qty * uRule.peso_trasportabile;
+                }
+            }
+        }
+    }
+    return totalCapacity;
+};
+
 // Main calculate function using A*
-const calculatePath = async (startLng, startLat, targetName, targetLng, targetLat, multiplier = 1, currentPathInfo = null, matchMultiplier = 1) => {
+const calculatePath = async (startLng, startLat, targetName, targetLng, targetLat, multiplier = 1, currentPathInfo = null, matchMultiplier = 1, player = null, waypoints = []) => {
+    const rulesRawBase64 = await redis.get("assets:game_rules.json");
+    let rulesObj = null;
+    if (rulesRawBase64) {
+        rulesObj = JSON.parse(Buffer.from(rulesRawBase64, 'base64').toString('utf8'));
+    }
+
+    const baseSpeed = 50; // km/h
+
+    console.log(`[PATH_DEBUG] calculatePath startLng: ${startLng}, startLat: ${startLat}, targetLng: ${targetLng}, targetLat: ${targetLat}, waypoints:`, waypoints);
+    if (waypoints && waypoints.length > 0) {
+        let combinedCoords = [];
+        let combinedCost = 0;
+        let combinedDistance = 0;
+        let combinedEtaMs = 0;
+        let isValid = true;
+
+        const points = [[startLng, startLat], ...waypoints, [targetLng, targetLat]];
+        for (let i = 0; i < points.length - 1; i++) {
+            const segStart = points[i];
+            const segEnd = points[i+1];
+            
+            let segPathRes = await dynamicPathfinder.findPath(segStart[0], segStart[1], segEnd[0], segEnd[1], multiplier);
+            if (segPathRes.isValid) {
+                if (combinedCoords.length > 0) {
+                    combinedCoords = combinedCoords.concat(segPathRes.path.slice(1));
+                } else {
+                    combinedCoords = combinedCoords.concat(segPathRes.path);
+                }
+                combinedCost += segPathRes.cost;
+                
+                let segmentDistance = 0;
+                for (let j = 0; j < segPathRes.path.length - 1; j++) {
+                    segmentDistance += haversineDist(segPathRes.path[j][0], segPathRes.path[j][1], segPathRes.path[j+1][0], segPathRes.path[j+1][1]);
+                }
+                combinedDistance += segmentDistance;
+                
+                let segEtaMs = segmentDistance / (baseSpeed * multiplier) * 60 * 60 * 1000;
+                if (segPathRes.cost > 0) {
+                    segEtaMs = (segPathRes.cost * 11.1) / (baseSpeed * multiplier) * 60 * 60 * 1000;
+                }
+                combinedEtaMs += segEtaMs;
+            } else {
+                const startRegionId = getRegionAtCoords(segStart[0], segStart[1]);
+                const endRegionId = getRegionAtCoords(segEnd[0], segEnd[1]);
+                
+                const hasStartPort = player && player.strutture && player.strutture.some(s => s.status === 'built' && s.structureId.startsWith('porto_t') && s.regionId === startRegionId);
+                const hasEndPort = player && player.strutture && player.strutture.some(s => s.status === 'built' && s.structureId.startsWith('porto_t') && s.regionId === endRegionId);
+                
+                const hasStartAirport = player && player.strutture && player.strutture.some(s => s.status === 'built' && s.structureId.startsWith('aeroporto_t') && s.regionId === startRegionId);
+                const hasEndAirport = player && player.strutture && player.strutture.some(s => s.status === 'built' && s.structureId.startsWith('aeroporto_t') && s.regionId === endRegionId);
+                
+                let isTransitValid = false;
+                let transitSpeed = baseSpeed;
+                
+                if (hasStartPort && hasEndPort) {
+                    const capacity = await checkPlayerTransportCapacity(player, startRegionId, 2, rulesObj);
+                    if (capacity > 0) {
+                        isTransitValid = true;
+                        transitSpeed = 25;
+                    }
+                } else if (hasStartAirport && hasEndAirport) {
+                    const capacity = await checkPlayerTransportCapacity(player, startRegionId, 0, rulesObj);
+                    if (capacity > 0) {
+                        isTransitValid = true;
+                        transitSpeed = 150;
+                    }
+                }
+                
+                if (isTransitValid) {
+                    if (combinedCoords.length > 0) {
+                        combinedCoords.push(segEnd);
+                    } else {
+                        combinedCoords.push(segStart, segEnd);
+                    }
+                    const segDist = haversineDist(segStart[0], segStart[1], segEnd[0], segEnd[1]);
+                    combinedDistance += segDist;
+                    const segEtaMs = segDist / transitSpeed * 60 * 60 * 1000;
+                    combinedEtaMs += segEtaMs;
+                } else {
+                    isValid = false;
+                    if (combinedCoords.length > 0) {
+                        combinedCoords.push(segEnd);
+                    } else {
+                        combinedCoords.push(segStart, segEnd);
+                    }
+                    const segDist = haversineDist(segStart[0], segStart[1], segEnd[0], segEnd[1]);
+                    combinedDistance += segDist;
+                    combinedEtaMs += segDist / baseSpeed * 60 * 60 * 1000;
+                }
+            }
+        }
+
+        if (matchMultiplier > 0) {
+            combinedEtaMs = Math.floor(combinedEtaMs / matchMultiplier);
+        }
+
+        return {
+            isValid,
+            distance: combinedDistance,
+            etaMs: combinedEtaMs > 0 ? combinedEtaMs : 1000,
+            path: combinedCoords,
+            cost: combinedCost
+        };
+    }
+
     // Ottieni il percorso base tramite A* dinamico
     let pathRes = await dynamicPathfinder.findPath(startLng, startLat, targetLng, targetLat, multiplier);
     let pathCoords = pathRes.path || pathRes;
     let pathCost = pathRes.cost || 0;
+
+    // Se A* fallisce e c'è il player, tenta l'instradamento automatico hub-to-hub
+    if (!pathRes.isValid && player && rulesObj) {
+        const ports = [];
+        const airports = [];
+        if (player.strutture) {
+            for (const s of player.strutture) {
+                if (s.status === 'built') {
+                    const coords = getNodeCoords(s.regionId);
+                    if (coords) {
+                        if (s.structureId.startsWith('porto_t')) {
+                            ports.push({ id: s.id, regionId: s.regionId, coords, type: 'port' });
+                        } else if (s.structureId.startsWith('aeroporto_t')) {
+                            airports.push({ id: s.id, regionId: s.regionId, coords, type: 'airport' });
+                        }
+                    }
+                }
+            }
+        }
+
+        const originPorts = [];
+        const originAirports = [];
+        const destPorts = [];
+        const destAirports = [];
+
+        for (const p of ports) {
+            const pRes = await dynamicPathfinder.findPath(startLng, startLat, p.coords[0], p.coords[1], multiplier);
+            if (pRes.isValid) originPorts.push({ hub: p, path: pRes.path, cost: pRes.cost });
+        }
+        for (const a of airports) {
+            const pRes = await dynamicPathfinder.findPath(startLng, startLat, a.coords[0], a.coords[1], multiplier);
+            if (pRes.isValid) originAirports.push({ hub: a, path: pRes.path, cost: pRes.cost });
+        }
+
+        for (const p of ports) {
+            const pRes = await dynamicPathfinder.findPath(p.coords[0], p.coords[1], targetLng, targetLat, multiplier);
+            if (pRes.isValid) destPorts.push({ hub: p, path: pRes.path, cost: pRes.cost });
+        }
+        for (const a of airports) {
+            const pRes = await dynamicPathfinder.findPath(a.coords[0], a.coords[1], targetLng, targetLat, multiplier);
+            if (pRes.isValid) destAirports.push({ hub: a, path: pRes.path, cost: pRes.cost });
+        }
+
+        let bestRoute = null;
+        let bestDistance = Infinity;
+
+        // Port-to-Port
+        for (const OP of originPorts) {
+            for (const DP of destPorts) {
+                const capacity = await checkPlayerTransportCapacity(player, OP.hub.regionId, 2, rulesObj);
+                if (capacity > 0) {
+                    const walk1Dist = OP.cost * 11.1;
+                    const transitDist = haversineDist(OP.hub.coords[0], OP.hub.coords[1], DP.hub.coords[0], DP.hub.coords[1]);
+                    const walk2Dist = DP.cost * 11.1;
+                    const totalDist = walk1Dist + transitDist + walk2Dist;
+                    if (totalDist < bestDistance) {
+                        bestDistance = totalDist;
+                        bestRoute = {
+                            type: 'sea',
+                            origin: OP,
+                            dest: DP,
+                            transitDist,
+                            walk1Dist,
+                            walk2Dist
+                        };
+                    }
+                }
+            }
+        }
+
+        // Airport-to-Airport
+        for (const OA of originAirports) {
+            for (const DA of destAirports) {
+                const capacity = await checkPlayerTransportCapacity(player, OA.hub.regionId, 0, rulesObj);
+                if (capacity > 0) {
+                    const walk1Dist = OA.cost * 11.1;
+                    const transitDist = haversineDist(OA.hub.coords[0], OA.hub.coords[1], DA.hub.coords[0], DA.hub.coords[1]);
+                    const walk2Dist = DA.cost * 11.1;
+                    const totalDist = walk1Dist + transitDist + walk2Dist;
+                    if (totalDist < bestDistance) {
+                        bestDistance = totalDist;
+                        bestRoute = {
+                            type: 'air',
+                            origin: OA,
+                            dest: DA,
+                            transitDist,
+                            walk1Dist,
+                            walk2Dist
+                        };
+                    }
+                }
+            }
+        }
+
+        if (bestRoute) {
+            const combinedCoords = [...bestRoute.origin.path, ...bestRoute.dest.path];
+            const walkSpeed = baseSpeed;
+            const transitSpeed = bestRoute.type === 'sea' ? 25 : 150;
+            
+            const walk1Eta = bestRoute.walk1Dist / (walkSpeed * multiplier);
+            const transitEta = bestRoute.transitDist / transitSpeed;
+            const walk2Eta = bestRoute.walk2Dist / (walkSpeed * multiplier);
+            
+            let totalEtaHours = walk1Eta + transitEta + walk2Eta;
+            let etaMs = Math.floor(totalEtaHours * 60 * 60 * 1000);
+            
+            if (matchMultiplier > 0) {
+                etaMs = Math.floor(etaMs / matchMultiplier);
+            }
+
+            return {
+                isValid: true,
+                distance: bestDistance,
+                etaMs: etaMs > 0 ? etaMs : 1000,
+                path: combinedCoords,
+                cost: bestRoute.origin.cost + bestRoute.dest.cost
+            };
+        }
+    }
 
     // Calcola la distanza effettiva per stimare l'ETA
     let distanceKm = 0;
@@ -45,7 +322,6 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
         }
     }
 
-    const baseSpeed = 50; // km/h
     let etaHours = distanceKm / (baseSpeed * multiplier);
 
     if (pathCost > 0) {
@@ -62,10 +338,11 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
     }
 
     return {
-        isValid: true,
+        isValid: pathRes.isValid !== undefined ? pathRes.isValid : true,
         distance: distanceKm,
         etaMs: etaMs > 0 ? etaMs : 1000,
-        path: pathCoords
+        path: pathCoords,
+        cost: pathCost
     };
 };
 
@@ -162,7 +439,9 @@ const getRegionIdByName = (name) => {
 const calculateCurrentPosition = (path, startTime, etaMs) => {
     if (!path || path.length < 2 || !startTime || !etaMs) return null;
     const now = Date.now();
-    const elapsed = now - startTime;
+    const startTs = (typeof startTime === 'string' || startTime instanceof Date) ? new Date(startTime).getTime() : Number(startTime);
+    if (isNaN(startTs)) return null;
+    const elapsed = now - startTs;
     const progress = Math.max(0, Math.min(1, elapsed / etaMs));
     if (progress >= 1) {
         return { lng: path[path.length - 1][0], lat: path[path.length - 1][1], currentIndex: path.length - 1, elapsed };
@@ -219,4 +498,18 @@ const getArmyLocation = (army) => {
     return coords;
 };
 
-module.exports = { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, getRegionIdByName, calculateCurrentPosition, getArmyLocation, haversineDist };
+const getRegionAtCoords = (lng, lat) => {
+    loadGeometries();
+    if (!regionsFeatures) return null;
+    const pt = turf.point([lng, lat]);
+    for (const f of regionsFeatures) {
+        try {
+            if (turf.booleanPointInPolygon(pt, f)) {
+                return f.properties?.adm1_code || f.id;
+            }
+        } catch (e) {}
+    }
+    return null;
+};
+
+module.exports = { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, getRegionIdByName, calculateCurrentPosition, getArmyLocation, haversineDist, getRegionAtCoords };

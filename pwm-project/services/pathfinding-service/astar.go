@@ -99,6 +99,9 @@ func getCost(pt Point) float64 {
 	multiplier := 1.0
 	if LandCoverData != nil && TerrainCosts != nil {
 		lcClass := LandCoverData[idx]
+		if lcClass == 0 || lcClass == 17 {
+			return math.Inf(1) // Acqua (laghi ad alta quota, fiumi larghi, bacini interni)
+		}
 		terrainKey, ok := TerrainKeyMap[lcClass]
 		if ok {
 			speedMult, hasCost := TerrainCosts[terrainKey]
@@ -116,15 +119,52 @@ func heuristic(a, b Point) float64 {
 	return math.Max(dx, dy)
 }
 
-func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64) ([][2]float64, float64) {
+func findNearestLandPoint(pt Point) Point {
+	if !math.IsInf(getCost(pt), 1) {
+		return pt
+	}
+
+	for r := 1; r < 20; r++ {
+		for dx := -r; dx <= r; dx++ {
+			p1 := Point{X: pt.X + dx, Y: pt.Y - r}
+			if p1.X >= 0 && p1.X < Width && p1.Y >= 0 && p1.Y < Height {
+				if !math.IsInf(getCost(p1), 1) {
+					return p1
+				}
+			}
+			p2 := Point{X: pt.X + dx, Y: pt.Y + r}
+			if p2.X >= 0 && p2.X < Width && p2.Y >= 0 && p2.Y < Height {
+				if !math.IsInf(getCost(p2), 1) {
+					return p2
+				}
+			}
+		}
+		for dy := -r + 1; dy < r; dy++ {
+			p1 := Point{X: pt.X - r, Y: pt.Y + dy}
+			if p1.X >= 0 && p1.X < Width && p1.Y >= 0 && p1.Y < Height {
+				if !math.IsInf(getCost(p1), 1) {
+					return p1
+				}
+			}
+			p2 := Point{X: pt.X + r, Y: pt.Y + dy}
+			if p2.X >= 0 && p2.X < Width && p2.Y >= 0 && p2.Y < Height {
+				if !math.IsInf(getCost(p2), 1) {
+					return p2
+				}
+			}
+		}
+	}
+	return pt
+}
+
+func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64) ([][2]float64, float64, bool) {
 	start := lngLatToIndex(startLng, startLat)
 	end := lngLatToIndex(endLng, endLat)
 
 	fallbackPath := [][2]float64{{startLng, startLat}, {endLng, endLat}}
 
-	if math.IsInf(getCost(start), 1) || math.IsInf(getCost(end), 1) {
-		return fallbackPath, 0.0
-	}
+	snappedStart := findNearestLandPoint(start)
+	snappedEnd := findNearestLandPoint(end)
 
 	pq := make(PriorityQueue, 0)
 	heap.Init(&pq)
@@ -132,11 +172,11 @@ func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64) ([
 	cameFrom := make(map[Point]Point)
 	gScore := make(map[Point]float64)
 
-	gScore[start] = 0
+	gScore[snappedStart] = 0
 	heap.Push(&pq, &Node{
-		Pt:       start,
+		Pt:       snappedStart,
 		Cost:     0,
-		Priority: heuristic(start, end),
+		Priority: heuristic(snappedStart, snappedEnd),
 	})
 
 	nodesVisited := 0
@@ -152,8 +192,13 @@ func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64) ([
 		current := heap.Pop(&pq).(*Node)
 		currPt := current.Pt
 
-		if currPt == end {
-			return reconstructPath(cameFrom, currPt, startLng, startLat, endLng, endLat), current.Cost * multiplier
+		if currPt == snappedEnd {
+			path := reconstructPath(cameFrom, currPt, startLng, startLat, endLng, endLat)
+			if len(path) > 0 {
+				path[0] = [2]float64{startLng, startLat}
+				path[len(path)-1] = [2]float64{endLng, endLat}
+			}
+			return path, current.Cost * multiplier, true
 		}
 
 		neighbors := []Point{
@@ -184,7 +229,7 @@ func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64) ([
 			if !exists || tentativeGScore < gScoreN {
 				cameFrom[n] = currPt
 				gScore[n] = tentativeGScore
-				priority := tentativeGScore + heuristic(n, end)
+				priority := tentativeGScore + heuristic(n, snappedEnd)
 				heap.Push(&pq, &Node{
 					Pt:       n,
 					Cost:     tentativeGScore,
@@ -194,7 +239,7 @@ func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64) ([
 		}
 	}
 
-	return fallbackPath, 0.0
+	return fallbackPath, 0.0, false
 }
 
 func reconstructPath(cameFrom map[Point]Point, current Point, exactStartLng, exactStartLat, exactEndLng, exactEndLat float64) [][2]float64 {
