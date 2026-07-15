@@ -49,8 +49,8 @@ func (pq *PriorityQueue) Pop() any {
 }
 
 func lngLatToIndex(lng, lat float64) Point {
-	x := int(math.Floor((lng + 180.0) / Resolution))
-	y := int(math.Floor((90.0 - lat) / Resolution))
+	x := int(math.Floor((lng - OriginX) / Resolution))
+	y := int(math.Floor((OriginY - lat) / Resolution))
 
 	if x < 0 { x = 0 }
 	if x >= Width { x = Width - 1 }
@@ -61,8 +61,8 @@ func lngLatToIndex(lng, lat float64) Point {
 }
 
 func indexToLngLat(pt Point) (float64, float64) {
-	lng := -180.0 + (float64(pt.X)+0.5)*Resolution
-	lat := 90.0 - (float64(pt.Y)+0.5)*Resolution
+	lng := OriginX + (float64(pt.X)+0.5)*Resolution
+	lat := OriginY - (float64(pt.Y)+0.5)*Resolution
 	return lng, lat
 }
 
@@ -93,20 +93,37 @@ func getCost(pt Point) float64 {
 
 	elevation := EtopoData[idx]
 	if elevation <= 0 {
-		return math.Inf(1) // Acqua
+		return math.Inf(1) // Acqua marina (sotto il livello del mare)
 	}
 
 	multiplier := 1.0
-	if LandCoverData != nil && TerrainCosts != nil {
-		lcClass := LandCoverData[idx]
-		if lcClass == 0 || lcClass == 17 {
-			return math.Inf(1) // Acqua (laghi ad alta quota, fiumi larghi, bacini interni)
-		}
-		terrainKey, ok := TerrainKeyMap[lcClass]
-		if ok {
-			speedMult, hasCost := TerrainCosts[terrainKey]
-			if hasCost && speedMult > 0 {
-				multiplier = 1.0 / speedMult
+	if LandCoverData != nil && LcWidth > 0 {
+		// Calcola le coordinate geografiche del punto corrente
+		lng, lat := indexToLngLat(pt)
+
+		// Calcola l'indice nel raster MCD12Q1 usando la SUA origine e risoluzione
+		lcX := int(math.Floor((lng - LcOriginX) / LcResolution))
+		lcY := int(math.Floor((LcOriginY - lat) / LcResolution))
+		if lcX < 0 { lcX = 0 }
+		if lcX >= LcWidth { lcX = LcWidth - 1 }
+		if lcY < 0 { lcY = 0 }
+		if lcY >= LcHeight { lcY = LcHeight - 1 }
+		lcIdx := lcY*LcWidth + lcX
+
+		if lcIdx >= 0 && lcIdx < len(LandCoverData) {
+			lcClass := LandCoverData[lcIdx]
+			// Classi 0 e 17 = corpi idrici MODIS (laghi, fiumi larghi, bacini interni)
+			if lcClass == 0 || lcClass == 17 {
+				return math.Inf(1)
+			}
+			if TerrainCosts != nil {
+				terrainKey, ok := TerrainKeyMap[lcClass]
+				if ok {
+					speedMult, hasCost := TerrainCosts[terrainKey]
+					if hasCost && speedMult > 0 {
+						multiplier = 1.0 / speedMult
+					}
+				}
 			}
 		}
 	}
@@ -180,8 +197,8 @@ func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64) ([
 	})
 
 	nodesVisited := 0
-	// Limite più alto rispetto a Node.js grazie a Go
-	maxNodes := 250000 
+	// Limite elevato per supportare percorsi intercontinentali su larga scala
+	maxNodes := 1500000
 
 	for pq.Len() > 0 {
 		nodesVisited++

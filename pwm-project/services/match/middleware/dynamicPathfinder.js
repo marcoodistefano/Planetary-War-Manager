@@ -39,26 +39,25 @@ class DynamicPathfinder {
                         try {
                             const resJson = JSON.parse(data);
                             if (Array.isArray(resJson)) {
-                                resolve({ path: resJson, cost: 0 }); // Fallback old format
+                                // Vecchio formato array — non ha isValid, assumiamo invalido
+                                resolve({ path: resJson, cost: 0, isValid: false });
                             } else {
-                                resolve(resJson); // { path: [...], cost: ... }
+                                resolve(resJson); // { path: [...], cost: ..., isValid: bool }
                             }
                         } catch (err) {
                             console.error("[PATHFINDER] Errore parsing risposta dal servizio Go:", err);
-                            // Fallback
-                            resolve({ path: [[startLng, startLat], [endLng, endLat]], cost: 0 });
+                            resolve({ path: [[startLng, startLat], [endLng, endLat]], cost: 0, isValid: false });
                         }
                     } else {
                         console.error(`[PATHFINDER] Errore servizio Go. StatusCode: ${res.statusCode}`);
-                        resolve({ path: [[startLng, startLat], [endLng, endLat]], cost: 0 });
+                        resolve({ path: [[startLng, startLat], [endLng, endLat]], cost: 0, isValid: false });
                     }
                 });
             });
 
             req.on('error', (e) => {
                 console.error(`[PATHFINDER] Connessione al servizio Go fallita: ${e.message}`);
-                // Fallback in caso di mancata connessione
-                resolve({ path: [[startLng, startLat], [endLng, endLat]], cost: 0 });
+                resolve({ path: [[startLng, startLat], [endLng, endLat]], cost: 0, isValid: false });
             });
 
             req.write(payload);

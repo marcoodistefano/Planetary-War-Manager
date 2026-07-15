@@ -84,14 +84,75 @@ const checkPlayerTransportCapacity = async (player, regionId, domain, rulesObj) 
 };
 
 // Main calculate function using A*
-const calculatePath = async (startLng, startLat, targetName, targetLng, targetLat, multiplier = 1, currentPathInfo = null, matchMultiplier = 1, player = null, waypoints = []) => {
+const calculatePath = async (startLng, startLat, targetName, targetLng, targetLat, multiplier = 1, currentPathInfo = null, matchMultiplier = 1, player = null, waypoints = [], armyComposition = null) => {
     const rulesRawBase64 = await redis.get("assets:game_rules.json");
     let rulesObj = null;
     if (rulesRawBase64) {
         rulesObj = JSON.parse(Buffer.from(rulesRawBase64, 'base64').toString('utf8'));
     }
 
-    const baseSpeed = 50; // km/h
+    // --- Calcolo velocità reale dell'armata dalla composizione ---
+    // Il convoglio si muove alla velocità dell'unità più lenta (principio tattico realistico)
+    // Il campo `velocita` in game_rules è un moltiplicatore relativo: 1.5 = 15 km/h, 10 = 100 km/h
+    // Calibrazione: velocita=1 → 10 km/h (passo fante in terreno difficile), velocita=10 → 100 km/h (veicolo su strada)
+    const BASE_UNIT_KMH = 10; // km/h per unità con velocita=1
+    const NAVAL_KMH = 28;     // ~15 nodi per navi cargo
+    const AIR_KMH = 500;      // km/h per aerei da trasporto
+
+    let landSpeedKmh = BASE_UNIT_KMH * 5; // default 50 km/h se non ci sono regole
+    let navalSpeedKmh = NAVAL_KMH;
+    let airSpeedKmh = AIR_KMH;
+
+    if (rulesObj && armyComposition) {
+        const truppeSheet = rulesObj.sheets.find(s => s.name === "Truppe" || s.name === "truppe");
+        const truppeLines = truppeSheet ? truppeSheet.lines : [];
+        let minLandSpeed = Infinity;
+        let hasNaval = false;
+        let hasAir = false;
+        for (const [unitId, qty] of Object.entries(armyComposition)) {
+            if (!qty || qty <= 0) continue;
+            const uRule = truppeLines.find(l => l.id_truppa === unitId);
+            if (!uRule) continue;
+            if (uRule.dominio === 1 && uRule.velocita > 0) {
+                const unitKmh = uRule.velocita * BASE_UNIT_KMH;
+                if (unitKmh < minLandSpeed) minLandSpeed = unitKmh;
+            } else if (uRule.dominio === 2) {
+                hasNaval = true;
+                if (uRule.velocita > 0) navalSpeedKmh = uRule.velocita * BASE_UNIT_KMH;
+            } else if (uRule.dominio === 0) {
+                hasAir = true;
+                if (uRule.velocita > 0) airSpeedKmh = uRule.velocita * BASE_UNIT_KMH;
+            }
+        }
+        if (minLandSpeed !== Infinity) landSpeedKmh = minLandSpeed;
+    }
+
+    // Helper: calcola ETA in ms da path e costo A*
+    const computeEtaMs = (pathCoords, pathCost, speedKmh, matchMult) => {
+        let distanceKm = 0;
+        if (pathCoords && pathCoords.length > 1) {
+            for (let i = 0; i < pathCoords.length - 1; i++) {
+                distanceKm += haversineDist(pathCoords[i][0], pathCoords[i][1], pathCoords[i+1][0], pathCoords[i+1][1]);
+            }
+        }
+        // Se abbiamo il costo A* (tiene conto del terreno) usiamo quello per l'ETA
+        let effectiveHours;
+        if (pathCost > 0) {
+            // 1 cella ETOPO a ~1 arcominuto ≈ 1.85 km; il costo è normalizzato per risoluzione
+            // Usiamo la distanza reale pesata dal moltiplicatore terreno
+            effectiveHours = distanceKm / speedKmh;
+            // Il costo A* include già il moltiplicatore di terreno; rapporto costo/distanza > 1 = terreno difficile
+            if (distanceKm > 0) {
+                const terrainPenalty = Math.max(1, pathCost / (distanceKm / 11.1));
+                effectiveHours = effectiveHours * terrainPenalty;
+            }
+        } else {
+            effectiveHours = distanceKm / speedKmh;
+        }
+        let etaMs = Math.floor(effectiveHours * 3600 * 1000);
+        if (matchMult > 0) etaMs = Math.floor(etaMs / matchMult);
+        return { etaMs: etaMs > 0 ? etaMs : 1000, distanceKm };
+    };
 
     console.log(`[PATH_DEBUG] calculatePath startLng: ${startLng}, startLat: ${startLat}, targetLng: ${targetLng}, targetLat: ${targetLat}, waypoints:`, waypoints);
     if (waypoints && waypoints.length > 0) {
@@ -114,18 +175,9 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
                     combinedCoords = combinedCoords.concat(segPathRes.path);
                 }
                 combinedCost += segPathRes.cost;
-                
-                let segmentDistance = 0;
-                for (let j = 0; j < segPathRes.path.length - 1; j++) {
-                    segmentDistance += haversineDist(segPathRes.path[j][0], segPathRes.path[j][1], segPathRes.path[j+1][0], segPathRes.path[j+1][1]);
-                }
-                combinedDistance += segmentDistance;
-                
-                let segEtaMs = segmentDistance / (baseSpeed * multiplier) * 60 * 60 * 1000;
-                if (segPathRes.cost > 0) {
-                    segEtaMs = (segPathRes.cost * 11.1) / (baseSpeed * multiplier) * 60 * 60 * 1000;
-                }
-                combinedEtaMs += segEtaMs;
+                const { etaMs: segEta, distanceKm: segDist } = computeEtaMs(segPathRes.path, segPathRes.cost, landSpeedKmh, 0);
+                combinedDistance += segDist;
+                combinedEtaMs += segEta;
             } else {
                 const startRegionId = getRegionAtCoords(segStart[0], segStart[1]);
                 const endRegionId = getRegionAtCoords(segEnd[0], segEnd[1]);
@@ -137,49 +189,27 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
                 const hasEndAirport = player && player.strutture && player.strutture.some(s => s.status === 'built' && s.structureId.startsWith('aeroporto_t') && s.regionId === endRegionId);
                 
                 let isTransitValid = false;
-                let transitSpeed = baseSpeed;
+                let transitSpeed = landSpeedKmh;
                 
                 if (hasStartPort && hasEndPort) {
                     const capacity = await checkPlayerTransportCapacity(player, startRegionId, 2, rulesObj);
-                    if (capacity > 0) {
-                        isTransitValid = true;
-                        transitSpeed = 25;
-                    }
+                    if (capacity > 0) { isTransitValid = true; transitSpeed = navalSpeedKmh; }
                 } else if (hasStartAirport && hasEndAirport) {
                     const capacity = await checkPlayerTransportCapacity(player, startRegionId, 0, rulesObj);
-                    if (capacity > 0) {
-                        isTransitValid = true;
-                        transitSpeed = 150;
-                    }
+                    if (capacity > 0) { isTransitValid = true; transitSpeed = airSpeedKmh; }
                 }
                 
-                if (isTransitValid) {
-                    if (combinedCoords.length > 0) {
-                        combinedCoords.push(segEnd);
-                    } else {
-                        combinedCoords.push(segStart, segEnd);
-                    }
-                    const segDist = haversineDist(segStart[0], segStart[1], segEnd[0], segEnd[1]);
-                    combinedDistance += segDist;
-                    const segEtaMs = segDist / transitSpeed * 60 * 60 * 1000;
-                    combinedEtaMs += segEtaMs;
-                } else {
-                    isValid = false;
-                    if (combinedCoords.length > 0) {
-                        combinedCoords.push(segEnd);
-                    } else {
-                        combinedCoords.push(segStart, segEnd);
-                    }
-                    const segDist = haversineDist(segStart[0], segStart[1], segEnd[0], segEnd[1]);
-                    combinedDistance += segDist;
-                    combinedEtaMs += segDist / baseSpeed * 60 * 60 * 1000;
-                }
+                const segDist = haversineDist(segStart[0], segStart[1], segEnd[0], segEnd[1]);
+                const segEta = segDist / transitSpeed * 3600 * 1000;
+                combinedDistance += segDist;
+                combinedEtaMs += segEta;
+                if (!isTransitValid) isValid = false;
+                if (combinedCoords.length > 0) combinedCoords.push(segEnd);
+                else combinedCoords.push(segStart, segEnd);
             }
         }
 
-        if (matchMultiplier > 0) {
-            combinedEtaMs = Math.floor(combinedEtaMs / matchMultiplier);
-        }
+        if (matchMultiplier > 0) combinedEtaMs = Math.floor(combinedEtaMs / matchMultiplier);
 
         return {
             isValid,
@@ -245,20 +275,13 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
             for (const DP of destPorts) {
                 const capacity = await checkPlayerTransportCapacity(player, OP.hub.regionId, 2, rulesObj);
                 if (capacity > 0) {
-                    const walk1Dist = OP.cost * 11.1;
+                    const { distanceKm: walk1Dist } = computeEtaMs(OP.path, OP.cost, landSpeedKmh, 0);
                     const transitDist = haversineDist(OP.hub.coords[0], OP.hub.coords[1], DP.hub.coords[0], DP.hub.coords[1]);
-                    const walk2Dist = DP.cost * 11.1;
+                    const { distanceKm: walk2Dist } = computeEtaMs(DP.path, DP.cost, landSpeedKmh, 0);
                     const totalDist = walk1Dist + transitDist + walk2Dist;
                     if (totalDist < bestDistance) {
                         bestDistance = totalDist;
-                        bestRoute = {
-                            type: 'sea',
-                            origin: OP,
-                            dest: DP,
-                            transitDist,
-                            walk1Dist,
-                            walk2Dist
-                        };
+                        bestRoute = { type: 'sea', origin: OP, dest: DP, transitDist, walk1Dist, walk2Dist };
                     }
                 }
             }
@@ -269,20 +292,13 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
             for (const DA of destAirports) {
                 const capacity = await checkPlayerTransportCapacity(player, OA.hub.regionId, 0, rulesObj);
                 if (capacity > 0) {
-                    const walk1Dist = OA.cost * 11.1;
+                    const { distanceKm: walk1Dist } = computeEtaMs(OA.path, OA.cost, landSpeedKmh, 0);
                     const transitDist = haversineDist(OA.hub.coords[0], OA.hub.coords[1], DA.hub.coords[0], DA.hub.coords[1]);
-                    const walk2Dist = DA.cost * 11.1;
+                    const { distanceKm: walk2Dist } = computeEtaMs(DA.path, DA.cost, landSpeedKmh, 0);
                     const totalDist = walk1Dist + transitDist + walk2Dist;
                     if (totalDist < bestDistance) {
                         bestDistance = totalDist;
-                        bestRoute = {
-                            type: 'air',
-                            origin: OA,
-                            dest: DA,
-                            transitDist,
-                            walk1Dist,
-                            walk2Dist
-                        };
+                        bestRoute = { type: 'air', origin: OA, dest: DA, transitDist, walk1Dist, walk2Dist };
                     }
                 }
             }
@@ -290,19 +306,14 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
 
         if (bestRoute) {
             const combinedCoords = [...bestRoute.origin.path, ...bestRoute.dest.path];
-            const walkSpeed = baseSpeed;
-            const transitSpeed = bestRoute.type === 'sea' ? 25 : 150;
+            const transitSpeed = bestRoute.type === 'sea' ? navalSpeedKmh : airSpeedKmh;
             
-            const walk1Eta = bestRoute.walk1Dist / (walkSpeed * multiplier);
+            const walk1Eta = bestRoute.walk1Dist / landSpeedKmh;
             const transitEta = bestRoute.transitDist / transitSpeed;
-            const walk2Eta = bestRoute.walk2Dist / (walkSpeed * multiplier);
+            const walk2Eta = bestRoute.walk2Dist / landSpeedKmh;
             
-            let totalEtaHours = walk1Eta + transitEta + walk2Eta;
-            let etaMs = Math.floor(totalEtaHours * 60 * 60 * 1000);
-            
-            if (matchMultiplier > 0) {
-                etaMs = Math.floor(etaMs / matchMultiplier);
-            }
+            let etaMs = Math.floor((walk1Eta + transitEta + walk2Eta) * 3600 * 1000);
+            if (matchMultiplier > 0) etaMs = Math.floor(etaMs / matchMultiplier);
 
             return {
                 isValid: true,
@@ -314,33 +325,13 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
         }
     }
 
-    // Calcola la distanza effettiva per stimare l'ETA
-    let distanceKm = 0;
-    if (pathCoords && pathCoords.length > 1) {
-        for (let i = 0; i < pathCoords.length - 1; i++) {
-            distanceKm += haversineDist(pathCoords[i][0], pathCoords[i][1], pathCoords[i+1][0], pathCoords[i+1][1]);
-        }
-    }
-
-    let etaHours = distanceKm / (baseSpeed * multiplier);
-
-    if (pathCost > 0) {
-        // Usa il costo per calcolare il vero tempo (1 cella ~ 11.1km)
-        let effectiveDistanceKm = pathCost * 11.1;
-        etaHours = effectiveDistanceKm / (baseSpeed * multiplier);
-    }
-
-    let etaMs = Math.floor(etaHours * 60 * 60 * 1000);
-    
-    // Applica il moltiplicatore della partita (es: 60x real time)
-    if (matchMultiplier > 0) {
-        etaMs = Math.floor(etaMs / matchMultiplier);
-    }
+    // Percorso terrestre diretto
+    const { etaMs, distanceKm } = computeEtaMs(pathCoords, pathCost, landSpeedKmh, matchMultiplier);
 
     return {
         isValid: pathRes.isValid !== undefined ? pathRes.isValid : true,
         distance: distanceKm,
-        etaMs: etaMs > 0 ? etaMs : 1000,
+        etaMs,
         path: pathCoords,
         cost: pathCost
     };

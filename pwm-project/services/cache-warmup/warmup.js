@@ -388,18 +388,65 @@ const loadMapDataForBackend = async () => {
       console.log("[CACHE_WARMUP] Dati della mappa json per il backend caricati su Redis con successo.");
     }
 
-    // Caricamento dei file Raster ETOPO e Landing Cover
+    // Caricamento dei file Raster ETOPO e Landing Cover — estrazione pixel raw via geotiff
+    const { fromFile } = await import('geotiff');
     for (const entry of entries) {
         if (entry.isDirectory()) continue;
         const absolutePath = path.join(mapDir, entry.name);
         
         if (entry.name.startsWith("ETOPO") || entry.name.startsWith("lc_mcd12")) {
-          console.log(`[CACHE_WARMUP] Lettura del file raster di grandi dimensioni: ${entry.name}...`);
+          console.log(`[CACHE_WARMUP] Lettura raster GeoTIFF: ${entry.name}...`);
           try {
-            const buffer = await fs.readFile(absolutePath);
-            // Salva direttamente come buffer senza passare dal multi per evitare picchi di memoria
-            await redis.set(`map_data:raster:${entry.name}`, buffer);
-            console.log(`[CACHE_WARMUP] Raster ${entry.name} caricato su Redis (${(buffer.length / 1024 / 1024).toFixed(2)} MB).`);
+             const tiff = await fromFile(absolutePath);
+             const image = await tiff.getImage();
+             const originalWidth = image.getWidth();
+             const originalHeight = image.getHeight();
+             let width = originalWidth;
+             let height = originalHeight;
+
+             // Se l'immagine è troppo grande (es: Land Cover con 3 miliardi di pixel),
+             // eseguiamo il downsampling a una larghezza massima di 21600 pixel
+             // per evitare di superare il limite di payload di 512MB di Redis
+             const MAX_WIDTH = 21600;
+             let downsample = false;
+             if (originalWidth > MAX_WIDTH) {
+               width = MAX_WIDTH;
+               height = Math.round(originalHeight * (MAX_WIDTH / originalWidth));
+               downsample = true;
+               console.log(`[CACHE_WARMUP] Immagine troppo grande. Eseguo downsampling da ${originalWidth}x${originalHeight} a ${width}x${height}`);
+             }
+
+             const [originX, originY] = image.getOrigin();
+             const [resX, resY] = image.getResolution();
+             
+             // Ricalcola la risoluzione in caso di downsampling
+             const pixelResX = Math.abs(resX) * (originalWidth / width);
+             const pixelResY = Math.abs(resY) * (originalHeight / height);
+ 
+             console.log(`[CACHE_WARMUP] ${entry.name}: ${width}x${height}, Origin=(${originX.toFixed(4)},${originY.toFixed(4)}), Res=(${pixelResX.toFixed(6)},${pixelResY.toFixed(6)})`);
+ 
+             // Salva metadati della griglia
+             const meta = { width, height, originX, originY, resX: pixelResX, resY: pixelResY };
+             await redis.set(`map_data:raster_meta:${entry.name}`, JSON.stringify(meta));
+ 
+             // Estrai pixel raw e salva come buffer binario puro (senza header TIFF)
+             const readOptions = downsample ? { width, height } : {};
+             const rasterData = await image.readRasters(readOptions);
+             let rawData = rasterData[0];
+ 
+             if (rawData instanceof Float32Array) {
+               console.log(`[CACHE_WARMUP] Converto Float32Array a Int16Array (${rawData.length} elementi)...`);
+               const int16Data = new Int16Array(rawData.length);
+               for (let i = 0; i < rawData.length; i++) {
+                 int16Data[i] = Math.round(rawData[i]);
+               }
+               rawData = int16Data;
+             }
+ 
+             // rawData è un TypedArray (Int16Array per ETOPO, Uint8Array per LC)
+             const rawBuffer = Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength);
+             await redis.set(`map_data:raster:${entry.name}`, rawBuffer);
+             console.log(`[CACHE_WARMUP] Raster ${entry.name}: pixel salvati (${(rawBuffer.length / 1024 / 1024).toFixed(2)} MB raw, ${width}x${height}).`);
           } catch (err) {
             console.error(`[CACHE_WARMUP] Errore caricamento raster ${entry.name}:`, err.message);
           }

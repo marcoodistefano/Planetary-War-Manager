@@ -481,7 +481,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             }
 
                             try {
-                                const pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, unitSpeedMultiplier, currentPathInfo, matchMultiplier, player, waypoints || []);
+                                const pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, 1, currentPathInfo, matchMultiplier, player, waypoints || [], armata.composition || null);
                                 
                                 let isValid = true;
                                 let errorMessage = null;
@@ -614,7 +614,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                     let pathInfo = { isValid: false, distance: 0, etaMs: 0, path: [], cost: 0 };
                     try {
-                        pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, unitSpeedMultiplier, currentPathInfo, matchMultiplier, player, waypoints || []);
+                        pathInfo = await calculatePath(startLng, startLat, targetName, targetLng, targetLat, 1, currentPathInfo, matchMultiplier, player, waypoints || [], armata.composition || null);
                         await validateSeaCrossing(player, armata, loc, startLng, startLat, targetLng, targetLat, targetName, pathInfo.isValid);
                     } catch (e) {
                         console.error("Errore durante calculatePath o validazione:", e);
