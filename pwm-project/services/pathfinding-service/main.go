@@ -23,14 +23,16 @@ var TerrainCosts map[string]float64
 // ETOPO raster dimensions (dalla chiave raster_meta in Redis)
 var Width int
 var Height int
-var Resolution float64 = 0.016667 // default 1 arcominuto
+var ResolutionX float64 = 0.016667 // default 1 arcominuto
+var ResolutionY float64 = 0.016667
 var OriginX float64 = -180.0
 var OriginY float64 = 90.0
 
 // MCD12Q1 Land Cover raster dimensions (dalla chiave raster_meta in Redis)
 var LcWidth int
 var LcHeight int
-var LcResolution float64 = 0.004167 // default ~500m
+var LcResolutionX float64 = 0.004167 // default ~500m
+var LcResolutionY float64 = 0.004167
 var LcOriginX float64 = -180.0
 var LcOriginY float64 = 90.0
 
@@ -95,21 +97,22 @@ func loadMapData() {
 				if err2 := json.Unmarshal([]byte(metaStr), &meta); err2 == nil {
 					Width = meta.Width
 					Height = meta.Height
-					Resolution = meta.ResX
+					ResolutionX = meta.ResX
+					ResolutionY = meta.ResY
 					OriginX = meta.OriginX
 					OriginY = meta.OriginY
-					log.Printf("ETOPO grid from meta: %dx%d, Res=%f, Origin=(%f,%f)", Width, Height, Resolution, OriginX, OriginY)
+					log.Printf("ETOPO grid from meta: %dx%d, Res=(%f,%f), Origin=(%f,%f)", Width, Height, ResolutionX, ResolutionY, OriginX, OriginY)
 				} else {
 					log.Printf("ETOPO meta parse error: %v — falling back to approximation", err2)
 					H := int(math.Round(math.Sqrt(float64(len(EtopoData)) / 2.0)))
-					Width = H * 2; Height = H; Resolution = 360.0 / float64(Width)
+					Width = H * 2; Height = H; ResolutionX = 360.0 / float64(Width); ResolutionY = 180.0 / float64(Height)
 				}
 			} else {
 				log.Printf("ETOPO meta not found: %v — falling back to approximation", merr)
 				H := int(math.Round(math.Sqrt(float64(len(EtopoData)) / 2.0)))
-				Width = H * 2; Height = H; Resolution = 360.0 / float64(Width)
+				Width = H * 2; Height = H; ResolutionX = 360.0 / float64(Width); ResolutionY = 180.0 / float64(Height)
 			}
-			log.Printf("ETOPO ready: Grid %dx%d (Res: %f)", Width, Height, Resolution)
+			log.Printf("ETOPO ready: Grid %dx%d (ResX: %f, ResY: %f)", Width, Height, ResolutionX, ResolutionY)
 		}
 	}
 
@@ -128,21 +131,22 @@ func loadMapData() {
 				if err2 := json.Unmarshal([]byte(metaStr), &meta); err2 == nil {
 					LcWidth = meta.Width
 					LcHeight = meta.Height
-					LcResolution = meta.ResX
+					LcResolutionX = meta.ResX
+					LcResolutionY = meta.ResY
 					LcOriginX = meta.OriginX
 					LcOriginY = meta.OriginY
-					log.Printf("LC grid from meta: %dx%d, Res=%f, Origin=(%f,%f)", LcWidth, LcHeight, LcResolution, LcOriginX, LcOriginY)
+					log.Printf("LC grid from meta: %dx%d, Res=(%f,%f), Origin=(%f,%f)", LcWidth, LcHeight, LcResolutionX, LcResolutionY, LcOriginX, LcOriginY)
 				} else {
 					log.Printf("LC meta parse error: %v — falling back to approximation", err2)
 					LcH := int(math.Round(math.Sqrt(float64(len(LandCoverData)) / 2.0)))
-					LcWidth = LcH * 2; LcHeight = LcH; LcResolution = 360.0 / float64(LcWidth)
+					LcWidth = LcH * 2; LcHeight = LcH; LcResolutionX = 360.0 / float64(LcWidth); LcResolutionY = 180.0 / float64(LcHeight)
 				}
 			} else {
 				log.Printf("LC meta not found: %v — falling back to approximation", merr)
 				LcH := int(math.Round(math.Sqrt(float64(len(LandCoverData)) / 2.0)))
-				LcWidth = LcH * 2; LcHeight = LcH; LcResolution = 360.0 / float64(LcWidth)
+				LcWidth = LcH * 2; LcHeight = LcH; LcResolutionX = 360.0 / float64(LcWidth); LcResolutionY = 180.0 / float64(LcHeight)
 			}
-			log.Printf("LC ready: %d cells. Grid: %dx%d (Res: %f)", len(LandCoverData), LcWidth, LcHeight, LcResolution)
+			log.Printf("LC ready: %d cells. Grid: %dx%d (ResX: %f, ResY: %f)", len(LandCoverData), LcWidth, LcHeight, LcResolutionX, LcResolutionY)
 		}
 	}
 }
@@ -153,6 +157,7 @@ type PathRequest struct {
 	TargetX    float64 `json:"targetX"`
 	TargetY    float64 `json:"targetY"`
 	Multiplier float64 `json:"multiplier"`
+	Mode       string  `json:"mode"`
 }
 
 func handleCalculatePath(w http.ResponseWriter, r *http.Request) {
@@ -185,10 +190,51 @@ func handleCalculatePath(w http.ResponseWriter, r *http.Request) {
 		multiplier = 1.0
 	}
 
-	path, cost, isValid := FindPath(req.StartX, req.StartY, req.TargetX, req.TargetY, multiplier)
+	mode := req.Mode
+	if mode == "" {
+		mode = "land"
+	}
+
+	path, cost, isValid := FindPath(req.StartX, req.StartY, req.TargetX, req.TargetY, multiplier, mode)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(PathResponse{Path: path, Cost: cost, IsValid: isValid})
+}
+
+type NearestWaterRequest struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type NearestWaterResponse struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+func handleNearestWater(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req NearestWaterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if EtopoData == nil {
+		json.NewEncoder(w).Encode(NearestWaterResponse{X: req.X, Y: req.Y})
+		return
+	}
+
+	pt := lngLatToIndex(req.X, req.Y)
+	waterPt := findNearestWaterPoint(pt)
+	lng, lat := indexToLngLat(waterPt)
+
+	json.NewEncoder(w).Encode(NearestWaterResponse{X: lng, Y: lat})
 }
 
 func main() {
@@ -208,6 +254,7 @@ func main() {
 	}
 
 	http.HandleFunc("/api/calculate", handleCalculatePath)
+	http.HandleFunc("/api/nearest-water", handleNearestWater)
 
 	port := os.Getenv("PORT")
 	if port == "" {

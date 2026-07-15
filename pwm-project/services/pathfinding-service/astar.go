@@ -2,6 +2,7 @@ package main
 
 import (
 	"container/heap"
+	"log"
 	"math"
 )
 
@@ -49,8 +50,8 @@ func (pq *PriorityQueue) Pop() any {
 }
 
 func lngLatToIndex(lng, lat float64) Point {
-	x := int(math.Floor((lng - OriginX) / Resolution))
-	y := int(math.Floor((OriginY - lat) / Resolution))
+	x := int(math.Floor((lng - OriginX) / ResolutionX))
+	y := int(math.Floor((OriginY - lat) / ResolutionY))
 
 	if x < 0 { x = 0 }
 	if x >= Width { x = Width - 1 }
@@ -61,8 +62,8 @@ func lngLatToIndex(lng, lat float64) Point {
 }
 
 func indexToLngLat(pt Point) (float64, float64) {
-	lng := OriginX + (float64(pt.X)+0.5)*Resolution
-	lat := OriginY - (float64(pt.Y)+0.5)*Resolution
+	lng := OriginX + (float64(pt.X)+0.5)*ResolutionX
+	lat := OriginY - (float64(pt.Y)+0.5)*ResolutionY
 	return lng, lat
 }
 
@@ -85,7 +86,41 @@ var TerrainKeyMap = map[uint8]string{
 	16: "barren_desert",
 }
 
-func getCost(pt Point) float64 {
+func isWater(pt Point) bool {
+	idx := pt.Y*Width + pt.X
+	if idx < 0 || idx >= len(EtopoData) {
+		return false
+	}
+
+	elevation := EtopoData[idx]
+	if elevation <= 0 {
+		return true // Acqua marina (sotto il livello del mare)
+	}
+
+	if LandCoverData != nil && LcWidth > 0 {
+		lng, lat := indexToLngLat(pt)
+
+		lcX := int(math.Floor((lng - LcOriginX) / LcResolutionX))
+		lcY := int(math.Floor((LcOriginY - lat) / LcResolutionY))
+		if lcX < 0 { lcX = 0 }
+		if lcX >= LcWidth { lcX = LcWidth - 1 }
+		if lcY < 0 { lcY = 0 }
+		if lcY >= LcHeight { lcY = LcHeight - 1 }
+		lcIdx := lcY*LcWidth + lcX
+
+		if lcIdx >= 0 && lcIdx < len(LandCoverData) {
+			lcClass := LandCoverData[lcIdx]
+			// Classi 0 e 17 = corpi idrici MODIS (laghi, fiumi larghi, bacini interni)
+			// Classe 15 = ghiaccio/neve (non navigabile per navi)
+			if (lcClass == 0 || lcClass == 17) && lcClass != 15 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func getCostLand(pt Point) float64 {
 	idx := pt.Y*Width + pt.X
 	if idx < 0 || idx >= len(EtopoData) {
 		return math.Inf(1)
@@ -102,8 +137,8 @@ func getCost(pt Point) float64 {
 		lng, lat := indexToLngLat(pt)
 
 		// Calcola l'indice nel raster MCD12Q1 usando la SUA origine e risoluzione
-		lcX := int(math.Floor((lng - LcOriginX) / LcResolution))
-		lcY := int(math.Floor((LcOriginY - lat) / LcResolution))
+		lcX := int(math.Floor((lng - LcOriginX) / LcResolutionX))
+		lcY := int(math.Floor((LcOriginY - lat) / LcResolutionY))
 		if lcX < 0 { lcX = 0 }
 		if lcX >= LcWidth { lcX = LcWidth - 1 }
 		if lcY < 0 { lcY = 0 }
@@ -130,6 +165,20 @@ func getCost(pt Point) float64 {
 	return multiplier
 }
 
+func getCostSea(pt Point) float64 {
+	if !isWater(pt) {
+		return math.Inf(1) // Terraferma non navigabile per unità navali
+	}
+	return 1.0 // Costo piatto per acqua navigabile
+}
+
+func getCostMode(pt Point, mode string) float64 {
+	if mode == "sea" {
+		return getCostSea(pt)
+	}
+	return getCostLand(pt)
+}
+
 func heuristic(a, b Point) float64 {
 	dx := math.Abs(float64(a.X - b.X))
 	dy := math.Abs(float64(a.Y - b.Y))
@@ -137,7 +186,7 @@ func heuristic(a, b Point) float64 {
 }
 
 func findNearestLandPoint(pt Point) Point {
-	if !math.IsInf(getCost(pt), 1) {
+	if !math.IsInf(getCostLand(pt), 1) {
 		return pt
 	}
 
@@ -145,13 +194,13 @@ func findNearestLandPoint(pt Point) Point {
 		for dx := -r; dx <= r; dx++ {
 			p1 := Point{X: pt.X + dx, Y: pt.Y - r}
 			if p1.X >= 0 && p1.X < Width && p1.Y >= 0 && p1.Y < Height {
-				if !math.IsInf(getCost(p1), 1) {
+				if !math.IsInf(getCostLand(p1), 1) {
 					return p1
 				}
 			}
 			p2 := Point{X: pt.X + dx, Y: pt.Y + r}
 			if p2.X >= 0 && p2.X < Width && p2.Y >= 0 && p2.Y < Height {
-				if !math.IsInf(getCost(p2), 1) {
+				if !math.IsInf(getCostLand(p2), 1) {
 					return p2
 				}
 			}
@@ -159,13 +208,13 @@ func findNearestLandPoint(pt Point) Point {
 		for dy := -r + 1; dy < r; dy++ {
 			p1 := Point{X: pt.X - r, Y: pt.Y + dy}
 			if p1.X >= 0 && p1.X < Width && p1.Y >= 0 && p1.Y < Height {
-				if !math.IsInf(getCost(p1), 1) {
+				if !math.IsInf(getCostLand(p1), 1) {
 					return p1
 				}
 			}
 			p2 := Point{X: pt.X + r, Y: pt.Y + dy}
 			if p2.X >= 0 && p2.X < Width && p2.Y >= 0 && p2.Y < Height {
-				if !math.IsInf(getCost(p2), 1) {
+				if !math.IsInf(getCostLand(p2), 1) {
 					return p2
 				}
 			}
@@ -174,14 +223,60 @@ func findNearestLandPoint(pt Point) Point {
 	return pt
 }
 
-func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64) ([][2]float64, float64, bool) {
+func findNearestWaterPoint(pt Point) Point {
+	if isWater(pt) {
+		return pt
+	}
+
+	for r := 1; r < 50; r++ { // raggio di ricerca più ampio per coste
+		for dx := -r; dx <= r; dx++ {
+			p1 := Point{X: pt.X + dx, Y: pt.Y - r}
+			if p1.X >= 0 && p1.X < Width && p1.Y >= 0 && p1.Y < Height {
+				if isWater(p1) {
+					return p1
+				}
+			}
+			p2 := Point{X: pt.X + dx, Y: pt.Y + r}
+			if p2.X >= 0 && p2.X < Width && p2.Y >= 0 && p2.Y < Height {
+				if isWater(p2) {
+					return p2
+				}
+			}
+		}
+		for dy := -r + 1; dy < r; dy++ {
+			p1 := Point{X: pt.X - r, Y: pt.Y + dy}
+			if p1.X >= 0 && p1.X < Width && p1.Y >= 0 && p1.Y < Height {
+				if isWater(p1) {
+					return p1
+				}
+			}
+			p2 := Point{X: pt.X + r, Y: pt.Y + dy}
+			if p2.X >= 0 && p2.X < Width && p2.Y >= 0 && p2.Y < Height {
+				if isWater(p2) {
+					return p2
+				}
+			}
+		}
+	}
+	return pt
+}
+
+func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64, mode string) ([][2]float64, float64, bool) {
 	start := lngLatToIndex(startLng, startLat)
 	end := lngLatToIndex(endLng, endLat)
 
 	fallbackPath := [][2]float64{{startLng, startLat}, {endLng, endLat}}
 
-	snappedStart := findNearestLandPoint(start)
-	snappedEnd := findNearestLandPoint(end)
+	var snappedStart, snappedEnd Point
+	if mode == "sea" {
+		snappedStart = findNearestWaterPoint(start)
+		snappedEnd = findNearestWaterPoint(end)
+	} else {
+		snappedStart = findNearestLandPoint(start)
+		snappedEnd = findNearestLandPoint(end)
+	}
+
+	log.Printf("[DEBUG_SNAP] mode=%s, start=(%d,%d), end=(%d,%d), snappedStart=(%d,%d), snappedEnd=(%d,%d)", mode, start.X, start.Y, end.X, end.Y, snappedStart.X, snappedStart.Y, snappedEnd.X, snappedEnd.Y)
 
 	pq := make(PriorityQueue, 0)
 	heap.Init(&pq)
@@ -230,7 +325,7 @@ func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64) ([
 				continue
 			}
 
-			cost := getCost(n)
+			cost := getCostMode(n, mode)
 			if math.IsInf(cost, 1) {
 				continue
 			}
@@ -265,14 +360,14 @@ func reconstructPath(cameFrom map[Point]Point, current Point, exactStartLng, exa
 
 	curr := current
 	for {
+		lng, lat := indexToLngLat(curr)
+		path = append([][2]float64{{lng, lat}}, path...)
+
 		prev, ok := cameFrom[curr]
 		if !ok {
 			break
 		}
 		curr = prev
-		lng, lat := indexToLngLat(curr)
-		// prepend
-		path = append([][2]float64{{lng, lat}}, path...)
 	}
 
 	if len(path) > 0 {
@@ -289,6 +384,13 @@ func simplifyPath(path [][2]float64) [][2]float64 {
 	simplified := [][2]float64{path[0]}
 
 	for i := 1; i < len(path)-1; i++ {
+		// Preserva sempre il penultimo elemento per evitare che la semplificazione
+		// rimuova il punto di snapping finale reale (importante per il controllo delle navi).
+		if i == len(path)-2 {
+			simplified = append(simplified, path[i])
+			continue
+		}
+
 		p1 := path[i-1]
 		p2 := path[i]
 		p3 := path[i+1]

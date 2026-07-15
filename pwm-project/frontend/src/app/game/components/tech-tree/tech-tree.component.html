@@ -9,6 +9,20 @@
         <span class="system-name">TECH_TREE</span>
         <span class="version">ACADEMY_OS V.1.0</span>
       </div>
+
+      <!-- Contatore ricerche completate nella sezione attiva -->
+      <ng-container *ngIf="filteredTracks.length > 0">
+        <div class="research-progress-box">
+          <div class="progress-label">
+            <span>RICERCHE COMPLETATE</span>
+            <span class="progress-fraction">{{ getCompletedCount().done }}/{{ getCompletedCount().total }}</span>
+          </div>
+          <div class="progress-bar-outer">
+            <div class="progress-bar-inner" [style.width.%]="getCompletedCount().total > 0 ? (getCompletedCount().done / getCompletedCount().total * 100) : 0"></div>
+          </div>
+        </div>
+      </ng-container>
+
       <nav>
         <div class="nav-item" [class.active]="activeBranch === 'hq'" (click)="setBranch('hq')">
           <ion-icon name="business-outline"></ion-icon><span>COMANDO</span>
@@ -26,6 +40,28 @@
           <ion-icon name="list-outline"></ion-icon><span>TUTTI</span>
         </div>
       </nav>
+
+      <!-- Legenda stati -->
+      <div class="status-legend">
+        <div class="legend-title">LEGENDA</div>
+        <div class="legend-item legend-completed">
+          <span class="legend-dot dot-completed"></span>
+          <span>Completata</span>
+        </div>
+        <div class="legend-item legend-affordable">
+          <span class="legend-dot dot-affordable"></span>
+          <span>Ricercabile</span>
+        </div>
+        <div class="legend-item legend-resource-blocked">
+          <span class="legend-dot dot-resource-blocked"></span>
+          <span>Risorse mancanti</span>
+        </div>
+        <div class="legend-item legend-locked">
+          <span class="legend-dot dot-locked"></span>
+          <span>Requisiti bloccati</span>
+        </div>
+      </div>
+
       <div class="sidebar-footer">
         <button class="exit-btn" (click)="close.emit()">
           <ion-icon name="power-outline" class="close-icon"></ion-icon>
@@ -35,6 +71,8 @@
       
 
     </div>
+
+
 
     <div class="tech-main scrollable-x"
          (mousedown)="onPanStart($event)"
@@ -56,6 +94,7 @@
               <div class="tech-node" 
                    [class.locked]="!isUnlocked(node) && !canUnlock(node)" 
                    [class.affordable]="!isUnlocked(node) && canUnlock(node) && hasResources(node)"
+                   [class.resource-blocked]="!isUnlocked(node) && canUnlock(node) && !hasResources(node)"
                    [class.unlocked]="isUnlocked(node)"
                    (mouseup)="onNodeClick(node)">
                 
@@ -64,7 +103,7 @@
                   <div class="node-tier">TIER {{ node.tier }}</div>
                 </div>
 
-                <div class="node-costs">
+                <div class="node-costs" *ngIf="!isUnlocked(node)">
                   <span class="cost-unit" *ngIf="node.costo_denaro > 0">💵 {{ node.costo_denaro | number }}</span>
                   <span class="cost-unit" *ngIf="node.costo_legno > 0">🪵 {{ node.costo_legno | number }}</span>
                   <span class="cost-unit" *ngIf="node.costo_mattoni > 0">🧱 {{ node.costo_mattoni | number }}</span>
@@ -73,11 +112,21 @@
                   <span class="cost-unit" *ngIf="node.costo_piombo > 0 || node.costo_piombio > 0">🔘 {{ (node.costo_piombo || node.costo_piombio) | number }}</span>
                 </div>
 
+                <div class="inline-research-text" *ngIf="isUnlocked(node)">
+                  <span class="status-text completed">
+                    <ion-icon name="checkmark-circle-outline"></ion-icon>
+                    COMPLETATA
+                  </span>
+                </div>
+
                 <div class="inline-research-text" *ngIf="!isUnlocked(node)">
-                  <span class="status-text" [class.can-buy]="canUnlock(node) && hasResources(node)">
-                    <ion-icon name="lock-closed-outline" *ngIf="!hasResources(node) || !canUnlock(node)"></ion-icon>
-                    <ion-icon name="flask-outline" *ngIf="hasResources(node) && canUnlock(node)"></ion-icon>
-                    {{ (!hasResources(node) || !canUnlock(node)) ? 'RICERCA BLOCCATA' : 'CLICCA PER RICERCARE' }}
+                  <span class="status-text" 
+                        [class.can-buy]="canUnlock(node) && hasResources(node)"
+                        [class.insufficient-resources]="canUnlock(node) && !hasResources(node)">
+                    <ion-icon name="lock-closed-outline" *ngIf="!canUnlock(node)"></ion-icon>
+                    <ion-icon name="close-circle-outline" *ngIf="canUnlock(node) && !hasResources(node)"></ion-icon>
+                    <ion-icon name="flask-outline" *ngIf="canUnlock(node) && hasResources(node)"></ion-icon>
+                    {{ !canUnlock(node) ? 'REQUISITI MANCANTI' : (!hasResources(node) ? 'RISORSE INSUFFICIENTI' : 'CLICCA PER RICERCARE') }}
                   </span>
                 </div>
 

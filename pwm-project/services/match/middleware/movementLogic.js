@@ -102,6 +102,7 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
     let landSpeedKmh = BASE_UNIT_KMH * 5; // default 50 km/h se non ci sono regole
     let navalSpeedKmh = NAVAL_KMH;
     let airSpeedKmh = AIR_KMH;
+    let isNavalOnly = false;
 
     if (rulesObj && armyComposition) {
         const truppeSheet = rulesObj.sheets.find(s => s.name === "Truppe" || s.name === "truppe");
@@ -109,8 +110,11 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
         let minLandSpeed = Infinity;
         let hasNaval = false;
         let hasAir = false;
+        let totalUnits = 0;
+        let navalUnitsCount = 0;
         for (const [unitId, qty] of Object.entries(armyComposition)) {
             if (!qty || qty <= 0) continue;
+            totalUnits += qty;
             const uRule = truppeLines.find(l => l.id_truppa === unitId);
             if (!uRule) continue;
             if (uRule.dominio === 1 && uRule.velocita > 0) {
@@ -118,6 +122,7 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
                 if (unitKmh < minLandSpeed) minLandSpeed = unitKmh;
             } else if (uRule.dominio === 2) {
                 hasNaval = true;
+                navalUnitsCount += qty;
                 if (uRule.velocita > 0) navalSpeedKmh = uRule.velocita * BASE_UNIT_KMH;
             } else if (uRule.dominio === 0) {
                 hasAir = true;
@@ -125,7 +130,13 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
             }
         }
         if (minLandSpeed !== Infinity) landSpeedKmh = minLandSpeed;
+        if (totalUnits > 0 && navalUnitsCount === totalUnits) {
+            isNavalOnly = true;
+        }
     }
+
+    const pathfindingMode = isNavalOnly ? 'sea' : 'land';
+    const currentSpeedKmh = isNavalOnly ? navalSpeedKmh : landSpeedKmh;
 
     // Helper: calcola ETA in ms da path e costo A*
     const computeEtaMs = (pathCoords, pathCost, speedKmh, matchMult) => {
@@ -154,7 +165,7 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
         return { etaMs: etaMs > 0 ? etaMs : 1000, distanceKm };
     };
 
-    console.log(`[PATH_DEBUG] calculatePath startLng: ${startLng}, startLat: ${startLat}, targetLng: ${targetLng}, targetLat: ${targetLat}, waypoints:`, waypoints);
+    console.log(`[PATH_DEBUG] calculatePath startLng: ${startLng}, startLat: ${startLat}, targetLng: ${targetLng}, targetLat: ${targetLat}, mode: ${pathfindingMode}, waypoints:`, waypoints);
     if (waypoints && waypoints.length > 0) {
         let combinedCoords = [];
         let combinedCost = 0;
@@ -167,7 +178,7 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
             const segStart = points[i];
             const segEnd = points[i+1];
             
-            let segPathRes = await dynamicPathfinder.findPath(segStart[0], segStart[1], segEnd[0], segEnd[1], multiplier);
+            let segPathRes = await dynamicPathfinder.findPath(segStart[0], segStart[1], segEnd[0], segEnd[1], multiplier, pathfindingMode);
             if (segPathRes.isValid) {
                 if (combinedCoords.length > 0) {
                     combinedCoords = combinedCoords.concat(segPathRes.path.slice(1));
@@ -175,7 +186,7 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
                     combinedCoords = combinedCoords.concat(segPathRes.path);
                 }
                 combinedCost += segPathRes.cost;
-                const { etaMs: segEta, distanceKm: segDist } = computeEtaMs(segPathRes.path, segPathRes.cost, landSpeedKmh, 0);
+                const { etaMs: segEta, distanceKm: segDist } = computeEtaMs(segPathRes.path, segPathRes.cost, currentSpeedKmh, 0);
                 combinedDistance += segDist;
                 combinedEtaMs += segEta;
             } else {
@@ -189,14 +200,16 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
                 const hasEndAirport = player && player.strutture && player.strutture.some(s => s.status === 'built' && s.structureId.startsWith('aeroporto_t') && s.regionId === endRegionId);
                 
                 let isTransitValid = false;
-                let transitSpeed = landSpeedKmh;
+                let transitSpeed = currentSpeedKmh;
                 
-                if (hasStartPort && hasEndPort) {
-                    const capacity = await checkPlayerTransportCapacity(player, startRegionId, 2, rulesObj);
-                    if (capacity > 0) { isTransitValid = true; transitSpeed = navalSpeedKmh; }
-                } else if (hasStartAirport && hasEndAirport) {
-                    const capacity = await checkPlayerTransportCapacity(player, startRegionId, 0, rulesObj);
-                    if (capacity > 0) { isTransitValid = true; transitSpeed = airSpeedKmh; }
+                if (!isNavalOnly) {
+                    if (hasStartPort && hasEndPort) {
+                        const capacity = await checkPlayerTransportCapacity(player, startRegionId, 2, rulesObj);
+                        if (capacity > 0) { isTransitValid = true; transitSpeed = navalSpeedKmh; }
+                    } else if (hasStartAirport && hasEndAirport) {
+                        const capacity = await checkPlayerTransportCapacity(player, startRegionId, 0, rulesObj);
+                        if (capacity > 0) { isTransitValid = true; transitSpeed = airSpeedKmh; }
+                    }
                 }
                 
                 const segDist = haversineDist(segStart[0], segStart[1], segEnd[0], segEnd[1]);
@@ -221,12 +234,12 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
     }
 
     // Ottieni il percorso base tramite A* dinamico
-    let pathRes = await dynamicPathfinder.findPath(startLng, startLat, targetLng, targetLat, multiplier);
+    let pathRes = await dynamicPathfinder.findPath(startLng, startLat, targetLng, targetLat, multiplier, pathfindingMode);
     let pathCoords = pathRes.path || pathRes;
     let pathCost = pathRes.cost || 0;
 
-    // Se A* fallisce e c'è il player, tenta l'instradamento automatico hub-to-hub
-    if (!pathRes.isValid && player && rulesObj) {
+    // Se A* fallisce e c'è il player, tenta l'instradamento automatico hub-to-hub (non consentito per unità navali)
+    if (!pathRes.isValid && player && rulesObj && !isNavalOnly) {
         const ports = [];
         const airports = [];
         if (player.strutture) {
@@ -326,10 +339,25 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
     }
 
     // Percorso terrestre diretto
-    const { etaMs, distanceKm } = computeEtaMs(pathCoords, pathCost, landSpeedKmh, matchMultiplier);
+    const { etaMs, distanceKm } = computeEtaMs(pathCoords, pathCost, currentSpeedKmh, matchMultiplier);
+
+    let isValid = pathRes.isValid !== undefined ? pathRes.isValid : true;
+
+    // Se l'armata è puramente navale, il punto finale reale del percorso A* (in acqua, penultimo punto)
+    // deve essere molto vicino alla destinazione reale richiesta. Se la destinazione
+    // è nell'entroterra profondo, l'A* snapperà ad un corpo idrico lontano: in questo
+    // caso consideriamo il movimento non valido per l'unità navale.
+    if (isNavalOnly && pathCoords && pathCoords.length > 1) {
+        const actualEndPoint = pathCoords[pathCoords.length - 2];
+        const distToTarget = haversineDist(actualEndPoint[0], actualEndPoint[1], targetLng, targetLat);
+        if (distToTarget > 5.0) { // Soglia di 5 km per porti costieri/inaccuratezze
+            isValid = false;
+            console.log(`[PATH_DEBUG] Movimento navale annullato: destinazione reale troppo lontana dall'acqua (${distToTarget.toFixed(2)} km)`);
+        }
+    }
 
     return {
-        isValid: pathRes.isValid !== undefined ? pathRes.isValid : true,
+        isValid: isValid,
         distance: distanceKm,
         etaMs,
         path: pathCoords,

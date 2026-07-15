@@ -5,7 +5,7 @@ const path = require('path');
 const { setupCombatFromArrival, processActiveCombats, getRegionsGeojson } = require('./combatLogic.js');
 const turf = require('@turf/turf');
 
-const { getArmyVisionRadius } = require('./gameUtils.js');
+const { getArmyVisionRadius, getArmyAttackRange } = require('./gameUtils.js');
 
 const { getArmyLocation, haversineDist } = require('./movementLogic.js');
 let nodesFeatures = [];
@@ -55,7 +55,7 @@ const checkCombatTriggers = async () => {
 
             for (const army of allArmies) {
                 if (army.status === "Pronto all'attacco" || army.status === "Pronto alla conquista") {
-                    const radius = getArmyVisionRadius(army);
+                    const radius = getArmyAttackRange(army);
                     const myCoords = getArmyLocation(army);
                     if (!myCoords) continue;
 
@@ -85,27 +85,13 @@ const checkCombatTriggers = async () => {
 
                     if (targetCoords) {
                         const dist = haversineDist(myCoords[0], myCoords[1], targetCoords[0], targetCoords[1]);
-                        let isInsideRegion = false;
                         
-                        if (!enemyArmy && targetName) {
-                            const { getRegionForNode } = require('./movementLogic.js');
-                            const regionId = getRegionForNode(targetName) || targetName;
-                            const geojson = getRegionsGeojson();
-                            if (geojson) {
-                                const feature = geojson.features.find(f => f.properties && (f.properties.adm1_code === regionId || f.id === regionId));
-                                if (feature) {
-                                    try {
-                                        const pt = turf.point([myCoords[0], myCoords[1]]);
-                                        if (turf.booleanPointInPolygon(pt, feature)) {
-                                            isInsideRegion = true;
-                                        }
-                                    } catch(e) {}
-                                }
-                            }
-                        }
-
-                        console.log(`[COMBAT_TRIGGER] dist: ${dist}, radius: ${radius}, targetCoords: ${targetCoords}, isInsideRegion: ${isInsideRegion}`);
-                        if (dist <= radius || isInsideRegion) {
+                        // Per le unità melee (gittata 0 o non valorizzata), usiamo un buffer minimo di 5 km.
+                        // Questo evita trigger prematuri dovuti ad attraversamento del confine o raggio visivo elevato.
+                        const triggerRadius = radius > 0 ? radius : 5.0;
+                        console.log(`[COMBAT_TRIGGER] dist: ${dist}, attackRange: ${radius}, triggerRadius: ${triggerRadius}, targetCoords: ${targetCoords}`);
+                        
+                        if (dist <= triggerRadius) {
                             // Innesca il combattimento!
                             // Dobbiamo recuperare la mossa dal DB
                             const mossaRes = await db.query(`SELECT * FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, [army.id]);

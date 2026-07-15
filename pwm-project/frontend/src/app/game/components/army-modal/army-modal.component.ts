@@ -185,29 +185,48 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
     // Definiamo le icone base e le descrizioni (o potremmo prenderle dal json se ci fossero)
     const extraInfo: any = {
       'fante': { icon: '🪖', description: 'Unità di fanteria base. Generata anche passivamente.' },
-      'lmv': { icon: '🏎️', description: 'Mezzo veloce per ricognizione e attacchi rapidi.' },
-      'speciali': { icon: '🥷', description: 'Forze speciali per operazioni tattiche.' },
+      'lmv': { icon: '🚘', description: 'Veicolo leggero da ricognizione.' },
+      'speciali': { icon: '🥷', description: 'Forze speciali d\'élite.' },
       'artiglieria': { icon: '🎯', description: 'Supporto dalla distanza.' },
       'apc': { icon: '🛡️', description: 'Trasporto truppe corazzato.' },
       'sam_mobile': { icon: '🚀', description: 'Difesa contraerea mobile.' },
       'carro_armato': { icon: '🚜', description: 'Forza d\'urto pesante.' },
       'missile_crociera': { icon: '🛰️', description: 'Missile tattico a lungo raggio.' },
       'missile_balistico': { icon: '🚀', description: 'Missile strategico intercontinentale.' },
-      'icbm': { icon: '☢️', description: 'Arma di distruzione di massa.' }
+      'icbm': { icon: '☢️', description: 'Arma di distruzione di massa.' },
+      // Unità Navali (Mare)
+      'corvetta': { icon: '🚢', description: 'Corvetta di pattugliamento costiero.' },
+      'fregata': { icon: '🚢', description: 'Fregata multiruolo pesante.' },
+      'cargo_navale': { icon: '🚢', description: 'Nave cargo per trasporto truppe.' },
+      'cacciatorpediniere': { icon: '🚢', description: 'Nave da combattimento cacciatorpediniere.' },
+      'sommergibile': { icon: '🐙', description: 'Sommergibile stealth d\'attacco.' },
+      'portaerei': { icon: '🚢', description: 'Portaerei strategica per supporto aereo.' },
+      // Unità Aeree (Aria)
+      'drone': { icon: '🛸', description: 'Drone da ricognizione aerea.' },
+      'elicottero': { icon: '🚁', description: 'Elicottero d\'attacco tattico.' },
+      'caccia': { icon: '✈️', description: 'Caccia da superiorità aerea.' },
+      'aereo_cargo': { icon: '✈️', description: 'Aereo da trasporto pesante.' },
+      'bombardiere': { icon: '✈️', description: 'Bombardiere strategico.' },
+      'bombardiere_stealth': { icon: '✈️', description: 'Bombardiere stealth invisibile ai radar.' }
     };
 
     const newCatalog = [];
     for (const unit of truppeSheet.lines) {
       if (!unit.id_truppa) continue;
-      // Filtriamo solo le truppe di terra (prodotte in caserma o fabbrica, no aria o mare per ora)
       if (unit.id_truppa === 'fante') continue; // I fanti vengono generati passivamente ogni ora
-      if (unit.prodotta_in && (unit.prodotta_in.startsWith('caserma') || unit.prodotta_in.startsWith('fabbrica') || unit.prodotta_in.startsWith('tenda'))) {
+      if (unit.prodotta_in && (
+        unit.prodotta_in.startsWith('caserma') ||
+        unit.prodotta_in.startsWith('fabbrica') ||
+        unit.prodotta_in.startsWith('tenda') ||
+        unit.prodotta_in.startsWith('porto') ||
+        unit.prodotta_in.startsWith('aeroporto')
+      )) {
         newCatalog.push({
           id: unit.id_truppa,
           name: unit.nome || unit.id_truppa,
           tier: unit.tier || 1,
           icon: extraInfo[unit.id_truppa]?.icon || '⚔️',
-          description: extraInfo[unit.id_truppa]?.description || 'Unità di terra.',
+          description: extraInfo[unit.id_truppa]?.description || 'Unità militare.',
           costMoney: unit.costo_denaro || 0,
           costSteel: unit.costo_acciaio || 0,
           costLead: unit.costo_piombo || 0,
@@ -216,7 +235,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
           hp: unit.HP || 100,
           damage: unit.danno_base || 10,
           trainTime: unit.tempo_addestramento || 0,
-          requiredBuilding: unit.prodotta_in // Es: 'caserma_t1'
+          requiredBuilding: unit.prodotta_in
         });
       }
     }

@@ -85,9 +85,22 @@ export class TechTreeComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['gameRules'] || changes['activeBranch']) {
+    if (changes['gameRules'] || changes['activeBranch'] || changes['userTechnologies']) {
       this.updateTracks();
     }
+  }
+
+  /** Restituisce il numero di nodi già ricercati rispetto al totale dei nodi nelle tracce correnti */
+  getCompletedCount(): { done: number; total: number } {
+    let done = 0;
+    let total = 0;
+    for (const track of this.filteredTracks) {
+      for (const node of (track.steps || [])) {
+        total++;
+        if (this.isUnlocked(node)) done++;
+      }
+    }
+    return { done, total };
   }
 
   setBranch(branch: string) {

@@ -408,7 +408,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             if ((marker as any)._lastDirection !== direction) {
               const assetUrl = `url(${this.getArmyModelAssetUrl(army, direction)})`;
               imgDiv.style.backgroundImage = assetUrl;
-              const targetTransform = direction === 'side-flip' ? 'scaleX(-1)' : 'scaleX(1)';
+              const targetTransform = direction === 'side-flip' ? 'scaleX(1)' : 'scaleX(-1)';
               imgDiv.style.transform = targetTransform;
               (marker as any)._lastDirection = direction;
             }
@@ -734,7 +734,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               color: 'success'
             }).then(t => t.present());
             if (parsed.payload?.technologies) {
-              this.userTechnologies = parsed.payload.technologies;
+              // Usa spread per creare un nuovo riferimento array: Angular ngOnChanges lo rileva correttamente
+              this.userTechnologies = [...parsed.payload.technologies];
             }
             if (parsed.payload?.risorse) {
               this.updatePlayerResources(parsed.payload.risorse);
@@ -758,6 +759,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             }
             if (parsed.data?.production) {
               this.resourceProduction = parsed.data.production;
+            }
+            if (parsed.data?.technologies) {
+              this.userTechnologies = [...parsed.data.technologies];
             }
             if (parsed.data?.truppe) {
               this.playerTroops = parsed.data.truppe;

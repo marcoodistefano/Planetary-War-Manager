@@ -108,6 +108,90 @@
     }
   }
 
+  /* Progress bar ricerche completate */
+  .research-progress-box {
+    margin: 0 20px 18px;
+    padding: 12px 14px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(134, 215, 255, 0.15);
+    border-radius: 8px;
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.55rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+
+      .progress-fraction {
+        color: var(--primary-blue);
+        font-size: 0.7rem;
+        text-shadow: 0 0 6px var(--primary-glow);
+      }
+    }
+
+    .progress-bar-outer {
+      height: 6px;
+      background: rgba(134, 215, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+
+      .progress-bar-inner {
+        height: 100%;
+        background: linear-gradient(90deg, #00ff88, #00ccaa);
+        border-radius: 4px;
+        box-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+        transition: width 0.4s ease;
+        min-width: 0%;
+      }
+    }
+  }
+
+  /* Legenda stati */
+  .status-legend {
+    margin: 0 20px 18px;
+    padding: 12px 14px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px dashed rgba(134, 215, 255, 0.1);
+    border-radius: 8px;
+
+    .legend-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.5rem;
+      font-weight: 900;
+      color: var(--text-muted);
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+
+      &:last-child { margin-bottom: 0; }
+
+      .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+
+        &.dot-completed    { background: #00ff88; box-shadow: 0 0 6px rgba(0, 255, 136, 0.6); }
+        &.dot-affordable   { background: #ffd700; box-shadow: 0 0 6px rgba(255, 215, 0, 0.5); }
+        &.dot-resource-blocked { background: #ff7b72; box-shadow: 0 0 6px rgba(255, 123, 114, 0.5); }
+        &.dot-locked       { background: rgba(134, 215, 255, 0.25); border: 1px solid rgba(134, 215, 255, 0.3); }
+      }
+    }
+  }
+
   .sidebar-footer {
     padding: 20px;
     border-top: 1px solid var(--glass-border);
@@ -254,6 +338,18 @@
         background: rgba(0, 255, 136, 0.1);
         text-shadow: 0 0 5px rgba(0, 255, 136, 0.5);
       }
+      &.completed {
+        color: #00ff88;
+        border-color: rgba(0, 255, 136, 0.4);
+        background: rgba(0, 255, 136, 0.1);
+        text-shadow: 0 0 5px rgba(0, 255, 136, 0.5);
+      }
+      &.insufficient-resources {
+        color: #ff7b72;
+        border-color: rgba(255, 123, 114, 0.4);
+        background: rgba(255, 123, 114, 0.1);
+        text-shadow: 0 0 5px rgba(255, 123, 114, 0.3);
+      }
     }
   }
 
@@ -285,6 +381,13 @@
 .affordable {
   border-color: rgba(255, 215, 0, 0.4);
   box-shadow: 0 0 5px rgba(255, 215, 0, 0.2);
+}
+
+/* Modalità con requisiti soddisfatti ma risorse insufficienti */
+.resource-blocked {
+  border-color: rgba(255, 123, 114, 0.4);
+  background: rgba(255, 123, 114, 0.02);
+  box-shadow: 0 0 5px rgba(255, 123, 114, 0.15);
 }
 
 /* Modalità sbloccata/ricercata */

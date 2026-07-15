@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 let troopsVisionMap = {};
+let troopsAttackRangeMap = {};
 let defaultVisionRadius = 100; // Using 100 as the global default for vision
 
 try {
@@ -12,8 +13,9 @@ try {
         if (truppeSheet && truppeSheet.lines) {
             truppeSheet.lines.forEach(l => {
                 troopsVisionMap[l.id_truppa] = l.raggio_visivo || defaultVisionRadius;
+                troopsAttackRangeMap[l.id_truppa] = l.raggio_attacco || 0;
             });
-            console.log(`[GAME_UTILS] Caricati ${Object.keys(troopsVisionMap).length} raggi visivi dal JSON.`);
+            console.log(`[GAME_UTILS] Caricati ${Object.keys(troopsVisionMap).length} raggi visivi e di attacco dal JSON.`);
         }
     }
 } catch (e) {
@@ -33,7 +35,21 @@ function getArmyVisionRadius(army) {
     return maxRadius;
 }
 
+// Funzione per calcolare la gittata d'attacco di un'armata
+function getArmyAttackRange(army) {
+    let maxRange = 0;
+    if (army.composition) {
+        for (const [id_truppa, qty] of Object.entries(army.composition)) {
+            if (qty > 0 && troopsAttackRangeMap[id_truppa] !== undefined && troopsAttackRangeMap[id_truppa] > maxRange) {
+                maxRange = troopsAttackRangeMap[id_truppa];
+            }
+        }
+    }
+    return maxRange;
+}
+
 module.exports = {
     getArmyVisionRadius,
+    getArmyAttackRange,
     defaultVisionRadius
 };
