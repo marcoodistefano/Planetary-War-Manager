@@ -4,9 +4,9 @@ const redis = new Redis({ host: process.env.REDIS_HOST || 'redis', port: process
 const fs = require("fs");
 const path = require("path");
 const { getMatch } = require('../../shared/matchMonolithic.js');
-
 const { getNodeCoords, getArmyLocation } = require('./movementLogic.js');
-const { getArmyVisionRadius, defaultVisionRadius } = require('./gameUtils.js');
+
+const { getArmyVisionRadius, defaultVisionRadius, isAirArmy, isStealthArmy, radarRadiusMap } = require('./gameUtils.js');
 
 const runFogOfWarCycle = async () => {
     try {
@@ -90,19 +90,46 @@ const runFogOfWarCycle = async () => {
                     return { coords: getArmyLocation(a), radius: getArmyVisionRadius(a) };
                 }).filter(a => a.coords !== null);
 
+                // Aggiungiamo i radar costruiti
+                const myRadars = [];
+                if (player.strutture) {
+                    for (const s of player.strutture) {
+                        if (s.status === 'built' && s.structureId && s.structureId.startsWith('radar_')) {
+                            const radius = radarRadiusMap[s.structureId] || 500; // default 500 se non trovato
+                            if (s.targetCoords) {
+                                myRadars.push({
+                                    coords: s.targetCoords,
+                                    radius: radius,
+                                    isAntiAir: s.structureId.startsWith('radar_anti_aereo')
+                                });
+                            }
+                        }
+                    }
+                }
+
                 // Pipeline per le ricerche visive
                 const searchPipeline = redis.pipeline();
                 let searchCount = 0;
+                let searchTypes = []; // Per tenere traccia di chi esegue la ricerca ('default', 'antiAir', 'terrestrial')
 
                 // 1. Ricerca visiva attorno ai miei territori
                 for (const tCoord of myTerritoriesCoords) {
                     searchPipeline.georadius(geoKey, tCoord[0], tCoord[1], defaultVisionRadius, 'km');
+                    searchTypes.push('default');
                     searchCount++;
                 }
 
                 // 2. Ricerca visiva attorno alle mie armate
                 for (const aVision of myArmiesVision) {
                     searchPipeline.georadius(geoKey, aVision.coords[0], aVision.coords[1], aVision.radius, 'km');
+                    searchTypes.push('default');
+                    searchCount++;
+                }
+                
+                // 3. Ricerca visiva attorno ai miei radar
+                for (const radar of myRadars) {
+                    searchPipeline.georadius(geoKey, radar.coords[0], radar.coords[1], radar.radius, 'km');
+                    searchTypes.push(radar.isAntiAir ? 'antiAir' : 'terrestrial');
                     searchCount++;
                 }
 
@@ -111,16 +138,28 @@ const runFogOfWarCycle = async () => {
                     const searchResults = await searchPipeline.exec();
                     const seenArmyIds = new Set();
 
-                    for (const res of searchResults) {
+                    for (let i = 0; i < searchResults.length; i++) {
+                        const res = searchResults[i];
+                        const sType = searchTypes[i];
                         const members = res[1]; // array di stringhe "username|armyId"
                         if (members && Array.isArray(members)) {
                             for (const member of members) {
                                 if (member.startsWith(`${username}|`)) continue; // Ignora le mie armate
                                 if (!seenArmyIds.has(member)) {
+                                    const enemyArmy = armiesDict[member];
+                                    if (!enemyArmy) continue;
+                                    
+                                    // Stealth invisibile ai radar
+                                    if ((sType === 'antiAir' || sType === 'terrestrial') && isStealthArmy(enemyArmy)) continue;
+                                    
+                                    // Radar anti-aereo vede solo aerei
+                                    if (sType === 'antiAir' && !isAirArmy(enemyArmy)) continue;
+                                    
+                                    // Radar terrestre NON vede aerei puri
+                                    if (sType === 'terrestrial' && isAirArmy(enemyArmy)) continue;
+                                    
                                     seenArmyIds.add(member);
-                                    if (armiesDict[member]) {
-                                        visibleEnemies.push(armiesDict[member]);
-                                    }
+                                    visibleEnemies.push(enemyArmy);
                                 }
                             }
                         }

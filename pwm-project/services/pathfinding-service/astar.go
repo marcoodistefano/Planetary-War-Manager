@@ -182,7 +182,8 @@ func getCostMode(pt Point, mode string) float64 {
 func heuristic(a, b Point) float64 {
 	dx := math.Abs(float64(a.X - b.X))
 	dy := math.Abs(float64(a.Y - b.Y))
-	return math.Max(dx, dy)
+	// Octile distance con peso massiccio per forzare Greedy Best-First Search su scala globale
+	return (math.Max(dx, dy) + 0.414*math.Min(dx, dy)) * 50.0
 }
 
 func findNearestLandPoint(pt Point) Point {
@@ -303,6 +304,11 @@ func FindPath(startLng, startLat, endLng, endLat float64, multiplier float64, mo
 
 		current := heap.Pop(&pq).(*Node)
 		currPt := current.Pt
+
+		// SKIP nodi obsoleti (già raggiunti con un costo minore precedentemente)
+		if current.Cost > gScore[currPt] {
+			continue
+		}
 
 		if currPt == snappedEnd {
 			path := reconstructPath(cameFrom, currPt, startLng, startLat, endLng, endLat)

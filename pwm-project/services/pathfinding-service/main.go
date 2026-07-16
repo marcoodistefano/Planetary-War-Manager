@@ -237,6 +237,32 @@ func handleNearestWater(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(NearestWaterResponse{X: lng, Y: lat})
 }
 
+func handleNearestLand(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req NearestWaterRequest // Usiamo la stessa struct
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if EtopoData == nil {
+		json.NewEncoder(w).Encode(NearestWaterResponse{X: req.X, Y: req.Y})
+		return
+	}
+
+	pt := lngLatToIndex(req.X, req.Y)
+	landPt := findNearestLandPoint(pt)
+	lng, lat := indexToLngLat(landPt)
+
+	json.NewEncoder(w).Encode(NearestWaterResponse{X: lng, Y: lat})
+}
+
 func main() {
 	// Attesa di 5 secondi per dare il tempo a redis e warmup di partire
 	time.Sleep(5 * time.Second)
@@ -255,6 +281,7 @@ func main() {
 
 	http.HandleFunc("/api/calculate", handleCalculatePath)
 	http.HandleFunc("/api/nearest-water", handleNearestWater)
+	http.HandleFunc("/api/nearest-land", handleNearestLand)
 
 	port := os.Getenv("PORT")
 	if port == "" {

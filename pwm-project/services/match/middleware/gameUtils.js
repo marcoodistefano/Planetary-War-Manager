@@ -3,6 +3,8 @@ const path = require('path');
 
 let troopsVisionMap = {};
 let troopsAttackRangeMap = {};
+let troopsDomainMap = {};
+let radarRadiusMap = {};
 let defaultVisionRadius = 100; // Using 100 as the global default for vision
 
 try {
@@ -14,8 +16,18 @@ try {
             truppeSheet.lines.forEach(l => {
                 troopsVisionMap[l.id_truppa] = l.raggio_visivo || defaultVisionRadius;
                 troopsAttackRangeMap[l.id_truppa] = l.raggio_attacco || 0;
+                troopsDomainMap[l.id_truppa] = l.dominio;
             });
             console.log(`[GAME_UTILS] Caricati ${Object.keys(troopsVisionMap).length} raggi visivi e di attacco dal JSON.`);
+        }
+
+        const struttureSheet = gameRules.sheets.find(s => s.name === 'Strutture');
+        if (struttureSheet && struttureSheet.lines) {
+            struttureSheet.lines.forEach(l => {
+                if (l.id_struttura && l.id_struttura.startsWith('radar_')) {
+                    radarRadiusMap[l.id_struttura] = (l.raggio_azione || 0) * 10;
+                }
+            });
         }
     }
 } catch (e) {
@@ -48,8 +60,41 @@ function getArmyAttackRange(army) {
     return maxRange;
 }
 
+// Funzione per capire se un'armata è puramente aerea (tutti i componenti hanno dominio 0)
+function isAirArmy(army) {
+    if (!army || !army.composition) return false;
+    let hasUnits = false;
+    for (const [id_truppa, qty] of Object.entries(army.composition)) {
+        if (qty > 0) {
+            hasUnits = true;
+            if (troopsDomainMap[id_truppa] !== 0) {
+                return false;
+            }
+        }
+    }
+    return hasUnits;
+}
+
+// Funzione per capire se un'armata è stealth (tutti i componenti sono bombardiere_stealth)
+function isStealthArmy(army) {
+    if (!army || !army.composition) return false;
+    let hasUnits = false;
+    for (const [id_truppa, qty] of Object.entries(army.composition)) {
+        if (qty > 0) {
+            hasUnits = true;
+            if (id_truppa !== 'bombardiere_stealth') {
+                return false;
+            }
+        }
+    }
+    return hasUnits;
+}
+
 module.exports = {
     getArmyVisionRadius,
     getArmyAttackRange,
+    isAirArmy,
+    isStealthArmy,
+    radarRadiusMap,
     defaultVisionRadius
 };

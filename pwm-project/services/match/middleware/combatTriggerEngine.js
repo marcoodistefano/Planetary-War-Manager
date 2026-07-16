@@ -54,6 +54,19 @@ const checkCombatTriggers = async () => {
             }
 
             for (const army of allArmies) {
+                if (army.status === 'cooldown' && army.cooldownUntil && Date.now() >= army.cooldownUntil) {
+                    console.log(`[COOLDOWN] Army ${army.id} ha terminato il rifornimento.`);
+                    await updateMatch(matchId, (mObj) => {
+                        const p = mObj.match.player.find(x => x.username === army.owner);
+                        if (p && p.armate && p.armate[army.id]) {
+                            p.armate[army.id].status = 'standby';
+                            delete p.armate[army.id].cooldownUntil;
+                        }
+                        return { save: true, matchObj: mObj };
+                    });
+                    continue;
+                }
+
                 if (army.status === "Pronto all'attacco" || army.status === "Pronto alla conquista") {
                     const radius = getArmyAttackRange(army);
                     const myCoords = getArmyLocation(army);

@@ -1337,6 +1337,10 @@ ion-menu {
 
   .top-navbar.desktop-only .res-item {
     flex: 0 1 auto;
+    @media (max-width: 768px) {
+      font-size: 0.8rem;
+      padding: 10px 15px;
+    }
     min-width: 116px;
     min-height: 56px;
     padding: 8px 12px;
@@ -1648,4 +1652,25 @@ ion-menu {
     opacity: 0;
     transform: translate(-50%, -30px);
   }
+}
+
+/* EFFETTO FLASH NUCLEARE */
+.nuke-flash {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #ffffff;
+  z-index: 999999;
+  pointer-events: none;
+  animation: nukeFlashAnim 3s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+
+@keyframes nukeFlashAnim {
+  0% { opacity: 0; }
+  5% { opacity: 1; }
+  15% { opacity: 1; background-color: #ffaa00; }
+  50% { opacity: 0.8; background-color: #ff3300; }
+  100% { opacity: 0; }
 }

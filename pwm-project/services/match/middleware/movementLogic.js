@@ -7,6 +7,19 @@ const redis = require('../../shared/redisClient.js');
 
 let regionsFeatures = null;
 
+let cachedGameRules = null;
+let lastGameRulesFetch = 0;
+async function getGameRulesCached(redisClient) {
+    if (cachedGameRules && (Date.now() - lastGameRulesFetch < 60000)) {
+        return cachedGameRules;
+    }
+    const rulesRawBase64 = await redisClient.get("assets:game_rules.json");
+    if (rulesRawBase64) {
+        cachedGameRules = JSON.parse(Buffer.from(rulesRawBase64, 'base64').toString('utf8'));
+        lastGameRulesFetch = Date.now();
+    }
+    return cachedGameRules;
+}
 // Load map topologies (only regions are needed now)
 function loadGeometries() {
     if (!regionsFeatures) {
@@ -85,11 +98,7 @@ const checkPlayerTransportCapacity = async (player, regionId, domain, rulesObj) 
 
 // Main calculate function using A*
 const calculatePath = async (startLng, startLat, targetName, targetLng, targetLat, multiplier = 1, currentPathInfo = null, matchMultiplier = 1, player = null, waypoints = [], armyComposition = null) => {
-    const rulesRawBase64 = await redis.get("assets:game_rules.json");
-    let rulesObj = null;
-    if (rulesRawBase64) {
-        rulesObj = JSON.parse(Buffer.from(rulesRawBase64, 'base64').toString('utf8'));
-    }
+    const rulesObj = await getGameRulesCached(redis);
 
     // --- Calcolo velocità reale dell'armata dalla composizione ---
     // Il convoglio si muove alla velocità dell'unità più lenta (principio tattico realistico)
@@ -155,6 +164,7 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
             // Il costo A* include già il moltiplicatore di terreno; rapporto costo/distanza > 1 = terreno difficile
             if (distanceKm > 0) {
                 const terrainPenalty = Math.max(1, pathCost / (distanceKm / 11.1));
+                console.log(`[PATH_DEBUG] Distance: ${distanceKm.toFixed(2)}km, pathCost: ${pathCost.toFixed(2)}, TerrainPenalty: ${terrainPenalty.toFixed(2)}x`);
                 effectiveHours = effectiveHours * terrainPenalty;
             }
         } else {

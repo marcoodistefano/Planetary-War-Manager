@@ -15,6 +15,8 @@ const safeParse = (str) => {
 // FUNZIONI DI FRAMMENTAZIONE (SMART PROXY)
 // ==========================================
 
+const matchLocalCache = new Map();
+
 async function getMatch(matchId) {
     let actualKey = `match:${matchId}`;
     let aliasCheck = await redis.get(actualKey);
@@ -22,6 +24,13 @@ async function getMatch(matchId) {
     if (aliasCheck && aliasCheck.startsWith('ALIAS:')) {
         actualKey = `match:${aliasCheck.substring(6)}`;
         aliasCheck = await redis.get(actualKey);
+    }
+
+    if (matchLocalCache.has(actualKey)) {
+        const cached = matchLocalCache.get(actualKey);
+        if (Date.now() - cached.ts < 5000) { // 5 secondi di validità massima in caso non venga aggiornato
+            return JSON.parse(cached.data);
+        }
     }
 
     if (aliasCheck && aliasCheck.startsWith('{')) {
@@ -92,6 +101,7 @@ async function getMatch(matchId) {
         }
     }
 
+    matchLocalCache.set(actualKey, { ts: Date.now(), data: JSON.stringify(matchObj) });
     return matchObj;
 }
 
@@ -177,6 +187,10 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 100) {
                 const username = newPlayer.username;
                 const prePlayer = preState.match.player ? preState.match.player.find(p => p.username === username) || {} : {};
 
+                if (JSON.stringify(prePlayer) === JSON.stringify(newPlayer)) {
+                    continue; // Skip pesante parsing se il player non è cambiato
+                }
+
                 const pBaseOld = { ...prePlayer }; 
                 delete pBaseOld.armate; delete pBaseOld.truppe; delete pBaseOld.risorse; delete pBaseOld.territori; delete pBaseOld.territori_dict;
                 const pBaseNew = { ...newPlayer }; 
@@ -228,6 +242,8 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 100) {
                 console.error("Errore critico in redis.multi().exec() durante updateMatch", matchId);
                 throw new Error("Transazione fallita");
             }
+
+            matchLocalCache.set(actualKey, { ts: Date.now(), data: JSON.stringify(newMatchObj) });
 
             return result.data;
         } finally {

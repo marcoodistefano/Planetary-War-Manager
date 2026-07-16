@@ -144,6 +144,117 @@ const addToGraveyard = async (id_partita_hash, playerUsername, armyData, destroy
     }
 };
 
+const getArmyDomain = (army) => {
+    if (army && army.composition) {
+        for (const [troopId, count] of Object.entries(army.composition)) {
+            if (count > 0) {
+                const stats = getTroopStats(troopId);
+                if (stats && stats.dominio !== undefined) return stats.dominio;
+            }
+        }
+    }
+    return 1;
+};
+
+const getArmyType = (army) => {
+    if (army && army.composition) {
+        for (const [troopId, count] of Object.entries(army.composition)) {
+            if (count > 0) {
+                const stats = getTroopStats(troopId);
+                if (stats && stats.tipo !== undefined) return stats.tipo;
+            }
+        }
+    }
+    return 1;
+};
+
+const executeAirStrike = async (attackerArmy, targetPlayer, defenderArmy, matchId, matchObj) => {
+    const dmg = calculateArmyDamage(attackerArmy);
+    if (dmg <= 0) return { damageDealt: 0, killed: false };
+
+    console.log(`[AIR_STRIKE] Esecuzione strike da ${attackerArmy.id} (dmg: ${dmg}) contro ${defenderArmy ? defenderArmy.id : targetPlayer}`);
+
+    let killed = false;
+    if (defenderArmy) {
+        killed = applyDamageToArmy(defenderArmy, dmg);
+        if (killed) {
+            await addToGraveyard(matchId, targetPlayer, defenderArmy, attackerArmy.owner);
+        }
+        await emitCombatEvent(matchId, attackerArmy.owner, targetPlayer, dmg, killed ? 'distrutto' : 'danneggiato', [attackerArmy.owner, targetPlayer]);
+    } else {
+        // Se in futuro ci saranno danni alle strutture (HP del nodo), andranno applicati qui.
+        console.log(`[AIR_STRIKE] Nessuna armata nemica trovata. Bombardamento sulle infrastrutture non ancora supportato in full.`);
+    }
+
+    return { damageDealt: dmg, killed };
+};
+
+const executeNukeStrike = async (attackerArmy, targetCoords, matchId, matchObj) => {
+    const dmg = calculateArmyDamage(attackerArmy);
+    console.log(`[NUKE_STRIKE] Esecuzione Nuke da ${attackerArmy.id} (dmg: ${dmg}) a coords: ${targetCoords}`);
+
+    const { haversineDist, getArmyLocation } = require('./movementLogic.js');
+    const BLAST_RADIUS_KM = 50; // Raggio letale dell'esplosione nucleare (in km)
+
+    let destroyedArmies = [];
+    let destroyedStructures = [];
+    let targetLng = targetCoords[0];
+    let targetLat = targetCoords[1];
+
+    // Iteriamo su TUTTI i giocatori per trovare chi è nel raggio
+    for (const player of matchObj.match.player) {
+        // Distruzione Armate
+        if (player.armate) {
+            for (const [aId, armata] of Object.entries(player.armate)) {
+                if (aId === attackerArmy.id) continue; // Non distruggiamo il missile stesso durante il check
+                const loc = getArmyLocation(armata);
+                if (loc) {
+                    const dist = haversineDist(targetLng, targetLat, loc[0], loc[1]);
+                    if (dist <= BLAST_RADIUS_KM) {
+                        console.log(`[NUKE_STRIKE] Armata ${aId} di ${player.username} distrutta dall'onda d'urto (dist: ${dist} km).`);
+                        await addToGraveyard(matchId, player.username, armata, 'Esplosione Nucleare');
+                        destroyedArmies.push({ id: aId, owner: player.username });
+                        delete player.armate[aId];
+                    }
+                }
+            }
+        }
+        
+        // Distruzione Strutture
+        if (player.strutture) {
+            for (let i = player.strutture.length - 1; i >= 0; i--) {
+                const struct = player.strutture[i];
+                if (struct.coords) {
+                    const dist = haversineDist(targetLng, targetLat, struct.coords[0], struct.coords[1]);
+                    if (dist <= BLAST_RADIUS_KM) {
+                        console.log(`[NUKE_STRIKE] Struttura ${struct.id} di ${player.username} distrutta dall'onda d'urto (dist: ${dist} km).`);
+                        destroyedStructures.push({ id: struct.id, owner: player.username });
+                        player.strutture.splice(i, 1);
+                    }
+                }
+            }
+        }
+    }
+
+    // Emetti l'evento Nuke al frontend
+    const broadcastPayload = {
+        matchId,
+        payload: {
+            type: 'NUKE_EXPLOSION',
+            data: {
+                coords: [targetLng, targetLat],
+                radiusKm: BLAST_RADIUS_KM,
+                attacker: attackerArmy.owner,
+                destroyedArmies,
+                destroyedStructures
+            }
+        }
+    };
+    await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+
+    return { destroyedArmies, destroyedStructures };
+};
+
 const emitCombatEvent = async (id_partita_hash, attackerName, defenderName, damage, result, playersInvolved) => {
     try {
         const broadcastPayload = {
@@ -1025,5 +1136,11 @@ module.exports = {
     startCombatLoop,
     setupCombatFromArrival,
     processActiveCombats,
-    getRegionsGeojson
+    getRegionsGeojson,
+    applyDamageToArmy,
+    getArmyDomain,
+    getArmyType,
+    executeAirStrike,
+    executeNukeStrike,
+    addToGraveyard
 };

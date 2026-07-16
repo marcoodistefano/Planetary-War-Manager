@@ -121,6 +121,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   isDiplomacyModalOpen = false;
   isIntelligenceModalOpen = false;
   isChatOpen = false;
+  isNukeFlashActive = false;
+  nukeRadiationZones: any[] = [];
   isMarketModalOpen = false;
   isArmyModalOpen = false;
   playerTrainings: any[] = [];
@@ -223,11 +225,29 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       else if (mod.includes('caccia') || mod.includes('aircraft')) { modelName = 'F35'; folder = 'Air_troops'; }
     }
 
+    if (this.isAirOrSeaArmy(army) && (direction === 'front' || direction === 'back')) {
+      direction = 'side';
+    }
+
     const suffix = '_' + direction.replace('-flip', '') + '.png';
     if (modelName === 'Soldier') {
       return `/assets/2Dmodels/Land_troops/Soldier/soldier${suffix}`;
     }
     return `/assets/2Dmodels/${folder}/${modelName}/${modelName}${suffix}`;
+  }
+
+  isAirOrSeaArmy(army: any): boolean {
+    if (!army) return false;
+    if (army.composition) {
+      if (army.composition['cacciatorpediniere'] || army.composition['fregata'] || army.composition['corvetta'] || army.composition['cargo_navale'] || army.composition['sommergibile'] || army.composition['portaerei']) return true;
+      if (army.composition['caccia'] || army.composition['bombardiere'] || army.composition['elicottero'] || army.composition['drone'] || army.composition['bombardiere_stealth'] || army.composition['aereo_cargo']) return true;
+    }
+    if (army.id_modello && typeof army.id_modello === 'string') {
+      const mod = army.id_modello.toLowerCase();
+      if (mod.includes('cacciatorpediniere') || mod.includes('fregata') || mod.includes('corvetta') || mod.includes('cargo_navale') || mod.includes('sommergibile') || mod.includes('portaerei') || mod.includes('boat') || mod.includes('ship')) return true;
+      if (mod.includes('caccia') || mod.includes('aircraft') || mod.includes('bomb') || mod.includes('elicottero') || mod.includes('drone') || mod.includes('f35')) return true;
+    }
+    return false;
   }
 
   startAnimationLoop() {
@@ -376,10 +396,15 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         const dx = currentLngLat[0] - prevLngLat[0];
         const dy = currentLngLat[1] - prevLngLat[1];
-        if (Math.abs(dx) > Math.abs(dy)) {
-          direction = dx > 0 ? 'side' : 'side-flip';
+        
+        if (this.isAirOrSeaArmy(army)) {
+          direction = dx >= 0 ? 'side' : 'side-flip';
         } else {
-          direction = dy > 0 ? 'back' : 'front';
+          if (Math.abs(dx) > Math.abs(dy)) {
+            direction = dx > 0 ? 'side' : 'side-flip';
+          } else {
+            direction = dy > 0 ? 'back' : 'front';
+          }
         }
 
         const marker = this.armyMarkers.get(army.id);
@@ -408,7 +433,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             if ((marker as any)._lastDirection !== direction) {
               const assetUrl = `url(${this.getArmyModelAssetUrl(army, direction)})`;
               imgDiv.style.backgroundImage = assetUrl;
-              const targetTransform = direction === 'side-flip' ? 'scaleX(1)' : 'scaleX(-1)';
+              const targetTransform = direction === 'side-flip' ? 'scaleX(-1)' : 'scaleX(1)';
               imgDiv.style.transform = targetTransform;
               (marker as any)._lastDirection = direction;
             }
@@ -672,18 +697,18 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const wsUrl = `${wsBaseUrl}/match/${encodeURIComponent(this.currentMatchId)}`;
 
     try {
-        console.log(`[WS_MATCH] Tentativo di connessione a ${wsUrl}`);
-        this.matchState.connect(wsUrl);
+      console.log(`[WS_MATCH] Tentativo di connessione a ${wsUrl}`);
+      this.matchState.connect(wsUrl);
 
-        if (this.matchSub) return; // Fix memory leak su reconnect multipli
+      if (this.matchSub) return; // Fix memory leak su reconnect multipli
 
-        this.ngZone.runOutsideAngular(() => {
-          this.matchSub = this.matchState.messages$.subscribe((parsed: any) => {
+      this.ngZone.runOutsideAngular(() => {
+        this.matchSub = this.matchState.messages$.subscribe((parsed: any) => {
           console.log('[WS_MATCH] Evento ricevuto:', parsed);
 
           if (parsed.type === 'INITIAL_STATE') {
             if (parsed.payload?.armies) {
-              this.matchArmies = parsed.payload.armies.filter((a: any) => a.owner === this.userProfile.username);
+              this.matchArmies = parsed.payload.armies;
               // Pre-calcola la path cache per le armate già in movimento al momento del caricamento
               this.matchArmies.forEach((a: any) => {
                 if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
@@ -771,15 +796,20 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             }
             if (parsed.data?.armies_updated && parsed.data?.armies) {
               this.matchArmies = parsed.data.armies;
+              // Pre-calcola path cache per armate in movimento
+              this.matchArmies.forEach((a: any) => {
+                if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
+              });
               this.renderArmies();
             }
             if (parsed.data?.addestramenti) {
               this.playerTrainings = parsed.data.addestramenti;
             }
             if (parsed.data?.strutture) {
+              const curUserNormR = String(this.userProfile?.username || '').trim().toLowerCase();
               const playerStr = parsed.data.strutture.map((s: any) => ({ ...s, owner: this.userProfile.username }));
-              // Keep non-player structures intact
-              this.matchStructures = this.matchStructures.filter((s: any) => s.owner !== this.userProfile.username).concat(playerStr);
+              // Keep non-player structures intact (case-insensitive comparison)
+              this.matchStructures = this.matchStructures.filter((s: any) => String(s.owner || '').trim().toLowerCase() !== curUserNormR).concat(playerStr);
               setTimeout(() => this.renderStructures(), 100);
             }
             this.ngZone.run(() => this.cdr.detectChanges());
@@ -909,12 +939,15 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             let visibleEnemies = [];
             let myArmies = [];
 
+            const currentUserNorm = String(this.userProfile?.username || '').trim().toLowerCase();
             if (Array.isArray(parsed.payload)) {
               visibleEnemies = parsed.payload;
-              myArmies = this.matchArmies.filter(a => a.owner === this.userProfile.username);
+              myArmies = this.matchArmies.filter(a => String(a.owner || '').trim().toLowerCase() === currentUserNorm);
             } else if (parsed.payload && typeof parsed.payload === 'object') {
               visibleEnemies = parsed.payload.visibleEnemies || [];
-              myArmies = parsed.payload.myArmies || this.matchArmies.filter(a => a.owner === this.userProfile.username);
+              myArmies = parsed.payload.myArmies?.length
+                ? parsed.payload.myArmies
+                : this.matchArmies.filter(a => String(a.owner || '').trim().toLowerCase() === currentUserNorm);
               this.citiesHp = parsed.payload.citiesHp || {};
             }
 
@@ -962,7 +995,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
           if (parsed.type === 'FOG_OF_WAR_STRUCTURES_UPDATE') {
             if (parsed.payload && Array.isArray(parsed.payload.visibleStructures)) {
-              this.matchStructures = parsed.payload.visibleStructures;
+              // Normalizza il confronto owner per evitare problemi di case
+              const curUserNorm = String(this.userProfile?.username || '').trim().toLowerCase();
+              // Mantieni sempre le strutture del giocatore (aggiornate da RESOURCES_UPDATED)
+              const myStructures = this.matchStructures.filter(
+                (s: any) => String(s.owner || '').trim().toLowerCase() === curUserNorm
+              );
+              // Le strutture visibili dal FOG sono solo quelle nemiche/allineate
+              const externalStructures = parsed.payload.visibleStructures.filter(
+                (s: any) => String(s.owner || '').trim().toLowerCase() !== curUserNorm
+              );
+              this.matchStructures = [...myStructures, ...externalStructures];
               setTimeout(() => this.renderStructures(), 100);
               this.ngZone.run(() => this.cdr.detectChanges());
             }
@@ -1024,7 +1067,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.totalPreviewEta = results.reduce((acc: number, r: any) => acc + (r.etaMs || 0), 0);
               this.isPreviewValid = results.every((r: any) => r.isValid !== false);
               this.previewError = results.find((r: any) => r.error)?.error || null;
-              
+
               const features: any[] = [];
               let allPathCoords: [number, number][] = [];
               results.forEach((r: any) => {
@@ -1056,11 +1099,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                   const el = document.createElement('div');
                   el.className = 'destination-marker';
                   el.innerHTML = `<div style="background:#06b6d4; border:2px solid white; border-radius:50%; width:16px; height:16px; box-shadow:0 0 5px rgba(0,0,0,0.5); cursor: move;"></div>`;
-                  
+
                   this.destinationMarker = new maplibregl.Marker({ element: el, draggable: true })
                     .setLngLat(finalCoords)
                     .addTo(this.map);
-                  
+
                   this.destinationMarker.on('dragend', () => {
                     const newLngLat = this.destinationMarker.getLngLat();
                     this.pendingMissions.forEach((m: any) => {
@@ -1111,6 +1154,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                 this.armyModalComponent.loadGraveyard();
               }
             }
+          }
+          if (parsed.type === 'NUKE_EXPLOSION') {
+            const { coords, radiusKm, attacker, destroyedArmies, destroyedStructures } = parsed.data;
+            this.handleNukeExplosion(coords, radiusKm, attacker, destroyedArmies, destroyedStructures);
           }
 
           if (parsed.type === 'BUILD_SUCCESS') {
@@ -1205,7 +1252,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.regionsResources = state.regionsResources;
             }
             if (state.armies) {
-              this.matchArmies = state.armies.filter((a: any) => a.owner === this.userProfile?.username);
+              this.matchArmies = state.armies;
               this.matchArmies.forEach((a: any) => {
                 if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
               });
@@ -1602,6 +1649,180 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     updateBanner();
     this.armyHoverInterval = setInterval(updateBanner, 1000);
+  }
+
+  createGeoJSONCircle(center: [number, number], radiusInKm: number, points: number = 64) {
+    const coords = { latitude: center[1], longitude: center[0] };
+    const km = radiusInKm;
+    const ret = [];
+    const distanceX = km / (111.32 * Math.cos(coords.latitude * Math.PI / 180));
+    const distanceY = km / 110.574;
+    let theta, x, y;
+    for (let i = 0; i < points; i++) {
+        theta = (i / points) * (2 * Math.PI);
+        x = distanceX * Math.cos(theta);
+        y = distanceY * Math.sin(theta);
+        ret.push([coords.longitude + x, coords.latitude + y]);
+    }
+    ret.push(ret[0]);
+    return {
+        type: "Feature",
+        geometry: {
+            type: "Polygon",
+            coordinates: [ret]
+        }
+    };
+  }
+
+  playNukeSound() {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.type = 'square';
+      oscillator.frequency.setValueAtTime(150, audioCtx.currentTime); 
+      oscillator.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 3);
+      
+      gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 3);
+      
+      const distortion = audioCtx.createWaveShaper();
+      function makeDistortionCurve(amount: number) {
+        var k = typeof amount === 'number' ? amount : 50,
+          n_samples = 44100,
+          curve = new Float32Array(n_samples),
+          deg = Math.PI / 180,
+          i = 0,
+          x;
+        for ( ; i < n_samples; ++i ) {
+          x = i * 2 / n_samples - 1;
+          curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
+        }
+        return curve;
+      }
+      distortion.curve = makeDistortionCurve(400);
+      distortion.oversample = '4x';
+      
+      oscillator.connect(distortion);
+      distortion.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 3);
+    } catch (e) {
+      console.warn("AudioContext non supportato o bloccato dal browser", e);
+    }
+  }
+
+  handleNukeExplosion(coords: [number, number], radiusKm: number, attacker: string, destroyedArmies: any[], destroyedStructures: any[]) {
+    this.playNukeSound();
+
+    this.isNukeFlashActive = true;
+    this.ngZone.run(() => this.cdr.detectChanges());
+    
+    if (this.map) {
+      this.map.flyTo({ center: coords, zoom: 6, duration: 1000 });
+    }
+
+    setTimeout(() => {
+      this.isNukeFlashActive = false;
+      this.ngZone.run(() => this.cdr.detectChanges());
+    }, 3000);
+
+    if (this.map) {
+      if (!this.map.getSource('nuke-radiation-source')) {
+        this.map.addSource('nuke-radiation-source', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        
+        this.map.addLayer({
+          id: 'nuke-zone-1',
+          type: 'fill',
+          source: 'nuke-radiation-source',
+          filter: ['==', 'zone', 1],
+          paint: { 'fill-color': '#ffffff', 'fill-opacity': 0.8 }
+        });
+        this.map.addLayer({
+          id: 'nuke-zone-2',
+          type: 'fill',
+          source: 'nuke-radiation-source',
+          filter: ['==', 'zone', 2],
+          paint: { 'fill-color': '#ff3300', 'fill-opacity': 0.5 }
+        });
+        this.map.addLayer({
+          id: 'nuke-zone-3',
+          type: 'fill',
+          source: 'nuke-radiation-source',
+          filter: ['==', 'zone', 3],
+          paint: { 'fill-color': '#ff9900', 'fill-opacity': 0.3 }
+        });
+      }
+
+      const z1: any = this.createGeoJSONCircle(coords, radiusKm * 0.2);
+      const z2: any = this.createGeoJSONCircle(coords, radiusKm * 0.5);
+      const z3: any = this.createGeoJSONCircle(coords, radiusKm);
+      
+      z1.properties = { zone: 1 };
+      z2.properties = { zone: 2 };
+      z3.properties = { zone: 3 };
+      
+      const newZones = [z3, z2, z1];
+      this.nukeRadiationZones = [...this.nukeRadiationZones, ...newZones];
+
+      const animationDuration = 2000;
+      const startTime = performance.now();
+
+      const animateCircles = (timestamp: number) => {
+        const progress = (timestamp - startTime) / animationDuration;
+        if (progress < 1) {
+          const easeProgress = 1 - Math.pow(1 - progress, 5);
+          
+          const a1: any = this.createGeoJSONCircle(coords, (radiusKm * 0.2) * easeProgress);
+          const a2: any = this.createGeoJSONCircle(coords, (radiusKm * 0.5) * easeProgress);
+          const a3: any = this.createGeoJSONCircle(coords, radiusKm * easeProgress);
+          a1.properties = { zone: 1 };
+          a2.properties = { zone: 2 };
+          a3.properties = { zone: 3 };
+          
+          const source: any = this.map.getSource('nuke-radiation-source');
+          if (source) {
+            source.setData({
+              type: 'FeatureCollection',
+              features: [...this.nukeRadiationZones.slice(0, -3), a3, a2, a1]
+            });
+          }
+          requestAnimationFrame(animateCircles);
+        } else {
+          const source: any = this.map.getSource('nuke-radiation-source');
+          if (source) {
+            source.setData({
+              type: 'FeatureCollection',
+              features: this.nukeRadiationZones
+            });
+          }
+        }
+      };
+      
+      requestAnimationFrame(animateCircles);
+    }
+
+    this.toastCtrl.create({
+      header: 'ESPLOSIONE NUCLEARE!',
+      message: `${attacker} ha sganciato una testata nucleare.\n${destroyedArmies.length} armate distrutte.\n${destroyedStructures.length} strutture polverizzate.`,
+      position: 'middle',
+      color: 'danger',
+      duration: 5000,
+      icon: 'warning-outline'
+    }).then(t => t.present());
+    
+    for (const d of destroyedStructures) {
+      if (this.structureMarkers.has(d.id)) {
+        this.structureMarkers.get(d.id).remove();
+        this.structureMarkers.delete(d.id);
+      }
+    }
   }
 
   hideArmyHoverBanner() {
@@ -2368,7 +2589,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               p1[0] + (p2[0] - p1[0]) * segProgress,
               p1[1] + (p2[1] - p1[1]) * segProgress
             ];
-            
+
             remainingPath = [currentLngLat];
             for (let i = segIdx + 1; i < army.path.length; i++) {
               remainingPath.push(army.path[i] as [number, number]);
@@ -2442,7 +2663,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const badgeEl = marker.getElement().querySelector('.army-badge') as HTMLElement;
         if (badgeEl) badgeEl.innerText = String(totalTroops);
         // Salviamo info per il clustering
-        marker.troopsData = { total: totalTroops, id: army.id };
+        marker.troopsData = { total: totalTroops, id: army.id, isAirOrSea: this.isAirOrSeaArmy(army) };
 
         // Aggiorniamo i listener esistenti? MapLibre riutilizza il DOM, 
         // quindi gli event listener precedentemente agganciati continuano a funzionare.
@@ -2468,9 +2689,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         container.style.alignItems = 'center'; // Modificato per centrare il contenuto
         container.style.cursor = 'pointer';
 
-        // Inizializziamo a 32x32 per sicurezza
-        container.style.width = '32px';
-        container.style.height = '32px';
+        // Inizializziamo a 32x32 per sicurezza, aumentato per mare/aria
+        let initialSize = 32;
+        if (this.isAirOrSeaArmy(army)) {
+          initialSize = Math.floor(initialSize * 1.35);
+        }
+        container.style.width = `${initialSize}px`;
+        container.style.height = `${initialSize}px`;
 
         const imgDiv = document.createElement('div');
         imgDiv.className = 'army-image';
@@ -2714,7 +2939,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           .addTo(this.map);
 
         // Salviamo dati utili sul marker stesso
-        (marker as any).troopsData = { total: totalTroops, id: army.id };
+        (marker as any).troopsData = { total: totalTroops, id: army.id, isAirOrSea: this.isAirOrSeaArmy(army) };
         this.armyMarkers.set(army.id, marker);
       }
     });
@@ -2790,10 +3015,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     // Adesso applichiamo le classi e le scale
     clusters.forEach(cluster => {
       // Il marker principale è quello con più truppe o il primo
-      cluster.items.sort((a: any, b: any) => b.marker.troopsData.total - a.marker.troopsData.total);
+      cluster.items.sort((a: any, b: any) => (b.marker.troopsData?.total || 0) - (a.marker.troopsData?.total || 0));
 
       // Calcoliamo la somma totale delle truppe per questo cluster
-      const clusterTotalTroops = cluster.items.reduce((sum: number, item: any) => sum + item.marker.troopsData.total, 0);
+      const clusterTotalTroops = cluster.items.reduce((sum: number, item: any) => sum + (item.marker.troopsData?.total || 0), 0);
 
       cluster.items.forEach((item: any, index: number) => {
         const el = item.marker.getElement();
@@ -2815,6 +3040,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         const maxSize = 80;
         const scaleFactor = Math.min(Math.max((currentZoom - 3) / (10 - 3), 0), 1);
         let dynamicSize = minSize + (maxSize - minSize) * scaleFactor;
+        
+        if (item.marker.troopsData && item.marker.troopsData.isAirOrSea) {
+          dynamicSize *= 1.35; // Sprites navali e aerei più grandi del 35% in scala
+        }
 
         if (currentZoom < thresholdZoom) {
           // In fase di dezoom: Mostra l'avatar e MOSTRA il badge numerico!
@@ -2843,7 +3072,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           badgeDiv.style.display = 'none';
 
           // Ripristina il numero corretto della singola armata nel caso serva
-          badgeDiv.innerText = String(item.marker.troopsData.total);
+          badgeDiv.innerText = String(item.marker.troopsData?.total || 0);
         }
       });
     });
@@ -3527,13 +3756,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       position: 'top',
       color: 'tertiary'
     }).then(t => t.present());
-    
+
     // Non azzeriamo ancora this.selectedArmiesForMovement finché non conferma
   }
 
   confirmPendingMissions() {
     if (!this.pendingMissions || this.pendingMissions.length === 0) return;
-    
+
     this.pendingMissions.forEach(missionData => {
       this.onArmyMissionRequested(missionData);
     });
@@ -3556,11 +3785,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.isPreviewValid = true;
     this.previewError = null;
     this.currentPreviewPath = [];
-    
+
     if (this.map && this.map.getSource('preview-troop-paths-source')) {
       (this.map.getSource('preview-troop-paths-source') as any).setData({ type: 'FeatureCollection', features: [] });
     }
-    
+
     this.selectedWaypoints = [];
     this.waypointMarkers.forEach(m => m.remove());
     this.waypointMarkers = [];
@@ -3576,18 +3805,18 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   addWaypoint() {
     if (!this.currentPreviewPath || this.currentPreviewPath.length < 2) return;
-    
+
     // Trova la coordinata a metà del tracciato corrente
     const midIndex = Math.floor(this.currentPreviewPath.length / 2);
     const coords = this.currentPreviewPath[midIndex];
-    
+
     if (coords && this.map) {
       this.selectedWaypoints.push(coords);
-      
+
       const el = document.createElement('div');
       el.className = 'waypoint-marker';
       el.innerHTML = `<div style="background:#eab308; border:2px solid white; border-radius:50%; width:14px; height:14px; box-shadow:0 0 5px rgba(0,0,0,0.5); cursor: move;" title="Trascina per spostare, clicca per eliminare"></div>`;
-      
+
       const marker = new maplibregl.Marker({ element: el, draggable: true })
         .setLngLat(coords)
         .addTo(this.map);
@@ -3610,7 +3839,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           this.waypointMarkers.splice(idx, 1);
           this.selectedWaypoints.splice(idx, 1);
           this.recalculatePreview();
-          
+
           this.toastCtrl.create({
             message: 'Tappa rimossa',
             duration: 1500,

@@ -248,6 +248,18 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
       .sort((left, right) => left[0].localeCompare(right[0]));
   }
 
+  isAirArmy(army: any): boolean {
+    if (!army) return false;
+    if (army.composition) {
+      if (army.composition['caccia'] || army.composition['bombardiere'] || army.composition['elicottero'] || army.composition['drone'] || army.composition['bombardiere_stealth'] || army.composition['aereo_cargo']) return true;
+    }
+    if (army.id_modello && typeof army.id_modello === 'string') {
+      const mod = army.id_modello.toLowerCase();
+      if (mod.includes('caccia') || mod.includes('aircraft') || mod.includes('bomb') || mod.includes('elicottero') || mod.includes('drone') || mod.includes('f35')) return true;
+    }
+    return false;
+  }
+
   get totalAvailableTroops() {
     return Object.values(this.availableTroops).reduce((total, value) => total + Number(value || 0), 0);
   }

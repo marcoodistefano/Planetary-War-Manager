@@ -19,6 +19,7 @@ const { loadMinimumPathToRedis } = require("./middleware/loadPathToRedis.js");
 const { startCombatLoop } = require("./middleware/combatLogic.js");
 const { startFogOfWarEngine } = require("./middleware/fogOfWarEngine.js");
 const { startCombatTriggerEngine } = require("./middleware/combatTriggerEngine.js");
+const { startLogisticsEngine } = require("./middleware/logisticsEngine.js");
 const { startSnapshotEngine } = require("./middleware/snapshotEngine.js");
 const { startMatchStateEngine } = require("./middleware/matchStateEngine.js");
 const { startLeaderboardEngine } = require("./middleware/leaderboardEngine.js");
@@ -40,10 +41,24 @@ function translateRedisToFe(resources) {
     };
 }
 
+let cachedGameRules = null;
+let lastGameRulesFetch = 0;
+
+async function getGameRulesCached(redisClient) {
+    if (cachedGameRules && (Date.now() - lastGameRulesFetch < 60000)) {
+        return cachedGameRules;
+    }
+    const rulesRawBase64 = await redisClient.get("assets:game_rules.json");
+    if (rulesRawBase64) {
+        cachedGameRules = JSON.parse(Buffer.from(rulesRawBase64, 'base64').toString('utf8'));
+        lastGameRulesFetch = Date.now();
+    }
+    return cachedGameRules;
+}
+
 const validateSeaCrossing = async (player, armata, loc, startLng, startLat, targetLng, targetLat, targetName, isValid) => {
-    const rulesRawBase64 = await redis.get("assets:game_rules.json");
-    if (!rulesRawBase64) return;
-    const rulesObj = JSON.parse(Buffer.from(rulesRawBase64, 'base64').toString('utf8'));
+    const rulesObj = await getGameRulesCached(redis);
+    if (!rulesObj) return;
     const truppeSheet = rulesObj.sheets.find(s => s.name === "Truppe" || s.name === "truppe");
     const truppeLines = truppeSheet ? truppeSheet.lines : [];
 
@@ -280,15 +295,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         console.log("[RECRUIT_UNIT] Inizio elaborazione", payload);
                         const { unitId, targetName, targetCoords, costMoney, costSteel, trainTime } = payload;
                         
-                        const rulesRawBase64 = await redis.get("assets:game_rules.json");
-                        let rulesObj = { sheets: [] };
-                        if (rulesRawBase64) {
-                            try {
-                                rulesObj = JSON.parse(Buffer.from(rulesRawBase64, 'base64').toString('utf8'));
-                            } catch (e) {
-                                console.error("[RECRUIT_UNIT] Errore parsing game_rules.json:", e);
-                            }
-                        }
+                        const rulesObj = await getGameRulesCached(redis) || { sheets: [] };
 
                         const result = await updateMatch(ws.matchId, async (matchObj) => {
                             if (!matchObj || !matchObj.match || !matchObj.match.player) {
@@ -353,12 +360,22 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             const truppeSheet = rulesObj.sheets.find(s => s.name === "Truppe" || s.name === "truppe");
                             const truppeLines = truppeSheet ? truppeSheet.lines : [];
                             const uRule = truppeLines.find(l => l.id_truppa === unitId);
-                            if (uRule && uRule.dominio === 2 && targetCoords && typeof targetCoords === 'string' && targetCoords.includes(',')) {
+                            if (uRule && targetCoords && typeof targetCoords === 'string' && targetCoords.includes(',')) {
                                 const [sLng, sLat] = targetCoords.split(',').map(s => parseFloat(s.trim()));
                                 if (!isNaN(sLng) && !isNaN(sLat)) {
-                                    const waterCoords = await dynamicPathfinder.findNearestWater(sLng, sLat);
-                                    spawnCoords = `${waterCoords.lng},${waterCoords.lat}`;
-                                    console.log(`[RECRUIT_UNIT] Spawning navale rilevato: risoluzione coordinate da ${targetCoords} a ${spawnCoords}`);
+                                    if (uRule.dominio === 2) {
+                                        // Truppe di mare: cerca l'acqua più vicina
+                                        const waterCoords = await dynamicPathfinder.findNearestWater(sLng, sLat);
+                                        spawnCoords = `${waterCoords.lng},${waterCoords.lat}`;
+                                        console.log(`[RECRUIT_UNIT] Spawning navale rilevato: risoluzione coordinate da ${targetCoords} a ${spawnCoords}`);
+                                    } else {
+                                        // Truppe di terra (1) o aria (0): applica offset per non spawnare esattamente sulla caserma
+                                        const offsetLng = (Math.random() - 0.5) * 0.1; // ~5-10km offset
+                                        const offsetLat = (Math.random() - 0.5) * 0.1;
+                                        const landCoords = await dynamicPathfinder.findNearestLand(sLng + offsetLng, sLat + offsetLat);
+                                        spawnCoords = `${landCoords.lng},${landCoords.lat}`;
+                                        console.log(`[RECRUIT_UNIT] Spawning terra/aria rilevato: offset coordinate da ${targetCoords} a ${spawnCoords}`);
+                                    }
                                 }
                             }
 
@@ -759,6 +776,11 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         const p = matchObj.match.player.find(n => n.username === ws.username);
                         if (!p || !p.armate || !p.armate[armyId]) return { save: false };
 
+                        if (p.armate[armyId].cooldownUntil && Date.now() < p.armate[armyId].cooldownUntil) {
+                            return { error: 'L\'armata è in fase di rifornimento e non può decollare.' };
+                        }
+
+                        p.armate[armyId].startingLocation = `${startLng},${startLat}`;
                         p.armate[armyId].currentLocation = `${startLng},${startLat}`;
                         p.armate[armyId].status = (isAttack || (isAttack && pathInfo.path.length > 0)) ? "Pronto alla conquista" : "moving";
                         p.armate[armyId].targetCoords = parsedTargetCoords || targetCoords;
@@ -928,10 +950,9 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                 if (payload.action === 'RESEARCH_TECH') {
                     const { structureId } = payload.payload;
                     try {
-                        const rulesRawBase64 = await redis.get("assets:game_rules.json");
+                        const rules = await getGameRulesCached(redis);
                         let structureDetails = null;
-                        if (rulesRawBase64) {
-                            const rules = JSON.parse(Buffer.from(rulesRawBase64, "base64").toString("utf-8"));
+                        if (rules) {
                             const estrattoriSheet = rules.sheets.find(s => s.name === "Estrattori");
                             const struttureSheet = rules.sheets.find(s => s.name === "Strutture");
                             const estrattoriLines = estrattoriSheet ? estrattoriSheet.lines : [];
@@ -1038,10 +1059,9 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                     try {
 
-                        const rulesRawBase64 = await redis.get("assets:game_rules.json");
+                        const rules = await getGameRulesCached(redis);
                         let structureDetails = null;
-                        if (rulesRawBase64) {
-                            const rules = JSON.parse(Buffer.from(rulesRawBase64, "base64").toString("utf-8"));
+                        if (rules) {
                             const estrattoriSheet = rules.sheets.find(s => s.name === "Estrattori");
                             const struttureSheet = rules.sheets.find(s => s.name === "Strutture");
                             const estrattoriLines = estrattoriSheet ? estrattoriSheet.lines : [];
@@ -1429,6 +1449,84 @@ const startArrivalEngine = () => {
                 }
 
                 let success = false;
+                
+                const { getArmyDomain, getArmyType, executeAirStrike } = require('./middleware/combatLogic.js');
+                const armyDomain = getArmyDomain(army);
+                const armyType = getArmyType(army);
+
+                if (armyDomain === 0 && army.missionMode === 'conquer') {
+                    // Air Strike and Return / Explode
+                    console.log("[ARRIVAL] Air Strike detected for army " + row.id_armata);
+                    if (armyType === 3) {
+                        // Missile: Nuke strike (AOE) and destroy self
+                        const { executeNukeStrike } = require('./middleware/combatLogic.js');
+                        const tCoords = army.targetCoords || [row.x_dest, row.y_dest];
+                        await executeNukeStrike(army, tCoords, row.match_id, matchObj);
+                        await db.query(`DELETE FROM spostamenti WHERE id_spostamento = $1`, [row.id_spostamento]);
+                        await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [row.id_mossa]);
+                        
+                        // Rimuovi missile dal gioco
+                        await updateMatch(row.match_id, (mObj) => {
+                            const p = mObj.match.player.find(x => x.username === row.username);
+                            if (p && p.armate && p.armate[row.id_armata]) {
+                                delete p.armate[row.id_armata];
+                            }
+                            return { save: true, matchObj: mObj };
+                        });
+                        continue;
+                    } else if (armyType === 8 || armyType === 7) {
+                        // Strike and return
+                        let defArmy = null;
+                        let targetPlayer = row.target_node;
+                        for (const p of matchObj.match.player) {
+                            if (p.username === row.username || !p.armate) continue;
+                            if (p.armate[row.target_node]) { 
+                                defArmy = p.armate[row.target_node]; 
+                                targetPlayer = p.username;
+                                break; 
+                            }
+                        }
+                        
+                        await executeAirStrike(army, targetPlayer, defArmy, row.match_id, matchObj);
+                        
+                        // Set up return
+                        const startLoc = army.startingLocation || row.target_node;
+                        const returnEtaMs = 60000; // Tempo fittizio/fisso per ora, in futuro calcolato su distanza
+                        const etaDate = new Date(Date.now() + returnEtaMs);
+                        
+                        await db.query(`DELETE FROM spostamenti WHERE id_spostamento = $1`, [row.id_spostamento]);
+                        await db.query(`UPDATE mosse SET ttl = $1, type_action = 'mov' WHERE id_mossa = $2`, [etaDate, row.id_mossa]);
+                        
+                        // Dobbiamo estrarre lat/lng da startLoc
+                        let x_dest = 0, y_dest = 0;
+                        if (typeof startLoc === 'string' && startLoc.includes(',')) {
+                            const pts = startLoc.split(',');
+                            x_dest = parseFloat(pts[0]);
+                            y_dest = parseFloat(pts[1]);
+                        }
+                        
+                        await db.query(`INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`, [row.id_mossa, x_dest, y_dest, 'Rientro', etaDate]);
+                        
+                        await updateMatch(row.match_id, (mObj) => {
+                            const p = mObj.match.player.find(x => x.username === row.username);
+                            if (p && p.armate && p.armate[row.id_armata]) {
+                                p.armate[row.id_armata].status = 'returning';
+                                p.armate[row.id_armata].missionMode = 'return';
+                                p.armate[row.id_armata].targetName = 'Rientro';
+                                p.armate[row.id_armata].targetCoords = [x_dest, y_dest];
+                                p.armate[row.id_armata].startTime = Date.now();
+                                p.armate[row.id_armata].etaMs = returnEtaMs;
+                                
+                                // Reverse path if it exists
+                                if (p.armate[row.id_armata].path) {
+                                    p.armate[row.id_armata].path = p.armate[row.id_armata].path.reverse();
+                                }
+                            }
+                            return { save: true, matchObj: mObj };
+                        });
+                        continue;
+                    }
+                }
 
                 if (army.missionMode === 'conquer') {
                     const { setupCombatFromArrival } = require('./middleware/combatLogic.js');
@@ -1468,7 +1566,14 @@ const startArrivalEngine = () => {
                         await updateMatch(row.match_id, (mObj) => {
                             const p = mObj.match.player.find(x => x.username === row.username);
                             if (p && p.armate && p.armate[row.id_armata]) {
-                                p.armate[row.id_armata].status = 'standby';
+                                const { getArmyDomain } = require('./middleware/combatLogic.js');
+                                const dom = getArmyDomain(p.armate[row.id_armata]);
+                                if (dom === 0) {
+                                    p.armate[row.id_armata].status = 'cooldown';
+                                    p.armate[row.id_armata].cooldownUntil = Date.now() + 60000; // 60s cooldown
+                                } else {
+                                    p.armate[row.id_armata].status = 'standby';
+                                }
                                 if (p.armate[row.id_armata].path && p.armate[row.id_armata].path.length > 0) {
                                     const lastCoord = p.armate[row.id_armata].path[p.armate[row.id_armata].path.length - 1];
                                     p.armate[row.id_armata].currentLocation = `${lastCoord[0]},${lastCoord[1]}`;
@@ -1628,6 +1733,7 @@ loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(async () => {
         startCombatLoop();
         startFogOfWarEngine();
         startCombatTriggerEngine();
+        startLogisticsEngine();
         startSnapshotEngine();
         startMatchStateEngine();
         startLeaderboardEngine();

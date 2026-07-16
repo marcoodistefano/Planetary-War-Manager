@@ -120,6 +120,46 @@ class DynamicPathfinder {
             req.end();
         });
     }
+
+    async findNearestLand(lng, lat) {
+        return new Promise((resolve, reject) => {
+            const payload = JSON.stringify({ x: lng, y: lat });
+            const options = {
+                hostname: this.goServiceHost,
+                port: this.goServicePort,
+                path: '/api/nearest-land',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(payload)
+                }
+            };
+            const req = http.request(options, (res) => {
+                let data = '';
+                res.on('data', (chunk) => { data += chunk; });
+                res.on('end', () => {
+                    if (res.statusCode === 200) {
+                        try {
+                            const resJson = JSON.parse(data);
+                            resolve({ lng: resJson.x, lat: resJson.y });
+                        } catch (err) {
+                            console.error("[PATHFINDER] Errore parsing risposta nearest-land:", err);
+                            resolve({ lng, lat });
+                        }
+                    } else {
+                        console.error(`[PATHFINDER] Errore nearest-land. StatusCode: ${res.statusCode}`);
+                        resolve({ lng, lat });
+                    }
+                });
+            });
+            req.on('error', (e) => {
+                console.error(`[PATHFINDER] Connessione a nearest-land fallita: ${e.message}`);
+                resolve({ lng, lat });
+            });
+            req.write(payload);
+            req.end();
+        });
+    }
 }
 
 const pathfinder = new DynamicPathfinder();

@@ -326,7 +326,7 @@ async function generateResources() {
                                     truppe: player.truppe,
                                     fanti_rate: fantiProdRate,
                                     armies_updated: nuoveArmate,
-                                    armies: player.armate ? (Array.isArray(player.armate) ? player.armate : Object.values(player.armate)) : [],
+                                    armies: player.armate ? (Array.isArray(player.armate) ? player.armate : Object.values(player.armate)).map(a => ({ ...a, owner: player.username })) : [],
                                     addestramenti: player.addestramenti,
                                     strutture: player.strutture
                                 }

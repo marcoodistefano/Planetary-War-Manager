@@ -244,7 +244,9 @@
 
               <div class="mission-toggle">
                 <button [class.active]="selectedMissionMode === 'move'" (click)="selectedMissionMode = 'move'">SPOSTA</button>
-                <button [class.active]="selectedMissionMode === 'conquer'" (click)="selectedMissionMode = 'conquer'">CONQUISTA</button>
+                <button [class.active]="selectedMissionMode === 'conquer'" (click)="selectedMissionMode = 'conquer'">
+                  {{ selectedArmy && isAirArmy(selectedArmy) ? 'ATTACCA' : 'CONQUISTA' }}
+                </button>
               </div>
 
               <div class="command-field">
