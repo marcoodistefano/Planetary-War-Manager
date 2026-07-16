@@ -17,6 +17,21 @@ const safeParse = (str) => {
 
 const matchLocalCache = new Map();
 
+function setLocalCache(key, data) {
+    if (matchLocalCache.size > 500) {
+        const now = Date.now();
+        for (const [k, cached] of matchLocalCache.entries()) {
+            if (now - cached.ts > 5000) {
+                matchLocalCache.delete(k);
+            }
+        }
+        if (matchLocalCache.size > 500) {
+            matchLocalCache.clear();
+        }
+    }
+    matchLocalCache.set(key, { ts: Date.now(), data: JSON.stringify(data) });
+}
+
 async function getMatch(matchId) {
     let actualKey = `match:${matchId}`;
     let aliasCheck = await redis.get(actualKey);
@@ -101,7 +116,7 @@ async function getMatch(matchId) {
         }
     }
 
-    matchLocalCache.set(actualKey, { ts: Date.now(), data: JSON.stringify(matchObj) });
+    setLocalCache(actualKey, matchObj);
     return matchObj;
 }
 
@@ -243,7 +258,7 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 100) {
                 throw new Error("Transazione fallita");
             }
 
-            matchLocalCache.set(actualKey, { ts: Date.now(), data: JSON.stringify(newMatchObj) });
+            setLocalCache(actualKey, newMatchObj);
 
             return result.data;
         } finally {

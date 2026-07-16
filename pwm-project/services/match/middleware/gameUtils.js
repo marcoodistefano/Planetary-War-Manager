@@ -36,15 +36,20 @@ try {
 
 // Funzione per calcolare il raggio visivo di un'armata
 function getArmyVisionRadius(army) {
-    let maxRadius = defaultVisionRadius;
-    if (army.composition) {
+    let maxRadius = 0;
+    let hasUnits = false;
+    if (army && army.composition) {
         for (const [id_truppa, qty] of Object.entries(army.composition)) {
-            if (qty > 0 && troopsVisionMap[id_truppa] > maxRadius) {
-                maxRadius = troopsVisionMap[id_truppa];
+            if (qty > 0) {
+                hasUnits = true;
+                const r = troopsVisionMap[id_truppa] !== undefined ? troopsVisionMap[id_truppa] : defaultVisionRadius;
+                if (r > maxRadius) {
+                    maxRadius = r;
+                }
             }
         }
     }
-    return maxRadius;
+    return hasUnits ? maxRadius : defaultVisionRadius;
 }
 
 // Funzione per calcolare la gittata d'attacco di un'armata

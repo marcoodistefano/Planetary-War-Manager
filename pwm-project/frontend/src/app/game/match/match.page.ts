@@ -109,6 +109,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   private touchTimer: any;
   private avatarSub?: Subscription;
   private matchSub?: Subscription;
+  private _globalClickHandler?: () => void;
   isTouchLayout = false;
 
   // --- 2. STATO DELL'INTERFACCIA (UI) ---
@@ -548,28 +549,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   radialMenuY = 0;
   radialMenuOpenedAt = 0;
 
-  // All'interno di ngOnInit o in una funzione di inizializzazione
-  initRadialListeners() {
-    const mapEl = document.getElementById('map-container');
-
-    if (mapEl) {
-      mapEl.addEventListener('contextmenu', (e: MouseEvent) => {
-        e.preventDefault(); // Blocca il menu standard del browser
-
-        this.radialMenuX = e.clientX;
-        this.radialMenuY = e.clientY;
-        this.isRadialMenuVisible = true;
-
-        // Forza il refresh della UI se necessario
-        this.cdr.detectChanges();
-      });
-    }
-
-    // Chiude il menu se si clicca altrove con il tasto sinistro
-    window.addEventListener('click', () => {
-      if (this.isRadialMenuVisible) this.isRadialMenuVisible = false;
-    });
-  }
+  // initRadialListeners() rimosso: era dead code (mai chiamato).
+  // Il contextmenu della mappa è gestito da map.on('contextmenu') in initMap().
+  // Il click globale è gestito in ngOnInit() tramite _globalClickHandler.
 
   constructor(
     private router: Router,
@@ -607,7 +589,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.connectMatchSocket();
     }
 
-    window.addEventListener('click', () => {
+    // FIX CRITICO-1: salviamo il riferimento per poterlo rimuovere in ngOnDestroy
+    this._globalClickHandler = () => {
       if (this.isRadialMenuVisible) {
         this.isRadialMenuVisible = false;
         this.cdr.detectChanges();
@@ -617,7 +600,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         this.isTroopsDropdownOpen = false;
         this.cdr.detectChanges();
       }
-    });
+    };
+    window.addEventListener('click', this._globalClickHandler);
   }
 
   ngOnDestroy() {
@@ -627,6 +611,13 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.matchState.disconnect();
     if (this.avatarSub) this.avatarSub.unsubscribe();
     if (this.matchSub) this.matchSub.unsubscribe();
+    this.matchSub = undefined;
+
+    // FIX CRITICO-1: rimuove il listener globale per evitare memory leak
+    if (this._globalClickHandler) {
+      window.removeEventListener('click', this._globalClickHandler);
+      this._globalClickHandler = undefined;
+    }
 
     // Rimuovi la mappa e resetta tutti i flag di sessione
     if (this.map) this.map.remove();
@@ -697,14 +688,20 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const wsUrl = `${wsBaseUrl}/match/${encodeURIComponent(this.currentMatchId)}`;
 
     try {
-      console.log(`[WS_MATCH] Tentativo di connessione a ${wsUrl}`);
+      // console.log(`[WS_MATCH] Tentativo di connessione a ${wsUrl}`);
       this.matchState.connect(wsUrl);
 
-      if (this.matchSub) return; // Fix memory leak su reconnect multipli
+      // FIX CRITICO-2: unsubscribe dalla subscription precedente prima di crearne una nuova.
+      // Il vecchio guard "if (this.matchSub) return" impediva la ri-sottoscrizione dopo
+      // una disconnessione, rendendo il client sordo a tutti gli eventi WS.
+      if (this.matchSub) {
+        this.matchSub.unsubscribe();
+        this.matchSub = undefined;
+      }
 
       this.ngZone.runOutsideAngular(() => {
         this.matchSub = this.matchState.messages$.subscribe((parsed: any) => {
-          console.log('[WS_MATCH] Evento ricevuto:', parsed);
+          // console.log('[WS_MATCH] Evento ricevuto:', parsed);
 
           if (parsed.type === 'INITIAL_STATE') {
             if (parsed.payload?.armies) {
@@ -714,7 +711,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                 if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
               });
               const moving = this.matchArmies.find((a: any) => a.status === "moving");
-              if (moving) console.log("INITIAL_STATE moving army:", moving.id, "startTime:", moving.startTime, "path:", moving.path?.length);
+              // if (moving) console.log("INITIAL_STATE moving army:", moving.id, "startTime:", moving.startTime, "path:", moving.path?.length);
               this.renderArmies();
             }
             if (parsed.payload?.nations) {
@@ -833,7 +830,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.armyTetherCache.delete(armyId); // Invalida il tether per forzare il ricalcolo al nuovo target
               this.matchArmies = newArmies;
             }
-            console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
+            // console.log(`[WS_MATCH] Movimento in corso verso ${targetName}. Arrivo stimato: ${etaMs}ms`);
             this.renderArmies();
             this.requestTerritoryColors(); // <-- Re-added to fix red layout on attack
             this.ngZone.run(() => this.cdr.detectChanges());
@@ -873,7 +870,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                 }
               }
             }
-            console.log(`[WS_MATCH] Armata arrivata a ${targetName}.`);
+            // console.log(`[WS_MATCH] Armata arrivata a ${targetName}.`);
             this.renderArmies();
             this.ngZone.run(() => this.cdr.detectChanges());
           }
@@ -900,7 +897,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               }
               this.hideArmyHoverBanner();
             }
-            console.log(`[WS_MATCH] Missione armata ${armyId} annullata.`);
+            // console.log(`[WS_MATCH] Missione armata ${armyId} annullata.`);
             this.renderArmies();
             this.ngZone.run(() => this.cdr.detectChanges());
           }
@@ -929,7 +926,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             const { userId, army } = parsed.data;
             if (userId === this.userProfile.username) {
               this.matchArmies.push(army);
-              console.log(`[WS_MATCH] Nuova truppa generata a Palermo per l'utente ${userId}!`);
+              // console.log(`[WS_MATCH] Nuova truppa generata a Palermo per l'utente ${userId}!`);
             }
             this.renderArmies();
             this.ngZone.run(() => this.cdr.detectChanges());
@@ -1012,7 +1009,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
 
           if (parsed.type === 'PLAYER_JOINED') {
-            console.log(`[WS_MATCH] Un nuovo giocatore si è unito: ${parsed.payload.newPlayer}`);
+            // console.log(`[WS_MATCH] Un nuovo giocatore si è unito: ${parsed.payload.newPlayer}`);
             if (parsed.payload?.nations) {
               this.matchNations = parsed.payload.nations;
               this.requestTerritoryColors();
@@ -1021,7 +1018,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
 
           if (parsed.type === 'WAR_DECLARED' || parsed.type === 'TERRITORY_CONQUERED' || parsed.type === 'DIPLOMACY_UPDATED') {
-            console.log(`[WS_MATCH] Aggiornamento mappa (${parsed.type})`);
+            // console.log(`[WS_MATCH] Aggiornamento mappa (${parsed.type})`);
             const updatedNations = parsed.nations || parsed.payload?.nations;
             if (updatedNations) {
               this.matchNations = updatedNations;
@@ -1122,7 +1119,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
 
           if (parsed.type === 'ALLIANCE_UPDATED') {
-            console.log(`[WS_MATCH] Aggiornamento alleanze (${parsed.type})`);
+            // console.log(`[WS_MATCH] Aggiornamento alleanze (${parsed.type})`);
             this.reloadMatchAlliances();
           }
 
@@ -1226,7 +1223,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         this.matchState.connectionStatus$.subscribe(isConnected => {
           if (!isConnected && this.shouldReconnect) {
-            console.log('[WS_MATCH] Riconnessione in corso tra 3 secondi...');
+            // console.log('[WS_MATCH] Riconnessione in corso tra 3 secondi...');
             this.reconnectTimer = window.setTimeout(() => this.connectMatchSocket(), 3000);
           }
         });
@@ -1860,16 +1857,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onResearchTech(structureId: string) {
-    console.log('[FRONTEND] Sending RESEARCH_TECH for:', structureId);
-    if (true) {
-      console.log('[FRONTEND] Socket is OPEN, sending payload...');
-      this.matchState.send(JSON.stringify({
-        action: 'RESEARCH_TECH',
-        payload: { structureId }
-      }));
-    } else {
-      console.error('[FRONTEND] Socket is NOT OPEN!', this.matchSocket?.readyState);
-    }
+    // FIX CRITICO-3: rimosso il blocco if(true)/else dead code
+    // console.log('[FRONTEND] Sending RESEARCH_TECH for:', structureId);
+    this.matchState.send({
+      action: 'RESEARCH_TECH',
+      payload: { structureId }
+    });
   }
 
   // Assicurati che gli altri toggle chiudano isTechModalOpen
@@ -2179,7 +2172,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  calculateCurrentPosition(path: number[][], startTime: any, etaMs: number): { lng: number, lat: number } | null {
+  calculateCurrentPosition(path: number[][], startTime: any, etaMs: number, pathCache?: any): { lng: number, lat: number } | null {
     if (!path || path.length < 2 || !etaMs || !startTime) return null;
     const startTs = (typeof startTime === 'string' || startTime instanceof Date) ? new Date(startTime).getTime() : Number(startTime);
     if (isNaN(startTs)) return null;
@@ -2187,6 +2180,21 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     const progress = Math.max(0, Math.min(1, elapsed / etaMs));
     if (progress >= 1) return { lng: path[path.length - 1][0], lat: path[path.length - 1][1] };
 
+    // FIX STRUTTURALE-2: usa _pathCache se disponibile (O(log n)) invece di ricalcolare O(n) ogni volta
+    if (pathCache && pathCache.totalDistance > 0) {
+      const targetDistance = progress * pathCache.totalDistance;
+      const segIdx = this.findSegmentBinarySearch(pathCache.cumulativeDistances, targetDistance);
+      const segDist = pathCache.segmentDistances[segIdx];
+      const segProgress = segDist > 0 ? (targetDistance - pathCache.cumulativeDistances[segIdx]) / segDist : 0;
+      const p1 = path[segIdx];
+      const p2 = path[segIdx + 1] || p1;
+      return {
+        lng: p1[0] + (p2[0] - p1[0]) * segProgress,
+        lat: p1[1] + (p2[1] - p1[1]) * segProgress
+      };
+    }
+
+    // Fallback: calcolo lineare O(n) quando la cache non è disponibile
     let totalDistance = 0;
     const segmentDistances: number[] = [];
     for (let i = 0; i < path.length - 1; i++) {
@@ -2217,7 +2225,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   getArmyCoordinates(army: any): [number, number] | null {
     if ((army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto alla conquista") && army.path && army.path.length > 1 && army.startTime && army.etaMs) {
-      const pos = this.calculateCurrentPosition(army.path, army.startTime, army.etaMs);
+      // FIX STRUTTURALE-2: passa _pathCache per sfruttare la binary search cache O(log n)
+      const pos = this.calculateCurrentPosition(army.path, army.startTime, army.etaMs, army._pathCache);
       if (pos) return [pos.lng, pos.lat];
     }
     if (['in_battaglia', 'in combattimento'].includes(army.status) && army.path && army.path.length > 0) {
@@ -2503,7 +2512,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   // --- RENDERING ARMATE SU MAPPA ---
   renderArmies() {
     this.recalculatePlayerTroops();
-    console.log('[DEBUG_MAP] renderArmies richiamato. Mappa pronta?', !!this.map, 'Armate in memoria:', this.matchArmies.length);
+    // console.log('[DEBUG_MAP] renderArmies richiamato. Mappa pronta?', !!this.map, 'Armate in memoria:', this.matchArmies.length);
     if (!this.map) return;
 
     // Rimuoviamo i marker non più presenti
@@ -3370,11 +3379,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   // Eseguita quando si preme un'azione nel menu radiale
   handleRadialAction(action: string) {
     if (Date.now() - this.radialMenuOpenedAt < 50) {
-      console.log("Ignorato click sintetico/immediato sul menu radiale");
+      // console.log("Ignorato click sintetico/immediato sul menu radiale");
       return;
     }
 
-    console.log("Comando Tattico:", action);
+    // console.log("Comando Tattico:", action);
 
     switch (action) {
       case 'COSTRUISCI':
@@ -3521,73 +3530,60 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onArmyMissionRequested(event: any) {
-    console.log('Ordine armata emesso:', event);
-    if (true) {
-      if (event.mode === 'cancel') {
-        this.matchState.send(JSON.stringify({
-          action: 'CANCEL_MISSION',
-          payload: {
-            armyId: event.armyId
-          }
-        }));
-      } else {
-        this.matchState.send(JSON.stringify({
-          action: 'MOVE_TROOPS',
-          payload: {
-            armyId: event.armyId,
-            mode: event.mode,
-            targetName: event.targetName,
-            targetCoords: event.targetCoords,
-            composition: event.composition,
-            waypoints: event.waypoints || []
-          }
-        }));
-      }
+    // FIX CRITICO-3: rimosso il blocco if(true)/else dead code
+    // console.log('Ordine armata emesso:', event);
+    if (event.mode === 'cancel') {
+      this.matchState.send({
+        action: 'CANCEL_MISSION',
+        payload: {
+          armyId: event.armyId
+        }
+      });
     } else {
-      console.error("WebSocket non connesso");
+      this.matchState.send({
+        action: 'MOVE_TROOPS',
+        payload: {
+          armyId: event.armyId,
+          mode: event.mode,
+          targetName: event.targetName,
+          targetCoords: event.targetCoords,
+          composition: event.composition,
+          waypoints: event.waypoints || []
+        }
+      });
     }
   }
 
   onRecruitUnitRequest(event: any) {
-    console.log("Inviando richiesta RECRUIT_UNIT", event);
-    if (true) {
-      this.matchState.send(JSON.stringify({
-        action: 'RECRUIT_UNIT',
-        matchId: this.currentMatchId,
-        unitId: event.unitId,
-        targetName: event.targetName,
-        targetCoords: event.targetCoords,
-        costMoney: event.costMoney,
-        costSteel: event.costSteel,
-        trainTime: event.trainTime
-      }));
-      this.toastCtrl.create({
-        message: 'Richiesta di addestramento inviata...',
-        duration: 2000,
-        position: 'top',
-        color: 'primary'
-      }).then(t => t.present());
-    } else {
-      console.warn("WebSocket non pronto per RECRUIT_UNIT");
-      this.toastCtrl.create({
-        message: 'Connessione al server persa. Aggiorna la pagina.',
-        duration: 3000,
-        position: 'top',
-        color: 'danger'
-      }).then(t => t.present());
-    }
+    // FIX CRITICO-3: rimosso il blocco if(true)/else dead code
+    // console.log("Inviando richiesta RECRUIT_UNIT", event);
+    this.matchState.send({
+      action: 'RECRUIT_UNIT',
+      matchId: this.currentMatchId,
+      unitId: event.unitId,
+      targetName: event.targetName,
+      targetCoords: event.targetCoords,
+      costMoney: event.costMoney,
+      costSteel: event.costSteel,
+      trainTime: event.trainTime
+    });
+    this.toastCtrl.create({
+      message: 'Richiesta di addestramento inviata...',
+      duration: 2000,
+      position: 'top',
+      color: 'primary'
+    }).then(t => t.present());
   }
 
   saveArmiesToBackend() {
-    if (true) {
-      this.matchState.send(JSON.stringify({
-        action: 'SAVE_ARMIES',
-        payload: {
-          armies: this.matchArmies,
-          playerTroops: this.playerTroops
-        }
-      }));
-    }
+    // FIX CRITICO-3: rimosso il blocco if(true) dead code
+    this.matchState.send({
+      action: 'SAVE_ARMIES',
+      payload: {
+        armies: this.matchArmies,
+        playerTroops: this.playerTroops
+      }
+    });
   }
 
   // Chiude il menu se si clicca altrove col tasto sinistro
@@ -3744,6 +3740,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     if (missions.length > 0) {
       this.pendingMissions = missions;
+      // FIX CRITICO-4: matchState.send() accetta già oggetti (li serializza internamente),
+      // quindi non serve JSON.stringify qui. Rimosso l'invio come stringa grezza.
       this.matchState.send({
         action: 'PREVIEW_MISSIONS',
         payload: { missions }
@@ -3860,6 +3858,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.pendingMissions.forEach(m => {
       m.waypoints = [...this.selectedWaypoints];
     });
+    // FIX CRITICO-4: coerente con sendMissionOrder — matchState.send() serializza internamente
     this.matchState.send({
       action: 'PREVIEW_MISSIONS',
       payload: { missions: this.pendingMissions }
@@ -3867,7 +3866,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   handleMapPointSelect(e: any) {
-    console.log("Map clicked!", e.point);
+    // console.log("Map clicked!", e.point);
 
     if (this.activePopup) {
       this.activePopup.remove();
@@ -3891,18 +3890,15 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
       // Ownership validation is done by the backend (which safely resolves region names to IDs).
 
-      // Invio websocket
-      if (true) {
-        const payload = {
-          action: 'BUILD_STRUCTURE',
-          payload: {
-            structureId: this.selectedStructureForBuild.id_struttura || this.selectedStructureForBuild.id_extractor,
-            targetName: targetName,
-            targetCoords: targetCoords
-          }
-        };
-        this.matchState.send(JSON.stringify(payload));
-      }
+      // Invio websocket — FIX CRITICO-3: rimosso il blocco if(true) dead code
+      this.matchState.send({
+        action: 'BUILD_STRUCTURE',
+        payload: {
+          structureId: this.selectedStructureForBuild.id_struttura || this.selectedStructureForBuild.id_extractor,
+          targetName: targetName,
+          targetCoords: targetCoords
+        }
+      });
 
       this.selectedStructureForBuild = null;
       if (this.buildPreviewMarker) {

@@ -224,8 +224,9 @@ const executeNukeStrike = async (attackerArmy, targetCoords, matchId, matchObj) 
         if (player.strutture) {
             for (let i = player.strutture.length - 1; i >= 0; i--) {
                 const struct = player.strutture[i];
-                if (struct.coords) {
-                    const dist = haversineDist(targetLng, targetLat, struct.coords[0], struct.coords[1]);
+                const structCoords = struct.targetCoords || struct.coords;
+                if (structCoords) {
+                    const dist = haversineDist(targetLng, targetLat, structCoords[0], structCoords[1]);
                     if (dist <= BLAST_RADIUS_KM) {
                         console.log(`[NUKE_STRIKE] Struttura ${struct.id} di ${player.username} distrutta dall'onda d'urto (dist: ${dist} km).`);
                         destroyedStructures.push({ id: struct.id, owner: player.username });
@@ -1138,6 +1139,7 @@ module.exports = {
     processActiveCombats,
     getRegionsGeojson,
     applyDamageToArmy,
+    getArmyMaxHp,
     getArmyDomain,
     getArmyType,
     executeAirStrike,

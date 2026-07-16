@@ -2,7 +2,7 @@ const redis = require('../../shared/redisClient.js');
 const db = require('../../shared/postgresClient.js');
 const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
 const { getArmyLocation, haversineDist, getRegionAtCoords } = require('./movementLogic.js');
-const { applyDamageToArmy, addToGraveyard } = require('./combatLogic.js');
+const { applyDamageToArmy, getArmyMaxHp, addToGraveyard } = require('./combatLogic.js');
 
 const ATTRITION_DAMAGE_PERCENT = 0.05; // 5% max hp damage per tick
 const MAX_SUPPLY_DISTANCE_KM = 2500; // 2500 km max supply line
@@ -38,27 +38,22 @@ const processLogistics = async () => {
                     }
                 }
 
-                // Gather node coords from match structures
-                const friendlyCitiesCoordsByPlayer = {};
-                for (const player of matchObj.match.player) {
-                    friendlyCitiesCoordsByPlayer[player.username] = [];
-                    if (player.strutture) {
-                        for (const s of player.strutture) {
-                            if (s.status === 'built' && s.structureId.startsWith('centro_comando')) {
-                                // We can use region coords or node coords, we'll need to fetch them if we can, but we can't easily sync them here without movementLogic's getNodeCoords
-                                // We will just check if army is in friendly region first.
-                            }
-                        }
-                    }
-                }
+                // Get participant userIds to target broadcasts correctly
+                const matchDbRes = await db.query("SELECT id_partita FROM partite WHERE id_partita_hash = $1", [matchId]);
+                let matchDbId = matchDbRes.rows.length > 0 ? matchDbRes.rows[0].id_partita : null;
+                const participants = matchDbId ? await db.query(
+                    "SELECT u.username, u.id_user FROM partecipanti_partite pp JOIN utenti u ON pp.user_id = u.id_user WHERE pp.partita_id = $1",
+                    [matchDbId]
+                ) : { rows: [] };
 
                 for (const player of matchObj.match.player) {
                     if (!player.armate) continue;
                     
                     const myFriendlyRegions = friendlyRegionsByPlayer[player.username] || [];
+                    let playerSaveNeeded = false;
 
                     for (const [armyId, army] of Object.entries(player.armate)) {
-                        if (['in_battaglia', 'in combattimento'].includes(army.status)) continue; // Skip logistics if actively fighting? Or maybe they suffer more? Let's skip for now to avoid race conditions with combatEngine.
+                        if (['in_battaglia', 'in combattimento'].includes(army.status)) continue; // Skip logistics if actively fighting
                         
                         const loc = getArmyLocation(army);
                         if (!loc) continue;
@@ -68,33 +63,17 @@ const processLogistics = async () => {
 
                         if (!isInFriendlyRegion) {
                             // Check distance to closest friendly region centroid or just apply a base attrition if deep in enemy territory
-                            // For a simple GSG mechanic: if outside friendly territory, 2% attrition
+                            const maxHp = getArmyMaxHp(army);
                             
-                            // Let's calculate total max HP to apply fixed percentage damage
-                            const { getArmyMaxHp } = require('./combatLogic.js'); // We need this exported or we can just calculate it
-                            
-                            // Wait, getArmyMaxHp is not exported. Let's just use applyDamageToArmy with an estimated damage or export getArmyMaxHp.
-                            // I'll export getArmyMaxHp in the next step. For now, let's assume we can get it or we just apply flat damage.
-                            
-                            // Let's do a simple logic: 1 unit lost per tick if outside supply lines
-                            let totalUnits = 0;
-                            if (army.composition) {
-                                for (const qty of Object.values(army.composition)) {
-                                    totalUnits += qty;
-                                }
-                            }
-                            
-                            if (totalUnits > 0) {
+                            if (maxHp > 0) {
                                 console.log(`[LOGISTICS] Army ${armyId} of ${player.username} is outside friendly territory. Applying attrition.`);
                                 
-                                // Randomly remove 1-5% of units
-                                const attrDamage = Math.max(1, Math.floor(totalUnits * ATTRITION_DAMAGE_PERCENT));
-                                
-                                // Since we didn't export getArmyMaxHp, let's just reduce composition directly to be safe and simple
-                                let damageToDeal = attrDamage * 10; // estimate 10 hp per unit
+                                // Calculate attrition as 5% of max HP
+                                const damageToDeal = Math.max(10, Math.round(maxHp * ATTRITION_DAMAGE_PERCENT));
                                 const isDead = applyDamageToArmy(army, damageToDeal);
                                 
                                 army.status_logistics = 'out_of_supply';
+                                playerSaveNeeded = true;
                                 saveNeeded = true;
                                 
                                 if (isDead) {
@@ -106,18 +85,36 @@ const processLogistics = async () => {
                         } else {
                             if (army.status_logistics === 'out_of_supply') {
                                 delete army.status_logistics;
+                                playerSaveNeeded = true;
                                 saveNeeded = true;
                             }
                         }
                     }
-                }
 
-                if (saveNeeded) {
-                    // Trigger broadcast of RESOURCES_UPDATED so frontend knows
-                    redis.publish('match_ws_broadcast_channel', JSON.stringify({
-                        matchId: matchId,
-                        payload: { type: 'RESOURCES_UPDATED', data: { armies_updated: true, armies: Object.values(matchObj.match.player.find(p=>p.username===matchObj.match.player[0].username).armate).map(a => ({...a, owner: matchObj.match.player[0].username})) } }
-                    })); // This broadcast is a bit hacky for all players, let's let the sync_workers handle the actual full broadcast, we just save.
+                    if (playerSaveNeeded) {
+                        // Publish selective broadcast targeting only this specific player's web client
+                        let targetUserId = player.id_user;
+                        if (!targetUserId) {
+                            const pRow = participants.rows.find(p => p.username === player.username);
+                            if (pRow) targetUserId = pRow.id_user;
+                        }
+                        
+                        if (targetUserId) {
+                            const armiesList = Object.values(player.armate).map(a => ({ ...a, owner: player.username }));
+                            const broadcastPayload = {
+                                matchId: matchId,
+                                targetUsers: [targetUserId],
+                                payload: {
+                                    type: 'RESOURCES_UPDATED',
+                                    data: {
+                                        armies_updated: true,
+                                        armies: armiesList
+                                    }
+                                }
+                            };
+                            await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+                        }
+                    }
                 }
 
                 return { save: saveNeeded, matchObj };

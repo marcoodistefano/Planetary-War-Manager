@@ -4,12 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
-import { ModalController, ToastController } from '@ionic/angular';
+import { ModalController, ToastController, LoadingController, AlertController } from '@ionic/angular';
 
 // Importazione del Service e del Modello
 import { HomeService } from './home'; 
 import { UserStateService } from '../user-state.service';
-import { Subscription } from 'rxjs';
+import { Subscription, firstValueFrom } from 'rxjs';
 import { AuthApiService } from '../auth/auth-api.service';
 import { HomeData } from './home-data.model';
 
@@ -63,6 +63,8 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
     private titleService: Title,
     private modalCtrl: ModalController,
     private toastCtrl: ToastController,
+    private loadingCtrl: LoadingController,
+    private alertCtrl: AlertController,
     private homeService: HomeService, // Iniezione del Service creato
     private userState: UserStateService,
     private authService: AuthApiService
@@ -259,7 +261,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   loadJoinableMatches() {
     this.homeService.getJoinableMatches().subscribe({
       next: (response) => {
-        console.log('Partite joinabili caricate periodicamente:', response);
+        // Rimosso debug console.log
       },
       error: (err) => {
         console.error('Errore nel fetch periodico a /joinable:', err);
@@ -450,37 +452,66 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
 
     const { data } = await modal.onDidDismiss();
 
-    if (data?.created) {
-      // Salva il matchId se disponibile
-      if (data.matchId) {
-        localStorage.setItem('pwm_last_joined_match', data.matchId);
-        this.lastJoinedMatchId = data.matchId;
+    if (data?.confirmCreate && data?.matchData) {
+      // 1. Apri popup con un caricamento
+      const loading = await this.loadingCtrl.create({
+        message: 'Trasmissione ordini di battaglia... Creazione partita in corso...',
+        spinner: 'circles',
+        cssClass: 'tactical-loading'
+      });
+      await loading.present();
+
+      try {
+        // 2. Esegui la creazione tramite il service
+        const response = await firstValueFrom(this.homeService.createMatch(data.matchData));
+
+        // Forza ricaricamento delle partite joinabili
+        try {
+          await firstValueFrom(this.homeService.getJoinableMatches());
+        } catch (joinableError) {
+          console.error('Errore durante il fetch di /joinable:', joinableError);
+        }
+
+        // Chiudi caricamento
+        await loading.dismiss();
+
+        // 3. Mostra alert esito positivo
+        const alert = await this.alertCtrl.create({
+          header: 'Partita Creata!',
+          message: 'La partita è stata creata con successo. Sei pronto per la battaglia?',
+          buttons: ['OK'],
+          cssClass: 'tactical-alert tactical-alert-success'
+        });
+        await alert.present();
+
+        if (response?.data?.matchId) {
+          localStorage.setItem('pwm_last_joined_match', response.data.matchId);
+          this.lastJoinedMatchId = response.data.matchId;
+        }
+
+        // Rinfresca homepage
+        this.loadDashboardData(true);
+        this.loadJoinableMatches();
+
+      } catch (error) {
+        // Chiudi caricamento
+        await loading.dismiss();
+        console.error('Errore durante la trasmissione:', error);
+
+        const status = (error as { status?: number })?.status;
+        const errMsg = status === 400 
+          ? 'Non puoi creare una nuova partita perché ne hai già una attiva.\nRiprova nel momento in cui la partita precedentemente creata non sará terminata!'
+          : 'Errore imprevisto durante la creazione della partita.';
+
+        // Mostra alert esito negativo
+        const alert = await this.alertCtrl.create({
+          header: 'Errore Creazione',
+          message: errMsg,
+          buttons: ['OK'],
+          cssClass: 'tactical-alert tactical-alert-error'
+        });
+        await alert.present();
       }
-
-      const toast = await this.toastCtrl.create({
-        message: 'La partita è stata creata con successo!',
-        duration: 5000,
-        position: 'top',
-        cssClass: 'tactical-toast tactical-toast-success',
-        icon: 'checkmark-circle-outline'
-      });
-      await toast.present();
-
-      // Refresh completo della homepage
-      this.loadDashboardData(true);
-      this.loadJoinableMatches();
-      return;
-    }
-
-    if (data?.errorMessage) {
-      const toast = await this.toastCtrl.create({
-        message: data.errorMessage,
-        duration: 5000,
-        position: 'top',
-        cssClass: 'tactical-toast tactical-toast-error',
-        icon: 'alert-circle-outline'
-      });
-      await toast.present();
     }
   }
 

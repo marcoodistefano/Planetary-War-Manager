@@ -276,9 +276,19 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
     if (!army || !army.composition) return { current: 0, max: 0 };
     let maxHp = 0;
     for (const [troopId, count] of Object.entries(army.composition)) {
-      const unit = this.recruitmentCatalog.find(u => u.id === troopId);
+      // FIX STRUTTURALE-5: cerca prima nel catalogo, poi direttamente in gameRules
+      // (i fanti sono esclusi dal recruitmentCatalog perché generati passivamente,
+      //  ma hanno HP definiti nel foglio 'Truppe')
+      let unit = this.recruitmentCatalog.find(u => u.id === troopId);
+      if (!unit && this.gameRules?.sheets) {
+        const truppeSheet = this.gameRules.sheets.find((s: any) => s.name === 'Truppe');
+        const raw = truppeSheet?.lines?.find((l: any) => l.id_truppa === troopId);
+        if (raw) {
+          unit = { hp: raw.HP || 100, damage: raw.danno_base || 10 } as any;
+        }
+      }
       if (unit && Number(count) > 0) {
-        maxHp += unit.hp * Number(count);
+        maxHp += (unit.hp || 100) * Number(count);
       }
     }
     const currentHp = army.hp !== undefined ? army.hp : maxHp;
@@ -289,9 +299,17 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
     if (!army || !army.composition) return 0;
     let dmg = 0;
     for (const [troopId, count] of Object.entries(army.composition)) {
-      const unit = this.recruitmentCatalog.find(u => u.id === troopId);
+      // FIX STRUTTURALE-5: stessa logica di getArmyHp per consistenza
+      let unit = this.recruitmentCatalog.find(u => u.id === troopId);
+      if (!unit && this.gameRules?.sheets) {
+        const truppeSheet = this.gameRules.sheets.find((s: any) => s.name === 'Truppe');
+        const raw = truppeSheet?.lines?.find((l: any) => l.id_truppa === troopId);
+        if (raw) {
+          unit = { hp: raw.HP || 100, damage: raw.danno_base || 10 } as any;
+        }
+      }
       if (unit && Number(count) > 0) {
-        dmg += unit.damage * Number(count);
+        dmg += (unit.damage || 0) * Number(count);
       }
     }
     return dmg;

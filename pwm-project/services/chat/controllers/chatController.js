@@ -62,11 +62,13 @@ const postMessage = async (req, res) => {
 };
 
 const postSystemMessage = async (req, res) => {
-  try{
-    const mex = req.body.message.content;
-    const destinatario = req.body.message.destinatario;
-    const tipo = req.body.message.tipo;
-    const matchId = req.body.matchId;
+  try {
+    const mex = req.body?.message?.content || req.body?.message?.text || req.body?.content;
+    const destinatario = req.body?.message?.destinatario || req.body?.destinatario;
+    const dest_tipo = req.body?.message?.dest_tipo || req.body?.dest_tipo;
+    const tipo = req.body?.message?.tipo || req.body?.tipo;
+    const matchId = req.body?.matchId || req.body?.id_partita;
+
     const result = await chatModel.processSYSMessage({
       userId: "SYSTEM",
       matchId,
@@ -75,6 +77,12 @@ const postSystemMessage = async (req, res) => {
       tipo,
       content: mex,
     });
+
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+
+    return res.status(201).json({ message: result.message });
   } catch (error) {
     console.error("[SYS_ERR] System message error:", error);
     return res.status(500).json({ error: "Errore interno del server" });

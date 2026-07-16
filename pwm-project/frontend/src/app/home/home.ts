@@ -32,6 +32,10 @@ export class HomeService {
     return this.http.get<any>(`${this.matchApiUrl}/joinable`, { withCredentials: true });
   }
 
+  createMatch(matchData: any): Observable<any> {
+    return this.http.post<any>(`${this.matchApiUrl}/create`, matchData, { withCredentials: true });
+  }
+
   joinMatch(matchId: string): Observable<any> {
     return this.http.post<any>(`${this.matchApiUrl}/${matchId}/join`, {}, { withCredentials: true });
   }

@@ -156,46 +156,10 @@ export class CreateMatchComponent {
   }
 
   async confirmCreation() {
-    console.log('Trasmissione ordini di battaglia...');
-
-    try {
-      const response: any = await firstValueFrom(
-        this.http.post('/api/match/create', this.matchData, {
-          withCredentials: true
-        })
-      );
-
-      console.log('Risposta Cluster:', response);
-
-      try {
-        await firstValueFrom(
-          this.http.get('/api/match/joinable', {
-            withCredentials: true
-          })
-        );
-        console.log('Partite joinabili aggiornate con successo.');
-      } catch (joinableError) {
-        console.error('Errore durante il fetch di /joinable:', joinableError);
-      }
-
-      this.modalCtrl.dismiss({
-        created: true,
-        matchId: response?.data?.matchId
-      });
-    } catch (error) {
-      console.error('Errore durante la trasmissione:', error);
-
-      const status = (error as { status?: number })?.status;
-      if (status === 400) {
-        this.modalCtrl.dismiss({
-          created: false,
-          errorMessage: this.duplicateMatchErrorMessage
-        });
-      }
-    }
-
-
-
+    this.modalCtrl.dismiss({
+      confirmCreate: true,
+      matchData: this.matchData
+    });
   }
 
   close() {

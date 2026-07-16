@@ -1909,6 +1909,7 @@ const leaveMatch = async (playerId, matchId) => {
               // Resetta la nazione al bot (libera per un nuovo giocatore)
               player.isOccupied = false;
               player.id_user = null;
+              player.username = (player.nationName || player.name || 'Bot') + "_bot";
               // Annulla eventuali stati di guerra residui
               if (player.inWarWith) player.inWarWith = [];
 

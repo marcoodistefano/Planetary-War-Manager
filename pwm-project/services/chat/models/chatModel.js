@@ -315,6 +315,12 @@ const persistMessage = async ({
   tipoLabel,
   recipients,
 }) => {
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_REGEX.test(userId) || userId === "00000000-0000-0000-0000-000000000000") {
+    console.log(`[CHAT] System message skipped from DB persistence (id: ${idMex})`);
+    return;
+  }
+
   const client = await db.connect();
   const uniqueRecipients = [...new Set(recipients)].filter(Boolean);
 
@@ -522,9 +528,21 @@ const processMessage = async ({
   return { ok: true, message };
 };
 
-const processSYSMessage = async (userId, matchId, destinatario, dest_tipo, tipo, content) => {
-  //non ho bisogno di verificare l'identità del mittente visto che sono solo messaggi di sistema  
-  const text = String(content ?? "").trim();
+const processSYSMessage = async ({
+  userId = "SYSTEM",
+  matchId,
+  destinatario,
+  dest_tipo,
+  tipo,
+  content,
+}) => {
+  // non ho bisogno di verificare l'identità del mittente visto che sono solo messaggi di sistema  
+  const resolvedMatchId = await resolveMatchId(matchId);
+  if (!resolvedMatchId) {
+    return { ok: false, status: 404, error: "Partita non trovata" };
+  }
+
+  let text = String(content ?? "").trim();
   if (!text) {
     return { ok: false, status: 400, error: "Messaggio vuoto" };
   }
@@ -533,69 +551,74 @@ const processSYSMessage = async (userId, matchId, destinatario, dest_tipo, tipo,
     text = text.substring(0, MAX_MESSAGE_LENGTH);
     console.log("[SYS_WARN] Messaggio di sistema troncato per superamento lunghezza massima:", text);
   }
-  if(tipo !== "[SYS]"){
+  if (tipo !== "[SYS]") {
     return { ok: false, status: 400, error: "Tipo di messaggio non valido per SYS" };
   }
-  if(dest_tipo === "ALL"){
-    const participants = await getParticipants(matchId);
-    if(participants.length === 0){
-      return { ok: false, status: 404, error: "Nessun partecipante trovato" };
-    }
-    //eliminazione match?
-  }
-  if(dest_tipo === "ALLIANCE"){
-    const members = await getAllianceMembers(matchId, destinatario);
-    if(members.length === 0){
-      return { ok: false, status: 404, error: "Alleanza non valida o vuota" };
-    }
-  }
-  if(dest_tipo === "PLAYER"){
-    const recipientId = await resolveUserIdByUsername(matchId, destinatario);
-    if (!recipientId) {
-      return { ok: false, status: 404, error: "Destinatario non valido" };
-    }
-  }
+
+  let tipoCode = 0;
+  let tipoLabel = "privata";
+  let destinatarioValue = destinatario;
+
   if (typeof destinatarioValue === "string") {
     destinatarioValue = destinatarioValue.trim();
   }
-  const isMember = await ensureUserInMatch({
-    userId,
-    matchId: resolvedMatchId,
-  });
-  if (!isMember) {
-    return { ok: false, status: 403, error: "Utente non in partita" };
+
+  if (dest_tipo === "ALL" || dest_tipo === "GLOBAL") {
+    tipoCode = 2;
+    tipoLabel = "globale";
+    destinatarioValue = "ALL";
+  } else if (dest_tipo === "ALLIANCE") {
+    tipoCode = 1;
+    tipoLabel = "alleanza";
   }
 
-  const recipientsResult = await resolveRecipients({
-    matchId: resolvedMatchId,
-    tipoCode: tipoInfo.code,
-    destinatario: destinatarioValue,
-    senderId: userId,
-  });
+  let recipients = [];
+  let dbRecipients = [];
+  let recipientId = null;
 
-  if (!recipientsResult.ok) {
-    return recipientsResult;
+  if (dest_tipo === "ALL" || dest_tipo === "GLOBAL") {
+    recipients = await getParticipants(resolvedMatchId);
+    if (recipients.length === 0) {
+      return { ok: false, status: 404, error: "Nessun partecipante trovato" };
+    }
+    dbRecipients = [...recipients];
+  } else if (dest_tipo === "ALLIANCE") {
+    recipients = await getAllianceMembers(resolvedMatchId, destinatarioValue);
+    if (recipients.length === 0) {
+      return { ok: false, status: 404, error: "Alleanza non valida o vuota" };
+    }
+    dbRecipients = [...recipients];
+  } else if (dest_tipo === "PLAYER") {
+    recipientId = await resolveUserIdByUsername(resolvedMatchId, destinatarioValue);
+    if (!recipientId) {
+      return { ok: false, status: 404, error: "Destinatario non valido" };
+    }
+    recipients = [recipientId];
+    dbRecipients = [recipientId];
+  } else {
+    return { ok: false, status: 400, error: "Tipo destinatario non valido" };
   }
 
-  const { recipients, dbRecipients, recipientId } = recipientsResult;
   const idMex = crypto.randomUUID();
   const timestamp = new Date().toISOString();
 
   const message = {
     id_mex: idMex,
-    id_user_send: userId,
+    id_user_send: "SYSTEM",
+    sender_username: "SYSTEM",
     id_partita: resolvedMatchId,
     content: text,
     time_stamp: timestamp,
-    tipo: tipoInfo.code,
+    tipo: tipoCode,
     destinatario: destinatarioValue,
+    scope: tipoLabel === 'globale' ? 'global' : (tipoLabel === 'alleanza' ? 'alliance' : 'direct'),
   };
 
   const listKey = buildChatListKey({
     matchId: resolvedMatchId,
-    tipoCode: tipoInfo.code,
+    tipoCode,
     destinatario: destinatarioValue,
-    senderId: userId,
+    senderId: "SYSTEM",
     recipientId,
   });
 
@@ -609,11 +632,11 @@ const processSYSMessage = async (userId, matchId, destinatario, dest_tipo, tipo,
 
   persistMessageAsync({
     idMex,
-    userId,
+    userId: "00000000-0000-0000-0000-000000000000",
     matchId: resolvedMatchId,
     content: text,
     timestamp,
-    tipoLabel: tipoInfo.label,
+    tipoLabel,
     recipients: dbRecipients,
   });
 

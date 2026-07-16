@@ -164,7 +164,7 @@ async function generateResources() {
                 [matchDbId]
             );
 
-            const { getMatch, updateMatch } = require('./services/shared/matchMonolithic.js');
+            const { getMatch, updateMatch } = require('../shared/matchMonolithic.js');
 
             await updateMatch(matchId, async (matchObj) => {
                 if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
@@ -266,13 +266,18 @@ async function generateResources() {
                                 timestamp: Date.now()
                             };
                             
-                            if (!player.armate) player.armate = [];
-                            // Controlla se è un array o un dizionario. Nel frontend `armate` è spesso un array, ma in redis?
-                            if (Array.isArray(player.armate)) {
-                                player.armate.push(newArmy);
-                            } else {
-                                player.armate[newArmy.id] = newArmy;
+                            if (!player.armate || Array.isArray(player.armate)) {
+                                if (Array.isArray(player.armate)) {
+                                    const dict = {};
+                                    player.armate.forEach(a => {
+                                        if (a && a.id) dict[a.id] = a;
+                                    });
+                                    player.armate = dict;
+                                } else {
+                                    player.armate = {};
+                                }
                             }
+                            player.armate[newArmy.id] = newArmy;
                             nuoveArmate = true;
 
                             // Inserimento DB PostgreSQL
