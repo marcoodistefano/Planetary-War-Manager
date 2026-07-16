@@ -4,6 +4,8 @@ const redis = require("../shared/redisClient.js");
 const { getMatch: getMatchFromRedis } = require("../shared/matchMonolithic.js");
 const Eru = require("./middleware/Eru.js");
 const db = require("../shared/postgresClient.js");
+const { getArmyLocation, haversineDist, getNodeCoords } = require("./middleware/movementLogic.js");
+const { getArmyVisionRadius, isAirArmy, isStealthArmy, radarRadiusMap, defaultVisionRadius } = require("./middleware/gameUtils.js");
 
 
 const notImplemented = (res) =>
@@ -465,11 +467,23 @@ const getInitialState = async (req, res) => {
     if (!matchId) return res.status(400).json({ error: "Match id mancante." });
 
     const auth = await getAuthContextFromRequest(req);
-    const username = auth ? auth.username : null;
 
     const matchData = await getMatchFromRedis(matchId);
     if (!matchData || !matchData.match) {
       return res.status(404).json({ error: "Partita non trovata." });
+    }
+
+    let username = null;
+    if (auth && auth.ok) {
+      const myPlayer = matchData.match.player ? matchData.match.player.find(p => p.id_user === auth.userId) : null;
+      if (myPlayer) {
+        username = myPlayer.username;
+      } else {
+        const userRow = await db.query(`SELECT username FROM utenti WHERE id_user = $1`, [auth.userId]);
+        if (userRow.rows.length > 0) {
+          username = userRow.rows[0].username;
+        }
+      }
     }
 
     let armies = [];
@@ -485,10 +499,98 @@ const getInitialState = async (req, res) => {
       const myPlayer = nations.find(p => p.username === username);
       const myAllianceId = myPlayer ? myPlayer.id_alleanza : null;
 
+      const alliedUsers = new Set(
+        nations
+          .filter(p => p.username === username || (myAllianceId && String(p.id_alleanza) === String(myAllianceId)))
+          .map(p => p.username)
+      );
+
+      const alliedArmiesVision = [];
+      const alliedRadars = [];
+      const alliedTerritoriesCoords = [];
+
+      for (const p of nations) {
+        if (!alliedUsers.has(p.username)) continue;
+
+        if (p.armate) {
+          Object.values(p.armate).forEach(a => {
+            const loc = getArmyLocation(a);
+            if (loc) {
+              alliedArmiesVision.push({
+                coords: loc,
+                radius: getArmyVisionRadius(a)
+              });
+            }
+          });
+        }
+
+        if (p.strutture) {
+          p.strutture.forEach(s => {
+            if (s.status === 'built' && s.structureId && s.structureId.startsWith('radar_')) {
+              const radius = radarRadiusMap[s.structureId] || 500;
+              if (s.targetCoords) {
+                alliedRadars.push({
+                  coords: s.targetCoords,
+                  radius: radius,
+                  isAntiAir: s.structureId.startsWith('radar_anti_aereo')
+                });
+              }
+            }
+          });
+        }
+
+        const pTerrNames = new Set();
+        if (p.territori_dict) {
+          Object.values(p.territori_dict).forEach(provs => {
+            provs.forEach(t => pTerrNames.add(String(t).trim().toLowerCase()));
+          });
+        } else if (p.territori) {
+          p.territori.forEach(t => pTerrNames.add(String(t).trim().toLowerCase()));
+        }
+
+        pTerrNames.forEach(nodeName => {
+          const coords = getNodeCoords(nodeName);
+          if (coords) {
+            alliedTerritoriesCoords.push(coords);
+          }
+        });
+      }
+
       for (const p of nations) {
         if (p.armate) {
           const playerArmies = Object.values(p.armate).map(a => ({ ...a, owner: p.username }));
-          armies = armies.concat(playerArmies);
+          if (alliedUsers.has(p.username)) {
+            armies = armies.concat(playerArmies);
+          } else {
+            const visibleEnemies = playerArmies.filter(enemy => {
+              const enemyLoc = getArmyLocation(enemy);
+              if (!enemyLoc) return false;
+
+              for (const tCoord of alliedTerritoriesCoords) {
+                if (haversineDist(enemyLoc[0], enemyLoc[1], tCoord[0], tCoord[1]) <= defaultVisionRadius) {
+                  return true;
+                }
+              }
+
+              for (const aVision of alliedArmiesVision) {
+                if (haversineDist(enemyLoc[0], enemyLoc[1], aVision.coords[0], aVision.coords[1]) <= aVision.radius) {
+                  return true;
+                }
+              }
+
+              for (const radar of alliedRadars) {
+                if (haversineDist(enemyLoc[0], enemyLoc[1], radar.coords[0], radar.coords[1]) <= radar.radius) {
+                  if (isStealthArmy(enemy)) continue;
+                  if (radar.isAntiAir && !isAirArmy(enemy)) continue;
+                  if (!radar.isAntiAir && isAirArmy(enemy)) continue;
+                  return true;
+                }
+              }
+
+              return false;
+            });
+            armies = armies.concat(visibleEnemies);
+          }
         }
         if (p.strutture) {
           const isAlly = myAllianceId && String(p.id_alleanza) === String(myAllianceId);

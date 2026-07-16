@@ -292,6 +292,133 @@ ion-toast.tactical-toast-error {
 }
 
 /* ==========================================================================
+   ALERT TATTICI (SUCCESS / ERROR)
+   ========================================================================== */
+ion-alert.tactical-alert {
+  --background: rgba(10, 15, 30, 0.96);
+  --backdrop-opacity: 0.65;
+  
+  &::part(container) {
+    border-radius: 14px;
+    border: 1px solid rgba(88, 166, 255, 0.35);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(88, 166, 255, 0.18);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    padding: 10px;
+  }
+
+  &::part(title) {
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: 900;
+    font-size: 1.25rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-bottom: 1px dashed rgba(88, 166, 255, 0.25);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+
+  &::part(message) {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: #e2e8f0;
+    letter-spacing: 0.02em;
+    white-space: pre-line;
+  }
+
+  &::part(button) {
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    border: 1px solid rgba(88, 166, 255, 0.3);
+    border-radius: 4px;
+    background: rgba(88, 166, 255, 0.08);
+    color: #58a6ff;
+    padding: 8px 16px;
+    margin: 6px;
+    transition: all 0.2s ease-in-out;
+
+    &:hover, &.button-active {
+      background: rgba(88, 166, 255, 0.2);
+      border-color: #58a6ff;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
+    }
+  }
+}
+
+ion-alert.tactical-alert-success {
+  &::part(container) {
+    border-color: rgba(63, 185, 80, 0.45);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(63, 185, 80, 0.15);
+  }
+  &::part(title) {
+    color: #3fb950;
+    border-bottom-color: rgba(63, 185, 80, 0.25);
+  }
+  &::part(button) {
+    border-color: rgba(63, 185, 80, 0.3);
+    background: rgba(63, 185, 80, 0.08);
+    color: #3fb950;
+    &:hover, &.button-active {
+      background: rgba(63, 185, 80, 0.2);
+      border-color: #3fb950;
+    }
+  }
+}
+
+ion-alert.tactical-alert-error {
+  &::part(container) {
+    border-color: rgba(255, 123, 114, 0.50);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(255, 123, 114, 0.15);
+  }
+  &::part(title) {
+    color: #ff7b72;
+    border-bottom-color: rgba(255, 123, 114, 0.25);
+  }
+  &::part(button) {
+    border-color: rgba(255, 123, 114, 0.3);
+    background: rgba(255, 123, 114, 0.08);
+    color: #ff7b72;
+    &:hover, &.button-active {
+      background: rgba(255, 123, 114, 0.2);
+      border-color: #ff7b72;
+    }
+  }
+}
+
+/* ==========================================================================
+   CARICAMENTO TATTICO (LOADING)
+   ========================================================================== */
+ion-loading.tactical-loading {
+  --background: rgba(10, 15, 30, 0.95);
+  --backdrop-opacity: 0.7;
+  --spinner-color: #58a6ff;
+  
+  &::part(container) {
+    border-radius: 14px;
+    border: 1px solid rgba(88, 166, 255, 0.35);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(88, 166, 255, 0.18);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    padding: 20px 24px;
+  }
+
+  &::part(message) {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #ffffff;
+    letter-spacing: 0.03em;
+    line-height: 1.4;
+    margin-left: 12px;
+  }
+}
+
+/* ==========================================================================
    GLOBAL RESPONSIVE DESIGN & ULTRAWIDE COMPATIBILITY (21:9, SMALL DISPLAYS)
    ========================================================================== */
 @media (min-width: 1920px) {

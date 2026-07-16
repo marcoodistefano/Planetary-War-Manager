@@ -11,7 +11,8 @@ const { getAuthContextFromRequest } = require("../shared/authContext.js");
 const { initDispatcher } = require("./Dispatcher/webDispatcher.js");
 const redis = require("../shared/redisClient.js");
 const dynamicPathfinder = require("./middleware/dynamicPathfinder.js");
-const { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, calculateCurrentPosition, getRegionIdByName, getRegionAtCoords } = require("./middleware/movementLogic.js");
+const { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, calculateCurrentPosition, getRegionIdByName, getRegionAtCoords, getArmyLocation, haversineDist } = require("./middleware/movementLogic.js");
+const { getArmyVisionRadius, isAirArmy, isStealthArmy, radarRadiusMap, defaultVisionRadius } = require("./middleware/gameUtils.js");
 const { getMatch, updateMatch } = require('../shared/matchMonolithic.js');
 const db = require('../shared/postgresClient.js');
 const { startTroopGenerator } = require("./middleware/troopGenerator.js");
@@ -255,10 +256,98 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         const myPlayer = nations.find(p => p.username === ws.username);
                         const myAllianceId = myPlayer ? myPlayer.id_alleanza : null;
 
+                        const alliedUsers = new Set(
+                            nations
+                                .filter(p => p.username === ws.username || (myAllianceId && String(p.id_alleanza) === String(myAllianceId)))
+                                .map(p => p.username)
+                        );
+
+                        const alliedArmiesVision = [];
+                        const alliedRadars = [];
+                        const alliedTerritoriesCoords = [];
+
+                        for (const p of nations) {
+                            if (!alliedUsers.has(p.username)) continue;
+
+                            if (p.armate) {
+                                Object.values(p.armate).forEach(a => {
+                                    const loc = getArmyLocation(a);
+                                    if (loc) {
+                                        alliedArmiesVision.push({
+                                            coords: loc,
+                                            radius: getArmyVisionRadius(a)
+                                        });
+                                    }
+                                });
+                            }
+
+                            if (p.strutture) {
+                                p.strutture.forEach(s => {
+                                    if (s.status === 'built' && s.structureId && s.structureId.startsWith('radar_')) {
+                                        const radius = radarRadiusMap[s.structureId] || 500;
+                                        if (s.targetCoords) {
+                                            alliedRadars.push({
+                                                coords: s.targetCoords,
+                                                radius: radius,
+                                                isAntiAir: s.structureId.startsWith('radar_anti_aereo')
+                                            });
+                                        }
+                                    }
+                                });
+                            }
+
+                            const pTerrNames = new Set();
+                            if (p.territori_dict) {
+                                Object.values(p.territori_dict).forEach(provs => {
+                                    provs.forEach(t => pTerrNames.add(String(t).trim().toLowerCase()));
+                                });
+                            } else if (p.territori) {
+                                p.territori.forEach(t => pTerrNames.add(String(t).trim().toLowerCase()));
+                            }
+
+                            pTerrNames.forEach(nodeName => {
+                                const coords = getNodeCoords(nodeName);
+                                if (coords) {
+                                    alliedTerritoriesCoords.push(coords);
+                                }
+                            });
+                        }
+
                         for (const p of nations) {
                             if (p.armate) {
                                 const playerArmies = Object.values(p.armate).map(a => ({ ...a, owner: p.username }));
-                                armies = armies.concat(playerArmies);
+                                if (alliedUsers.has(p.username)) {
+                                    armies = armies.concat(playerArmies);
+                                } else {
+                                    const visibleEnemies = playerArmies.filter(enemy => {
+                                        const enemyLoc = getArmyLocation(enemy);
+                                        if (!enemyLoc) return false;
+
+                                        for (const tCoord of alliedTerritoriesCoords) {
+                                            if (haversineDist(enemyLoc[0], enemyLoc[1], tCoord[0], tCoord[1]) <= defaultVisionRadius) {
+                                                return true;
+                                            }
+                                        }
+
+                                        for (const aVision of alliedArmiesVision) {
+                                            if (haversineDist(enemyLoc[0], enemyLoc[1], aVision.coords[0], aVision.coords[1]) <= aVision.radius) {
+                                                return true;
+                                            }
+                                        }
+
+                                        for (const radar of alliedRadars) {
+                                            if (haversineDist(enemyLoc[0], enemyLoc[1], radar.coords[0], radar.coords[1]) <= radar.radius) {
+                                                if (isStealthArmy(enemy)) continue;
+                                                if (radar.isAntiAir && !isAirArmy(enemy)) continue;
+                                                if (!radar.isAntiAir && isAirArmy(enemy)) continue;
+                                                return true;
+                                            }
+                                        }
+
+                                        return false;
+                                    });
+                                    armies = armies.concat(visibleEnemies);
+                                }
                             }
                             if (p.strutture) {
                                 const isAlly = myAllianceId && String(p.id_alleanza) === String(myAllianceId);

@@ -252,24 +252,6 @@
               <button class="ghost-button mini" (click)="switchGlobe()">3D GLOBE</button>
             </div>
           </div>
-
-          <div class="hud-separator"></div>
-
-          <div class="hud-sub-section">
-            <div class="title-block compact">
-              <p class="eyebrow">Intelligence</p>
-              <h2>SENSOR FEED</h2>
-            </div>
-            <div class="sensor-grid">
-              <div class="sensor-row"><span>TER:</span><span class="sensor-val">{{ isTouchLayout ? (selectedPointName ||
-                  currentHoveredName || '--') : (currentHoveredName || '--') }}</span></div>
-              <div class="sensor-row"><span>POS:</span><span id="out-coords" class="sensor-val">{{ isTouchLayout ?
-                  selectedPointCoords : '--' }}</span></div>
-              <div class="sensor-row"><span>ALT:</span><span id="out-alt" class="sensor-val">--</span></div>
-              <div class="sensor-row"><span>COM:</span><span id="out-res-com" class="sensor-val res-glow">--</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
