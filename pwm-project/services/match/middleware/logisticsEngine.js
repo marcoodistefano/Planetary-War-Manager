@@ -29,12 +29,12 @@ const processLogistics = async () => {
                 // Map all friendly regions
                 for (const player of matchObj.match.player) {
                     friendlyRegionsByPlayer[player.username] = [];
-                    if (matchObj.match.nations) {
-                        for (const nation of matchObj.match.nations) {
-                            if (nation.player_username === player.username) {
-                                friendlyRegionsByPlayer[player.username].push(nation.id_nazione);
-                            }
+                    if (player.territori_dict) {
+                        for (const list of Object.values(player.territori_dict)) {
+                            friendlyRegionsByPlayer[player.username].push(...(list || []));
                         }
+                    } else if (player.territori) {
+                        friendlyRegionsByPlayer[player.username].push(...(player.territori || []));
                     }
                 }
 

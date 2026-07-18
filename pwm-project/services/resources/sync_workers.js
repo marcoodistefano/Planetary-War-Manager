@@ -164,7 +164,7 @@ async function generateResources() {
                 [matchDbId]
             );
 
-            const { getMatch, updateMatch } = require('../shared/matchMonolithic.js');
+            const { getMatch, updateMatch } = require('./services/shared/matchMonolithic.js');
 
             await updateMatch(matchId, async (matchObj) => {
                 if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
@@ -328,7 +328,7 @@ async function generateResources() {
                                 data: {
                                     resources: feResources,
                                     production: feProduction,
-                                    truppe: player.truppe,
+                                    truppe: Object.fromEntries(Object.entries(player.truppe || {}).filter(([k,v]) => typeof v === 'number')),
                                     fanti_rate: fantiProdRate,
                                     armies_updated: nuoveArmate,
                                     armies: player.armate ? (Array.isArray(player.armate) ? player.armate : Object.values(player.armate)).map(a => ({ ...a, owner: player.username })) : [],

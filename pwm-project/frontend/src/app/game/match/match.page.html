@@ -82,8 +82,13 @@
           </div>
 
           <div class="troops-dropdown" *ngIf="res.isTrigger && !useFloatingDropdown">
-            <div class="dropdown-header">ARMATA DISPIEGATA</div>
+            <div class="dropdown-header">RISERVE</div>
             <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
+              <span class="t-key">{{ troop.key }}</span>
+              <span class="t-val">{{ troop.value }}</span>
+            </div>
+            <div class="dropdown-header" style="margin-top: 5px;">IN CAMPO</div>
+            <div class="troop-entry" *ngFor="let troop of deployedTroops | keyvalue">
               <span class="t-key">{{ troop.key }}</span>
               <span class="t-val">{{ troop.value }}</span>
             </div>
@@ -99,6 +104,7 @@
       </div>
 
       <div class="profile-section">
+        <button class="surrender-btn" (click)="surrender()" title="Abbandona Partita">🏳️</button>
         <div class="profile-trigger" (click)="setOpenProfile(true)">
           <div class="profile-info">
             <span class="p-rank">GENERALE DI BRIGATA</span>
@@ -124,6 +130,9 @@
           chatUnreadCount }}</span>
       </div>
       <div class="mobile-logo">PWM</div>
+      <div class="mobile-actions">
+        <button class="surrender-btn" (click)="surrender()" title="Abbandona Partita">🏳️</button>
+      </div>
     </div>
 
     <div class="vertical-resource-bar mobile-only scrollable-y-hidden" [class.is-hidden]="isChatOpen">
@@ -135,8 +144,13 @@
           number: '1.0-0') : '--' }}</span>
         <span class="val" *ngIf="res.isTrigger">INFO</span>
         <div class="troops-dropdown" *ngIf="res.isTrigger && !useFloatingDropdown">
-          <div class="dropdown-header">ARMATA DISPIEGATA</div>
+          <div class="dropdown-header">RISERVE</div>
           <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
+            <span class="t-key">{{ troop.key }}</span>
+            <span class="t-val">{{ troop.value }}</span>
+          </div>
+          <div class="dropdown-header" style="margin-top: 5px;">IN CAMPO</div>
+          <div class="troop-entry" *ngFor="let troop of deployedTroops | keyvalue">
             <span class="t-key">{{ troop.key }}</span>
             <span class="t-val">{{ troop.value }}</span>
           </div>
@@ -153,8 +167,13 @@
 
     <div *ngIf="isTroopsDropdownOpen && useFloatingDropdown" class="troops-dropdown troops-dropdown-float"
       [style.left.px]="troopsDropdownX" [style.top.px]="troopsDropdownY">
-      <div class="dropdown-header">ARMATA DISPIEGATA</div>
+      <div class="dropdown-header">RISERVE</div>
       <div class="troop-entry" *ngFor="let troop of playerTroops | keyvalue">
+        <span class="t-key">{{ troop.key }}</span>
+        <span class="t-val">{{ troop.value }}</span>
+      </div>
+      <div class="dropdown-header" style="margin-top: 5px;">IN CAMPO</div>
+      <div class="troop-entry" *ngFor="let troop of deployedTroops | keyvalue">
         <span class="t-key">{{ troop.key }}</span>
         <span class="t-val">{{ troop.value }}</span>
       </div>
@@ -324,8 +343,11 @@
         <app-army-modal *ngIf="isArmyModalOpen" [playerTroops]="playerTroops" [armies]="matchArmies"
           [fantiRate]="fantiRate" [trainings]="playerTrainings" [matchStructures]="matchStructures"
           [gameRules]="gameRules" [selectedTargetName]="selectedPointName" [selectedTargetCoords]="selectedPointCoords"
-          [selectedArmyId]="selectedArmyId" [initialTab]="armyModalInitialTab" [currentMatchId]="currentMatchId"
-          [currentUsername]="userProfile.username" (playerTroopsChange)="playerTroops = $event; saveArmiesToBackend()"
+          [selectedArmyId]="selectedArmyId" [initialTab]="initialArmyTab"
+          [currentMatchId]="currentMatchId"
+          [currentUsername]="userProfile?.username || ''"
+          [capitalName]="myCapitalName"
+          (playerTroopsChange)="playerTroops = $event; saveArmiesToBackend()"
           (armiesChange)="matchArmies = $event; saveArmiesToBackend()"
           (recruitUnitRequest)="onRecruitUnitRequest($event)" (missionRequested)="onArmyMissionRequested($event)"
           (centerOnArmy)="centerMapOnArmy($event)" (close)="isArmyModalOpen = false">

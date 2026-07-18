@@ -493,6 +493,7 @@ const getInitialState = async (req, res) => {
     let structures = [];
     let technologies = [];
     let trainings = [];
+    let truppe = {};
 
     if (matchData && matchData.match && matchData.match.player) {
       nations = matchData.match.player;
@@ -604,6 +605,7 @@ const getInitialState = async (req, res) => {
           production = translateRedisToFe(p.produzione);
           technologies = p.technologies || [];
           trainings = p.addestramenti || [];
+          truppe = Object.fromEntries(Object.entries(p.truppe || {}).filter(([k,v]) => typeof v === 'number'));
         }
       }
     }
@@ -625,7 +627,8 @@ const getInitialState = async (req, res) => {
         regionsResources,
         technologies,
         trainings,
-        leaderboard
+        leaderboard,
+        truppe
       }
     });
   } catch (error) {

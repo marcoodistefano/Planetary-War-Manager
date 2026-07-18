@@ -102,8 +102,8 @@
                 <span class="status-msg">Gestisci e sciogli le unità.</span>
               </div>
 
-              <div class="army-grid army-grid--wide" *ngIf="armies.length > 0; else emptyArmyState">
-                <div class="unit-card army-card" *ngFor="let army of armies" [class.active]="army.id === activeArmyId">
+              <div class="army-grid army-grid--wide" *ngIf="myArmies.length > 0; else emptyArmyState">
+                <div class="unit-card army-card" *ngFor="let army of myArmies" [class.active]="army.id === activeArmyId">
                   <div class="army-card-head">
                     <div class="unit-icon">⚔️</div>
                     <div class="unit-info">
@@ -236,7 +236,7 @@
                 <label>ARMATA ATTIVA</label>
                 <select [(ngModel)]="activeArmyId" (change)="selectArmy(activeArmyId)">
                   <option value="">Seleziona un'armata</option>
-                  <option *ngFor="let army of armies" [value]="army.id">
+                  <option *ngFor="let army of myArmies" [value]="army.id">
                     {{ army.name }} - {{ getArmyTotal(army) }} unità
                   </option>
                 </select>

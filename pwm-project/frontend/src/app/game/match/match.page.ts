@@ -118,14 +118,24 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   // Gestione modali sovrapposte
   isBuildPanelOpen = false;
+  isArmyModalOpen = false;
+  initialArmyTab: any = 'management';
+  isRecruitModalOpen = false;
+  isStructureModalOpen = false;
   isTechModalOpen = false;
   isDiplomacyModalOpen = false;
   isIntelligenceModalOpen = false;
+  isRankingsModalOpen = false;
   isChatOpen = false;
+
+  get myCapitalName(): string {
+    if (!this.matchNations || !this.userProfile) return '';
+    const myNation = this.matchNations.find(n => n.username === this.userProfile.username);
+    return myNation ? myNation.nationName : '';
+  };
   isNukeFlashActive = false;
   nukeRadiationZones: any[] = [];
   isMarketModalOpen = false;
-  isArmyModalOpen = false;
   playerTrainings: any[] = [];
   fantiRate: number = 0;
 
@@ -504,6 +514,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   };
 
   playerTroops: any = {};
+  deployedTroops: any = {};
 
   // --- 4. CONFIGURAZIONI STATICHE ---
   resourceConfig = [
@@ -740,6 +751,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             if (parsed.payload?.trainings) {
               this.playerTrainings = parsed.payload.trainings;
             }
+            if (parsed.payload?.truppe) {
+              this.playerTroops = parsed.payload.truppe;
+            }
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
@@ -792,7 +806,9 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.fantiRate = parsed.data.fanti_rate;
             }
             if (parsed.data?.armies_updated && parsed.data?.armies) {
-              this.matchArmies = parsed.data.armies;
+              const curUserNorm = String(this.userProfile?.username || '').trim().toLowerCase();
+              const enemyArmies = this.matchArmies.filter(a => String(a.owner || '').trim().toLowerCase() !== curUserNorm);
+              this.matchArmies = [...enemyArmies, ...parsed.data.armies];
               // Pre-calcola path cache per armate in movimento
               this.matchArmies.forEach((a: any) => {
                 if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
@@ -1218,6 +1234,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               position: 'top',
               color: 'danger'
             }).then(t => t.present());
+          }
+
+          if (parsed.type === 'SURRENDER_OK') {
+            this.shouldReconnect = false;
+            this.matchState.disconnect();
+            this.router.navigate(['/home']);
           }
         }); // Chiude la sottoscrizione ai messaggi
 
@@ -2506,7 +2528,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     // Create sorted object so the dropdown looks nice
     const sortedTotals: Record<string, number> = {};
     Object.keys(totals).sort().forEach(k => sortedTotals[k] = totals[k]);
-    this.playerTroops = sortedTotals;
+    this.deployedTroops = sortedTotals;
   }
 
   // --- RENDERING ARMATE SU MAPPA ---
@@ -2974,10 +2996,45 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       } catch (err) { console.warn(err); }
     }
 
-    if (this.isFirstArmyRender && hasArmies) {
-      this.isFirstArmyRender = false;
-      if (minLng <= maxLng && minLat <= maxLat) {
+    if (this.isFirstArmyRender) {
+      const myNation = this.matchNations ? this.matchNations.find(n => n.username === this.userProfile?.username) : null;
+      
+      // Seleziona il territorio del giocatore come priorità
+      if (myNation && Array.isArray(myNation.territori) && myNation.territori.length > 0 && this.regionFeatureByKey && this.regionFeatureByKey.size > 0) {
+          this.isFirstArmyRender = false;
+          let tMinLng = 180, tMaxLng = -180, tMinLat = 90, tMaxLat = -90;
+          let hasCoords = false;
+          myNation.territori.forEach((provId: string) => {
+            const feature = this.regionFeatureByKey.get(String(provId).toLowerCase());
+            if (feature && feature.geometry && feature.geometry.coordinates) {
+              const extractCoords = (coordsArray: any[]) => {
+                coordsArray.forEach((coord: any) => {
+                  if (Array.isArray(coord) && coord.length === 2 && typeof coord[0] === 'number') {
+                    hasCoords = true;
+                    if (coord[0] < tMinLng) tMinLng = coord[0];
+                    if (coord[0] > tMaxLng) tMaxLng = coord[0];
+                    if (coord[1] < tMinLat) tMinLat = coord[1];
+                    if (coord[1] > tMaxLat) tMaxLat = coord[1];
+                  } else if (Array.isArray(coord)) {
+                    extractCoords(coord);
+                  }
+                });
+              };
+              extractCoords(feature.geometry.coordinates);
+            }
+          });
+          if (hasCoords && tMinLng <= tMaxLng && tMinLat <= tMaxLat) {
+            this.map.fitBounds([[tMinLng, tMinLat], [tMaxLng, tMaxLat]], { padding: 50, maxZoom: 5, duration: 2000 });
+          }
+      } 
+      // Se non ha territori, usa le armate come fallback
+      else if (hasArmies && minLng <= maxLng && minLat <= maxLat) {
+        this.isFirstArmyRender = false;
         this.map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 50, maxZoom: 6, duration: 2000 });
+      } 
+      // Se abbiamo caricato le nazioni e la feature map, disabilita il first render
+      else if (this.matchNations && this.matchNations.length > 0 && this.regionFeatureByKey && this.regionFeatureByKey.size > 0) {
+         this.isFirstArmyRender = false;
       }
     }
 
@@ -3407,6 +3464,27 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.isRadialMenuVisible = false;
   }
 
+  async surrender() {
+    const confirmStr = prompt('Sei sicuro di voler abbandonare la partita? Questa azione è irreversibile e comporterà la perdita di punti ELO se la partita è classificata. Scrivi "SI" per confermare:');
+    if (confirmStr !== 'SI') {
+      return;
+    }
+
+    // Invia l'azione SURRENDER
+    this.matchState.send({
+      action: 'SURRENDER',
+      payload: {}
+    });
+    
+    this.shouldReconnect = false;
+    
+    // Piccolo ritardo per assicurarsi che il messaggio parta sul WebSocket prima di disconnettersi
+    setTimeout(() => {
+      this.matchState.disconnect();
+      this.router.navigate(['/home']);
+    }, 100);
+  }
+
   openChatWithRegionOwner() {
     if (!this.selectedPointName) {
       this.toggleDiplomacyModal();
@@ -3575,12 +3653,28 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }).then(t => t.present());
   }
 
+  getMyArmies() {
+    const curUserNorm = String(this.userProfile?.username || '').trim().toLowerCase();
+    return this.matchArmies.filter(a => String(a.owner || '').trim().toLowerCase() === curUserNorm);
+  }
+
+  onArmiesChange(updatedArmies: any[]) {
+    const curUserNorm = String(this.userProfile?.username || '').trim().toLowerCase();
+    const enemyArmies = this.matchArmies.filter(a => String(a.owner || '').trim().toLowerCase() !== curUserNorm);
+    this.matchArmies = [...enemyArmies, ...updatedArmies];
+    
+    // Forza un ri-render immediato delle armate (es. la nuova armata creata nello split)
+    this.renderArmies();
+    
+    this.saveArmiesToBackend();
+  }
+
   saveArmiesToBackend() {
     // FIX CRITICO-3: rimosso il blocco if(true) dead code
     this.matchState.send({
       action: 'SAVE_ARMIES',
       payload: {
-        armies: this.matchArmies,
+        armies: this.getMyArmies(),
         playerTroops: this.playerTroops
       }
     });

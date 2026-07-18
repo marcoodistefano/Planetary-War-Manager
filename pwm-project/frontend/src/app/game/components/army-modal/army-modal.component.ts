@@ -16,6 +16,7 @@ interface ArmyGroup {
   targetName?: string;
   targetCoords?: string;
   currentLocation?: any;
+  owner?: string;
 }
 
 interface ArmyMissionRequest {
@@ -52,6 +53,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   @Input() initialTab: ArmyTab = 'management';
   @Input() currentMatchId = '';
   @Input() currentUsername = '';
+  @Input() capitalName = '';
 
   activeTab: ArmyTab = 'management';
   graveyardLosses: any[] = [];
@@ -265,7 +267,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   get selectedArmy() {
-    return this.armies.find((army) => army.id === this.activeArmyId) || this.armies[0] || null;
+    return this.myArmies.find((army) => army.id === this.activeArmyId) || this.myArmies[0] || null;
   }
 
   get selectedArmyCount() {
@@ -332,8 +334,8 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
 
     if (this.selectedArmyId) {
       this.activeArmyId = this.selectedArmyId;
-    } else if (!this.activeArmyId && this.armies.length > 0) {
-      this.activeArmyId = this.armies[0].id;
+    } else if (!this.activeArmyId && this.myArmies.length > 0) {
+      this.activeArmyId = this.myArmies[0].id;
     }
   }
 
@@ -354,8 +356,8 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
         ? this.selectedTargetCoords
         : this.missionCoords;
       this.missionTargetName = this.selectedTargetName || this.missionTargetName;
-      if (!this.activeArmyId && this.armies.length > 0) {
-        this.activeArmyId = this.armies[0].id;
+      if (!this.activeArmyId && this.myArmies.length > 0) {
+        this.activeArmyId = this.myArmies[0].id;
       }
     }
   }
@@ -396,51 +398,52 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
     const troopKey = String(this.selectedTroopKey || '').trim();
     const troopCount = Math.max(1, Math.floor(Number(this.selectedTroopCount) || 0));
 
-    if (!troopKey) return;
+    if (!troopKey || troopCount <= 0) return;
 
-    // Trova un'armata sorgente che contenga la truppa
-    let sourceArmy = null;
-    if (this.selectedTargetName) {
-        sourceArmy = this.armies.find(a => 
-            (a.currentLocation === this.selectedTargetName || a.targetName === this.selectedTargetName || a.currentLocation === this.selectedTargetCoords) 
-            && a.composition && a.composition[troopKey] >= troopCount
-        );
-    }
-    
-    // Se non la trova nel target selezionato, cerca una qualsiasi armata
-    if (!sourceArmy) {
-        sourceArmy = this.armies.find(a => a.composition && a.composition[troopKey] >= troopCount);
-    }
-
-    if (!sourceArmy) {
-        console.warn('Non hai truppe sufficienti di questo tipo in una singola armata per formare il gruppo.');
+    // Poiché l'utente seleziona le truppe dalle "Disponibili" (availableTroops),
+    // dobbiamo sempre sottrarle dalle riserve globali (playerTroops) e NON rubarle
+    // ad un'armata esistente.
+    if ((this.playerTroops[troopKey] || 0) < troopCount) {
+        alert('Non hai truppe sufficienti di questo tipo nelle riserve per formare il gruppo.');
         return;
     }
 
-    // Sottrai la truppa dall'armata sorgente
-    sourceArmy.composition[troopKey] -= troopCount;
-    if (sourceArmy.composition[troopKey] <= 0) {
-        delete sourceArmy.composition[troopKey];
-    }
-    
-    let armiesToKeep = this.armies;
-    if (Object.keys(sourceArmy.composition).length === 0) {
-        armiesToKeep = this.armies.filter(a => a.id !== sourceArmy.id);
+    let targetLoc = this.selectedTargetName || this.selectedTargetCoords;
+    if (!targetLoc || targetLoc === '--') {
+       // Se non ha selezionato un territorio sulla mappa, proviamo a prendere
+       // la regione della prima struttura costruita dal giocatore.
+       const myStructures = this.matchStructures?.filter(s => s.owner === this.currentUsername) || [];
+       if (myStructures.length > 0) {
+           targetLoc = myStructures[0].targetName || myStructures[0].regionId;
+       } else {
+           alert("Seleziona prima un territorio sulla mappa per schierare l'armata.");
+           return;
+       }
     }
 
+    // Sottrai dalle riserve
+    this.playerTroops[troopKey] -= troopCount;
+    this.playerTroopsChange.emit(this.playerTroops);
+    
     const nextArmy: ArmyGroup = {
       id: this.generateUUID(),
-      name: this.armyName.trim() || `Armata ${armiesToKeep.length + 1}`,
+      name: this.armyName.trim() || `Armata ${this.armies.length + 1}`,
       composition: { [troopKey]: troopCount },
       status: 'standby',
-      currentLocation: sourceArmy.currentLocation
+      currentLocation: targetLoc,
+      owner: this.currentUsername
     };
-
-    this.armies = [nextArmy, ...armiesToKeep];
+    
+    this.armies = [nextArmy, ...this.armies];
     this.activeArmyId = nextArmy.id;
+    this.armiesChange.emit(this.armies);
+    
+    // Ricalcola availableTroops
+    this.availableTroops[troopKey] -= troopCount;
+    
+    // Reset form
     this.armyName = '';
     this.selectedTroopCount = 1;
-    this.armiesChange.emit(this.armies);
     this.activeTab = 'management';
   }
 
@@ -450,16 +453,17 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
       return;
     }
 
-    const nextTroops = { ...this.availableTroops };
+    const nextAvailable = { ...this.availableTroops };
 
     Object.entries(army.composition).forEach(([troopKey, troopCount]) => {
-      nextTroops[troopKey] = Number(nextTroops[troopKey] || 0) + Number(troopCount || 0);
+      this.playerTroops[troopKey] = Number(this.playerTroops[troopKey] || 0) + Number(troopCount || 0);
+      nextAvailable[troopKey] = Number(nextAvailable[troopKey] || 0) + Number(troopCount || 0);
     });
 
-    this.availableTroops = nextTroops;
+    this.availableTroops = nextAvailable;
     this.armies = this.armies.filter((entry) => entry.id !== armyId);
-    this.activeArmyId = this.armies[0]?.id || '';
-    this.playerTroopsChange.emit(this.availableTroops);
+    this.activeArmyId = this.myArmies[0]?.id || '';
+    this.playerTroopsChange.emit(this.playerTroops);
     this.armiesChange.emit(this.armies);
     this.activeTab = 'management';
   }
@@ -607,6 +611,11 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   closeModal() { this.close.emit(); }
+
+  get myArmies() {
+    const curUserNorm = String(this.currentUsername || '').trim().toLowerCase();
+    return this.armies.filter((a) => String((a as any).owner || '').trim().toLowerCase() === curUserNorm);
+  }
 
   private generateUUID(): string {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {

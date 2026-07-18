@@ -140,7 +140,7 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 100) {
     const lockVal = Date.now() + Math.random().toString();
 
     for (let retry = 0; retry < maxRetries; retry++) {
-        const lockAcquired = await redis.set(lockKey, lockVal, 'NX', 'PX', 5000);
+        const lockAcquired = await redis.set(lockKey, lockVal, 'NX', 'PX', 15000);
         if (!lockAcquired) {
             await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
             continue;
@@ -157,6 +157,12 @@ async function updateMatch(matchId, updaterCallback, maxRetries = 100) {
 
             if (!result || !result.save) {
                 return result ? result.data : null;
+            }
+
+            const currentLockVal = await redis.get(lockKey);
+            if (currentLockVal !== lockVal) {
+                console.error("Lock scaduto durante updaterCallback in updateMatch:", matchId);
+                throw new Error("Transazione fallita: Lock scaduto durante l'elaborazione per evitare inconsistenze.");
             }
 
             const newMatchObj = result.matchObj;
@@ -321,10 +327,11 @@ function createEmptyPlayer(username, nationId, nationName) {
             legno: 0,
             piombo: 0,
             acciaio: 0,
-            mattoni: 0,
+            mattone: 0,
             petrolio: 0,
-            gas_naturale: 0,
-            cibo: 0,
+            gas: 0,
+            uranio: 0,
+            oro: 0,
             denaro: 0
         }
     };

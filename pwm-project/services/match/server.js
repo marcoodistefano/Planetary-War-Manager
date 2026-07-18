@@ -233,6 +233,68 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                 if (typeof payload === 'string') {
                     payload = JSON.parse(payload);
                 }
+                if (payload.action === 'SURRENDER') {
+                    try {
+                        const result = await updateMatch(ws.matchId, async (matchObj) => {
+                            let player = matchObj.match.player.find(p => p.username === ws.username);
+                            if (!player) return { save: false };
+
+                            player.isOccupied = false;
+                            player.inWar = false;
+                            player.inWarWith = [];
+                            
+                            // Cancella tutte le armate e truppe da Redis
+                            player.armate = {};
+                            
+                            // Cancella tutte le strutture (se presenti)
+                            player.strutture = [];
+                            
+                            // Azzera i territori (torna neutrale)
+                            player.territori = [];
+                            player.territori_dict = {};
+                            
+                            // Cancella code di produzione se presenti
+                            player.coda_produzione = [];
+                            player.costruzioni_in_corso = [];
+                            
+                            // Modifica lo username in modo che appaia come un bot abbandonato
+                            player.username = `Abbandonato_${Math.floor(Math.random() * 1000)}`;
+                            
+                            return { save: true, matchObj, data: true };
+                        });
+
+                        if (result) {
+                            // 1. Remove from partecipanti_partite
+                            await db.query(
+                                `DELETE FROM partecipanti_partite WHERE user_id = (SELECT id_user FROM utenti WHERE username = $1) AND partita_id = (SELECT id_partita FROM partite WHERE id_partita_hash = $2 OR id_partita_visualizzato = $2)`,
+                                [ws.username, ws.matchId]
+                            );
+
+                            // 2. ELO penalty if ranked
+                            const matchRes = await db.query('SELECT has_elo FROM partite WHERE id_partita_hash = $1 OR id_partita_visualizzato = $1', [ws.matchId]);
+                            if (matchRes.rows.length > 0 && matchRes.rows[0].has_elo) {
+                                // Sottrai una quota fissa (es. 20 punti) se non c'è un avversario umano
+                                // O usa la logica ELO standard contro un avversario fittizio di pari livello
+                                const resL = await db.query('SELECT elo_rating FROM utenti WHERE username = $1 FOR UPDATE', [ws.username]);
+                                if (resL.rows.length > 0) {
+                                    const ratingL = resL.rows[0].elo_rating || 1000;
+                                    const K_FACTOR = 32;
+                                    // Assume expected score 0.5 (contro pari livello) e risultato 0 (sconfitta)
+                                    const expectedL = 0.5;
+                                    const newRatingL = Math.max(0, Math.round(ratingL + K_FACTOR * (0 - expectedL)));
+                                    await db.query('UPDATE utenti SET elo_rating = $1 WHERE username = $2', [newRatingL, ws.username]);
+                                    console.log(`[SURRENDER] Penalità ELO applicata a ${ws.username}: ${ratingL} -> ${newRatingL}`);
+                                }
+                            }
+
+                            // 3. Notifica al client che può uscire
+                            ws.send(JSON.stringify({ type: 'SURRENDER_OK' }));
+                            console.log(`[SURRENDER] Giocatore ${ws.username} ha abbandonato la partita ${ws.matchId}.`);
+                        }
+                    } catch (err) {
+                        console.error('[SURRENDER] Errore:', err);
+                    }
+                }
             } catch (error) {
                 ws.send(JSON.stringify({ type: "ERROR", error: "Payload non valido" }));
                 return;
@@ -250,6 +312,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                     let structures = [];
                     let technologies = [];
                     let trainings = [];
+                    let truppe = {};
 
                     if (matchData && matchData.match && matchData.match.player) {
                         nations = matchData.match.player;
@@ -361,6 +424,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                                 production = translateRedisToFe(p.produzione);
                                 technologies = p.technologies || [];
                                 trainings = p.addestramenti || [];
+                                truppe = Object.fromEntries(Object.entries(p.truppe || {}).filter(([k,v]) => typeof v === 'number'));
                                 console.log(`[WS_MATCH] INITIAL_STATE per ${ws.username}: risorse=`, resources);
                             }
                         }
@@ -374,7 +438,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                     ws.send(JSON.stringify({
                         type: 'INITIAL_STATE',
-                        payload: { armies, nations, resources, production, structures, regionsResources, technologies, trainings, leaderboard }
+                        payload: { armies, nations, resources, production, structures, regionsResources, technologies, trainings, leaderboard, truppe }
                     }));
                     return;
                 }
@@ -382,7 +446,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                 if (payload.action === 'RECRUIT_UNIT') {
                     try {
                         console.log("[RECRUIT_UNIT] Inizio elaborazione", payload);
-                        const { unitId, targetName, targetCoords, costMoney, costSteel, trainTime } = payload;
+                        const { unitId, targetName, targetCoords } = payload;
                         
                         const rulesObj = await getGameRulesCached(redis) || { sheets: [] };
 
@@ -404,11 +468,16 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                                 return { save: false };
                             }
 
-                            // Controllo dei requisiti tecnologici della truppa
                             const recruitmentTruppeSheet = rulesObj.sheets.find(s => s.name === "Truppe" || s.name === "truppe");
                             const recruitmentTruppeLines = recruitmentTruppeSheet ? recruitmentTruppeSheet.lines : [];
                             const recruitmentURule = recruitmentTruppeLines.find(l => l.id_truppa === unitId);
-                            if (recruitmentURule && recruitmentURule.prodotta_in) {
+                            
+                            if (!recruitmentURule) {
+                                ws.send(JSON.stringify({ type: 'ERROR', error: 'Unità sconosciuta.' }));
+                                return { save: false };
+                            }
+
+                            if (recruitmentURule.prodotta_in) {
                                 const prodStructure = recruitmentURule.prodotta_in;
                                 const struttureSheet = rulesObj.sheets.find(s => s.name === "Strutture" || s.name === "strutture");
                                 const struttureLines = struttureSheet ? struttureSheet.lines : [];
@@ -423,16 +492,45 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                                 }
                             }
                             
+                            const reqDenaro = recruitmentURule.costo_denaro || 0;
+                            const reqLegno = recruitmentURule.costo_legno || 0;
+                            const reqMattoni = recruitmentURule.costo_mattoni || 0;
+                            const reqAcciaio = recruitmentURule.costo_acciaio || 0;
+                            const reqPetrolio = recruitmentURule.costo_petrolio || 0;
+                            const reqPiombo = (recruitmentURule.costo_piombo || recruitmentURule.costo_piombio) || 0;
+                            const reqGas = recruitmentURule.costo_gas || 0;
+                            const reqUranio = recruitmentURule.costo_uranio || 0;
+                            const reqOro = recruitmentURule.costo_oro || 0;
+                            const trainTime = recruitmentURule.tempo_addestramento || 0;
+                            
                             let resources = player.risorse || { denaro: 0, acciaio: 0 };
                             
-                            if (resources.denaro < costMoney || resources.acciaio < (costSteel || 0)) {
+                            if (
+                                (resources.denaro || 0) < reqDenaro ||
+                                (resources.legno || 0) < reqLegno ||
+                                (resources.mattone || 0) < reqMattoni ||
+                                (resources.acciaio || 0) < reqAcciaio ||
+                                (resources.petrolio || 0) < reqPetrolio ||
+                                (resources.piombo || 0) < reqPiombo ||
+                                (resources.gas || 0) < reqGas ||
+                                (resources.uranio || 0) < reqUranio ||
+                                (resources.oro || 0) < reqOro
+                            ) {
                                 console.log("[RECRUIT_UNIT] Risorse insufficienti");
                                 ws.send(JSON.stringify({ type: 'ERROR', error: 'Risorse insufficienti per il reclutamento.' }));
                                 return { save: false };
                             }
                             
-                            resources.denaro -= costMoney;
-                            if (costSteel) resources.acciaio -= costSteel;
+                            resources.denaro = (resources.denaro || 0) - reqDenaro;
+                            resources.legno = (resources.legno || 0) - reqLegno;
+                            resources.mattone = (resources.mattone || 0) - reqMattoni;
+                            resources.acciaio = (resources.acciaio || 0) - reqAcciaio;
+                            resources.petrolio = (resources.petrolio || 0) - reqPetrolio;
+                            resources.piombo = (resources.piombo || 0) - reqPiombo;
+                            resources.gas = (resources.gas || 0) - reqGas;
+                            resources.uranio = (resources.uranio || 0) - reqUranio;
+                            resources.oro = (resources.oro || 0) - reqOro;
+                            
                             player.risorse = resources;
                             
                             let multiplier = 1;
@@ -498,7 +596,14 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                 if (payload.action === 'SAVE_ARMIES') {
                     const dict = {};
-                    (payload.payload.armies || []).forEach(a => dict[a.id] = a);
+                    if (Array.isArray(payload.payload.armies)) {
+                        payload.payload.armies.forEach(a => {
+                            if (a && a.id) dict[a.id] = a;
+                        });
+                    } else if (payload.payload.armies) {
+                        Object.assign(dict, payload.payload.armies);
+                    }
+                    
                     await updateMatch(ws.matchId, async (matchObj) => {
                         if (!matchObj || !matchObj.match || !matchObj.match.player) return { save: false };
                         const player = matchObj.match.player.find(p => p.username === ws.username);
@@ -511,7 +616,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
 
                     // Sync PostgreSQL
                     try {
-                        const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1`, [ws.matchId]);
+                        const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1 OR id_partita_visualizzato = $1`, [ws.matchId]);
                         if (partitaRes.rows.length > 0) {
                             const partitaId = partitaRes.rows[0].id_partita;
                             const userRes = await db.query(`SELECT id_user FROM utenti WHERE username = $1`, [ws.username]);
@@ -622,23 +727,6 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                         }
 
                         if (startLng !== undefined && startLat !== undefined && targetLng !== undefined && targetLat !== undefined) {
-                            let unitSpeedMultiplier = 1;
-                            if (armata.composition) {
-                                const types = Object.keys(armata.composition);
-                                const gameRulesStr = await redis.get("map_data:game_rules");
-                                if (gameRulesStr) {
-                                    try {
-                                        const rules = JSON.parse(gameRulesStr);
-                                        let minSpeed = Infinity;
-                                        for (const type of types) {
-                                            const uRule = rules.units.find(r => r.id === type);
-                                            if (uRule && uRule.speed < minSpeed) minSpeed = uRule.speed;
-                                        }
-                                        if (minSpeed !== Infinity && minSpeed > 0) unitSpeedMultiplier = 1 / minSpeed;
-                                    } catch (e) {}
-                                }
-                            }
-
                             let matchMultiplier = 1;
                             if (matchData.match.struttura_partita) {
                                 try {
@@ -759,23 +847,6 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                             matchMultiplier = decodedMatch.multiplierValue || 1;
                         } catch (err) {
                             console.warn("[SYS_WARN] Errore decodifica match:", err.message);
-                        }
-                    }
-
-                    let unitSpeedMultiplier = 1;
-                    if (armata.composition) {
-                        const types = Object.keys(armata.composition);
-                        const gameRulesStr = await redis.get("map_data:game_rules");
-                        if (gameRulesStr) {
-                            try {
-                                const rules = JSON.parse(gameRulesStr);
-                                let minSpeed = Infinity;
-                                for (const type of types) {
-                                    const uRule = rules.units.find(r => r.id === type);
-                                    if (uRule && uRule.speed < minSpeed) minSpeed = uRule.speed;
-                                }
-                                if (minSpeed !== Infinity && minSpeed > 0) unitSpeedMultiplier = 1 / minSpeed;
-                            } catch (e) {}
                         }
                     }
 
@@ -922,7 +993,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                                 await db.query(`UPDATE mosse SET ttl = $1 WHERE id_mossa = $2`, [etaDate, id_mossa]);
                                 await db.query(`INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`, [id_mossa, targetLng, targetLat, targetName, etaDate]);
                             } else {
-                                const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1`, [ws.matchId]);
+                                const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1 OR id_partita_visualizzato = $1`, [ws.matchId]);
                                 if (partitaRes.rows.length > 0) {
                                     const partitaId = partitaRes.rows[0].id_partita;
                                     const insertMossa = await db.query(`INSERT INTO mosse (user_id, partita_id, type_action, id_armata, ttl) VALUES ((SELECT id_user FROM utenti WHERE username=$1), $2, 'mov', $3, $4) RETURNING id_mossa`, [ws.username, partitaId, armyId, etaDate]);
@@ -1022,7 +1093,7 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                                     await db.query(`UPDATE mosse SET ttl = $1 WHERE id_mossa = $2`, [etaDate, id_mossa]);
                                     await db.query(`INSERT INTO spostamenti (id_mossa, numero_coda, x_dest, y_dest, target_node, time_to_arrive) VALUES ($1, 1, $2, $3, $4, $5)`, [id_mossa, army.targetCoords[0], army.targetCoords[1], army.targetName, etaDate]);
                                 } else {
-                                    const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1`, [ws.matchId]);
+                                    const partitaRes = await db.query(`SELECT id_partita FROM partite WHERE id_partita_hash = $1 OR id_partita_visualizzato = $1`, [ws.matchId]);
                                     if (partitaRes.rows.length > 0) {
                                         const partitaId = partitaRes.rows[0].id_partita;
                                         const insertMossa = await db.query(`INSERT INTO mosse (user_id, partita_id, type_action, id_armata, ttl) VALUES ((SELECT id_user FROM utenti WHERE username=$1), $2, 'mov', $3, $4) RETURNING id_mossa`, [ws.username, partitaId, armyId, etaDate]);
