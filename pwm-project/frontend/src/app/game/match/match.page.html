@@ -54,7 +54,25 @@
       </button>
     </div>
 
-  </ion-content>
+  
+<!-- TACTICAL DECISIONS OVERLAY -->
+<div class="tactical-overlay" *ngIf="tacticalDecisions.length > 0">
+  <div class="tactical-card" *ngFor="let dec of tacticalDecisions">
+    <div class="tactical-header">
+      <ion-icon name="warning" color="warning"></ion-icon>
+      Rapporto Tattico
+    </div>
+    <div class="tactical-body">
+      {{ dec.message }}
+    </div>
+    <div class="tactical-actions">
+      <ion-button size="small" color="danger" (click)="handleTacticalDecision(dec, 'PURSUE')">Insegui</ion-button>
+      <ion-button size="small" color="medium" (click)="handleTacticalDecision(dec, 'HOLD')">Mantieni Posizione</ion-button>
+    </div>
+  </div>
+</div>
+
+</ion-content>
 </ion-menu>
 
 <div class="ion-page" id="main-map-content">
@@ -347,8 +365,8 @@
           [currentMatchId]="currentMatchId"
           [currentUsername]="userProfile?.username || ''"
           [capitalName]="myCapitalName"
-          (playerTroopsChange)="playerTroops = $event; saveArmiesToBackend()"
-          (armiesChange)="matchArmies = $event; saveArmiesToBackend()"
+          (createArmyRequest)="onCreateArmyRequest($event)"
+          (disbandArmyRequest)="onDisbandArmyRequest($event)"
           (recruitUnitRequest)="onRecruitUnitRequest($event)" (missionRequested)="onArmyMissionRequested($event)"
           (centerOnArmy)="centerMapOnArmy($event)" (close)="isArmyModalOpen = false">
         </app-army-modal>

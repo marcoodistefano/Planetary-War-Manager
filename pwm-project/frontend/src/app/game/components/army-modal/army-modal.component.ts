@@ -39,6 +39,8 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   @Output() playerTroopsChange = new EventEmitter<{ [key: string]: number }>();
   @Output() armiesChange = new EventEmitter<ArmyGroup[]>();
   @Output() missionRequested = new EventEmitter<ArmyMissionRequest>();
+  @Output() createArmyRequest = new EventEmitter<{ troopKey: string, troopCount: number, targetName?: string, targetCoords?: string, armyName?: string, armyId: string }>();
+  @Output() disbandArmyRequest = new EventEmitter<{ armyId: string }>();
   @Output() centerOnArmy = new EventEmitter<string>();
   @Output() recruitUnitRequest = new EventEmitter<any>();
   @Input() playerTroops: { [key: string]: number } = {};
@@ -400,9 +402,6 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
 
     if (!troopKey || troopCount <= 0) return;
 
-    // Poiché l'utente seleziona le truppe dalle "Disponibili" (availableTroops),
-    // dobbiamo sempre sottrarle dalle riserve globali (playerTroops) e NON rubarle
-    // ad un'armata esistente.
     if ((this.playerTroops[troopKey] || 0) < troopCount) {
         alert('Non hai truppe sufficienti di questo tipo nelle riserve per formare il gruppo.');
         return;
@@ -410,8 +409,6 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
 
     let targetLoc = this.selectedTargetName || this.selectedTargetCoords;
     if (!targetLoc || targetLoc === '--') {
-       // Se non ha selezionato un territorio sulla mappa, proviamo a prendere
-       // la regione della prima struttura costruita dal giocatore.
        const myStructures = this.matchStructures?.filter(s => s.owner === this.currentUsername) || [];
        if (myStructures.length > 0) {
            targetLoc = myStructures[0].targetName || myStructures[0].regionId;
@@ -421,27 +418,17 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
        }
     }
 
-    // Sottrai dalle riserve
-    this.playerTroops[troopKey] -= troopCount;
-    this.playerTroopsChange.emit(this.playerTroops);
+    const armyId = this.generateUUID();
     
-    const nextArmy: ArmyGroup = {
-      id: this.generateUUID(),
-      name: this.armyName.trim() || `Armata ${this.armies.length + 1}`,
-      composition: { [troopKey]: troopCount },
-      status: 'standby',
-      currentLocation: targetLoc,
-      owner: this.currentUsername
-    };
-    
-    this.armies = [nextArmy, ...this.armies];
-    this.activeArmyId = nextArmy.id;
-    this.armiesChange.emit(this.armies);
-    
-    // Ricalcola availableTroops
-    this.availableTroops[troopKey] -= troopCount;
-    
-    // Reset form
+    this.createArmyRequest.emit({
+        troopKey,
+        troopCount,
+        targetName: this.selectedTargetName || targetLoc,
+        targetCoords: this.selectedTargetCoords && this.selectedTargetCoords !== '--' ? this.selectedTargetCoords : undefined,
+        armyName: this.armyName.trim() || `Armata ${this.armies.length + 1}`,
+        armyId
+    });
+
     this.armyName = '';
     this.selectedTroopCount = 1;
     this.activeTab = 'management';
@@ -453,18 +440,12 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
       return;
     }
 
-    const nextAvailable = { ...this.availableTroops };
+    if (army.status !== 'standby') {
+        alert('Puoi sciogliere solo le armate in standby.');
+        return;
+    }
 
-    Object.entries(army.composition).forEach(([troopKey, troopCount]) => {
-      this.playerTroops[troopKey] = Number(this.playerTroops[troopKey] || 0) + Number(troopCount || 0);
-      nextAvailable[troopKey] = Number(nextAvailable[troopKey] || 0) + Number(troopCount || 0);
-    });
-
-    this.availableTroops = nextAvailable;
-    this.armies = this.armies.filter((entry) => entry.id !== armyId);
-    this.activeArmyId = this.myArmies[0]?.id || '';
-    this.playerTroopsChange.emit(this.playerTroops);
-    this.armiesChange.emit(this.armies);
+    this.disbandArmyRequest.emit({ armyId });
     this.activeTab = 'management';
   }
 

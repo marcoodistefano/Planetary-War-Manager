@@ -6,7 +6,7 @@ const path = require("path");
 const { getMatch } = require('../../shared/matchMonolithic.js');
 const { getNodeCoords, getArmyLocation } = require('./movementLogic.js');
 
-const { getArmyVisionRadius, defaultVisionRadius, isAirArmy, isStealthArmy, radarRadiusMap } = require('./gameUtils.js');
+const { getArmyVisionRadius, defaultVisionRadius, territoryVisionRadius, isAirArmy, isStealthArmy, radarRadiusMap } = require('./gameUtils.js');
 
 const runFogOfWarCycle = async () => {
     try {
@@ -114,7 +114,7 @@ const runFogOfWarCycle = async () => {
 
                 // 1. Ricerca visiva attorno ai miei territori
                 for (const tCoord of myTerritoriesCoords) {
-                    searchPipeline.georadius(geoKey, tCoord[0], tCoord[1], defaultVisionRadius, 'km');
+                    searchPipeline.georadius(geoKey, tCoord[0], tCoord[1], territoryVisionRadius, 'km');
                     searchTypes.push('default');
                     searchCount++;
                 }
@@ -277,7 +277,7 @@ const runFogOfWarStructuresCycle = async () => {
                 let searchCount = 0;
 
                 for (const tCoord of myTerritoriesCoords) {
-                    searchPipeline.georadius(geoKeyStructs, tCoord[0], tCoord[1], defaultVisionRadius, 'km');
+                    searchPipeline.georadius(geoKeyStructs, tCoord[0], tCoord[1], territoryVisionRadius, 'km');
                     searchCount++;
                 }
 

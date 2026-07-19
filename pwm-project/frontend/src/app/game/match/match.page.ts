@@ -109,6 +109,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   private touchTimer: any;
   private avatarSub?: Subscription;
   private matchSub?: Subscription;
+  private connStatusSub?: Subscription;
   private _globalClickHandler?: () => void;
   isTouchLayout = false;
 
@@ -127,6 +128,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   isIntelligenceModalOpen = false;
   isRankingsModalOpen = false;
   isChatOpen = false;
+  tacticalDecisions: any[] = [];
 
   get myCapitalName(): string {
     if (!this.matchNations || !this.userProfile) return '';
@@ -623,6 +625,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     if (this.avatarSub) this.avatarSub.unsubscribe();
     if (this.matchSub) this.matchSub.unsubscribe();
     this.matchSub = undefined;
+    if (this.connStatusSub) this.connStatusSub.unsubscribe();
+    this.connStatusSub = undefined;
 
     // FIX CRITICO-1: rimuove il listener globale per evitare memory leak
     if (this._globalClickHandler) {
@@ -750,6 +754,22 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             }
             if (parsed.payload?.trainings) {
               this.playerTrainings = parsed.payload.trainings;
+            }
+            if (parsed.payload?.truppe) {
+              this.playerTroops = parsed.payload.truppe;
+            }
+            this.ngZone.run(() => this.cdr.detectChanges());
+          }
+
+          if (parsed.type === 'ARMY_UPDATED') {
+            if (parsed.payload?.armate) {
+              const curUserNorm = String(this.userProfile?.username || '').trim().toLowerCase();
+              const enemyArmies = this.matchArmies.filter(a => String(a.owner || '').trim().toLowerCase() !== curUserNorm);
+              this.matchArmies = [...enemyArmies, ...parsed.payload.armate];
+              this.matchArmies.forEach((a: any) => {
+                if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
+              });
+              this.renderArmies();
             }
             if (parsed.payload?.truppe) {
               this.playerTroops = parsed.payload.truppe;
@@ -1139,6 +1159,20 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.reloadMatchAlliances();
           }
 
+          
+          if (parsed.type === 'TACTICAL_DECISION_REQUIRED') {
+            const payload = parsed.payload;
+            if (payload.attacker === this.userProfile.username) {
+              this.ngZone.run(() => {
+                this.tacticalDecisions.push({
+                  id: Date.now() + Math.random().toString(),
+                  ...payload
+                });
+                this.cdr.detectChanges();
+              });
+            }
+          }
+
           if (parsed.type === 'COMBAT_EVENT') {
             const { attacker, defender, damage, result, players } = parsed.payload;
             if (players && players.includes(this.userProfile.username)) {
@@ -1243,7 +1277,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
         }); // Chiude la sottoscrizione ai messaggi
 
-        this.matchState.connectionStatus$.subscribe(isConnected => {
+        if (this.connStatusSub) {
+          this.connStatusSub.unsubscribe();
+          this.connStatusSub = undefined;
+        }
+        this.connStatusSub = this.matchState.connectionStatus$.subscribe(isConnected => {
           if (!isConnected && this.shouldReconnect) {
             // console.log('[WS_MATCH] Riconnessione in corso tra 3 secondi...');
             this.reconnectTimer = window.setTimeout(() => this.connectMatchSocket(), 3000);
@@ -3658,25 +3696,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     return this.matchArmies.filter(a => String(a.owner || '').trim().toLowerCase() === curUserNorm);
   }
 
-  onArmiesChange(updatedArmies: any[]) {
-    const curUserNorm = String(this.userProfile?.username || '').trim().toLowerCase();
-    const enemyArmies = this.matchArmies.filter(a => String(a.owner || '').trim().toLowerCase() !== curUserNorm);
-    this.matchArmies = [...enemyArmies, ...updatedArmies];
-    
-    // Forza un ri-render immediato delle armate (es. la nuova armata creata nello split)
-    this.renderArmies();
-    
-    this.saveArmiesToBackend();
+  onCreateArmyRequest(payload: any) {
+    this.matchState.send({
+      action: 'CREATE_ARMY',
+      payload: payload
+    });
   }
 
-  saveArmiesToBackend() {
-    // FIX CRITICO-3: rimosso il blocco if(true) dead code
+  onDisbandArmyRequest(payload: { armyId: string }) {
     this.matchState.send({
-      action: 'SAVE_ARMIES',
-      payload: {
-        armies: this.getMyArmies(),
-        playerTroops: this.playerTroops
-      }
+      action: 'DISBAND_ARMY',
+      payload: payload
     });
   }
 
@@ -4608,4 +4638,33 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       console.error('Errore durante la chiusura della modale:', error);
     }
   }
+
+
+  handleTacticalDecision(decision: any, choice: string) {
+    this.tacticalDecisions = this.tacticalDecisions.filter((d: any) => d.id !== decision.id);
+    
+    const token = localStorage.getItem('pwm_access_token');
+    if (!token) return;
+
+    fetch(`${environment.apiBaseUrl}/api/match/${this.currentMatchId}/tactical-decision`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        decisionType: decision.decisionType,
+        choice: choice,
+        attackerArmyId: decision.attackerArmyId,
+        defenderArmyId: decision.defenderArmyId
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      console.log('Tactical decision sent:', choice);
+    })
+    .catch((err: any) => console.error('Error sending tactical decision', err));
+  }
+
+
 }

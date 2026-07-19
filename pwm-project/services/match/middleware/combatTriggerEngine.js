@@ -166,6 +166,46 @@ const checkCombatTriggers = async () => {
                 }
             }
         }
+    
+            // --- INIZIO RADAR DI PROSSIMITA' ---
+            const { setupInterceptCombat } = require('./combatLogic.js');
+            for (let i = 0; i < allArmies.length; i++) {
+                const armyA = allArmies[i];
+                if (armyA.status === 'combattimento' || armyA.status === 'in combattimento' || armyA.status === 'cooldown' || armyA.status === 'retreating') continue;
+
+                const playerA = matchObj.match.player.find(p => p.username === armyA.owner);
+                if (!playerA || !playerA.inWarWith || playerA.inWarWith.length === 0) continue;
+
+                for (let j = i + 1; j < allArmies.length; j++) {
+                    const armyB = allArmies[j];
+                    if (armyB.status === 'combattimento' || armyB.status === 'in combattimento' || armyB.status === 'cooldown' || armyB.status === 'retreating') continue;
+
+                    // Se sono nemici
+                    if (playerA.inWarWith.includes(armyB.owner)) {
+                        const coordsA = getArmyLocation(armyA);
+                        const coordsB = getArmyLocation(armyB);
+                        if (!coordsA || !coordsB) continue;
+
+                        const dist = haversineDist(coordsA[0], coordsA[1], coordsB[0], coordsB[1]);
+                        const rangeA = getArmyAttackRange(armyA);
+                        const rangeB = getArmyAttackRange(armyB);
+                        
+                        // L'ingaggio scatta se la distanza è minore del raggio d'attacco maggiore tra i due (o minimo 5km)
+                        const triggerRadius = Math.max(rangeA, rangeB, 5.0);
+
+                        if (dist <= triggerRadius) {
+                            console.log(`[PROXIMITY_RADAR] Ingaggio intercettato tra ${armyA.id} e ${armyB.id} (dist: ${dist}km <= trigger: ${triggerRadius}km)`);
+                            // Mettiamo temporaneamente uno status per evitare trigger multipli nello stesso loop
+                            armyA.status = 'in combattimento';
+                            armyB.status = 'in combattimento';
+                            await setupInterceptCombat(armyA, armyB, matchId);
+                            break; // Passa al prossimo armyA
+                        }
+                    }
+                }
+            }
+            // --- FINE RADAR DI PROSSIMITA' ---
+
     } catch (e) {
         console.error("Errore in combatTriggerEngine:", e);
     }

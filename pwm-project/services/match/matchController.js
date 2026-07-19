@@ -605,7 +605,7 @@ const getInitialState = async (req, res) => {
           production = translateRedisToFe(p.produzione);
           technologies = p.technologies || [];
           trainings = p.addestramenti || [];
-          truppe = Object.fromEntries(Object.entries(p.truppe || {}).filter(([k,v]) => typeof v === 'number'));
+          truppe = Object.fromEntries(Object.entries(p.truppe || {}).filter(([k, v]) => typeof v === 'number'));
         }
       }
     }
@@ -637,6 +637,69 @@ const getInitialState = async (req, res) => {
   }
 };
 
+
+const tacticalDecision = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { decisionType, choice, attackerArmyId, defenderArmyId } = req.body;
+    const auth = await getAuthContextFromRequest(req);
+    if (!auth.ok) return res.status(auth.status || 401).json({ error: "Identita non verificabile." });
+    const username = auth.userId;
+
+    if (decisionType === 'PURSUIT') {
+      if (choice === 'PURSUE') {
+        const redis = require('../../shared/redisClient.js');
+        const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
+
+        const { calculatePath, getArmyLocation } = require('./middleware/movementLogic.js');
+        const { getArmyDomain, getArmyType } = require('./middleware/gameUtils.js');
+
+        await updateMatch(id, async (mObj) => {
+          const attackerPlayer = mObj.match.player.find(p => p.username === username);
+          // Find defender army to get its location
+          let defArmy = null;
+          for (const p of mObj.match.player) {
+            if (p.armate && p.armate[defenderArmyId]) {
+              defArmy = p.armate[defenderArmyId];
+              break;
+            }
+          }
+
+          if (attackerPlayer && attackerPlayer.armate && attackerPlayer.armate[attackerArmyId] && defArmy) {
+            const a = attackerPlayer.armate[attackerArmyId];
+            const attLoc = getArmyLocation(a) || (a.currentLocation ? a.currentLocation.split(',').map(Number) : null);
+            const defLoc = getArmyLocation(defArmy) || (defArmy.currentLocation ? defArmy.currentLocation.split(',').map(Number) : null);
+
+            if (attLoc && defLoc) {
+              const path = await calculatePath(attLoc[0], attLoc[1], defLoc[0], defLoc[1], getArmyDomain(a), getArmyType(a));
+
+              a.status = 'Pronto all\'attacco';
+              a.targetName = defenderArmyId;
+              a.targetCoords = [defLoc[0], defLoc[1]];
+              a.missionMode = 'attacco';
+              a.path = path;
+              a.startTime = new Date().toISOString();
+            }
+          }
+          return { save: true, matchObj: mObj };
+        });
+        console.log(`[TACTICAL] ${username} ha deciso di INSEGUIRE ${defenderArmyId} con l'armata ${attackerArmyId}`);
+        return res.status(200).json({ success: true, message: "Inseguimento avviato" });
+      } else {
+        // HOLD position
+        console.log(`[TACTICAL] ${username} ha deciso di MANTENERE LA POSIZIONE con l'armata ${attackerArmyId}`);
+        // L'armata rimane in standby o riprende l'ordine, ci penserà il loop di combattimento
+        return res.status(200).json({ success: true, message: "Posizione mantenuta" });
+      }
+    }
+
+    res.status(400).json({ error: "Tipo di decisione non supportato" });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Errore interno" });
+  }
+};
+
 module.exports = {
   create,
   join,
@@ -653,5 +716,6 @@ module.exports = {
   LeaveAlliance,
   KickAlliance,
   getGraveyard,
-  getInitialState
+  getInitialState,
+  tacticalDecision
 };

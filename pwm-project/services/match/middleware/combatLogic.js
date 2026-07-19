@@ -474,15 +474,28 @@ const processActiveCombats = async () => {
                 }
             }
 
-            // --- CONTROLLO DISTANZA ---
+            // --- CONTROLLO DISTANZA E RITIRATA ---
+            let attackerOutOfRange = false;
+            let defenderOutOfRange = false;
+            let currentDist = 0;
+            
             if (defenderArmy) {
-                const { getArmyLocation, haversineDist } = require('./movementLogic.js');
+                const { getArmyLocation, haversineDist, calculatePath } = require('./movementLogic.js');
+                const { getArmyAttackRange } = require('./gameUtils.js');
                 const attLoc = getArmyLocation(attackerArmy);
                 const defLoc = getArmyLocation(defenderArmy);
+                
                 if (attLoc && defLoc) {
-                    const dist = haversineDist(attLoc[0], attLoc[1], defLoc[0], defLoc[1]);
-                    if (dist > defaultVisionRadius) {
-                        console.log(`[COMBAT] Bersaglio fuggito: ${dist}km. Annullamento attacco ${id_attacco}`);
+                    currentDist = haversineDist(attLoc[0], attLoc[1], defLoc[0], defLoc[1]);
+                    const attRange = getArmyAttackRange(attackerArmy);
+                    const defRange = getArmyAttackRange(defenderArmy);
+                    
+                    if (currentDist > attRange) attackerOutOfRange = true;
+                    if (currentDist > defRange) defenderOutOfRange = true;
+
+                    // Se entrambi fuori range, o fuggiti oltre range massimo * 2, scollega (safety net)
+                    if (currentDist > Math.max(attRange, defRange) * 2 && currentDist > 50) {
+                        console.log(`[COMBAT] Entrambi fuori range: ${currentDist}km. Annullamento attacco ${id_attacco}`);
                         await db.query(`UPDATE attacco SET status = 'ended' WHERE id_attacco = $1`, [id_attacco]);
                         await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
                         
@@ -490,12 +503,136 @@ const processActiveCombats = async () => {
                             const p = mObj.match.player.find(x => x.username === attackerPlayer);
                             if (p && p.armate && p.armate[id_attaccante]) {
                                 p.armate[id_attaccante].status = 'standby';
-                                delete p.armate[id_attaccante].targetName;
                                 delete p.armate[id_attaccante].next_round_time;
                             }
                             return { save: true, matchObj: mObj };
                         });
-                        continue; // Passa al prossimo scontro
+                        continue;
+                    }
+
+                    // Se il difensore è fuori portata e l'attaccante sta sparando, il difensore cerca di avvicinarsi
+                    if (defenderOutOfRange && !attackerOutOfRange) {
+                        console.log(`[TACTICAL] Difensore ${defenderArmy.id} fuori range (${currentDist} > ${defRange}), si avvicina a ${attackerArmy.id}`);
+                        // Spostiamo il difensore di 5 km verso l'attaccante in questo round
+                        const t = 5.0 / currentDist;
+                        if (t < 1) {
+                            const newLng = defLoc[0] + (attLoc[0] - defLoc[0]) * t;
+                            const newLat = defLoc[1] + (attLoc[1] - defLoc[1]) * t;
+                            await updateMatch(id_partita_hash, (mObj) => {
+                                const p = mObj.match.player.find(x => x.username === defenderPlayer);
+                                if (p && p.armate && p.armate[currentTargetArmataId]) {
+                                    p.armate[currentTargetArmataId].currentLocation = `${newLng},${newLat}`;
+                                }
+                                return { save: true, matchObj: mObj };
+                            });
+                        }
+                    } else if (attackerOutOfRange && !defenderOutOfRange) {
+                        // Se l'attaccante è fuori portata, si avvicina lui
+                        const t = 5.0 / currentDist;
+                        if (t < 1) {
+                            const newLng = attLoc[0] + (defLoc[0] - attLoc[0]) * t;
+                            const newLat = attLoc[1] + (defLoc[1] - attLoc[1]) * t;
+                            await updateMatch(id_partita_hash, (mObj) => {
+                                const p = mObj.match.player.find(x => x.username === attackerPlayer);
+                                if (p && p.armate && p.armate[id_attaccante]) {
+                                    p.armate[id_attaccante].currentLocation = `${newLng},${newLat}`;
+                                }
+                                return { save: true, matchObj: mObj };
+                            });
+                        }
+                    }
+
+                    // --- CHECK RITIRATA STRATEGICA ---
+                    // Definiamo originalMaxHp se non c'è
+                    if (!defenderArmy.originalMaxHp) {
+                        defenderArmy.originalMaxHp = getArmyMaxHp(defenderArmy);
+                        await updateMatch(id_partita_hash, (mObj) => {
+                            const p = mObj.match.player.find(x => x.username === defenderPlayer);
+                            if (p && p.armate && p.armate[currentTargetArmataId]) {
+                                p.armate[currentTargetArmataId].originalMaxHp = defenderArmy.originalMaxHp;
+                            }
+                            return { save: true, matchObj: mObj };
+                        });
+                    }
+                    
+                    const currentHp = defenderArmy.hp || getArmyMaxHp(defenderArmy);
+                    const lossRatio = 1 - (currentHp / (defenderArmy.originalMaxHp || 1));
+                    
+                    if (lossRatio >= 0.65) {
+                        // Controlliamo inferiorità numerica approssimativa tramite HP totale
+                        const attackerHp = attackerArmy.hp || getArmyMaxHp(attackerArmy);
+                        if (currentHp < attackerHp) {
+                            console.log(`[TACTICAL] Ritirata strategica innescata per ${defenderArmy.id} (perdite: ${(lossRatio*100).toFixed(1)}%, inferiorità)`);
+                            
+                            // Calcola la rotta di fuga (città alleata più vicina)
+                            const { calculatePath, getNodeCoords } = require('./movementLogic.js');
+                            let nearestCity = null;
+                            let minDist = Infinity;
+                            
+                            const defPlayerObj = matchObj.match.player.find(x => x.username === defenderPlayer);
+                            if (defPlayerObj && defPlayerObj.territori_dict) {
+                                for (const regions of Object.values(defPlayerObj.territori_dict)) {
+                                    for (const city of regions) {
+                                        const cCoords = getNodeCoords(city);
+                                        if (cCoords) {
+                                            const d = haversineDist(defLoc[0], defLoc[1], cCoords[0], cCoords[1]);
+                                            if (d < minDist) {
+                                                minDist = d;
+                                                nearestCity = { name: city, coords: cCoords };
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            let retreatPath = [];
+                            if (nearestCity) {
+                                retreatPath = await calculatePath(defLoc[0], defLoc[1], nearestCity.coords[0], nearestCity.coords[1], getArmyDomain(defenderArmy), getArmyType(defenderArmy));
+                            }
+                            
+                            await updateMatch(id_partita_hash, (mObj) => {
+                                const p = mObj.match.player.find(x => x.username === defenderPlayer);
+                                if (p && p.armate && p.armate[currentTargetArmataId]) {
+                                    p.armate[currentTargetArmataId].status = 'retreating';
+                                    if (retreatPath && retreatPath.length > 0) {
+                                        p.armate[currentTargetArmataId].path = retreatPath;
+                                        p.armate[currentTargetArmataId].startTime = new Date().toISOString();
+                                        p.armate[currentTargetArmataId].targetName = nearestCity.name;
+                                    }
+                                }
+                                return { save: true, matchObj: mObj };
+                            });
+
+                            // Emit websocket per chiedere se l'attaccante vuole inseguire
+                            const broadcastPayload = {
+                                matchId: id_partita_hash,
+                                payload: {
+                                    type: 'TACTICAL_DECISION_REQUIRED',
+                                    payload: {
+                                        decisionType: 'PURSUIT',
+                                        attacker: attackerPlayer,
+                                        defender: defenderPlayer,
+                                        attackerArmyId: id_attaccante,
+                                        defenderArmyId: currentTargetArmataId,
+                                        message: `L'armata nemica ${defenderArmy.name || currentTargetArmataId} sta fuggendo (perdite eccessive). Vuoi inseguirla e provare a distruggerla?`
+                                    }
+                                }
+                            };
+                            await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+
+                            await updateMatch(id_partita_hash, (mObj) => {
+                                const p = mObj.match.player.find(x => x.username === defenderPlayer);
+                                if (p && p.armate && p.armate[currentTargetArmataId]) {
+                                    p.armate[currentTargetArmataId].status = 'retreating';
+                                }
+                                return { save: true, matchObj: mObj };
+                            });
+                            
+                            // Fine combattimento (la ritirata scioglie l'ingaggio corrente a meno che non insegua)
+                            await db.query(`UPDATE attacco SET status = 'ended' WHERE id_attacco = $1`, [id_attacco]);
+                            await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
+                            continue;
+                        }
                     }
                 }
             } else if (id_target_citta) {
@@ -528,13 +665,13 @@ const processActiveCombats = async () => {
             const cityAlreadyFallen = id_target_citta && existingCityHp <= 0;
 
             if (cityAlreadyFallen && currentTargetArmataId && defenderArmy) {
-                 damageToArmy = totalDmg;
+                 damageToArmy = attackerOutOfRange ? 0 : totalDmg;
                  damageToCity = 0;
             } else if (currentTargetArmataId && defenderArmy && id_target_citta) {
                  damageToCity = Math.floor(totalDmg / 3);
                  damageToArmy = totalDmg - damageToCity;
             } else if (currentTargetArmataId && defenderArmy) {
-                 damageToArmy = totalDmg;
+                 damageToArmy = attackerOutOfRange ? 0 : totalDmg;
                  damageToCity = 0;
             } else if (id_target_citta) {
                  damageToArmy = 0;
@@ -564,9 +701,37 @@ const processActiveCombats = async () => {
                     const { updateElo } = require('./eloEngine.js');
                     await updateElo(id_partita_hash, attackerPlayer, defenderPlayer);
                     
+                    
                     if (!id_target_citta) {
                         combatEnded = true;
+                        
+                        // Ripresa degli ordini per il vincitore (Attaccante)
+                        if (attackerArmy.resumableTargetCoords || attackerArmy.resumableTargetName) {
+                            console.log(`[RESUME] L'attaccante ${attackerArmy.id} riprende la missione verso ${attackerArmy.resumableTargetName}`);
+                            const { calculatePath, getArmyLocation } = require('./movementLogic.js');
+                            const loc = getArmyLocation(attackerArmy);
+                            if (loc) {
+                                const path = await calculatePath(loc[0], loc[1], attackerArmy.resumableTargetCoords[0], attackerArmy.resumableTargetCoords[1], getArmyDomain(attackerArmy), getArmyType(attackerArmy));
+                                await updateMatch(id_partita_hash, (mObj) => {
+                                    const p = mObj.match.player.find(x => x.username === attackerPlayer);
+                                    if (p && p.armate && p.armate[id_attaccante]) {
+                                        const a = p.armate[id_attaccante];
+                                        a.status = a.resumableMissionMode || 'moving';
+                                        a.targetName = a.resumableTargetName;
+                                        a.targetCoords = a.resumableTargetCoords;
+                                        a.missionMode = a.resumableMissionMode;
+                                        a.path = path;
+                                        a.startTime = new Date().toISOString();
+                                        delete a.resumableTargetName;
+                                        delete a.resumableTargetCoords;
+                                        delete a.resumableMissionMode;
+                                    }
+                                    return { save: true, matchObj: mObj };
+                                });
+                            }
+                        }
                     } else {
+
                         await db.query(`UPDATE attacco SET id_target_armata = NULL WHERE id_attacco = $1`, [id_attacco]);
                     }
                 } else {
@@ -593,7 +758,7 @@ const processActiveCombats = async () => {
                     });
                     
                     const oldAttackerComposition = JSON.parse(JSON.stringify(attackerArmy.composition));
-                    let counterDmg = calculateArmyDamage(defenderArmy);
+                    let counterDmg = defenderOutOfRange ? 0 : calculateArmyDamage(defenderArmy);
                     attackerDied = applyDamageToArmy(attackerArmy, counterDmg);
                     
                     if (attackerDied) {
@@ -1133,7 +1298,77 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
     }
 };
 
+
+const setupInterceptCombat = async (armyA, armyB, id_partita_hash) => {
+    try {
+        const db = require('../../shared/postgresClient.js');
+        const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
+        const { getArmyLocation } = require('./movementLogic.js');
+        
+        let matchObj = await getMatch(id_partita_hash);
+        if (!matchObj || !matchObj.match) return;
+
+        const processArmyHalt = async (army) => {
+            if (army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto alla conquista" || army.status === "Pronto all'attacco") {
+                const loc = getArmyLocation(army);
+                if (loc) {
+                    await updateMatch(id_partita_hash, (mObj) => {
+                        const p = mObj.match.player.find(x => x.username === army.owner);
+                        if (p && p.armate && p.armate[army.id]) {
+                            const a = p.armate[army.id];
+                            a.resumableTargetName = a.targetName;
+                            a.resumableTargetCoords = a.targetCoords;
+                            a.resumableMissionMode = a.missionMode || a.status;
+                            a.resumablePath = a.path;
+                            a.currentLocation = loc.join(',');
+                            a.status = 'in combattimento';
+                            delete a.path;
+                            delete a.etaMs;
+                            delete a.startTime;
+                            delete a.targetName;
+                            delete a.targetCoords;
+                            delete a.missionMode;
+                        }
+                        return { save: true, matchObj: mObj };
+                    });
+                }
+            } else {
+                await updateMatch(id_partita_hash, (mObj) => {
+                    const p = mObj.match.player.find(x => x.username === army.owner);
+                    if (p && p.armate && p.armate[army.id]) {
+                        p.armate[army.id].status = 'in combattimento';
+                    }
+                    return { save: true, matchObj: mObj };
+                });
+            }
+        };
+
+        await processArmyHalt(armyA);
+        await processArmyHalt(armyB);
+
+        // We need the internal integer partita_id
+        const pRes = await db.query('SELECT id_partita FROM partite WHERE id_partita_hash = $1', [id_partita_hash]);
+        if (pRes.rows.length === 0) return;
+        const partita_id = pRes.rows[0].id_partita;
+
+        const mossaRes = await db.query(`INSERT INTO mosse (partita_id, id_armata, type_action, action_data) VALUES ($1, $2, 'atk', '{}') RETURNING id_mossa`, [partita_id, armyA.id]);
+        const id_mossa = mossaRes.rows[0].id_mossa;
+
+        const newNextRoundDate = new Date(Date.now() + 3000);
+        
+        await db.query(`
+            INSERT INTO attacco (id_mossa, partita_id, id_attaccante, id_target_armata, next_round_time)
+            VALUES ($1, $2, $3, $4, $5)
+        `, [id_mossa, partita_id, armyA.id, armyB.id, newNextRoundDate]);
+        
+        console.log(`[INTERCEPT] Creato combattimento automatico tra ${armyA.id} e ${armyB.id} (Mossa: ${id_mossa})`);
+    } catch (e) {
+        console.error("Errore in setupInterceptCombat:", e);
+    }
+};
+
 module.exports = {
+    setupInterceptCombat,
     startCombatLoop,
     setupCombatFromArrival,
     processActiveCombats,

@@ -416,7 +416,8 @@ const createMatch = async ({ playerId, gameMode }) => {
     // A. Controllo Pre-Flight (Check partite attive dell'host)
     const activeMatches = await db.query(
       `SELECT count(p.id_partita) FROM partite p 
-       WHERE p.id_host = $1 AND substring(p.struttura_partita::text from 1 for 2) IN ('00', '01');`,
+       JOIN partecipanti_partite pp ON p.id_partita = pp.partita_id
+       WHERE p.id_host = $1 AND pp.user_id = $1 AND substring(p.struttura_partita::text from 1 for 2) IN ('00', '01');`,
       [playerId],
     );
 

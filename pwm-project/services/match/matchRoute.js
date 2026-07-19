@@ -20,4 +20,6 @@ router.get("/:id/alliance", matchController.getAlliance);
 router.post("/:id/join/:id_alliance", matchController.JoinAlliance);
 router.post("/:id/leave/:id_alliance", matchController.LeaveAlliance);
 router.post("/:id/kick/:id_alliance", matchController.KickAlliance);
+router.post("/:id/tactical-decision", matchController.tacticalDecision);
+
 module.exports = router;

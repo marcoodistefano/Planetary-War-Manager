@@ -541,4 +541,114 @@ const getRegionAtCoords = (lng, lat) => {
     return null;
 };
 
-module.exports = { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, getRegionIdByName, calculateCurrentPosition, getArmyLocation, haversineDist, getRegionAtCoords };
+const validateSeaCrossing = async (player, armata, loc, startLng, startLat, targetLng, targetLat, targetName, isValid) => {
+    const rulesObj = await getGameRulesCached(redis);
+    if (!rulesObj) return;
+    const truppeSheet = rulesObj.sheets.find(s => s.name === "Truppe" || s.name === "truppe");
+    const truppeLines = truppeSheet ? truppeSheet.lines : [];
+
+    // Validazione per unità navali
+    let hasNavalUnits = false;
+    for (const [unitId, qty] of Object.entries(armata.composition || {})) {
+        if (!qty || qty <= 0) continue;
+        const uRule = truppeLines.find(line => line.id_truppa === unitId);
+        if (uRule && uRule.dominio === 2) {
+            hasNavalUnits = true;
+            break;
+        }
+    }
+
+    if (hasNavalUnits) {
+        if (!isValid) {
+            throw new Error("Spostamento via terra non consentito per unità navali.");
+        }
+        return;
+    }
+
+    const LAND_UNIT_IDS = ['fante', 'lmv', 'apc', 'speciali', 'carro_armato', 'sam_mobile', 'artiglieria'];
+    let totalLandWeight = 0;
+    let hasLandUnits = false;
+    for (const [unitId, qty] of Object.entries(armata.composition || {})) {
+        const uRule = truppeLines.find(line => line.id_truppa === unitId);
+        if (uRule && uRule.dominio === 1) {
+            hasLandUnits = true;
+            totalLandWeight += qty * (uRule.peso_truppa || 0);
+        }
+    }
+
+    if (!hasLandUnits) return;
+
+    const crossesWater = !isValid && (startLng !== targetLng || startLat !== targetLat);
+
+    if (crossesWater) {
+        let startRegionId = null;
+        if (loc && typeof loc === 'string' && !loc.includes(',')) {
+            startRegionId = getRegionForNode(loc);
+        } else {
+            startRegionId = getRegionAtCoords(startLng, startLat);
+        }
+
+        if (!startRegionId) {
+            throw new Error("Impossibile determinare la regione di partenza.");
+        }
+
+        const adjData = await redis.get('map_data:regions_adjacency');
+        if (!adjData) {
+            throw new Error("Dati di adiacenza delle regioni non trovati.");
+        }
+        const adjacency = JSON.parse(adjData);
+
+        const startEntry = Object.values(adjacency).find(entry => entry.provCode === startRegionId || entry.id === startRegionId);
+        if (!startEntry) {
+            throw new Error("Impossibile trovare la configurazione della regione di partenza.");
+        }
+
+        const neighborCodes = startEntry.neighbors.map(neighborIndex => adjacency[neighborIndex].provCode || adjacency[neighborIndex].id);
+        const adjacentRegionIds = [startRegionId, ...neighborCodes];
+
+        const hasPort = player.strutture && player.strutture.some(s => 
+            s.status === 'built' && 
+            s.structureId.startsWith('porto_t') && 
+            adjacentRegionIds.includes(s.regionId)
+        );
+
+        if (!hasPort) {
+            throw new Error("Movimento via mare non consentito: nessun porto disponibile nella regione di partenza o limitrofe.");
+        }
+
+        let totalTransportCapacity = 0;
+        for (const army of Object.values(player.armate || {})) {
+            let armyRegionId = null;
+            let armyLoc = army.currentLocation;
+            if (armyLoc && typeof armyLoc === 'string') {
+                if (armyLoc.includes(',')) {
+                    const pts = armyLoc.split(',').map(s => parseFloat(s.trim()));
+                    if (pts.length === 2 && !isNaN(pts[0])) {
+                        armyRegionId = getRegionAtCoords(pts[0], pts[1]);
+                    }
+                } else {
+                    armyRegionId = getRegionForNode(armyLoc);
+                }
+            } else if (armyLoc && armyLoc.x !== undefined) {
+                armyRegionId = getRegionAtCoords(armyLoc.x, armyLoc.y);
+            } else if (Array.isArray(armyLoc) && armyLoc.length >= 2) {
+                armyRegionId = getRegionAtCoords(armyLoc[0], armyLoc[1]);
+            }
+
+            if (armyRegionId && adjacentRegionIds.includes(armyRegionId)) {
+                for (const [unitId, qty] of Object.entries(army.composition || {})) {
+                    const uRule = truppeLines.find(line => line.id_truppa === unitId);
+                    if (uRule && uRule.dominio === 2 && uRule.peso_trasportabile > 0) {
+                        totalTransportCapacity += qty * uRule.peso_trasportabile;
+                    }
+                }
+            }
+        }
+
+        if (totalTransportCapacity < totalLandWeight) {
+            throw new Error(`Capacità di trasporto insufficiente: necessiti di ${totalLandWeight} tonnellate, ma hai solo ${totalTransportCapacity} disponibili nei porti adiacenti.`);
+        }
+    }
+};
+
+module.exports = { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, getRegionIdByName, calculateCurrentPosition, getArmyLocation, haversineDist, getRegionAtCoords, validateSeaCrossing };

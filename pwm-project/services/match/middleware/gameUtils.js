@@ -6,6 +6,7 @@ let troopsAttackRangeMap = {};
 let troopsDomainMap = {};
 let radarRadiusMap = {};
 let defaultVisionRadius = 100; // Using 100 as the global default for vision
+let territoryVisionRadius = 600; // Ridotto a 600km come compromesso tra regioni enormi (Russia/Canada) e regioni piccole (Europa)
 
 try {
     const rulesPath = path.join(__dirname, '../../../shared/assets/game_rules.json');
@@ -101,5 +102,6 @@ module.exports = {
     isAirArmy,
     isStealthArmy,
     radarRadiusMap,
-    defaultVisionRadius
+    defaultVisionRadius,
+    territoryVisionRadius
 };
