@@ -394,6 +394,21 @@ END $$;
 -- ==========================================
 -- INDEXES E PERMESSI
 -- ==========================================
+CREATE TABLE IF NOT EXISTS statistiche_match (
+    id SERIAL PRIMARY KEY,
+    utente_id UUID NOT NULL REFERENCES utenti(id_user) ON DELETE CASCADE,
+    partita_id UUID NOT NULL REFERENCES partite(id_partita) ON DELETE CASCADE,
+    kills INT DEFAULT 0,
+    deaths INT DEFAULT 0,
+    territories INT DEFAULT 0,
+    capitals INT DEFAULT 0,
+    esito VARCHAR(20) DEFAULT 'perso',
+    elo_delta INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_statistiche_utente_partita UNIQUE (utente_id, partita_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_statistiche_utente ON statistiche_match(utente_id);
 CREATE INDEX IF NOT EXISTS idx_truppe_geo ON truppe(x, y);
 CREATE INDEX IF NOT EXISTS idx_armata_geo ON armata(x, y);
 CREATE INDEX IF NOT EXISTS idx_messaggi_partita ON messaggi(id_partita, time_stamp);

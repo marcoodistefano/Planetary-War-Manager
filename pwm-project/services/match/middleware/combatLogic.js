@@ -139,6 +139,22 @@ const addToGraveyard = async (id_partita_hash, playerUsername, armyData, destroy
         // node-redis has lPush!
         await redis.lPush(graveyardKey, JSON.stringify(record));
         await redis.lTrim(graveyardKey, 0, 99);
+
+        // Calcola quante unità sono state perse/uccise
+        let unitsLost = 0;
+        if (armyData.composition) {
+            for (const cnt of Object.values(armyData.composition)) {
+                unitsLost += (Number(cnt) || 0);
+            }
+        }
+        if (unitsLost <= 0) unitsLost = 1;
+
+        // Traccia contatori in Redis per le statistiche del match:
+        // match:{hash}:stats:{username} -> HINCRBY deaths / kills
+        await redis.hIncrBy(`match:${id_partita_hash}:stats:${playerUsername}`, 'deaths', unitsLost);
+        if (destroyedBy && destroyedBy !== 'Sconosciuto' && destroyedBy !== 'Esplosione Nucleare' && !destroyedBy.includes('_bot')) {
+            await redis.hIncrBy(`match:${id_partita_hash}:stats:${destroyedBy}`, 'kills', unitsLost);
+        }
     } catch (e) {
         console.error("Errore salvataggio nel cimitero:", e);
     }

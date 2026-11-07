@@ -112,33 +112,13 @@ const checkMatchesState = async () => {
             }
 
             if (hasWinnerByThreshold || isTimeout) {
-                // Termina la partita -> aggiorna il DB e REDIS a STATO.TERMINATA (0b10)
-                let newMatchBigInt = (BigInt("0b" + match.struct) & ~(0b11n << 54n)) | (0b10n << 54n);
-                const newStructStr = newMatchBigInt.toString(2).padStart(56, "0");
+                const finalWinner = winnerAlliance ? `Alleanza ${winnerAlliance}` : winnerPlayer;
+                const endReason = hasWinnerByThreshold ? 'THRESHOLD_REACHED' : 'TIMEOUT';
 
-                await client.query(`UPDATE partite SET struttura_partita = $1::bit(56) WHERE id_partita_hash = $2`, [newStructStr, matchHashId]);
+                console.log(`[MATCH_ENGINE] Partita ${matchHashId} completata. Avvio closeMatch con esito: ${finalWinner}`);
                 
-                await updateMatch(matchHashId, (matchObj) => {
-                    matchObj.match.struttura_partita = newStructStr;
-                    matchObj.match.caratteristiche.stato = "Terminata";
-                    matchObj.match.caratteristiche.vincitore = winnerAlliance ? `Alleanza ${winnerAlliance}` : winnerPlayer;
-                    return { save: true, matchObj, data: true };
-                });
-
-                console.log(`[MATCH_ENGINE] Partita ${matchHashId} TERMINATA. Vincitore: ${winnerAlliance || winnerPlayer}`);
-
-                // Broadcast
-                await redis.publish('match_ws_broadcast_channel', JSON.stringify({
-                    matchId: matchHashId,
-                    payload: {
-                        type: 'MATCH_ENDED',
-                        data: {
-                            winnerPlayer,
-                            winnerAlliance,
-                            reason: hasWinnerByThreshold ? 'THRESHOLD_REACHED' : 'TIMEOUT'
-                        }
-                    }
-                }));
+                const { closeMatch } = require('../matchModel.js');
+                await closeMatch(matchHashId, endReason, finalWinner);
             }
         }
 

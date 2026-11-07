@@ -1,5 +1,6 @@
 const authModel = require("../models/authModel.js");
 const redisClient = require("../../shared/redisClient.js");
+const { extractTokenFromRequest } = require("../../shared/authContext.js");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 
@@ -192,6 +193,39 @@ const recoveryPasswordToken = async (req, res) => {
 
 const logout = async (req, res) => {
   try {
+    const token = extractTokenFromRequest(req);
+    let sessionId = null;
+    let userId = null;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        sessionId = decoded?.jti || null;
+        userId = decoded?.sub || null;
+      } catch (tokenErr) {
+        // Se il token è scaduto o non valido, proviamo comunque a leggere il payload decodificato senza verificare la scadenza
+        const decodedUnverified = jwt.decode(token);
+        if (decodedUnverified && typeof decodedUnverified === "object") {
+          sessionId = decodedUnverified.jti || null;
+          userId = decodedUnverified.sub || null;
+        }
+      }
+
+      if (sessionId) {
+        await redisClient.del(`session:${sessionId}`);
+        if (userId) {
+          await redisClient.sRem(`user_sessions:${userId}`, sessionId);
+        }
+      }
+
+      // Rimuoviamo la sessione di accesso anche dal DB se presente
+      try {
+        await authModel.deleteAccessSessionByCookieToken(token);
+      } catch (dbErr) {
+        console.error("Errore rimozione access session DB:", dbErr.message);
+      }
+    }
+
     res.clearCookie('auth_token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

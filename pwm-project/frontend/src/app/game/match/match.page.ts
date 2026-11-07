@@ -1275,6 +1275,24 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.matchState.disconnect();
             this.router.navigate(['/home']);
           }
+
+          if (parsed.type === 'MATCH_ENDED') {
+            const data = parsed.data || {};
+            const winner = data.winner || 'Nessuno';
+            const reason = data.reason === 'TIMEOUT' ? 'Tempo scaduto' : 'Soglia territori raggiunta';
+            this.toastCtrl.create({
+              message: `Partita terminata! Vincitore: ${winner} (${reason})`,
+              duration: 5000,
+              position: 'middle',
+              color: 'warning'
+            }).then(t => t.present());
+
+            this.shouldReconnect = false;
+            setTimeout(() => {
+              this.matchState.disconnect();
+              this.router.navigate(['/home']);
+            }, 4000);
+          }
         }); // Chiude la sottoscrizione ai messaggi
 
         if (this.connStatusSub) {

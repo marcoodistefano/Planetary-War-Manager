@@ -249,15 +249,51 @@ const buildHome = async (U_ID) => {
       return { status: 404, error: "Utente non trovato" };
     }
 
-    // 2. Simulazione statistiche belliche (In futuro le prenderai da una tabella 'statistiche_match')
-    // Ad esempio: Kills, Morti, Territori conquistati
+    // 2. Statistiche belliche reali dalla tabella statistiche_match
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS statistiche_match (
+        id SERIAL PRIMARY KEY,
+        utente_id UUID NOT NULL REFERENCES utenti(id_user) ON DELETE CASCADE,
+        partita_id UUID NOT NULL REFERENCES partite(id_partita) ON DELETE CASCADE,
+        kills INT DEFAULT 0,
+        deaths INT DEFAULT 0,
+        territories INT DEFAULT 0,
+        capitals INT DEFAULT 0,
+        esito VARCHAR(20) DEFAULT 'perso',
+        elo_delta INT DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_statistiche_utente_partita UNIQUE (utente_id, partita_id)
+      )
+    `);
+
+    const statsQuery = await db.query(
+      `SELECT
+         COALESCE(SUM(kills), 0)::int AS kills,
+         COALESCE(SUM(deaths), 0)::int AS deaths,
+         COALESCE(SUM(territories), 0)::int AS territories,
+         COALESCE(SUM(capitals), 0)::int AS capitals,
+         COUNT(*) FILTER (WHERE esito = 'vinto')::int AS wins,
+         COUNT(*)::int AS total_matches,
+         COALESCE(
+           ROUND(
+             COUNT(*) FILTER (WHERE esito = 'vinto')::numeric
+             / NULLIF(COUNT(*), 0) * 100, 1
+           ),
+           0.0
+         )::float AS win_rate
+       FROM statistiche_match
+       WHERE utente_id = $1`,
+      [U_ID]
+    );
+
+    const sRow = statsQuery.rows[0] || {};
     const stats = {
-      win_rate: 65, 
-      kills: 15420,
-      deaths: 8430,
-      territories: 142,
-      capitals: 12,
-      elo_history: [1100, 1250, 1200, 1380, 1450] // Andamento ELO
+      win_rate: sRow.win_rate !== undefined ? sRow.win_rate : 0,
+      kills: sRow.kills || 0,
+      deaths: sRow.deaths || 0,
+      territories: sRow.territories || 0,
+      capitals: sRow.capitals || 0,
+      elo_history: [user.elo_rating || 1000] // Cronologia o ELO attuale
     };
 
     return { 
@@ -356,6 +392,41 @@ const getFriendPendingRequests = async (U_ID) => {
     return { status: 500, error: "Errore durante il recupero delle richieste di amicizia in sospeso" };
   }
 };
+const checkFriendshipOrPending = async (userA, userB) => {
+  const idUserA = userA < userB ? userA : userB;
+  const idUserB = userA < userB ? userB : userA;
+
+  // 1. Verifica se sono già amici
+  const friendCheck = await db.query(
+    `SELECT 1 FROM amici WHERE id_user = $1 AND id_amico = $2 LIMIT 1`,
+    [idUserA, idUserB]
+  );
+  if (friendCheck && friendCheck.rowCount > 0) {
+    return { exists: true, reason: "friendship_exists", error: "Siete già amici" };
+  }
+
+  // 2. Verifica se esiste già una richiesta pendente in una delle due direzioni
+  const pendingCheck = await db.query(
+    `SELECT id_user FROM richieste_amici 
+     WHERE ((id_user = $1 AND id_target = $2) OR (id_user = $2 AND id_target = $1)) 
+       AND status = 'pending' 
+     LIMIT 1`,
+    [userA, userB]
+  );
+  if (pendingCheck && pendingCheck.rowCount > 0) {
+    const isSender = pendingCheck.rows[0].id_user === userA;
+    return {
+      exists: true,
+      reason: "request_pending",
+      error: isSender
+        ? "Hai già inviato una richiesta di amicizia a questo utente"
+        : "Questo utente ti ha già inviato una richiesta di amicizia"
+    };
+  }
+
+  return { exists: false };
+};
+
 const sendFriendRequest_byCode = async (username_utente, friendId) => {
   try {
     // username_utente is actually the authenticated user's id (id_user).
@@ -369,12 +440,20 @@ const sendFriendRequest_byCode = async (username_utente, friendId) => {
       return { status: 400, error: "Impossibile inviare richiesta a se stessi" };
     }
 
+    const check = await checkFriendshipOrPending(username_utente, destinatarioId);
+    if (check.exists) {
+      return { status: 409, error: check.error, code: check.reason };
+    }
+
     const result = await db.query(
       `INSERT INTO richieste_amici (id_user, id_target, status) VALUES ($1, $2, 'pending') RETURNING id_request;`,
       [username_utente, destinatarioId]
     );
     return { status: 200, data: { message: "Richiesta di amicizia inviata con successo", req_id: result.rows[0].id_request } };
   } catch (error) {
+    if (error.code === '23505') {
+      return { status: 409, error: "Richiesta di amicizia già esistente", code: "request_pending" };
+    }
     console.error("Errore in sendFriendRequest_byCode:", error);
     return { status: 500, error: "Errore durante l'invio della richiesta di amicizia" };
   }
@@ -391,12 +470,20 @@ const sendFriendRequest_byUsername = async (username_utente, username_destinatar
       return { status: 400, error: "Impossibile inviare richiesta a se stessi" };
     }
 
+    const check = await checkFriendshipOrPending(username_utente, destinatarioId);
+    if (check.exists) {
+      return { status: 409, error: check.error, code: check.reason };
+    }
+
     const result = await db.query(
       `INSERT INTO richieste_amici (id_user, id_target, status) VALUES ($1, $2, 'pending') RETURNING id_request;`,
       [username_utente, destinatarioId]
     );
     return { status: 200, data: { message: "Richiesta di amicizia inviata con successo", req_id: result.rows[0].id_request } };
   } catch (error) {
+    if (error.code === '23505') {
+      return { status: 409, error: "Richiesta di amicizia già esistente", code: "request_pending" };
+    }
     console.error("Errore in sendFriendRequest_byUsername:", error);
     return { status: 500, error: "Errore durante l'invio della richiesta di amicizia" };
   }

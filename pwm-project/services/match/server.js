@@ -759,6 +759,39 @@ const startArrivalEngine = () => {
         }
     }, 1000);
 };
+// Ripristino stato partite da snapshot DB se non presenti in Redis
+const restoreActiveMatchesState = async () => {
+    console.log("[SYSTEM] Controllo e ripristino partite attive da DB a Redis...");
+    try {
+        const activeMatches = await db.query(
+            "SELECT id_partita, id_partita_hash, stato_partita_json FROM partite WHERE substring(struttura_partita::text from 1 for 2) = '01'"
+        );
+
+        for (const row of activeMatches.rows) {
+            const hash = row.id_partita_hash;
+            const existingInRedis = await getMatch(hash);
+            
+            // Se Redis non ha lo stato in memoria ma c'è uno snapshot JSON salvato
+            if (!existingInRedis && row.stato_partita_json) {
+                try {
+                    const savedState = typeof row.stato_partita_json === 'string'
+                        ? JSON.parse(row.stato_partita_json)
+                        : row.stato_partita_json;
+
+                    if (savedState && savedState.match) {
+                        await updateMatch(hash, () => ({ save: true, matchObj: savedState }));
+                        console.log(`[SYSTEM] Ripristinato stato completo partita ${hash} da snapshot DB.`);
+                    }
+                } catch (e) {
+                    console.error(`[SYS_ERR] Impossibile ripristinare snapshot JSON per ${hash}:`, e.message);
+                }
+            }
+        }
+    } catch (err) {
+        console.error("[SYS_ERR] Errore ripristino partite attive da DB:", err.message);
+    }
+};
+
 // Caricamento in Redis
 const restoreActiveMoves = async () => {
     console.log("[SYSTEM] Avvio ripristino mosse attive da DB a Redis...");
@@ -869,6 +902,7 @@ const restoreActiveMoves = async () => {
 };
 
 loadMinimumPathToRedis(MINIMUM_PATH_FILE).then(async () => {
+    await restoreActiveMatchesState();
     await restoreActiveMoves();
     server.listen(PORT, () => {
         console.log(`[SYSTEM] Microservizio MATCH operativo su porta ${PORT} (HTTP + WS)`);

@@ -1976,6 +1976,246 @@ const leaveMatch = async (playerId, matchId) => {
   }
 };
 
+/**
+ * Pulizia di tutte le chiavi Redis temporanee associate a un match tramite SCAN iterativo.
+ * Evita il comando KEYS in produzione per non bloccare l'event loop di Redis.
+ */
+const cleanupMatchRedisKeys = async (matchIdentifiers) => {
+  if (!Array.isArray(matchIdentifiers) || matchIdentifiers.length === 0) return 0;
+  let totalDeleted = 0;
+
+  for (const identifier of matchIdentifiers) {
+    if (!identifier) continue;
+    const patterns = [
+      `match:${identifier}*`,
+      `combattimenti:${identifier}*`,
+      `spostamenti:${identifier}*`,
+      `processing:${identifier}*`
+    ];
+
+    for (const pattern of patterns) {
+      try {
+        let cursor = '0';
+        do {
+          const reply = await redis.scan(cursor, { MATCH: pattern, COUNT: 100 });
+          // Il client node-redis v4+ restituisce { cursor: string|number, keys: string[] }
+          // ioredis o tuple restituiscono [newCursor, keys]
+          let nextCursor = '0';
+          let keysFound = [];
+
+          if (Array.isArray(reply)) {
+            nextCursor = String(reply[0]);
+            keysFound = reply[1] || [];
+          } else if (reply && typeof reply === 'object') {
+            nextCursor = String(reply.cursor ?? '0');
+            keysFound = reply.keys || [];
+          }
+
+          if (keysFound.length > 0) {
+            await redis.del(...keysFound);
+            totalDeleted += keysFound.length;
+          }
+
+          cursor = nextCursor;
+        } while (cursor !== '0');
+      } catch (scanErr) {
+        // Fallback sicuro se lo SCAN fallisce per differenze di driver/mock
+        try {
+          const directKeys = await redis.keys(pattern);
+          if (directKeys && directKeys.length > 0) {
+            await redis.del(...directKeys);
+            totalDeleted += directKeys.length;
+          }
+        } catch (keysErr) {
+          console.error(`[CLEANUP_REDIS] Fallback keys error per pattern ${pattern}:`, keysErr.message);
+        }
+      }
+    }
+  }
+
+  return totalDeleted;
+};
+
+/**
+ * Chiusura formale del match (M2-D):
+ * 1. Aggiorna lo stato in DB ('conclusa' / bitmask '10' terminata)
+ * 2. Assegna variazioni ELO tra vincitore e partecipanti ranked
+ * 3. Notifica WS broadcast (MATCH_ENDED) con classifica
+ * 4. Cleanup chiavi temporanee Redis
+ */
+const closeMatch = async (matchId, reason = 'THRESHOLD_REACHED', explicitWinner = null) => {
+  const client = await db.connect();
+  try {
+    const matchRowRes = await client.query(`
+      SELECT id_partita, id_partita_hash, id_partita_visualizzato,
+             struttura_partita::text AS struct, has_elo, id_host
+      FROM partite
+      WHERE id_partita_hash = $1
+         OR id_partita_visualizzato = $1
+         OR id_partita::text = $1
+      LIMIT 1
+    `, [matchId]);
+
+    if (matchRowRes.rows.length === 0) {
+      return { success: false, error: 'Match non trovato' };
+    }
+
+    const matchRow = matchRowRes.rows[0];
+    const uuid = matchRow.id_partita;
+    const matchHash = matchRow.id_partita_hash;
+    const matchVisual = matchRow.id_partita_visualizzato;
+
+    // Recupera lo stato da Redis prima della pulizia
+    const { getMatch } = require('../shared/matchMonolithic.js');
+    const matchData = await getMatch(matchHash);
+
+    const players = (matchData && matchData.match && matchData.match.player) ? matchData.match.player : [];
+
+    // Calcolo punteggi / territori per determinare classifica
+    const leaderboard = players.map(p => {
+      let territoriesCount = 0;
+      if (p.territori_dict) {
+        for (const admin in p.territori_dict) {
+          territoriesCount += p.territori_dict[admin].length;
+        }
+      } else if (p.territori) {
+        territoriesCount = p.territori.length;
+      }
+
+      return {
+        username: p.username,
+        userId: p.id_user || null,
+        territories: territoriesCount,
+        allianceId: p.id_alleanza || null,
+        isBot: String(p.username).includes('_bot')
+      };
+    }).sort((a, b) => b.territories - a.territories);
+
+    let winnerUsername = explicitWinner;
+    if (!winnerUsername && leaderboard.length > 0) {
+      winnerUsername = leaderboard[0].username;
+    }
+
+    // Se tutti hanno abbandonato o non ci sono giocatori
+    const isAbandoned = leaderboard.length === 0 || leaderboard.every(p => p.username.startsWith('Abbandonato_'));
+    const finalReason = isAbandoned ? 'ABANDONED' : reason;
+
+    // 1. Aggiorna DB: stato a '10' (terminata) o '11' (se abbandonata da tutti)
+    let stateBits = isAbandoned ? 0b11n : 0b10n;
+    let newMatchBigInt = (BigInt('0b' + matchRow.struct) & ~(0b11n << 54n)) | (stateBits << 54n);
+    const newStructStr = newMatchBigInt.toString(2).padStart(56, '0');
+
+    await client.query(
+      `UPDATE partite SET struttura_partita = $1::bit(56) WHERE id_partita = $2`,
+      [newStructStr, uuid]
+    );
+
+    // 2. Calcolo ELO per i giocatori rimasti e persistenza statistiche match
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS statistiche_match (
+        id SERIAL PRIMARY KEY,
+        utente_id UUID NOT NULL REFERENCES utenti(id_user) ON DELETE CASCADE,
+        partita_id UUID NOT NULL REFERENCES partite(id_partita) ON DELETE CASCADE,
+        kills INT DEFAULT 0,
+        deaths INT DEFAULT 0,
+        territories INT DEFAULT 0,
+        capitals INT DEFAULT 0,
+        esito VARCHAR(20) DEFAULT 'perso',
+        elo_delta INT DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_statistiche_utente_partita UNIQUE (utente_id, partita_id)
+      )
+    `);
+
+    if (matchRow.has_elo && winnerUsername && !winnerUsername.includes('_bot') && !isAbandoned) {
+      const { updateElo } = require('./middleware/eloEngine.js');
+      for (const p of leaderboard) {
+        if (p.username !== winnerUsername && !p.isBot && !p.username.startsWith('Abbandonato_')) {
+          try {
+            await updateElo(matchHash, winnerUsername, p.username);
+          } catch (eloErr) {
+            console.error(`[CLOSE_MATCH] Errore aggiornamento ELO ${winnerUsername} vs ${p.username}:`, eloErr.message);
+          }
+        }
+      }
+    }
+
+    // 2b. Salvataggio contatori e statistiche di combattimento in statistiche_match per ciascun partecipante
+    for (const p of leaderboard) {
+      if (p.isBot || !p.username || p.username.startsWith('Abbandonato_')) continue;
+      try {
+        let uId = p.userId;
+        if (!uId) {
+          const uRes = await client.query('SELECT id_user FROM utenti WHERE username = $1 LIMIT 1', [p.username]);
+          if (uRes.rows.length > 0) uId = uRes.rows[0].id_user;
+        }
+
+        if (uId) {
+          // Legge contatori da Redis (match:{hash}:stats:{username})
+          const statsKey = `match:${matchHash}:stats:${p.username}`;
+          const redisStats = await redis.hGetAll(statsKey);
+          const kills = Number(redisStats?.kills) || 0;
+          const deaths = Number(redisStats?.deaths) || 0;
+          const esito = (p.username === winnerUsername) ? 'vinto' : 'perso';
+
+          await client.query(`
+            INSERT INTO statistiche_match (utente_id, partita_id, kills, deaths, territories, capitals, esito, elo_delta, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+            ON CONFLICT (utente_id, partita_id)
+            DO UPDATE SET kills = EXCLUDED.kills, deaths = EXCLUDED.deaths, territories = EXCLUDED.territories, esito = EXCLUDED.esito, created_at = NOW()
+          `, [uId, uuid, kills, deaths, p.territories, 0, esito, 0]);
+        }
+      } catch (statsErr) {
+        console.error(`[CLOSE_MATCH] Errore salvataggio statistiche per ${p.username}:`, statsErr.message);
+      }
+    }
+
+    // 3. Notifica WS Broadcast a tutti i client
+    try {
+      const broadcastPayload = {
+        matchId: matchHash,
+        payload: {
+          type: 'MATCH_ENDED',
+          data: {
+            matchId: matchHash,
+            winner: winnerUsername,
+            reason: finalReason,
+            leaderboard: leaderboard.map(l => ({ username: l.username, territories: l.territories }))
+          }
+        }
+      };
+      await redis.publish('match_ws_broadcast_channel', JSON.stringify(broadcastPayload));
+    } catch (wsErr) {
+      console.error('[CLOSE_MATCH] Errore broadcast MATCH_ENDED:', wsErr.message);
+    }
+
+    // 4. Routine di Cleanup Redis dopo una breve tolleranza (5 secondi) per permettere ai socket di ricevere l'evento
+    setTimeout(async () => {
+      try {
+        const identifiers = [matchHash, matchVisual, uuid];
+        const deletedCount = await cleanupMatchRedisKeys(identifiers);
+        console.log(`[CLOSE_MATCH] Cleanup Redis completato per partita ${matchHash}. Chiavi rimosse: ${deletedCount}`);
+      } catch (cleanupErr) {
+        console.error('[CLOSE_MATCH] Errore durante cleanup Redis:', cleanupErr.message);
+      }
+    }, 5000);
+
+    return {
+      success: true,
+      matchId: matchHash,
+      winner: winnerUsername,
+      reason: finalReason,
+      leaderboard
+    };
+
+  } catch (error) {
+    console.error('[CLOSE_MATCH] Errore critico:', error);
+    return { success: false, error: error.message };
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   authorizeWsConnection,
   createMatch,
@@ -1989,5 +2229,7 @@ module.exports = {
   leaveAlliance,
   kickAlliance,
   getGraveyard,
-  leaveMatch
+  leaveMatch,
+  cleanupMatchRedisKeys,
+  closeMatch
 };

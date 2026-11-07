@@ -16,40 +16,114 @@ const db = new Pool({
 });
 
 async function performDump() {
-    const partiteAttive = await redis.keys('modificati:*');
-    
-    for (const key of partiteAttive) {
-        const partitaId = key.split(':')[1];
-        const processingKey = `processing:${partitaId}`;
-        await redis.rename(key, processingKey).catch(() => null); 
-        
-        const ids = await redis.smembers(processingKey);
-        if (ids.length === 0) continue;
-
-        const rows = [];
-        for (const id of ids) {
-            const data = await redis.hgetall(`truppa:${id}`);
-            const currentX = data.targetX || data.x || 0;
-            const currentY = data.targetY || data.y || 0;
-            
-            rows.push([id, partitaId, data.user_id, data.tipo, currentX, currentY, data.alt || 0, data.rot || 0, data.hp || 100, data.stato || 1]);
-        }
-
-        const sql = format(
-            `INSERT INTO truppe (id_istanza_truppa, partita_id, user_id, id_modello, x, y, alt, rot, hp, stato) 
-             VALUES %L 
-             ON CONFLICT (id_istanza_truppa) 
-             DO UPDATE SET x=EXCLUDED.x, y=EXCLUDED.y, stato=EXCLUDED.stato`,
-            rows
+    try {
+        // 1. DUMP MONOLITICO REDIS -> DB PER TUTTE LE PARTITE ATTIVE
+        const activeMatches = await db.query(
+            "SELECT id_partita, id_partita_hash FROM partite WHERE substring(struttura_partita::text from 1 for 2) = '01'"
         );
-        
-        try {
-            await db.query(sql);
-            await redis.del(processingKey); 
-            console.log(`Sincronizzate ${ids.length} truppe per partita ${partitaId}`);
-        } catch(e) {
-            console.error("Errore DB. Mantengo la coda in processing.", e);
+
+        if (activeMatches.rows.length > 0) {
+            const { getMatch } = require('./services/shared/matchMonolithic.js');
+
+            for (const match of activeMatches.rows) {
+                const matchId = match.id_partita_hash;
+                const matchDbId = match.id_partita;
+
+                try {
+                    const matchObj = await getMatch(matchId);
+                    if (!matchObj || !matchObj.match || !matchObj.match.player) continue;
+
+                    const rows = [];
+                    for (const player of matchObj.match.player) {
+                        const truppe = player.truppe || {};
+                        const armate = player.armate || {};
+
+                        // Se ci sono record in player.truppe
+                        for (const [tId, tData] of Object.entries(truppe)) {
+                            if (!tData || typeof tData !== 'object') continue;
+                            const modelId = tData.type || tData.id_modello || 'fante';
+                            const hp = Number(tData.hp) || 100;
+                            const idArmata = tData.id_armata || null;
+                            let x = 0;
+                            let y = 0;
+                            if (idArmata && armate[idArmata] && armate[idArmata].currentLocation) {
+                                const loc = armate[idArmata].currentLocation;
+                                x = typeof loc.x === 'number' ? loc.x : (Array.isArray(loc) ? loc[0] : 0);
+                                y = typeof loc.y === 'number' ? loc.y : (Array.isArray(loc) ? loc[1] : 0);
+                            }
+                            // UUID check/fallback per id_istanza_truppa
+                            const truppaUuid = (tId && tId.length === 36) ? tId : null;
+                            if (truppaUuid && player.id_user) {
+                                rows.push([
+                                    truppaUuid,
+                                    matchDbId,
+                                    player.id_user,
+                                    modelId,
+                                    idArmata && idArmata.length === 36 ? idArmata : null,
+                                    x,
+                                    y,
+                                    0, // alt
+                                    0, // rot
+                                    hp,
+                                    '000' // stato bit(3)
+                                ]);
+                            }
+                        }
+                    }
+
+                    if (rows.length > 0) {
+                        const sql = format(
+                            `INSERT INTO truppe (id_istanza_truppa, partita_id, user_id, id_modello, id_armata, x, y, alt, rot, hp, stato) 
+                             VALUES %L 
+                             ON CONFLICT (id_istanza_truppa) 
+                             DO UPDATE SET x=EXCLUDED.x, y=EXCLUDED.y, hp=EXCLUDED.hp, stato=EXCLUDED.stato, id_armata=EXCLUDED.id_armata, last_update=NOW()`,
+                            rows
+                        );
+                        await db.query(sql);
+                    }
+                } catch (dumpErr) {
+                    console.error(`[SYNC_WORKERS] Errore sync truppe per partita ${matchId}:`, dumpErr.message);
+                }
+            }
         }
+
+        // 2. RETROCOMPATIBILITÀ: code 'modificati:*' se presenti da engine secondari
+        const partiteAttiveKeys = await redis.keys('modificati:*');
+        for (const key of partiteAttiveKeys) {
+            const partitaId = key.split(':')[1];
+            const processingKey = `processing:${partitaId}`;
+            await redis.rename(key, processingKey).catch(() => null); 
+            
+            const ids = await redis.smembers(processingKey);
+            if (ids.length === 0) continue;
+
+            const legacyRows = [];
+            for (const id of ids) {
+                const data = await redis.hgetall(`truppa:${id}`);
+                const currentX = data.targetX || data.x || 0;
+                const currentY = data.targetY || data.y || 0;
+                
+                legacyRows.push([id, partitaId, data.user_id, data.tipo, currentX, currentY, data.alt || 0, data.rot || 0, data.hp || 100, '000']);
+            }
+
+            if (legacyRows.length > 0) {
+                const sqlLegacy = format(
+                    `INSERT INTO truppe (id_istanza_truppa, partita_id, user_id, id_modello, x, y, alt, rot, hp, stato) 
+                     VALUES %L 
+                     ON CONFLICT (id_istanza_truppa) 
+                     DO UPDATE SET x=EXCLUDED.x, y=EXCLUDED.y, hp=EXCLUDED.hp, stato=EXCLUDED.stato, last_update=NOW()`,
+                    legacyRows
+                );
+                try {
+                    await db.query(sqlLegacy);
+                    await redis.del(processingKey); 
+                } catch(e) {
+                    console.error("Errore DB per legacy modificati:", e.message);
+                }
+            }
+        }
+    } catch (e) {
+        console.error("[SYNC_WORKERS] Errore generale performDump:", e);
     }
 }
 
