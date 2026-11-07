@@ -1,0 +1,61 @@
+<section class="order-center" aria-label="Centro ordini">
+  <header class="order-center-header">
+    <div>
+      <span class="order-eyebrow">CONTROLLO OPERATIVO</span>
+      <h2>CENTRO ORDINI</h2>
+      <p>{{ activeOrders.length }} missioni attive</p>
+    </div>
+    <button class="icon-button" (click)="close.emit()" title="Chiudi centro ordini" aria-label="Chiudi centro ordini">
+      <ion-icon name="close-outline"></ion-icon>
+    </button>
+  </header>
+
+  <nav class="order-filters" aria-label="Filtra ordini">
+    <button [class.active]="statusFilter === 'all'" (click)="statusFilter = 'all'">TUTTI</button>
+    <button [class.active]="statusFilter === 'moving'" (click)="statusFilter = 'moving'">MOVIMENTO</button>
+    <button [class.active]="statusFilter === 'combat'" (click)="statusFilter = 'combat'">COMBATTIMENTO</button>
+    <button [class.active]="statusFilter === 'returning'" (click)="statusFilter = 'returning'">RIENTRO</button>
+  </nav>
+
+  <div class="order-list" *ngIf="displayedOrders.length > 0; else noOrders">
+    <article class="order-card" *ngFor="let army of displayedOrders">
+      <div class="order-card-heading">
+        <div class="order-icon"><ion-icon [name]="getStatusIcon(army)"></ion-icon></div>
+        <div class="order-title">
+          <strong>{{ army.name || army.id }}</strong>
+          <span>{{ getMissionLabel(army) }}</span>
+        </div>
+        <span class="order-status">{{ getStatusLabel(army) }}</span>
+      </div>
+
+      <div class="order-details">
+        <div><span>DESTINAZIONE</span><strong>{{ army.targetName || 'Posizione attuale' }}</strong></div>
+        <div><span>ETA</span><strong>{{ getEtaLabel(army) }}</strong></div>
+        <div><span>UNITA</span><strong>{{ getArmyTotal(army) | number }}</strong></div>
+      </div>
+
+      <div class="order-event" *ngIf="getLastEvent(army) as event">
+        <ion-icon name="pulse-outline"></ion-icon>
+        <span>{{ event.label }}</span>
+        <time>{{ event.timestamp }}</time>
+      </div>
+
+      <div class="order-actions">
+        <button (click)="centerOnArmy.emit(army.id)" title="Centra sulla mappa">
+          <ion-icon name="locate-outline"></ion-icon> MAPPA
+        </button>
+        <button class="cancel-order" (click)="cancelMission.emit(army.id)" title="Annulla missione">
+          <ion-icon name="close-circle-outline"></ion-icon> ANNULLA
+        </button>
+      </div>
+    </article>
+  </div>
+
+  <ng-template #noOrders>
+    <div class="empty-orders">
+      <ion-icon name="checkmark-done-outline"></ion-icon>
+      <strong>Nessun ordine attivo</strong>
+      <span>Le nuove missioni appariranno qui.</span>
+    </div>
+  </ng-template>
+</section>

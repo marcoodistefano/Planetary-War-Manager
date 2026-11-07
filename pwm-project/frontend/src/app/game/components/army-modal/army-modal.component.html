@@ -91,8 +91,57 @@
                 </div>
               </div>
 
-              <button class="primary-glow" (click)="createArmy()" [disabled]="!selectedTroopKey || !(availableTroops[selectedTroopKey] > 0)">
+              <button class="ghost-action composition-add" (click)="addTroopToComposition()"
+                [disabled]="!selectedTroopKey || !(availableTroops[selectedTroopKey] > 0)"
+                title="Aggiungi questa unita alla formazione">
+                <ion-icon name="add-outline"></ion-icon> AGGIUNGI ALLA FORMAZIONE
+              </button>
+
+              <div class="composition-builder" *ngIf="armyCompositionEntries.length > 0">
+                <div class="composition-builder-header">
+                  <span>COMPOSIZIONE FORMAZIONE</span>
+                  <strong>{{ armyCompositionEntries.length }} tipi</strong>
+                </div>
+                <div class="composition-builder-row" *ngFor="let troop of armyCompositionEntries">
+                  <span>{{ troop[0] }}</span>
+                  <strong>{{ troop[1] | number }}</strong>
+                  <button class="remove-composition" (click)="removeTroopFromComposition(troop[0])"
+                    title="Rimuovi dalla formazione" aria-label="Rimuovi dalla formazione">
+                    <ion-icon name="close-outline"></ion-icon>
+                  </button>
+                </div>
+              </div>
+
+              <div class="formation-templates">
+                <div class="formation-template-head">
+                  <span>TEMPLATE FORMAZIONE</span>
+                  <small>Salva una composizione riutilizzabile.</small>
+                </div>
+                <div class="formation-template-controls">
+                  <input [(ngModel)]="templateName" type="text" placeholder="Nome template">
+                  <button class="template-save" (click)="saveFormationTemplate()"
+                    [disabled]="!templateName.trim() || armyCompositionEntries.length === 0" title="Salva template">
+                    <ion-icon name="save-outline"></ion-icon>
+                  </button>
+                </div>
+                <div class="formation-template-controls" *ngIf="formationTemplates.length > 0">
+                  <select [(ngModel)]="selectedTemplateName" (ngModelChange)="loadFormationTemplate($event)">
+                    <option value="">Carica template...</option>
+                    <option *ngFor="let template of formationTemplates" [value]="template.name">{{ template.name }}</option>
+                  </select>
+                  <button class="template-delete" (click)="deleteFormationTemplate()" [disabled]="!selectedTemplateName" title="Elimina template">
+                    <ion-icon name="trash-outline"></ion-icon>
+                  </button>
+                </div>
+              </div>
+
+              <button class="primary-glow" (click)="createArmy()" [disabled]="armyCompositionEntries.length === 0">
                 CREA NUOVA ARMATA
+              </button>
+              <button class="reinforce-action" *ngIf="selectedArmy && (selectedArmy.status === 'standby' || selectedArmy.state === 'standby')"
+                (click)="reinforceSelectedArmy()" [disabled]="armyCompositionEntries.length === 0">
+                <ion-icon name="add-circle-outline"></ion-icon>
+                RINFORZA {{ selectedArmy.name || 'ARMATA ATTIVA' }}
               </button>
             </section>
 
@@ -100,6 +149,22 @@
               <div class="army-list-header">
                 <p class="track-label">Armate Disponibili</p>
                 <span class="status-msg">Gestisci e sciogli le unità.</span>
+              </div>
+
+              <div class="merge-builder" *ngIf="mergeCandidates.length > 0">
+                <div>
+                  <span class="merge-label">FUSIONE ARMATE</span>
+                  <small>Seleziona un'armata nella stessa posizione di quella attiva.</small>
+                </div>
+                <select [(ngModel)]="mergeTargetArmyId">
+                  <option value="">Scegli destinazione...</option>
+                  <option *ngFor="let candidate of mergeCandidates" [value]="candidate.id">
+                    {{ candidate.name || candidate.id }}
+                  </option>
+                </select>
+                <button class="primary-glow slim" (click)="mergeSelectedArmies()" [disabled]="!mergeTargetArmyId">
+                  <ion-icon name="git-merge-outline"></ion-icon> FONDI
+                </button>
               </div>
 
               <div class="army-grid army-grid--wide" *ngIf="myArmies.length > 0; else emptyArmyState">
@@ -145,6 +210,7 @@
                   <div class="army-actions">
                     <button class="ghost-action" (click)="selectArmy(army.id)">APRI</button>
                     <button class="ghost-action" (click)="centerOnArmyMap(army)">MAPPA</button>
+                    <button class="ghost-action" *ngIf="army.status === 'standby' || army.state === 'standby'" (click)="splitArmy(army.id)" title="Dividi l'armata a metà">DIVIDI</button>
                     <button class="danger-action" *ngIf="isArmyMoving(army)" (click)="cancelMovement(army.id)">ANNULLA</button>
                     <button class="danger-action" *ngIf="!isArmyMoving(army)" (click)="disbandArmy(army.id)">SCIOGLI</button>
                   </div>

@@ -1,0 +1,51 @@
+<section class="combat-center" *ngIf="hasCombatContent" aria-label="Centro combattimento">
+  <header class="combat-header">
+    <div>
+      <span class="combat-eyebrow">SITUAZIONE TATTICA</span>
+      <h2>COMBATTIMENTI ATTIVI</h2>
+    </div>
+    <ion-icon name="flash-outline"></ion-icon>
+  </header>
+
+  <article class="combat-card" *ngFor="let army of activeCombats">
+    <div class="combat-card-title">
+      <div>
+        <strong>{{ army.name || army.id }}</strong>
+        <span>Ingaggio in corso</span>
+      </div>
+      <span class="combat-status">{{ getNextRoundLabel(army) }}</span>
+    </div>
+
+    <div class="combat-stats">
+      <div><span>HP</span><strong>{{ getHpLabel(army) }}</strong></div>
+      <div><span>UNITA</span><strong>{{ getArmyUnits(army) | number }}</strong></div>
+      <div><span>BERSAGLIO</span><strong>{{ army.targetName || 'Nemico rilevato' }}</strong></div>
+        <div><span>DISTANZA</span><strong>{{ getCombatDistance(army) }}</strong></div>
+        <div><span>GITTATA</span><strong>{{ getCombatRange(army) }}</strong></div>
+    </div>
+
+    <div class="combat-event" *ngIf="getLatestEvent(army) as event">
+      <ion-icon name="pulse-outline"></ion-icon>
+      <span>{{ event.attacker }} / {{ event.defender }}: {{ event.damage }} danni, {{ event.result }}</span>
+    </div>
+
+    <div class="combat-actions">
+      <button class="retreat-button" (click)="retreat.emit(army.id)" title="Ritirati dal combattimento">
+        <ion-icon name="return-up-back-outline"></ion-icon> RITIRATI
+      </button>
+    </div>
+  </article>
+
+  <article class="decision-card" *ngFor="let decision of tacticalDecisions">
+    <span class="combat-eyebrow">DECISIONE RICHIESTA</span>
+    <strong>{{ decision.message }}</strong>
+    <div>
+      <button class="pursue-button" (click)="tacticalDecision.emit({ decision, choice: 'PURSUE' })">
+        INSEGUI
+      </button>
+      <button class="hold-button" (click)="tacticalDecision.emit({ decision, choice: 'HOLD' })">
+        MANTIENI POSIZIONE
+      </button>
+    </div>
+  </article>
+</section>

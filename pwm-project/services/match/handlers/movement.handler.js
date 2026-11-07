@@ -2,6 +2,35 @@ const redis = require('../../shared/redisClient.js');
 const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
 const Eru = require('../middleware/Eru.js');
 const { calculatePath, validateSeaCrossing, getNodeCoords, getRegionForNode, calculateCurrentPosition } = require('../middleware/movementLogic.js');
+const { randomUUID } = require('crypto');
+const { ArmyState, isArmyMoving, isArmyInCombat, setArmyState } = require('../middleware/armyState.js');
+
+const COMMAND_CLAIM_TTL_SECONDS = 86400;
+
+const ORDER_ERROR_CODES = Object.freeze({
+    MATCH_NOT_FOUND: 'MATCH_NOT_FOUND',
+    MATCH_NOT_STARTED: 'MATCH_NOT_STARTED',
+    ARMY_NOT_FOUND: 'ARMY_NOT_FOUND',
+    INVALID_ORIGIN: 'INVALID_ORIGIN',
+    INVALID_DESTINATION: 'INVALID_DESTINATION',
+    PATH_VALIDATION_FAILED: 'PATH_VALIDATION_FAILED',
+    ALLY_TARGET: 'ALLY_TARGET',
+    ARMY_RESUPPLY: 'ARMY_RESUPPLY',
+    ORDER_NOT_APPLIED: 'ORDER_NOT_APPLIED'
+});
+
+function sendOrderError(ws, code, error) {
+    return ws.send(JSON.stringify({ type: 'ERROR', code, error }));
+}
+
+async function claimMovementCommand(matchId, username, commandId) {
+    const key = `match:${matchId}:command:${username}:${commandId}`;
+    const claimed = await redis.set(key, JSON.stringify({ status: 'processing', commandId }), {
+        NX: true,
+        EX: COMMAND_CLAIM_TTL_SECONDS
+    });
+    return { key, claimed: claimed === 'OK' };
+}
 
 async function handlePreviewMissions(ws, payload) {
     const missions = payload.payload.missions;
@@ -33,8 +62,7 @@ async function handlePreviewMissions(ws, payload) {
         }
 
         let currentPathInfo = null;
-        const armyState = armata.status;
-        if ((armyState === 'moving' || armyState === 'moving_to_border' || armyState === "Pronto alla conquista") && armata.path && armata.path.length > 1 && armata.startTime && armata.etaMs) {
+        if (isArmyMoving(armata) && armata.path && armata.path.length > 1 && armata.startTime && armata.etaMs) {
             const currentPos = calculateCurrentPosition(armata.path, armata.startTime, armata.etaMs);
             if (currentPos) {
                 startLng = currentPos.lng;
@@ -76,13 +104,33 @@ async function handlePreviewMissions(ws, payload) {
                     errorMessage = err.message;
                 }
 
+                const targetRegionId = getRegionForNode(targetName) || targetName;
+                const targetNation = matchData.match.player.find(n =>
+                    n.username !== ws.username &&
+                    n.isOccupied &&
+                    n.territori_dict &&
+                    Object.values(n.territori_dict).some(list => list.includes(targetRegionId))
+                );
+                const requiresWarDeclaration = Boolean(
+                    targetNation && !targetNation.inWarWith?.includes(ws.username)
+                );
+                const warnings = [];
+                if (!isValid) warnings.push('route_invalid');
+                if (requiresWarDeclaration) warnings.push('war_declaration_required');
+
                 results.push({
                     armyId,
                     path: pathInfo.path,
                     etaMs: pathInfo.etaMs,
                     distanceKm: pathInfo.distance,
+                    routeType: pathInfo.routeType || 'automatic',
                     isValid: isValid,
                     error: errorMessage,
+                    warnings,
+                    requiresWarDeclaration,
+                    arrivalCombat: {
+                        possible: Boolean(targetNation || mission.mode === 'conquer')
+                    },
                     originalMission: mission
                 });
             } catch(e) {
@@ -96,19 +144,21 @@ async function handlePreviewMissions(ws, payload) {
 
 async function handleMoveTroops(ws, payload, userId) {
     const { armyId, targetName, targetCoords, waypoints, mode } = payload.payload;
+    const commandId = payload.payload.commandId || randomUUID();
+    const missionType = payload.payload.type || (mode === 'conquer' ? 'conquer' : 'move');
 
     const matchData = await getMatch(ws.matchId);
     if (!matchData || !matchData.match || !matchData.match.player) {
-        return ws.send(JSON.stringify({ type: 'ERROR', error: 'Partita non trovata' }));
+        return sendOrderError(ws, ORDER_ERROR_CODES.MATCH_NOT_FOUND, 'Partita non trovata');
     }
 
     if (!matchData.match.struttura_partita || !matchData.match.struttura_partita.startsWith('01')) {
-        return ws.send(JSON.stringify({ type: 'ERROR', error: 'La partita non è ancora iniziata.' }));
+        return sendOrderError(ws, ORDER_ERROR_CODES.MATCH_NOT_STARTED, 'La partita non è ancora iniziata.');
     }
 
     const player = matchData.match.player.find(p => p.username === ws.username);
     if (!player || !player.armate || !player.armate[armyId]) {
-        return ws.send(JSON.stringify({ type: 'ERROR', error: 'Armata non trovata' }));
+        return sendOrderError(ws, ORDER_ERROR_CODES.ARMY_NOT_FOUND, 'Armata non trovata');
     }
 
     const armata = player.armate[armyId];
@@ -129,12 +179,11 @@ async function handleMoveTroops(ws, payload, userId) {
     }
 
     if (startLng === undefined || startLat === undefined) {
-        return ws.send(JSON.stringify({ type: 'ERROR', error: 'Coordinate di partenza invalide' }));
+        return sendOrderError(ws, ORDER_ERROR_CODES.INVALID_ORIGIN, 'Coordinate di partenza invalide');
     }
 
     let currentPathInfo = null;
-    const armyState = armata.status;
-    if ((armyState === 'moving' || armyState === 'moving_to_border' || armyState === "Pronto alla conquista") && armata.path && armata.path.length > 1 && armata.startTime && armata.etaMs) {
+    if (isArmyMoving(armata) && armata.path && armata.path.length > 1 && armata.startTime && armata.etaMs) {
         const currentPos = calculateCurrentPosition(armata.path, armata.startTime, armata.etaMs);
         if (currentPos) {
             startLng = currentPos.lng;
@@ -159,7 +208,7 @@ async function handleMoveTroops(ws, payload, userId) {
         if (nodeCoords) { targetLng = nodeCoords[0]; targetLat = nodeCoords[1]; parsedTargetCoords = [targetLng, targetLat]; }
     }
     if (targetLng === undefined || targetLat === undefined) {
-        return ws.send(JSON.stringify({ type: 'ERROR', error: 'Coordinate di destinazione invalide' }));
+        return sendOrderError(ws, ORDER_ERROR_CODES.INVALID_DESTINATION, 'Coordinate di destinazione invalide');
     }
 
     let matchMultiplier = 1;
@@ -176,7 +225,15 @@ async function handleMoveTroops(ws, payload, userId) {
         await validateSeaCrossing(player, armata, loc, startLng, startLat, targetLng, targetLat, targetName, pathInfo.isValid);
     } catch (e) {
         console.error("Errore durante calculatePath o validazione:", e);
-        return ws.send(JSON.stringify({ type: 'ERROR', error: e.message || 'Errore validazione percorso' }));
+        return sendOrderError(ws, ORDER_ERROR_CODES.PATH_VALIDATION_FAILED, e.message || 'Errore validazione percorso');
+    }
+
+    const commandClaim = await claimMovementCommand(ws.matchId, ws.username, commandId);
+    if (!commandClaim.claimed) {
+        return ws.send(JSON.stringify({
+            type: 'ORDER_DUPLICATE',
+            data: { commandId, armyId }
+        }));
     }
 
     let targetPlayerId = null;
@@ -201,7 +258,7 @@ async function handleMoveTroops(ws, payload, userId) {
             const isAlly = movingAllianceId && defenderAllianceId && String(movingAllianceId) === String(defenderAllianceId);
 
             if (isAlly) {
-                return { save: false, data: { error: 'Non puoi attaccare un membro della tua alleanza!' } };
+                return { save: false, data: { code: ORDER_ERROR_CODES.ALLY_TARGET, error: 'Non puoi attaccare un membro della tua alleanza!' } };
             }
 
             isAttack = true;
@@ -217,7 +274,7 @@ async function handleMoveTroops(ws, payload, userId) {
                     const movingAllianceId = movingPlayer ? movingPlayer.id_alleanza : null;
                     const defAllianceId = n.id_alleanza || null;
                     if (movingAllianceId && defAllianceId && String(movingAllianceId) === String(defAllianceId)) {
-                        return { save: false, data: { error: 'Non puoi attaccare un membro della tua alleanza!' } };
+                        return { save: false, data: { code: ORDER_ERROR_CODES.ALLY_TARGET, error: 'Non puoi attaccare un membro della tua alleanza!' } };
                     }
                     isAttack = true;
                     targetPlayerId = n.username;
@@ -252,12 +309,13 @@ async function handleMoveTroops(ws, payload, userId) {
         if (!p || !p.armate || !p.armate[armyId]) return { save: false };
 
         if (p.armate[armyId].cooldownUntil && Date.now() < p.armate[armyId].cooldownUntil) {
-            return { save: false, data: { error: 'L\'armata è in fase di rifornimento e non può decollare.' } };
+            return { save: false, data: { code: ORDER_ERROR_CODES.ARMY_RESUPPLY, error: 'L\'armata è in fase di rifornimento e non può decollare.' } };
         }
 
         p.armate[armyId].startingLocation = `${startLng},${startLat}`;
         p.armate[armyId].currentLocation = `${startLng},${startLat}`;
         p.armate[armyId].status = (isAttack || (isAttack && pathInfo.path.length > 0)) ? "Pronto alla conquista" : "moving";
+        setArmyState(p.armate[armyId], ArmyState.MOVING);
         p.armate[armyId].targetCoords = parsedTargetCoords || targetCoords;
         p.armate[armyId].targetName = targetName;
         p.armate[armyId].missionMode = mode;
@@ -274,12 +332,33 @@ async function handleMoveTroops(ws, payload, userId) {
     }
 
     if (updRes && (updRes.error || (updRes.data && updRes.data.error))) {
+        await redis.del(commandClaim.key);
         const errMessage = updRes.error || updRes.data.error;
-        return ws.send(JSON.stringify({ type: 'ERROR', error: errMessage }));
+        const errorCode = updRes.code || updRes.data.code || ORDER_ERROR_CODES.ORDER_NOT_APPLIED;
+        return sendOrderError(ws, errorCode, errMessage);
+    }
+
+    if (!updRes || !updRes.data || !updRes.data.armata) {
+        await redis.del(commandClaim.key);
+        return ws.send(JSON.stringify({
+            type: 'ERROR',
+            code: ORDER_ERROR_CODES.ORDER_NOT_APPLIED,
+            error: 'Ordine non applicato. Riprova.'
+        }));
     }
 
     if (updRes && updRes.data && updRes.data.armata) {
         const armataObj = updRes.data.armata;
+
+        ws.send(JSON.stringify({
+            type: 'ORDER_ACCEPTED',
+            data: {
+                commandId,
+                armyId,
+                type: missionType,
+                status: 'accepted'
+            }
+        }));
 
         // Redis is the source of truth, SQL is handled by snapshotEngine.
         const broadcastPayload = {
@@ -287,8 +366,11 @@ async function handleMoveTroops(ws, payload, userId) {
             payload: {
                 type: 'TROOPS_MOVED',
                 data: {
+                    commandId,
                     userId,
                     armyId,
+                    state: armataObj.state,
+                    type: missionType,
                     targetName,
                     targetCoords,
                     etaMs: pathInfo.etaMs,
@@ -312,11 +394,12 @@ async function handleCancelMission(ws, payload, userId) {
 
         const army = player.armate[armyId];
 
-        if (army.status === 'in combattimento') {
+        if (isArmyInCombat(army)) {
             army.status = 'standby';
+            setArmyState(army, ArmyState.STANDBY);
             delete army.targetName; delete army.targetCoords; delete army.missionMode; delete army.next_round_time;
             return { save: true, matchObj, data: { action: 'combat_cancelled', army } };
-        } else if (army.status === 'moving' || army.status === 'moving_to_border' || army.status === "Pronto alla conquista") {
+        } else if (isArmyMoving(army)) {
             const now = Date.now();
             let elapsed = 0; let returnPath = []; let currentLng, currentLat;
             if (army.path && army.path.length > 1 && army.startTime && army.etaMs) {
@@ -332,12 +415,14 @@ async function handleCancelMission(ws, payload, userId) {
                 }
             } else {
                 army.status = 'standby';
+                setArmyState(army, ArmyState.STANDBY);
                 delete army.path; delete army.startTime; delete army.etaMs; delete army.targetCoords; delete army.targetName; delete army.missionMode;
                 return { save: true, matchObj, data: { action: 'aborted', army } };
             }
             const returnEtaMs = Math.floor(elapsed);
             army.currentLocation = `${currentLng},${currentLat}`; army.path = returnPath; army.startTime = now; army.etaMs = returnEtaMs;
             army.targetCoords = returnPath[returnPath.length - 1]; army.targetName = "Ritorno"; army.status = 'moving';
+            setArmyState(army, ArmyState.RETURNING);
             return { save: true, matchObj, data: { action: 'returning', army, now, returnEtaMs } };
         }
         return { save: false };

@@ -4,6 +4,7 @@ const redis = require("../shared/redisClient.js"); // Client Redis collegato
 const Eru = require("./middleware/Eru.js");
 const territoryGenerator = require("./middleware/territoryGenerator.js");
 const troopGenerator = require("./middleware/troopGenerator.js");
+const { ArmyState, setArmyState } = require('./middleware/armyState.js');
 const { randomUUID } = require("crypto");
 
 let hasAbbandonoAlleanzaAtColumnCache = null;
@@ -1925,6 +1926,7 @@ const leaveMatch = async (playerId, matchId) => {
               if (player.armate) {
                   for (const armataId of Object.keys(player.armate)) {
                       player.armate[armataId].status = 'standby';
+                      setArmyState(player.armate[armataId], ArmyState.STANDBY);
                       delete player.armate[armataId].path;
                       delete player.armate[armataId].etaMs;
                       delete player.armate[armataId].startTime;

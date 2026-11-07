@@ -19,6 +19,8 @@ import { InGameChatComponent } from '../components/in-game-chat/in-game-chat.com
 import { TechTreeComponent } from '../components/tech-tree/tech-tree.component';
 import { MarketModalComponent } from '../components/market-modal/market-modal.component';
 import { ArmyModalComponent } from '../components/army-modal/army-modal.component';
+import { OrderCenterComponent } from '../components/order-center/order-center.component';
+import { CombatCenterComponent } from '../components/combat-center/combat-center.component';
 
 declare var maplibregl: any;
 declare var topojson: any;
@@ -42,7 +44,9 @@ const AVATAR_ASSET_VERSION = '20260517';
     InGameChatComponent,
     TechTreeComponent,
     MarketModalComponent,
-    ArmyModalComponent
+    ArmyModalComponent,
+    OrderCenterComponent,
+    CombatCenterComponent
   ]
 })
 export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
@@ -55,6 +59,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   public destinationMarker: any = null;
   public isPreviewValid: boolean = true;
   public previewError: string | null = null;
+  public previewWarnings: string[] = [];
+  public previewRouteType = 'automatic';
+  public previewRequiresWarDeclaration = false;
+  public showWarDeclarationConfirm = false;
   public currentPreviewPath: [number, number][] = [];
   @ViewChild(ArmyModalComponent) armyModalComponent!: ArmyModalComponent;
   @ViewChild(InGameChatComponent) chatComponent!: InGameChatComponent;
@@ -120,6 +128,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   // Gestione modali sovrapposte
   isBuildPanelOpen = false;
   isArmyModalOpen = false;
+  isOrderCenterOpen = false;
   initialArmyTab: any = 'management';
   isRecruitModalOpen = false;
   isStructureModalOpen = false;
@@ -129,6 +138,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   isRankingsModalOpen = false;
   isChatOpen = false;
   tacticalDecisions: any[] = [];
+  combatEvents: any[] = [];
 
   get myCapitalName(): string {
     if (!this.matchNations || !this.userProfile) return '';
@@ -202,8 +212,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   selectedArmyId = '';
   selectedArmiesForMovement: string[] = [];
   previousSelectedArmiesForMovement: string[] = [];
+  orderEvents: Record<string, Array<{ label: string; timestamp: string }>> = {};
+  armyGroups: Array<{ name: string; armyIds: string[] }> = [];
+  groupName = '';
+  selectedGroupName = '';
+  missionQueues: Record<string, any[]> = {};
+  previewEtaByArmyId: Record<string, number> = {};
+  synchronizedMissionTimers: ReturnType<typeof setTimeout>[] = [];
   animationFrameId: any;
   activeArmyPopup: any = null;
+  private lastMovingPathsUpdateAt = 0;
+  private lastMovingPathsSignature = '';
 
   getArmyModelAssetUrl(army: any, direction: 'front' | 'back' | 'side' | 'side-flip'): string {
     let modelName = 'Soldier';
@@ -456,10 +475,21 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     });
 
     if (this.map.getSource('moving-troops-paths-source')) {
-      (this.map.getSource('moving-troops-paths-source') as any).setData({
-        type: 'FeatureCollection',
-        features: movingPathsFeatures
-      });
+      const signature = movingPathsFeatures.map(feature => {
+        const coordinates = feature.geometry.coordinates;
+        const first = coordinates[0] || [];
+        return `${feature.properties.armyId}:${coordinates.length}:${Number(first[0] || 0).toFixed(3)}:${Number(first[1] || 0).toFixed(3)}`;
+      }).join('|');
+      const shouldUpdateLayer = signature !== this.lastMovingPathsSignature &&
+        (now - this.lastMovingPathsUpdateAt >= 100 || !this.lastMovingPathsSignature);
+      if (shouldUpdateLayer) {
+        (this.map.getSource('moving-troops-paths-source') as any).setData({
+          type: 'FeatureCollection',
+          features: movingPathsFeatures
+        });
+        this.lastMovingPathsUpdateAt = now;
+        this.lastMovingPathsSignature = signature;
+      }
     }
   }
 
@@ -584,6 +614,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit() {
     this.startAnimationLoop();
+    this.loadArmyGroups();
     this.currentMatchId = this.route.snapshot.paramMap.get('id') || localStorage.getItem('pwm_last_joined_match') || '';
     this.loadGameRules();
     this.loadUserProfile(() => {
@@ -720,7 +751,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
           if (parsed.type === 'INITIAL_STATE') {
             if (parsed.payload?.armies) {
-              this.matchArmies = parsed.payload.armies;
+              this.matchArmies = this.normalizeArmyCollection(parsed.payload.armies);
+              this.matchArmies
+                .filter((army: any) => this.isActiveArmyState(army))
+                .forEach((army: any) => this.recordOrderEvent(army.id, 'Stato ripristinato dopo la riconnessione'));
               // Pre-calcola la path cache per le armate già in movimento al momento del caricamento
               this.matchArmies.forEach((a: any) => {
                 if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
@@ -765,7 +799,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             if (parsed.payload?.armate) {
               const curUserNorm = String(this.userProfile?.username || '').trim().toLowerCase();
               const enemyArmies = this.matchArmies.filter(a => String(a.owner || '').trim().toLowerCase() !== curUserNorm);
-              this.matchArmies = [...enemyArmies, ...parsed.payload.armate];
+              this.matchArmies = [...enemyArmies, ...this.normalizeArmyCollection(parsed.payload.armate)];
               this.matchArmies.forEach((a: any) => {
                 if (a.path && a.path.length > 1) this.precomputeArmyPathCache(a);
               });
@@ -849,7 +883,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
 
           if (parsed.type === 'TROOPS_MOVED') {
-            const { armyId, targetName, targetCoords, etaMs, startTime, path, mode } = parsed.data;
+            const { armyId, targetName, targetCoords, etaMs, startTime, path, mode, type, state } = parsed.data;
+            this.recordOrderEvent(armyId, `Missione avviata verso ${targetName || 'destinazione'}`);
             const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
             if (armyIndex !== -1) {
               const newArmies = [...this.matchArmies];
@@ -860,7 +895,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               newArmies[armyIndex].path = path;
               newArmies[armyIndex].etaMs = etaMs;
               newArmies[armyIndex].startTime = startTime || Date.now();
-              if (mode) newArmies[armyIndex].missionMode = mode;
+              newArmies[armyIndex].state = state || 'moving';
+              if (type || mode) newArmies[armyIndex].missionMode = type || mode;
               // Pre-calcola la cache del path una sola volta appena ricevuto
               this.precomputeArmyPathCache(newArmies[armyIndex]);
               this.armyTetherCache.delete(armyId); // Invalida il tether per forzare il ricalcolo al nuovo target
@@ -872,8 +908,29 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             this.ngZone.run(() => this.cdr.detectChanges());
           }
 
+          if (parsed.type === 'ORDER_ACCEPTED') {
+            this.recordOrderEvent(parsed.data?.armyId, 'Ordine accettato');
+            this.toastCtrl.create({
+              message: 'Ordine accettato e messo in esecuzione.',
+              duration: 1800,
+              position: 'top',
+              color: 'success'
+            }).then(t => t.present());
+          }
+
+          if (parsed.type === 'ORDER_DUPLICATE') {
+            this.recordOrderEvent(parsed.data?.armyId, 'Ordine duplicato ignorato');
+            this.toastCtrl.create({
+              message: 'Questo ordine e gia stato ricevuto.',
+              duration: 2200,
+              position: 'top',
+              color: 'warning'
+            }).then(t => t.present());
+          }
+
           if (parsed.type === 'TROOPS_ARRIVED') {
             const { armyId, targetName, targetCoords } = parsed.data;
+            this.recordOrderEvent(armyId, `Arrivata a ${targetName || 'destinazione'}`);
             const armyIndex = this.matchArmies.findIndex(a => a.id === armyId);
             if (armyIndex !== -1) {
               const newArmies = [...this.matchArmies];
@@ -888,6 +945,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               delete newArmies[armyIndex]._pathCache; // Libera la cache
               this.armyTetherCache.delete(armyId); // Invalida tether cache per l'arrivo
               this.matchArmies = newArmies;
+              this.dispatchNextQueuedMission(armyId);
 
               const hoverSource: any = this.map?.getSource('hovered-troop-path-source');
               if (hoverSource) {
@@ -1100,6 +1158,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
               this.totalPreviewEta = results.reduce((acc: number, r: any) => acc + (r.etaMs || 0), 0);
               this.isPreviewValid = results.every((r: any) => r.isValid !== false);
               this.previewError = results.find((r: any) => r.error)?.error || null;
+              const previewWarnings = results.flatMap((r: any) => (r.warnings || []) as string[]);
+              this.previewWarnings = [...new Set<string>(previewWarnings)];
+              this.previewRouteType = [...new Set(results.map((r: any) => r.routeType || 'automatic'))].join(' + ');
+              this.previewRequiresWarDeclaration = results.some((r: any) => r.requiresWarDeclaration === true);
+              this.previewEtaByArmyId = results.reduce((etaMap: Record<string, number>, result: any) => {
+                etaMap[result.armyId] = result.etaMs || 0;
+                return etaMap;
+              }, {});
 
               const features: any[] = [];
               let allPathCoords: [number, number][] = [];
@@ -1175,6 +1241,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
           if (parsed.type === 'COMBAT_EVENT') {
             const { attacker, defender, damage, result, players } = parsed.payload;
+            this.combatEvents = [...this.combatEvents, { ...parsed.payload, receivedAt: Date.now() }].slice(-20);
             if (players && players.includes(this.userProfile.username)) {
               let color = 'primary';
               let icon = 'information-circle-outline';
@@ -1262,8 +1329,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
           if (parsed.type === 'ERROR') {
             console.error("[WS ERROR RICEVUTO]:", parsed);
+            if (parsed.data?.armyId || parsed.armyId) {
+              this.recordOrderEvent(parsed.data?.armyId || parsed.armyId, parsed.error || 'Ordine rifiutato');
+            }
             this.toastCtrl.create({
-              message: parsed.error || 'Si è verificato un errore',
+              message: this.getOrderErrorMessage(parsed),
               duration: 3000,
               position: 'top',
               color: 'danger'
@@ -1622,6 +1692,16 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       this.isMarketModalOpen = false;
     }
     this.closeMobileMenu();
+  }
+
+  toggleOrderCenter() {
+    this.isOrderCenterOpen = !this.isOrderCenterOpen;
+    this.closeMobileMenu();
+  }
+
+  cancelArmyMission(armyId: string) {
+    this.missionQueues = { ...this.missionQueues, [armyId]: [] };
+    this.onArmyMissionRequested({ armyId, mode: 'cancel' });
   }
 
   openArmyModalFromRadial() {
@@ -2053,6 +2133,65 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   // --- LOGICA MAPPA E SENSORI ---
 
+  private setupArmyBoxSelection() {
+    const container = this.map.getCanvasContainer() as HTMLElement;
+    let startPoint: { x: number; y: number } | null = null;
+    let selectionBox: HTMLDivElement | null = null;
+
+    container.addEventListener('mousedown', (event: MouseEvent) => {
+      if (!event.shiftKey || event.button !== 0) return;
+      const bounds = container.getBoundingClientRect();
+      startPoint = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+      selectionBox = document.createElement('div');
+      selectionBox.className = 'army-selection-box';
+      selectionBox.style.left = `${startPoint.x}px`;
+      selectionBox.style.top = `${startPoint.y}px`;
+      container.appendChild(selectionBox);
+      this.map.dragPan.disable();
+      event.preventDefault();
+    });
+
+    container.addEventListener('mousemove', (event: MouseEvent) => {
+      if (!startPoint || !selectionBox) return;
+      const bounds = container.getBoundingClientRect();
+      const currentX = event.clientX - bounds.left;
+      const currentY = event.clientY - bounds.top;
+      selectionBox.style.left = `${Math.min(startPoint.x, currentX)}px`;
+      selectionBox.style.top = `${Math.min(startPoint.y, currentY)}px`;
+      selectionBox.style.width = `${Math.abs(currentX - startPoint.x)}px`;
+      selectionBox.style.height = `${Math.abs(currentY - startPoint.y)}px`;
+    });
+
+    container.addEventListener('mouseup', (event: MouseEvent) => {
+      if (!startPoint) return;
+      const bounds = container.getBoundingClientRect();
+      const endPoint = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+      const minX = Math.min(startPoint.x, endPoint.x);
+      const maxX = Math.max(startPoint.x, endPoint.x);
+      const minY = Math.min(startPoint.y, endPoint.y);
+      const maxY = Math.max(startPoint.y, endPoint.y);
+      const selectedIds: string[] = [];
+
+      this.armyMarkers.forEach((marker, armyId) => {
+        const army = this.matchArmies.find(entry => entry.id === armyId);
+        if (!army || String(army.owner || '').toLowerCase() !== String(this.userProfile?.username || '').toLowerCase()) return;
+        const projected = this.map.project(marker.getLngLat());
+        if (projected.x >= minX && projected.x <= maxX && projected.y >= minY && projected.y <= maxY) {
+          selectedIds.push(armyId);
+        }
+      });
+
+      this.selectedArmiesForMovement = selectedIds;
+      this.previousSelectedArmiesForMovement = [...selectedIds];
+      this.selectedArmyId = selectedIds[0] || '';
+      selectionBox?.remove();
+      selectionBox = null;
+      startPoint = null;
+      this.map.dragPan.enable();
+      this.cdr.detectChanges();
+    });
+  }
+
   initMap() {
     this.map = new maplibregl.Map({
       container: this.mapContainer.nativeElement,
@@ -2079,6 +2218,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.map.on('load', () => {
+      this.setupArmyBoxSelection();
       this.map.addSource('contours', { type: 'vector', url: `https://api.maptiler.com/tiles/contours-v2/tiles.json?key=${this.MAPTILER_KEY}` });
 
       this.map.addLayer({
@@ -2948,6 +3088,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                   // Salviamo la selezione precedente per poterla ripristinare col tasto +
                   this.previousSelectedArmiesForMovement = [...this.selectedArmiesForMovement];
                   this.selectedArmiesForMovement = [army.id];
+                  this.selectedArmyId = army.id;
                 }
 
                 const popupHtml = `
@@ -3674,9 +3815,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         }
       });
     } else {
+      const commandId = this.createCommandId();
       this.matchState.send({
         action: 'MOVE_TROOPS',
         payload: {
+          commandId,
+          type: event.type || (event.mode === 'conquer' ? 'conquer' : 'move'),
           armyId: event.armyId,
           mode: event.mode,
           targetName: event.targetName,
@@ -3686,6 +3830,89 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         }
       });
     }
+  }
+
+  private createCommandId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+
+    return `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  private getOrderErrorMessage(error: any): string {
+    const labels: Record<string, string> = {
+      MATCH_NOT_FOUND: 'La partita non è disponibile.',
+      MATCH_NOT_STARTED: 'La partita non è ancora iniziata.',
+      ARMY_NOT_FOUND: 'L\'armata selezionata non è più disponibile.',
+      INVALID_ORIGIN: 'La posizione attuale dell\'armata non è valida.',
+      INVALID_DESTINATION: 'Il bersaglio selezionato non è valido.',
+      PATH_VALIDATION_FAILED: 'Il percorso non è valido per questa armata.',
+      ALLY_TARGET: 'Non puoi attaccare un membro della tua alleanza.',
+      ARMY_RESUPPLY: 'L\'armata è in fase di rifornimento.',
+      ORDER_NOT_APPLIED: 'L\'ordine non è stato applicato. Riprova.'
+    };
+
+    return labels[error?.code] || error?.error || 'Si è verificato un errore';
+  }
+
+  getPreviewActionLabel(): string {
+    const mode = this.pendingMissions[0]?.mode;
+    if (mode === 'conquer') return 'Conquista';
+    if (mode === 'move') return 'Spostamento';
+    return mode || 'Ordine';
+  }
+
+  getPreviewRouteLabel(): string {
+    const labels: Record<string, string> = {
+      land: 'Terrestre',
+      sea: 'Navale',
+      land_sea_land: 'Terra + mare + terra',
+      land_air_land: 'Terra + aria + terra',
+      waypoints: 'Con waypoint',
+      automatic: 'Automatica'
+    };
+
+    return this.previewRouteType
+      .split(' + ')
+      .map(route => labels[route] || route)
+      .join(' + ');
+  }
+
+  private normalizeArmyCollection(armies: any[]): any[] {
+    const stateMap: Record<string, string> = {
+      standby: 'standby',
+      moving: 'moving',
+      moving_to_border: 'moving',
+      'Pronto alla conquista': 'moving',
+      "Pronto all'attacco": 'engaging',
+      combattimento: 'combat',
+      'in combattimento': 'combat',
+      in_battaglia: 'combat',
+      retreating: 'retreating',
+      returning: 'returning',
+      cooldown: 'resupplying',
+      dead: 'destroyed',
+      destroyed: 'destroyed'
+    };
+
+    return (armies || []).map(army => ({
+      ...army,
+      state: army.state || stateMap[army.status] || 'standby'
+    }));
+  }
+
+  private isActiveArmyState(army: any): boolean {
+    return ['moving', 'engaging', 'combat', 'retreating', 'returning', 'resupplying'].includes(army.state);
+  }
+
+  private recordOrderEvent(armyId: string | undefined, label: string) {
+    if (!armyId) return;
+    const history = this.orderEvents[armyId] || [];
+    this.orderEvents = {
+      ...this.orderEvents,
+      [armyId]: [...history, { label, timestamp: new Date().toLocaleTimeString() }].slice(-8)
+    };
   }
 
   onRecruitUnitRequest(event: any) {
@@ -3726,6 +3953,35 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       action: 'DISBAND_ARMY',
       payload: payload
     });
+  }
+
+  onSplitArmyRequest(payload: { armyId: string }) {
+    this.matchState.send({
+      action: 'SPLIT_ARMY',
+      payload
+    });
+  }
+
+  onMergeArmiesRequest(payload: { sourceArmyId: string, targetArmyId: string }) {
+    this.matchState.send({
+      action: 'MERGE_ARMIES',
+      payload
+    });
+  }
+
+  onReinforceArmyRequest(payload: { armyId: string, composition: { [key: string]: number } }) {
+    this.matchState.send({
+      action: 'REINFORCE_ARMY',
+      payload
+    });
+  }
+
+  onCombatTacticalDecision(event: { decision: any, choice: string }) {
+    this.handleTacticalDecision(event.decision, event.choice);
+  }
+
+  retreatFromCombat(armyId: string) {
+    this.onArmyMissionRequested({ armyId, mode: 'cancel' });
   }
 
   // Chiude il menu se si clicca altrove col tasto sinistro
@@ -3903,6 +4159,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   confirmPendingMissions() {
     if (!this.pendingMissions || this.pendingMissions.length === 0) return;
 
+    if (this.previewRequiresWarDeclaration && !this.showWarDeclarationConfirm) {
+      this.showWarDeclarationConfirm = true;
+      this.cdr.detectChanges();
+      return;
+    }
+
     this.pendingMissions.forEach(missionData => {
       this.onArmyMissionRequested(missionData);
     });
@@ -3917,14 +4179,118 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.cancelPendingMissions();
   }
 
-  cancelPendingMissions() {
+  queuePendingMissions() {
+    if (!this.pendingMissions || this.pendingMissions.length === 0 || !this.isPreviewValid) return;
+    for (const mission of this.pendingMissions) {
+      const queue = this.missionQueues[mission.armyId] || [];
+      this.missionQueues[mission.armyId] = [...queue, { ...mission }];
+      const army = this.matchArmies.find(entry => entry.id === mission.armyId);
+      if (army && !this.isArmyBusyForQueue(army)) this.dispatchNextQueuedMission(mission.armyId);
+    }
+    this.toastCtrl.create({ message: `Accodate ${this.pendingMissions.length} missioni.`, duration: 2000, position: 'top', color: 'primary' }).then(t => t.present());
+    this.cancelPendingMissions();
+  }
+  public synchronizePendingMissions() {
+    if (!this.pendingMissions || this.pendingMissions.length === 0 || !this.isPreviewValid) return;
+    const maxEta = Math.max(...this.pendingMissions.map(mission => this.previewEtaByArmyId[mission.armyId] || 0));
+    this.synchronizedMissionTimers.forEach(timer => clearTimeout(timer));
+    this.synchronizedMissionTimers = [];
+    this.pendingMissions.forEach(mission => {
+      const delay = Math.max(0, maxEta - (this.previewEtaByArmyId[mission.armyId] || 0));
+      this.synchronizedMissionTimers.push(setTimeout(() => this.onArmyMissionRequested(mission), delay));
+    });
+    this.toastCtrl.create({ message: `Partenza sincronizzata per ${this.pendingMissions.length} armate.`, duration: 2200, position: 'top', color: 'primary' }).then(t => t.present());
+    this.cancelPendingMissions(false);
+  }
+
+  private dispatchNextQueuedMission(armyId: string) {
+    const queue = this.missionQueues[armyId] || [];
+    if (queue.length === 0) return;
+    const army = this.matchArmies.find(entry => entry.id === armyId);
+    if (army && this.isArmyBusyForQueue(army)) return;
+    const [nextMission, ...remaining] = queue;
+    this.missionQueues = { ...this.missionQueues, [armyId]: remaining };
+    this.onArmyMissionRequested(nextMission);
+  }
+
+  private isArmyBusyForQueue(army: any): boolean {
+    return ['moving', 'engaging', 'combat', 'retreating', 'returning', 'resupplying'].includes(army.state || army.status);
+  }
+
+  saveSelectedArmyGroup() {
+    const name = this.groupName.trim();
+    if (!name || this.selectedArmiesForMovement.length === 0) return;
+    const group = { name, armyIds: [...this.selectedArmiesForMovement] };
+    const index = this.armyGroups.findIndex(entry => entry.name.toLowerCase() === name.toLowerCase());
+    if (index >= 0) this.armyGroups[index] = group;
+    else this.armyGroups = [...this.armyGroups, group];
+    this.selectedGroupName = name;
+    this.groupName = '';
+    this.persistArmyGroups();
+  }
+
+  activateArmyGroup(name: string) {
+    const group = this.armyGroups.find(entry => entry.name === name);
+    if (!group) return;
+    const availableIds = new Set(this.matchArmies.filter(army => army.owner === this.userProfile?.username).map(army => army.id));
+    this.selectedArmiesForMovement = group.armyIds.filter(id => availableIds.has(id));
+    this.previousSelectedArmiesForMovement = [...this.selectedArmiesForMovement];
+    this.selectedGroupName = name;
+  }
+
+  deleteArmyGroup() {
+    if (!this.selectedGroupName) return;
+    this.armyGroups = this.armyGroups.filter(group => group.name !== this.selectedGroupName);
+    this.selectedGroupName = '';
+    this.persistArmyGroups();
+  }
+
+  private loadArmyGroups() {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(this.getArmyGroupStorageKey());
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) this.armyGroups = parsed;
+    } catch (error) {
+      console.warn('Impossibile caricare i gruppi armata.', error);
+    }
+  }
+
+  private persistArmyGroups() {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(this.getArmyGroupStorageKey(), JSON.stringify(this.armyGroups));
+  }
+
+  private getArmyGroupStorageKey(): string {
+    return `pwm:army-groups:${this.userProfile?.username || 'local'}`;
+  }
+
+  confirmWarDeclaration() {
+    this.confirmPendingMissions();
+  }
+
+  cancelWarDeclaration() {
+    this.showWarDeclarationConfirm = false;
+    this.cdr.detectChanges();
+  }
+
+  cancelPendingMissions(clearScheduledTimers = true) {
     this.pendingMissions = [];
     this.showPreviewModal = false;
     this.totalPreviewEta = 0;
     this.totalPreviewDistance = 0;
     this.isPreviewValid = true;
     this.previewError = null;
+    this.previewWarnings = [];
+    this.previewRouteType = 'automatic';
+    this.previewRequiresWarDeclaration = false;
+    this.previewEtaByArmyId = {};
+    this.showWarDeclarationConfirm = false;
     this.currentPreviewPath = [];
+    if (clearScheduledTimers) {
+      this.synchronizedMissionTimers.forEach(timer => clearTimeout(timer));
+      this.synchronizedMissionTimers = [];
+    }
 
     if (this.map && this.map.getSource('preview-troop-paths-source')) {
       (this.map.getSource('preview-troop-paths-source') as any).setData({ type: 'FeatureCollection', features: [] });
@@ -3941,6 +4307,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     this.selectedArmiesForMovement = [];
     this.previousSelectedArmiesForMovement = [];
+  }
+
+  clearArmySelection() {
+    this.selectedArmiesForMovement = [];
+    this.previousSelectedArmiesForMovement = [];
+    this.selectedArmyId = '';
+    if (this.activeArmyPopup) {
+      this.activeArmyPopup.remove();
+      this.activeArmyPopup = null;
+    }
+    this.cdr.detectChanges();
   }
 
   addWaypoint() {

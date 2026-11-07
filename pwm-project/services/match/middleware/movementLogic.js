@@ -239,7 +239,8 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
             distance: combinedDistance,
             etaMs: combinedEtaMs > 0 ? combinedEtaMs : 1000,
             path: combinedCoords,
-            cost: combinedCost
+                cost: combinedCost,
+                routeType: 'waypoints'
         };
     }
 
@@ -343,7 +344,8 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
                 distance: bestDistance,
                 etaMs: etaMs > 0 ? etaMs : 1000,
                 path: combinedCoords,
-                cost: bestRoute.origin.cost + bestRoute.dest.cost
+                cost: bestRoute.origin.cost + bestRoute.dest.cost,
+                routeType: bestRoute.type === 'sea' ? 'land_sea_land' : 'land_air_land'
             };
         }
     }
@@ -371,7 +373,8 @@ const calculatePath = async (startLng, startLat, targetName, targetLng, targetLa
         distance: distanceKm,
         etaMs,
         path: pathCoords,
-        cost: pathCost
+        cost: pathCost,
+        routeType: isNavalOnly ? 'sea' : 'land'
     };
 };
 

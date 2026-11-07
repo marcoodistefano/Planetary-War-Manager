@@ -1624,6 +1624,342 @@ ion-menu {
   }
 }
 
+.army-command-banner {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  max-width: min(680px, calc(100vw - 32px));
+  background: rgba(12, 24, 42, 0.94);
+  border: 1px solid var(--primary-blue);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 0 20px rgba(134, 215, 255, 0.3);
+  backdrop-filter: blur(10px);
+  animation: popupFade 0.3s ease-out forwards;
+
+  > ion-icon {
+    flex: 0 0 auto;
+    font-size: 1.5rem;
+    color: var(--primary-blue);
+  }
+
+  span {
+    min-width: 220px;
+    color: #fff;
+    font-size: 0.9rem;
+
+    strong {
+      color: #facc15;
+    }
+
+    small {
+      color: #cbd5e1;
+      font-size: 0.75rem;
+    }
+  }
+
+  button {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 7px 10px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .army-command-manage {
+    background: rgba(37, 99, 235, 0.85);
+    border-color: #60a5fa;
+  }
+
+  .army-command-cancel {
+    background: rgba(127, 29, 29, 0.85);
+    border-color: #f87171;
+  }
+}
+
+.army-selection-box {
+  position: absolute;
+  z-index: 9997;
+  pointer-events: none;
+  border: 1px solid #67e8f9;
+  background: rgba(34, 211, 238, 0.14);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.25);
+}
+
+.army-group-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  input,
+  select {
+    width: 92px;
+    min-width: 0;
+    padding: 6px;
+    border: 1px solid rgba(134, 215, 255, 0.3);
+    border-radius: 4px;
+    background: #1e293b;
+    color: #fff;
+    font-size: 0.65rem;
+  }
+
+  button {
+    display: grid;
+    width: 26px;
+    height: 26px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid rgba(134, 215, 255, 0.4);
+    border-radius: 4px;
+    background: rgba(14, 116, 144, 0.35);
+    color: #e0f2fe;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+  }
+}
+
+.mission-preview-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  z-index: 10000;
+  width: min(760px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid #22d3ee;
+  border-radius: 8px;
+  background: rgba(8, 47, 73, 0.96);
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.3);
+  backdrop-filter: blur(12px);
+  animation: popupFade 0.3s ease-out forwards;
+
+  &.invalid {
+    border-color: #ef4444;
+    background: rgba(69, 10, 10, 0.96);
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.25);
+  }
+}
+
+.mission-preview-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  > ion-icon {
+    flex: 0 0 auto;
+    color: #67e8f9;
+    font-size: 1.7rem;
+  }
+
+  strong,
+  small {
+    display: block;
+  }
+
+  strong {
+    color: #fff;
+    font-size: 0.95rem;
+  }
+
+  small {
+    margin-top: 3px;
+    color: #bae6fd;
+    font-size: 0.78rem;
+  }
+}
+
+.mission-preview-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 14px 0;
+
+  div {
+    padding: 8px 10px;
+    border: 1px solid rgba(186, 230, 253, 0.2);
+    border-radius: 4px;
+    background: rgba(8, 47, 73, 0.55);
+  }
+
+  span,
+  strong {
+    display: block;
+  }
+
+  span {
+    color: #7dd3fc;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+  }
+
+  strong {
+    margin-top: 3px;
+    color: #fff;
+    font-size: 0.9rem;
+  }
+}
+
+.mission-preview-error {
+  margin: 12px 0;
+  padding: 9px 10px;
+  border-left: 3px solid #f87171;
+  color: #fee2e2;
+  background: rgba(127, 29, 29, 0.35);
+  font-size: 0.8rem;
+}
+
+.mission-preview-warning {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 0;
+  padding: 8px 10px;
+  border-left: 3px solid #facc15;
+  color: #fef08a;
+  background: rgba(113, 63, 18, 0.4);
+  font-size: 0.78rem;
+}
+
+.war-declaration-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #f87171;
+  border-radius: 4px;
+  background: rgba(127, 29, 29, 0.5);
+  color: #fee2e2;
+  font-size: 0.78rem;
+
+  strong {
+    color: #fca5a5;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+  }
+
+  > div {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  button {
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 7px 10px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  .war-confirm {
+    border-color: #fca5a5;
+    background: #b91c1c;
+  }
+
+  .war-cancel {
+    border-color: #94a3b8;
+    background: rgba(71, 85, 105, 0.8);
+  }
+}
+
+.mission-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 7px 10px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  .preview-confirm {
+    border-color: #86efac;
+    background: #16a34a;
+  }
+
+  .preview-waypoint {
+    border-color: #fde047;
+    background: #a16207;
+  }
+
+  .preview-queue {
+    border-color: #93c5fd;
+    background: #1d4ed8;
+  }
+
+  .preview-sync {
+    border-color: #c4b5fd;
+    background: #6d28d9;
+  }
+
+  .preview-cancel {
+    border-color: #fca5a5;
+    background: #b91c1c;
+  }
+}
+
+@media (max-width: 640px) {
+  .army-command-banner {
+    bottom: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+
+    span {
+      min-width: 0;
+      flex: 1 1 calc(100% - 48px);
+    }
+  }
+
+  .mission-preview-panel {
+    bottom: 16px;
+  }
+
+  .mission-preview-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .mission-preview-actions {
+    justify-content: stretch;
+
+    button {
+      flex: 1;
+      justify-content: center;
+    }
+  }
+}
+
 /* ==========================================================================
    11. ANIMAZIONI RISORSE (SPESE)
    ========================================================================== */

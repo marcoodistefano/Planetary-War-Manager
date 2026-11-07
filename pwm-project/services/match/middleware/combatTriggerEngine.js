@@ -6,6 +6,7 @@ const { setupCombatFromArrival, processActiveCombats, getRegionsGeojson } = requ
 const turf = require('@turf/turf');
 
 const { getArmyVisionRadius, getArmyAttackRange } = require('./gameUtils.js');
+const { ArmyState, setArmyState } = require('./armyState.js');
 
 const { getArmyLocation, haversineDist } = require('./movementLogic.js');
 let nodesFeatures = [];
@@ -28,10 +29,20 @@ try {
 
 const { getMatch, updateMatch } = require('../../shared/matchMonolithic.js');
 
+const recordCombatMetric = async (field, amount = 1) => {
+    try {
+        await redis.hIncrBy('metrics:combat_trigger', field, amount);
+        await redis.expire('metrics:combat_trigger', 86400);
+    } catch (error) {
+        console.warn('[METRICS] Impossibile registrare metrica combat trigger:', error.message);
+    }
+};
+
 const checkCombatTriggers = async () => {
     try {
         const lockAcquired = await redis.set('engine_lock:combatTrigger', 'locked', 'NX', 'PX', 2900);
         if (!lockAcquired) return;
+        await recordCombatMetric('cycles');
         
         const matchKeys = await db.query("SELECT id_partita_hash FROM partite WHERE substring(struttura_partita::text from 1 for 2) = '01'").then(res => res.rows.map(r => `match:${r.id_partita_hash}`));
         const matchIds = new Set();
@@ -41,6 +52,7 @@ const checkCombatTriggers = async () => {
         });
 
         for (const matchId of matchIds) {
+            await recordCombatMetric('matches_scanned');
             const matchObj = await getMatch(matchId);
             if (!matchObj || !matchObj.match || !matchObj.match.player) continue;
 
@@ -60,6 +72,7 @@ const checkCombatTriggers = async () => {
                         const p = mObj.match.player.find(x => x.username === army.owner);
                         if (p && p.armate && p.armate[army.id]) {
                             p.armate[army.id].status = 'standby';
+                            setArmyState(p.armate[army.id], ArmyState.STANDBY);
                             delete p.armate[army.id].cooldownUntil;
                         }
                         return { save: true, matchObj: mObj };
@@ -105,6 +118,7 @@ const checkCombatTriggers = async () => {
                         console.log(`[COMBAT_TRIGGER] dist: ${dist}, attackRange: ${radius}, triggerRadius: ${triggerRadius}, targetCoords: ${targetCoords}`);
                         
                         if (dist <= triggerRadius) {
+                            await recordCombatMetric('engagements_started');
                             // Innesca il combattimento!
                             // Dobbiamo recuperare la mossa dal DB
                             const mossaRes = await db.query(`SELECT * FROM mosse WHERE id_armata = $1 AND type_action = 'mov'`, [army.id]);
@@ -131,6 +145,7 @@ const checkCombatTriggers = async () => {
                                     const p = mObj.match.player.find(x => x.username === army.owner);
                                     if (p && p.armate && p.armate[army.id]) {
                                         p.armate[army.id].status = army.status;
+                                        setArmyState(p.armate[army.id], ArmyState.ENGAGING);
                                         if (army.currentLocation) p.armate[army.id].currentLocation = army.currentLocation;
                                         if (army.next_round_time) p.armate[army.id].next_round_time = army.next_round_time;
                                         delete p.armate[army.id].path;
@@ -151,6 +166,7 @@ const checkCombatTriggers = async () => {
                                     const p = mObj.match.player.find(x => x.username === army.owner);
                                     if (p && p.armate && p.armate[army.id]) {
                                         p.armate[army.id].status = 'standby';
+                                        setArmyState(p.armate[army.id], ArmyState.STANDBY);
                                         delete p.armate[army.id].path;
                                         delete p.armate[army.id].etaMs;
                                         delete p.armate[army.id].startTime;
@@ -198,6 +214,8 @@ const checkCombatTriggers = async () => {
                             // Mettiamo temporaneamente uno status per evitare trigger multipli nello stesso loop
                             armyA.status = 'in combattimento';
                             armyB.status = 'in combattimento';
+                            setArmyState(armyA, ArmyState.COMBAT);
+                            setArmyState(armyB, ArmyState.COMBAT);
                             await setupInterceptCombat(armyA, armyB, matchId);
                             break; // Passa al prossimo armyA
                         }

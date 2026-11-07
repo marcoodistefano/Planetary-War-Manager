@@ -31,6 +31,9 @@
       <button class="nav-action-btn primary-glow" [class.active]="isArmyModalOpen" (click)="toggleArmyModal()">
         <ion-icon name="people-outline"></ion-icon> <span>GESTIONE ARMATE</span>
       </button>
+      <button class="nav-action-btn primary-glow" [class.active]="isOrderCenterOpen" (click)="toggleOrderCenter()">
+        <ion-icon name="list-outline"></ion-icon> <span>CENTRO ORDINI</span>
+      </button>
       <button class="nav-action-btn primary-glow" [class.active]="isDiplomacyModalOpen"
         (click)="toggleDiplomacyModal()">
         <ion-icon name="shield-half-outline"></ion-icon> <span>DIPLOMAZIA</span>
@@ -183,6 +186,25 @@
       </div>
     </div>
 
+    <app-order-center
+      *ngIf="isOrderCenterOpen"
+      [armies]="matchArmies"
+      [username]="userProfile?.username || ''"
+      [orderEvents]="orderEvents"
+      (close)="isOrderCenterOpen = false"
+      (centerOnArmy)="centerMapOnArmy($event)"
+      (cancelMission)="cancelArmyMission($event)">
+    </app-order-center>
+
+    <app-combat-center
+      [armies]="matchArmies"
+      [username]="userProfile?.username || ''"
+      [tacticalDecisions]="tacticalDecisions"
+      [combatEvents]="combatEvents"
+      (retreat)="retreatFromCombat($event)"
+      (tacticalDecision)="onCombatTacticalDecision($event)">
+    </app-combat-center>
+
     <div *ngIf="isTroopsDropdownOpen && useFloatingDropdown" class="troops-dropdown troops-dropdown-float"
       [style.left.px]="troopsDropdownX" [style.top.px]="troopsDropdownY">
       <div class="dropdown-header">RISERVE</div>
@@ -243,6 +265,9 @@
         </button>
         <button class="nav-action-btn primary-glow" [class.active]="isArmyModalOpen" (click)="toggleArmyModal()">
           <ion-icon name="people-outline"></ion-icon> <span>ARMATE</span>
+        </button>
+        <button class="nav-action-btn primary-glow" [class.active]="isOrderCenterOpen" (click)="toggleOrderCenter()">
+          <ion-icon name="list-outline"></ion-icon> <span>ORDINI</span>
         </button>
       </div>
 
@@ -367,6 +392,9 @@
           [capitalName]="myCapitalName"
           (createArmyRequest)="onCreateArmyRequest($event)"
           (disbandArmyRequest)="onDisbandArmyRequest($event)"
+          (splitArmyRequest)="onSplitArmyRequest($event)"
+          (mergeArmiesRequest)="onMergeArmiesRequest($event)"
+          (reinforceArmyRequest)="onReinforceArmyRequest($event)"
           (recruitUnitRequest)="onRecruitUnitRequest($event)" (missionRequested)="onArmyMissionRequested($event)"
           (centerOnArmy)="centerMapOnArmy($event)" (close)="isArmyModalOpen = false">
         </app-army-modal>
@@ -402,28 +430,87 @@
       <button (click)="cancelConstruction()">ANNULLA</button>
     </div>
 
-    <div class="construction-instruction-banner" *ngIf="showPreviewModal" 
-         [style.background]="isPreviewValid ? 'rgba(6, 182, 212, 0.95)' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95))'"
-         [style.border]="isPreviewValid ? '1px solid #22d3ee' : '1px solid #ef4444'"
-         style="border-radius: 12px; z-index: 10000; bottom: 80px; transition: all 0.3s ease;">
-      <ion-icon [name]="isPreviewValid ? 'analytics-outline' : 'warning-outline'"></ion-icon>
+    <div class="army-command-banner" *ngIf="selectedArmiesForMovement.length > 0 && !showPreviewModal">
+      <ion-icon name="locate-outline"></ion-icon>
       <span>
-        <strong>{{ isPreviewValid ? 'Anteprima Spostamento' : 'Spostamento Non Consentito' }}</strong><br>
-        <small style="color: #cffafe; font-size: 0.85rem;" *ngIf="isPreviewValid">
-          Armate: {{ pendingMissions.length }} | ETA Max: {{ (totalPreviewEta / 1000 / 60) | number:'1.0-0' }} min | Distanza Max: {{ totalPreviewDistance | number:'1.0-0' }} km
-        </small>
-        <small style="color: #fee2e2; font-size: 0.85rem; font-weight: 500;" *ngIf="!isPreviewValid">
-          {{ previewError || 'Il percorso attraversa l\'acqua senza i requisiti necessari.' }}
-        </small>
+        <strong>{{ selectedArmiesForMovement.length }} armata{{ selectedArmiesForMovement.length === 1 ? '' : 'e' }} selezionata{{ selectedArmiesForMovement.length === 1 ? '' : 'e' }}</strong><br>
+        <small>Clicca una regione o un'armata nemica per scegliere la destinazione.</small>
       </span>
-      <div style="display: flex; gap: 10px; margin-left: 10px;">
-        <button (click)="confirmPendingMissions()" 
-                [disabled]="!isPreviewValid"
-                [style.opacity]="isPreviewValid ? 1 : 0.4"
-                [style.cursor]="isPreviewValid ? 'pointer' : 'not-allowed'"
-                style="background: #22c55e; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; text-transform: uppercase;">Conferma</button>
-        <button (click)="addWaypoint()" style="background: #eab308; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase;">Aggiungi Tappa</button>
-        <button (click)="cancelPendingMissions()" style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase;">Annulla</button>
+      <button class="army-command-manage" (click)="openArmyModalFromRadial()" title="Apri gestione armate">
+        <ion-icon name="people-outline"></ion-icon>
+        GESTISCI
+      </button>
+      <div class="army-group-controls" *ngIf="armyGroups.length > 0 || selectedArmiesForMovement.length > 1">
+        <input [(ngModel)]="groupName" placeholder="Nome gruppo" title="Nome gruppo armate">
+        <button (click)="saveSelectedArmyGroup()" [disabled]="!groupName.trim()" title="Salva gruppo">
+          <ion-icon name="bookmark-outline"></ion-icon>
+        </button>
+        <select [(ngModel)]="selectedGroupName" (ngModelChange)="activateArmyGroup($event)" title="Carica gruppo">
+          <option value="">Gruppi...</option>
+          <option *ngFor="let group of armyGroups" [value]="group.name">{{ group.name }}</option>
+        </select>
+        <button (click)="deleteArmyGroup()" [disabled]="!selectedGroupName" title="Elimina gruppo">
+          <ion-icon name="trash-outline"></ion-icon>
+        </button>
+      </div>
+      <button class="army-command-cancel" (click)="clearArmySelection()" title="Annulla selezione">
+        <ion-icon name="close-outline"></ion-icon>
+        ANNULLA
+      </button>
+    </div>
+
+    <div class="mission-preview-panel" *ngIf="showPreviewModal" [class.invalid]="!isPreviewValid">
+      <div class="mission-preview-heading">
+        <ion-icon [name]="isPreviewValid ? 'analytics-outline' : 'warning-outline'"></ion-icon>
+        <div>
+          <strong>{{ isPreviewValid ? 'Conferma ordine tattico' : 'Percorso non consentito' }}</strong>
+          <small>{{ getPreviewActionLabel() }} verso {{ pendingMissions[0]?.targetName || 'bersaglio selezionato' }}</small>
+        </div>
+      </div>
+
+      <div class="mission-preview-stats" *ngIf="isPreviewValid">
+        <div><span>ARMATE</span><strong>{{ pendingMissions.length }}</strong></div>
+        <div><span>ETA MASSIMA</span><strong>{{ (totalPreviewEta / 1000 / 60) | number:'1.0-0' }} min</strong></div>
+        <div><span>DISTANZA</span><strong>{{ totalPreviewDistance | number:'1.0-0' }} km</strong></div>
+        <div><span>ROTTA</span><strong>{{ getPreviewRouteLabel() }}</strong></div>
+      </div>
+
+      <div class="mission-preview-warning" *ngIf="previewRequiresWarDeclaration">
+        <ion-icon name="warning-outline"></ion-icon>
+        <span>{{ showWarDeclarationConfirm ? 'Conferma per dichiarare guerra al proprietario del bersaglio.' : 'Questo ordine richiede una dichiarazione di guerra.' }}</span>
+      </div>
+
+      <div class="war-declaration-confirm" *ngIf="showWarDeclarationConfirm">
+        <strong>ATTENZIONE: AZIONE DIPLOMATICA</strong>
+        <span>L'invio dell'ordine avviera lo stato di guerra se il bersaglio non e gia un tuo nemico.</span>
+        <div>
+          <button class="war-confirm" (click)="confirmWarDeclaration()">
+            <ion-icon name="warning-outline"></ion-icon> DICHIARA E INVIA
+          </button>
+          <button class="war-cancel" (click)="cancelWarDeclaration()">TORNA INDIETRO</button>
+        </div>
+      </div>
+
+      <div class="mission-preview-error" *ngIf="!isPreviewValid">
+        {{ previewError || 'Il percorso attraversa l\'acqua senza i requisiti necessari.' }}
+      </div>
+
+      <div class="mission-preview-actions">
+        <button class="preview-confirm" (click)="confirmPendingMissions()" [disabled]="!isPreviewValid" title="Conferma ordine">
+          <ion-icon name="checkmark-outline"></ion-icon> CONFERMA
+        </button>
+        <button class="preview-queue" (click)="queuePendingMissions()" [disabled]="!isPreviewValid" title="Accoda missioni">
+          <ion-icon name="list-outline"></ion-icon> ACCODA
+        </button>
+        <button class="preview-sync" (click)="synchronizePendingMissions()" [disabled]="!isPreviewValid || pendingMissions.length < 2" title="Sincronizza arrivo">
+          <ion-icon name="git-compare-outline"></ion-icon> SINCRONIZZA
+        </button>
+        <button class="preview-waypoint" (click)="addWaypoint()" title="Aggiungi waypoint">
+          <ion-icon name="add-outline"></ion-icon> TAPPA
+        </button>
+        <button class="preview-cancel" (click)="cancelPendingMissions()" title="Annulla ordine">
+          <ion-icon name="close-outline"></ion-icon> ANNULLA
+        </button>
       </div>
     </div>
     <div class="nuke-flash" *ngIf="isNukeFlashActive"></div>

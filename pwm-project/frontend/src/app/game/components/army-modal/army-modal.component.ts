@@ -12,6 +12,7 @@ interface ArmyGroup {
   name: string;
   composition: { [key: string]: number };
   status: 'standby' | 'moving' | 'attacking';
+  state?: string;
   missionMode?: MissionMode;
   targetName?: string;
   targetCoords?: string;
@@ -39,8 +40,11 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   @Output() playerTroopsChange = new EventEmitter<{ [key: string]: number }>();
   @Output() armiesChange = new EventEmitter<ArmyGroup[]>();
   @Output() missionRequested = new EventEmitter<ArmyMissionRequest>();
-  @Output() createArmyRequest = new EventEmitter<{ troopKey: string, troopCount: number, targetName?: string, targetCoords?: string, armyName?: string, armyId: string }>();
+  @Output() createArmyRequest = new EventEmitter<{ composition: { [key: string]: number }, troopKey?: string, troopCount?: number, targetName?: string, targetCoords?: string, armyName?: string, armyId: string }>();
   @Output() disbandArmyRequest = new EventEmitter<{ armyId: string }>();
+  @Output() splitArmyRequest = new EventEmitter<{ armyId: string }>();
+  @Output() mergeArmiesRequest = new EventEmitter<{ sourceArmyId: string, targetArmyId: string }>();
+  @Output() reinforceArmyRequest = new EventEmitter<{ armyId: string, composition: { [key: string]: number } }>();
   @Output() centerOnArmy = new EventEmitter<string>();
   @Output() recruitUnitRequest = new EventEmitter<any>();
   @Input() playerTroops: { [key: string]: number } = {};
@@ -65,6 +69,11 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   armyName = '';
   selectedTroopKey = '';
   selectedTroopCount = 1;
+  armyComposition: { [key: string]: number } = {};
+  mergeTargetArmyId = '';
+  formationTemplates: Array<{ name: string, composition: { [key: string]: number } }> = [];
+  templateName = '';
+  selectedTemplateName = '';
   selectedMissionMode: MissionMode = 'move';
   missionCoords = '';
   missionTargetName = '';
@@ -86,6 +95,7 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
 
   ngOnInit() {
     this.syncFromInputs(true);
+    this.loadFormationTemplates();
     console.log("MILITARY OS: Protocolli di comando attivati...");
     this.timerInterval = setInterval(() => {
       this.updateCombatTimers();
@@ -252,6 +262,10 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
       .sort((left, right) => left[0].localeCompare(right[0]));
   }
 
+  get armyCompositionEntries() {
+    return Object.entries(this.armyComposition).filter(([, count]) => Number(count) > 0);
+  }
+
   isAirArmy(army: any): boolean {
     if (!army) return false;
     if (army.composition) {
@@ -274,6 +288,16 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
 
   get selectedArmyCount() {
     return this.selectedArmy ? Object.values(this.selectedArmy.composition).reduce((total, value) => total + Number(value || 0), 0) : 0;
+  }
+
+  get mergeCandidates(): ArmyGroup[] {
+    const sourceArmy = this.myArmies.find(army => army.id === this.activeArmyId);
+    if (!sourceArmy || (sourceArmy.status !== 'standby' && sourceArmy.state !== 'standby')) return [];
+    return this.myArmies.filter(army =>
+      army.id !== sourceArmy.id &&
+      (army.status === 'standby' || army.state === 'standby') &&
+      String(army.currentLocation) === String(sourceArmy.currentLocation)
+    );
   }
 
   getArmyHp(army: any): { current: number, max: number } {
@@ -397,14 +421,21 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   createArmy() {
-    const troopKey = String(this.selectedTroopKey || '').trim();
-    const troopCount = Math.max(1, Math.floor(Number(this.selectedTroopCount) || 0));
+    const composition = Object.entries(this.armyComposition).reduce((result, [unitKey, count]) => {
+      const normalizedCount = Math.floor(Number(count) || 0);
+      if (normalizedCount > 0) result[unitKey] = normalizedCount;
+      return result;
+    }, {} as { [key: string]: number });
+    const troopKey = Object.keys(composition)[0] || '';
+    const troopCount = Number(composition[troopKey] || 0);
 
-    if (!troopKey || troopCount <= 0) return;
+    if (Object.keys(composition).length === 0 || !troopKey || troopCount <= 0) return;
 
-    if ((this.playerTroops[troopKey] || 0) < troopCount) {
-        alert('Non hai truppe sufficienti di questo tipo nelle riserve per formare il gruppo.');
+    for (const [unitKey, unitCount] of Object.entries(composition)) {
+      if ((this.playerTroops[unitKey] || 0) < unitCount) {
+        alert(`Non hai truppe sufficienti di tipo ${unitKey} nelle riserve.`);
         return;
+      }
     }
 
     let targetLoc = this.selectedTargetName || this.selectedTargetCoords;
@@ -421,8 +452,9 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
     const armyId = this.generateUUID();
     
     this.createArmyRequest.emit({
-        troopKey,
-        troopCount,
+      composition,
+      troopKey,
+      troopCount,
         targetName: this.selectedTargetName || targetLoc,
         targetCoords: this.selectedTargetCoords && this.selectedTargetCoords !== '--' ? this.selectedTargetCoords : undefined,
         armyName: this.armyName.trim() || `Armata ${this.armies.length + 1}`,
@@ -431,7 +463,74 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
 
     this.armyName = '';
     this.selectedTroopCount = 1;
+    this.armyComposition = {};
     this.activeTab = 'management';
+  }
+
+  addTroopToComposition() {
+    const troopKey = String(this.selectedTroopKey || '').trim();
+    const troopCount = Math.max(1, Math.floor(Number(this.selectedTroopCount) || 0));
+    if (!troopKey || troopCount <= 0) return;
+
+    const alreadyAssigned = Number(this.armyComposition[troopKey] || 0);
+    const available = Number(this.playerTroops[troopKey] || 0);
+    this.armyComposition[troopKey] = Math.min(available, alreadyAssigned + troopCount);
+  }
+
+  removeTroopFromComposition(troopKey: string) {
+    delete this.armyComposition[troopKey];
+  }
+
+  saveFormationTemplate() {
+    const name = this.templateName.trim();
+    if (!name || this.armyCompositionEntries.length === 0) return;
+
+    const template = {
+      name,
+      composition: { ...this.armyComposition }
+    };
+    const existingIndex = this.formationTemplates.findIndex(entry => entry.name.toLowerCase() === name.toLowerCase());
+    if (existingIndex >= 0) {
+      this.formationTemplates[existingIndex] = template;
+    } else {
+      this.formationTemplates = [...this.formationTemplates, template];
+    }
+    this.selectedTemplateName = name;
+    this.templateName = '';
+    this.persistFormationTemplates();
+  }
+
+  loadFormationTemplate(name: string) {
+    const template = this.formationTemplates.find(entry => entry.name === name);
+    if (!template) return;
+    this.armyComposition = { ...template.composition };
+  }
+
+  deleteFormationTemplate() {
+    if (!this.selectedTemplateName) return;
+    this.formationTemplates = this.formationTemplates.filter(entry => entry.name !== this.selectedTemplateName);
+    this.selectedTemplateName = '';
+    this.persistFormationTemplates();
+  }
+
+  private loadFormationTemplates() {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(this.getFormationTemplateStorageKey());
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) this.formationTemplates = parsed;
+    } catch (error) {
+      console.warn('Impossibile caricare i template di formazione.', error);
+    }
+  }
+
+  private persistFormationTemplates() {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(this.getFormationTemplateStorageKey(), JSON.stringify(this.formationTemplates));
+  }
+
+  private getFormationTemplateStorageKey(): string {
+    return `pwm:formation-templates:${this.currentUsername || 'local'}`;
   }
 
   disbandArmy(armyId: string) {
@@ -447,6 +546,31 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
 
     this.disbandArmyRequest.emit({ armyId });
     this.activeTab = 'management';
+  }
+
+  splitArmy(armyId: string) {
+    const army = this.armies.find(entry => entry.id === armyId);
+    if (!army || (army.status !== 'standby' && army.state !== 'standby')) return;
+    this.splitArmyRequest.emit({ armyId });
+  }
+
+  mergeSelectedArmies() {
+    if (!this.activeArmyId || !this.mergeTargetArmyId || this.mergeCandidates.length === 0) return;
+    this.mergeArmiesRequest.emit({
+      sourceArmyId: this.activeArmyId,
+      targetArmyId: this.mergeTargetArmyId
+    });
+    this.mergeTargetArmyId = '';
+  }
+
+  reinforceSelectedArmy() {
+    const army = this.selectedArmy;
+    if (!army || (army.status !== 'standby' && army.state !== 'standby') || this.armyCompositionEntries.length === 0) return;
+    this.reinforceArmyRequest.emit({
+      armyId: army.id,
+      composition: { ...this.armyComposition }
+    });
+    this.armyComposition = {};
   }
 
   sendArmyOrder() {

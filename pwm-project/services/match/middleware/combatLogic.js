@@ -3,6 +3,7 @@ const redis = require('../../shared/redisClient.js');
 const fs = require('fs');
 const path = require('path');
 const { defaultVisionRadius } = require('./gameUtils.js');
+const { ArmyState, setArmyState } = require('./armyState.js');
 
 // Carica le regole dal json
 let gameRules = null;
@@ -274,6 +275,23 @@ const executeNukeStrike = async (attackerArmy, targetCoords, matchId, matchObj) 
 
 const emitCombatEvent = async (id_partita_hash, attackerName, defenderName, damage, result, playersInvolved) => {
     try {
+        const { getMatch } = require('../../shared/matchMonolithic.js');
+        const { getArmyLocation, haversineDist } = require('./movementLogic.js');
+        const { getArmyAttackRange } = require('./gameUtils.js');
+        const matchObj = await getMatch(id_partita_hash);
+        const armies = (matchObj?.match?.player || []).flatMap(player => Object.values(player.armate || {}));
+        const attackerArmy = armies.find(army => army.name === attackerName);
+        const defenderArmy = armies.find(army => army.name === defenderName);
+        const attackerLocation = attackerArmy ? getArmyLocation(attackerArmy) : null;
+        const defenderLocation = defenderArmy ? getArmyLocation(defenderArmy) : null;
+        const combat = {
+            distanceKm: attackerLocation && defenderLocation
+                ? Number(haversineDist(attackerLocation[0], attackerLocation[1], defenderLocation[0], defenderLocation[1]).toFixed(1))
+                : null,
+            attackerRangeKm: attackerArmy ? getArmyAttackRange(attackerArmy) : null,
+            defenderRangeKm: defenderArmy ? getArmyAttackRange(defenderArmy) : null,
+            nextRoundAt: attackerArmy?.next_round_time || defenderArmy?.next_round_time || null
+        };
         const broadcastPayload = {
             matchId: id_partita_hash,
             payload: {
@@ -283,7 +301,8 @@ const emitCombatEvent = async (id_partita_hash, attackerName, defenderName, dama
                     defender: defenderName,
                     damage: damage,
                     result: result,
-                    players: playersInvolved
+                    players: playersInvolved,
+                    combat
                 }
             }
         };
@@ -519,6 +538,7 @@ const processActiveCombats = async () => {
                             const p = mObj.match.player.find(x => x.username === attackerPlayer);
                             if (p && p.armate && p.armate[id_attaccante]) {
                                 p.armate[id_attaccante].status = 'standby';
+                                setArmyState(p.armate[id_attaccante], ArmyState.STANDBY);
                                 delete p.armate[id_attaccante].next_round_time;
                             }
                             return { save: true, matchObj: mObj };
@@ -610,6 +630,7 @@ const processActiveCombats = async () => {
                                 const p = mObj.match.player.find(x => x.username === defenderPlayer);
                                 if (p && p.armate && p.armate[currentTargetArmataId]) {
                                     p.armate[currentTargetArmataId].status = 'retreating';
+                                    setArmyState(p.armate[currentTargetArmataId], ArmyState.RETREATING);
                                     if (retreatPath && retreatPath.length > 0) {
                                         p.armate[currentTargetArmataId].path = retreatPath;
                                         p.armate[currentTargetArmataId].startTime = new Date().toISOString();
@@ -640,6 +661,7 @@ const processActiveCombats = async () => {
                                 const p = mObj.match.player.find(x => x.username === defenderPlayer);
                                 if (p && p.armate && p.armate[currentTargetArmataId]) {
                                     p.armate[currentTargetArmataId].status = 'retreating';
+                                    setArmyState(p.armate[currentTargetArmataId], ArmyState.RETREATING);
                                 }
                                 return { save: true, matchObj: mObj };
                             });
@@ -666,6 +688,7 @@ const processActiveCombats = async () => {
                             const p = mObj.match.player.find(x => x.username === attackerPlayer);
                             if (p && p.armate && p.armate[id_attaccante]) {
                                 p.armate[id_attaccante].status = 'standby';
+                                setArmyState(p.armate[id_attaccante], ArmyState.STANDBY);
                                 delete p.armate[id_attaccante].targetName;
                                 delete p.armate[id_attaccante].next_round_time;
                             }
@@ -733,6 +756,7 @@ const processActiveCombats = async () => {
                                     if (p && p.armate && p.armate[id_attaccante]) {
                                         const a = p.armate[id_attaccante];
                                         a.status = a.resumableMissionMode || 'moving';
+                                        setArmyState(a, ArmyState.MOVING);
                                         a.targetName = a.resumableTargetName;
                                         a.targetCoords = a.resumableTargetCoords;
                                         a.missionMode = a.resumableMissionMode;
@@ -1021,6 +1045,7 @@ const processActiveCombats = async () => {
                             const p = mObj.match.player.find(x => x.username === attackerPlayer);
                             if (p && p.armate && p.armate[id_attaccante]) {
                                 p.armate[id_attaccante].status = 'standby';
+                                setArmyState(p.armate[id_attaccante], ArmyState.STANDBY);
                             }
                             return { save: true, matchObj: mObj };
                         });
@@ -1073,6 +1098,7 @@ const processActiveCombats = async () => {
                     const att = mObj.match.player.find(x => x.username === attackerPlayer);
                     if (!attackerDied && att && att.armate && att.armate[id_attaccante]) {
                         att.armate[id_attaccante].status = 'standby';
+                        setArmyState(att.armate[id_attaccante], ArmyState.STANDBY);
                     }
 
                     return { save: true, matchObj: mObj };
@@ -1124,6 +1150,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
         if (targetNation && targetNation.username) {
             if (targetNation.username === attackerUsername) {
                 army.status = 'standby';
+                setArmyState(army, ArmyState.STANDBY);
                 delete army.next_round_time;
                 await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
                 return;
@@ -1134,6 +1161,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
             if (attackerAllianceId && defenderAllianceId && String(attackerAllianceId) === String(defenderAllianceId)) {
                 console.log(`[COMBAT] Attacco bloccato: ${attackerUsername} e ${targetNation.username} sono nella stessa alleanza.`);
                 army.status = 'standby';
+                setArmyState(army, ArmyState.STANDBY);
                 delete army.next_round_time;
                 await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
                 return;
@@ -1247,6 +1275,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
             if (!cityTarget && !defendingArmyId) {
                 console.log(`[COMBAT] Nessun bersaglio valido trovato per l'armata ${id_armata}. Annullamento attacco.`);
                 army.status = 'standby';
+                setArmyState(army, ArmyState.STANDBY);
                 await db.query(`DELETE FROM mosse WHERE id_mossa = $1`, [id_mossa]);
                 return;
             }
@@ -1257,6 +1286,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
             `, [id_mossa, mossa.partita_id, id_armata, cityTarget, defendingArmyId, newNextRoundDate]);
             
             army.status = 'in combattimento';
+            setArmyState(army, ArmyState.COMBAT);
             if (currentCoords) {
                 army.currentLocation = `${currentCoords[0]},${currentCoords[1]}`;
             } else {
@@ -1269,6 +1299,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
                     const p = mObj.match.player.find(x => x.username === defenderId);
                     if (p && p.armate && p.armate[defendingArmyId]) {
                         p.armate[defendingArmyId].status = 'in combattimento';
+                        setArmyState(p.armate[defendingArmyId], ArmyState.COMBAT);
                         if (p.armate[defendingArmyId].path && p.armate[defendingArmyId].path.length > 0 && p.armate[defendingArmyId].startTime && p.armate[defendingArmyId].etaMs) {
                             const { getArmyLocation } = require('./movementLogic.js');
                             const currentC = getArmyLocation(p.armate[defendingArmyId]) || p.armate[defendingArmyId].currentLocation;
@@ -1308,6 +1339,7 @@ const setupCombatFromArrival = async (army, mossa, id_partita_hash, attackerUser
             }
         } else {
             army.status = 'in combattimento';
+            setArmyState(army, ArmyState.COMBAT);
         }
     } catch (e) {
         console.error("Errore in setupCombatFromArrival:", e);
@@ -1338,6 +1370,7 @@ const setupInterceptCombat = async (armyA, armyB, id_partita_hash) => {
                             a.resumablePath = a.path;
                             a.currentLocation = loc.join(',');
                             a.status = 'in combattimento';
+                            setArmyState(a, ArmyState.COMBAT);
                             delete a.path;
                             delete a.etaMs;
                             delete a.startTime;
@@ -1353,6 +1386,7 @@ const setupInterceptCombat = async (armyA, armyB, id_partita_hash) => {
                     const p = mObj.match.player.find(x => x.username === army.owner);
                     if (p && p.armate && p.armate[army.id]) {
                         p.armate[army.id].status = 'in combattimento';
+                        setArmyState(p.armate[army.id], ArmyState.COMBAT);
                     }
                     return { save: true, matchObj: mObj };
                 });

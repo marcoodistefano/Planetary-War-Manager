@@ -6,6 +6,7 @@ const Eru = require("./middleware/Eru.js");
 const db = require("../shared/postgresClient.js");
 const { getArmyLocation, haversineDist, getNodeCoords } = require("./middleware/movementLogic.js");
 const { getArmyVisionRadius, isAirArmy, isStealthArmy, radarRadiusMap, defaultVisionRadius } = require("./middleware/gameUtils.js");
+const { ArmyState, setArmyState } = require('./middleware/armyState.js');
 
 
 const notImplemented = (res) =>
@@ -674,6 +675,7 @@ const tacticalDecision = async (req, res) => {
               const path = await calculatePath(attLoc[0], attLoc[1], defLoc[0], defLoc[1], getArmyDomain(a), getArmyType(a));
 
               a.status = 'Pronto all\'attacco';
+              setArmyState(a, ArmyState.ENGAGING);
               a.targetName = defenderArmyId;
               a.targetCoords = [defLoc[0], defLoc[1]];
               a.missionMode = 'attacco';

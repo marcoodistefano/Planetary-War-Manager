@@ -2,7 +2,7 @@ const express = require("express");
 const { handleRecruitUnit } = require('./handlers/recruit.handler.js');
 const { handleBuildStructure, handleResearchTech } = require('./handlers/build.handler.js');
 const { handlePreviewMissions, handleMoveTroops, handleCancelMission } = require('./handlers/movement.handler.js');
-const { handleCreateArmy, handleDisbandArmy } = require('./handlers/army.handler.js');
+const { handleCreateArmy, handleDisbandArmy, handleSplitArmy, handleMergeArmies, handleReinforceArmy } = require('./handlers/army.handler.js');
 
 const http = require("http");
 const cors = require("cors");
@@ -18,6 +18,7 @@ const redis = require("../shared/redisClient.js");
 const dynamicPathfinder = require("./middleware/dynamicPathfinder.js");
 const { calculatePath, getBorderIntersection, getNodeCoords, getRegionForNode, calculateCurrentPosition, getRegionIdByName, getRegionAtCoords, getArmyLocation, haversineDist } = require("./middleware/movementLogic.js");
 const { getArmyVisionRadius, isAirArmy, isStealthArmy, radarRadiusMap, defaultVisionRadius, territoryVisionRadius } = require("./middleware/gameUtils.js");
+const { ArmyState, normalizeArmyState, setArmyState } = require('./middleware/armyState.js');
 const { getMatch, updateMatch } = require('../shared/matchMonolithic.js');
 const db = require('../shared/postgresClient.js');
 const { startTroopGenerator } = require("./middleware/troopGenerator.js");
@@ -346,6 +347,15 @@ wss.on("connection", async (ws, req, userId, rawMatchId) => {
                 if (payload.action === 'DISBAND_ARMY') {
                     return await handleDisbandArmy(ws, payload, userId);
                 }
+                if (payload.action === 'SPLIT_ARMY') {
+                    return await handleSplitArmy(ws, payload, userId);
+                }
+                if (payload.action === 'MERGE_ARMIES') {
+                    return await handleMergeArmies(ws, payload, userId);
+                }
+                if (payload.action === 'REINFORCE_ARMY') {
+                    return await handleReinforceArmy(ws, payload, userId);
+                }
                 if (payload.action === 'SAVE_ARMIES') {
                     console.warn("[SECURITY_WARN] Endpoint SAVE_ARMIES deprecato contattato da", ws.username);
                     ws.send(JSON.stringify({ type: 'ERROR', error: 'Azione deprecata per motivi di sicurezza.' }));
@@ -655,6 +665,7 @@ const startArrivalEngine = () => {
                             const p = mObj.match.player.find(x => x.username === row.username);
                             if (p && p.armate && p.armate[row.id_armata]) {
                                 p.armate[row.id_armata].status = 'returning';
+                                setArmyState(p.armate[row.id_armata], ArmyState.RETURNING);
                                 p.armate[row.id_armata].missionMode = 'return';
                                 p.armate[row.id_armata].targetName = 'Rientro';
                                 p.armate[row.id_armata].targetCoords = [x_dest, y_dest];
@@ -690,6 +701,7 @@ const startArrivalEngine = () => {
                             const p = mObj.match.player.find(x => x.username === row.username);
                             if (p && p.armate && p.armate[row.id_armata]) {
                                 p.armate[row.id_armata].status = army.status;
+                                setArmyState(p.armate[row.id_armata], normalizeArmyState(army));
                                 if (army.currentLocation) p.armate[row.id_armata].currentLocation = army.currentLocation;
                                 if (army.next_round_time) p.armate[row.id_armata].next_round_time = army.next_round_time;
                                 delete p.armate[row.id_armata].path;
@@ -714,9 +726,11 @@ const startArrivalEngine = () => {
                                 const dom = getArmyDomain(p.armate[row.id_armata]);
                                 if (dom === 0) {
                                     p.armate[row.id_armata].status = 'cooldown';
+                                    setArmyState(p.armate[row.id_armata], ArmyState.RESUPPLYING);
                                     p.armate[row.id_armata].cooldownUntil = Date.now() + 60000; // 60s cooldown
                                 } else {
                                     p.armate[row.id_armata].status = 'standby';
+                                    setArmyState(p.armate[row.id_armata], ArmyState.STANDBY);
                                 }
                                 if (p.armate[row.id_armata].path && p.armate[row.id_armata].path.length > 0) {
                                     const lastCoord = p.armate[row.id_armata].path[p.armate[row.id_armata].path.length - 1];
@@ -876,6 +890,7 @@ const restoreActiveMoves = async () => {
                 const pathInfo = await calculatePath(startLng, startLat, row.target_node, row.x_dest, row.y_dest, unitSpeedMultiplier, null, matchMultiplier);
 
                 army.status = 'moving';
+                setArmyState(army, ArmyState.MOVING);
                 army.targetCoords = [parseFloat(row.x_dest), parseFloat(row.y_dest)];
                 army.targetName = row.target_node;
                 army.path = pathInfo.path;
