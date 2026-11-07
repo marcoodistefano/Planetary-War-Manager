@@ -10,9 +10,9 @@ import { CommonModule } from '@angular/common';
   imports: [IonicModule, CommonModule]
 })
 export class IconSelectorComponent {
-  // Aggiornato a 37 icone con estensione .jpeg e prefisso id_
+  // Aggiornato a 37 icone WebP con prefisso id_
   icons = Array.from({ length: 37 }, (_, i) => ({
-    path: `assets/profile_icons/id_${i + 1}.jpeg?v=20260517`,
+    path: `assets/profile_icons/id_${i + 1}.webp?v=20260517`,
     id: i + 1
   }));
 

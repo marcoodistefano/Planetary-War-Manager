@@ -30,13 +30,14 @@
       </div>
 
       <div class="objectives-list">
-        <div class="objective-card" *ngFor="let obj of objectives" [class.completed]="obj.progress === 100">
+        <p *ngIf="errorMessage" class="form-error">{{ errorMessage }}</p>
+        <div class="objective-card" *ngFor="let obj of objectives" [class.completed]="obj.completed">
           <div class="obj-header">
             <div class="obj-title-wrap">
               <ion-icon [name]="obj.icon"></ion-icon>
               <span>{{ obj.title }}</span>
             </div>
-            <span class="obj-reward">{{ obj.reward }}</span>
+            <span class="obj-reward">{{ obj.rewardLabel }}</span>
           </div>
           <div class="obj-body">
             <p>{{ obj.desc }}</p>
@@ -45,7 +46,8 @@
               <span class="percentage">{{ obj.progress }}%</span>
             </div>
           </div>
-          <div class="completed-badge" *ngIf="obj.progress === 100">COMPLETATO</div>
+          <div class="completed-badge" *ngIf="obj.completed">{{ obj.claimed ? 'RISCATTATO' : 'COMPLETATO' }}</div>
+          <button *ngIf="obj.completed && !obj.claimed" class="primary-glow" (click)="claim(obj)">RISCATTA</button>
         </div>
       </div>
     </div>

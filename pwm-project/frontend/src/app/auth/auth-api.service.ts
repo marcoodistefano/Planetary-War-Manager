@@ -70,4 +70,16 @@ export class AuthApiService {
   updateAvatar(avatarId: string): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.baseUrl}/player/profile/avatar`, { avatarId }, { withCredentials: true });
   }
+
+  updateUsername(newUsername: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.baseUrl}/player/profile/username`, { newUsername }, { withCredentials: true });
+  }
+
+  getAchievements(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/player/achievements`, { withCredentials: true });
+  }
+
+  claimAchievement(id: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.baseUrl}/player/achievements/${id}/claim`, {}, { withCredentials: true });
+  }
 }

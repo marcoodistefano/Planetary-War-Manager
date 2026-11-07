@@ -489,13 +489,13 @@ body {
 
 * {
   box-sizing: border-box;
-  cursor: url('/assets/mouse_cursor/mouse_cursor.png'), auto !important;
+  cursor: url('/assets/mouse_cursor/mouse_cursor.webp'), auto !important;
 }
 
 /* Overrides per lo sfondo statico */
 body.static-bg {
   .auth-background {
-    background-image: url('/assets/background/background.png') !important;
+    background-image: url('/assets/background/background.webp') !important;
     background-size: cover !important;
     background-position: center !important;
   }

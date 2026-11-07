@@ -17,6 +17,10 @@ export class AuthInterceptor implements HttpInterceptor {
   intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     return next.handle(request).pipe(
       catchError((error: unknown) => {
+        if (this.isBannedError(error)) {
+          this.router.navigate(['/login'], { queryParams: { reason: 'account_banned' } });
+        }
+
         if (this.shouldRedirectToLogin(request, error)) {
           const currentUrl = this.router.url || '/home';
           try {
@@ -30,6 +34,12 @@ export class AuthInterceptor implements HttpInterceptor {
         return throwError(() => error);
       })
     );
+  }
+
+  private isBannedError(error: unknown): boolean {
+    return error instanceof HttpErrorResponse
+      && error.status === 403
+      && error.error?.error === 'account_banned';
   }
 
   private shouldRedirectToLogin(request: HttpRequest<unknown>, error: unknown): boolean {

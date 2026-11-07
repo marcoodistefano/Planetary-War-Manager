@@ -77,7 +77,7 @@ export class ProfileModalComponent implements OnInit, OnDestroy {
     const parsedAvatarId = Number(avatarId);
 
     if (Number.isFinite(parsedAvatarId) && parsedAvatarId > 0) {
-      return `assets/profile_icons/id_${parsedAvatarId}.jpeg?v=${AVATAR_ASSET_VERSION}`;
+      return `assets/profile_icons/id_${parsedAvatarId}.webp?v=${AVATAR_ASSET_VERSION}`;
     }
 
     return null;

@@ -2170,6 +2170,20 @@ const closeMatch = async (matchId, reason = 'THRESHOLD_REACHED', explicitWinner 
       }
     }
 
+    try {
+      const { updateForMatch } = require('../shared/achievementEngine.js');
+      await updateForMatch(
+        leaderboard.map((p) => ({
+          ...p,
+          stats: { territories: p.territories },
+        })),
+        uuid,
+        client,
+      );
+    } catch (achievementErr) {
+      console.error('[CLOSE_MATCH] Errore aggiornamento achievement:', achievementErr.message);
+    }
+
     // 3. Notifica WS Broadcast a tutti i client
     try {
       const broadcastPayload = {

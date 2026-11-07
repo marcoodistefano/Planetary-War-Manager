@@ -2,7 +2,7 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } fr
 import { CommonModule } from '@angular/common'; 
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';   
 import { IonicModule, IonContent } from '@ionic/angular';   
-import { Router, RouterLink } from '@angular/router'; // Aggiungi RouterLink
+import { ActivatedRoute, Router, RouterLink } from '@angular/router'; // Aggiungi RouterLink
 import { AuthApiService } from '../auth-api.service';
 import { finalize } from 'rxjs/operators';
 import { Title } from '@angular/platform-browser';
@@ -46,12 +46,16 @@ export class LoginPage implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     private formBuilder: FormBuilder,
     private router: Router,
+    private route: ActivatedRoute,
     private authApi: AuthApiService,
     private titleService: Title
   ) {}
 
   ngOnInit() {
     this.titleService.setTitle('PWM | Login');
+    if (this.route.snapshot.queryParamMap.get('reason') === 'account_banned') {
+      this.errorMessage = 'Account sospeso. Contatta un amministratore.';
+    }
     // 3. Inizializza il form e i suoi controlli (es. email e password)
     this.loginForm = this.formBuilder.group({
       username: ['', [Validators.required, Validators.minLength(3), this.emailOrUsernameValidator]],
@@ -81,7 +85,9 @@ export class LoginPage implements OnInit, AfterViewInit, OnDestroy {
   ionViewDidEnter() {
     this.playBackgroundVideo();
     this.loginForm?.reset();
-    this.errorMessage = '';
+    this.errorMessage = this.route.snapshot.queryParamMap.get('reason') === 'account_banned'
+      ? 'Account sospeso. Contatta un amministratore.'
+      : '';
   }
 
   private playBackgroundVideo() {

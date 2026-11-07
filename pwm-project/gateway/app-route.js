@@ -54,6 +54,7 @@ const REDIS_ASSET_CONTENT_TYPES = {
   ".jpeg": "image/jpeg",
   ".jpg": "image/jpeg",
   ".png": "image/png",
+  ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".tif": "image/tiff",
   ".tiff": "image/tiff",

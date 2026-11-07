@@ -20,10 +20,10 @@
 | **M1-C** | Allineamento modello truppe Redis ↔ DB (`sync_workers`) | M1 | Bloccante | [x] | Aggiornato `performDump` in `sync_workers.js` per scansionare lo stato monolitico delle partite attive e fare `UPSERT` su `truppe` con coordinate, armata e stato. Integrato `restoreActiveMatchesState` all'avvio del `match-service` per ripristinare partite da snapshot DB se assenti in Redis. |
 | **M2-D** | Fine partita formale + cleanup chiavi Redis | M2 | Core Gameplay | [x] | Implementata `closeMatch` e `cleanupMatchRedisKeys` (SCAN iterativo sicuro) in `matchModel.js`. Aggiorna stato DB a terminata/abbandonata, applica variazioni ELO tra vincitore e ranked rimasti, invia evento WS broadcast `MATCH_ENDED` con classifica e gestisce l'evento sul frontend navigando a `/home`. |
 | **M2-E** | Statistiche di combattimento reali nel profilo | M2 | Core Gameplay | [x] | Creata tabella `statistiche_match` in `database.sql` (con indici e vincoli). Aggiunto conteggio in-game in Redis (`match:{hash}:stats:{user}`) in `combatLogic.js`. Persistenza a fine partita in `closeMatch` e calcolo aggregato reale (`kills`, `deaths`, `territories`, `win_rate`) in `playerModel.js` (`getProfileData`). |
-| **M3-F** | Aggiornamento username (`POST /player/profile/username`) | M3 | UX / Profilo | [ ] | L'endpoint in `playerController.js` (`updateUsername`) risponde con placeholder: `{"message": "Username aggiornato in costruzione"}`. Manca logica model e unicità. |
-| **M4-G** | Enforcement ban utente (middleware + gateway) | M4 | Moderazione | [ ] | Le colonne `is_banned` / `is_perma_banned` e la tabella `ban` esistono nel DB, ma `authContext.js` non controlla se l'utente è bannato, né invalida le sessioni attive al ban. |
-| **M4-H** | Autenticazione a due fattori (2FA TOTP) | M4 | Sicurezza Avanzata | [ ] | Colonne `two_fa_*` presenti in `utenti`, ma nessun endpoint né logica TOTP/QR code o verifica a due passaggi in fase di login. |
-| **M5-I** | Sistema obiettivi / achievement | M5 | Progressione (Post-v1.0) | [ ] | Tabelle `obiettivi` e `obiettivi_utente` presenti in DB, ma nessun engine di tracciamento progressi, erogazione ricompense né UI collegata. |
+| **M3-F** | Aggiornamento username (`POST /player/profile/username`) | M3 | UX / Profilo | [x] | Implementati validazione `3-32` caratteri alfanumerici/underscore, unicità case-insensitive, update DB, invalidazione `home_info:{userId}`, risposta `409 username_taken` e gestione inline nel modal Angular con aggiornamento di `UserStateService`. |
+| **M4-G** | Enforcement ban utente (middleware + gateway) | M4 | Moderazione | [x] | Aggiunto controllo cache/DB in `authContext.js` e login con `403 account_banned`; il pannello admin espone ban/unban protetti, aggiorna `utenti`, registra la scadenza in `ban` e invalida tutte le sessioni Redis. L'interceptor Angular redirige al login con messaggio esplicativo. |
+| **M4-H** | Autenticazione a due fattori (2FA TOTP) | M4 | Sicurezza Avanzata | [ ] | Saltato su richiesta; colonne `two_fa_*` presenti in `utenti`, ma nessun endpoint né logica TOTP/QR code. |
+| **M5-I** | Sistema obiettivi / achievement | M5 | Progressione (Post-v1.0) | [x] | Creato `achievementEngine.js` con catalogo e trigger a fine partita; aggiunti endpoint lista/claim, premio ELO e UI Angular con progresso reale e riscatto. |
 
 ---
 
@@ -67,20 +67,20 @@
 ---
 
 ### Milestone M3 — Profilo Utente e UX
-- [ ] **M3-F · Implementazione Aggiornamento Username**
-  - [ ] Validazione sintassi e unicità nuovo username
-  - [ ] Aggiornamento record tabella `utenti`
-  - [ ] Invalidazione cache Redis (`home_info:{userId}`)
-  - [ ] Integrazione gestione errore 409 e salvataggio nel frontend
+- [x] **M3-F · Implementazione Aggiornamento Username**
+  - [x] Validazione sintassi e unicità nuovo username
+  - [x] Aggiornamento record tabella `utenti`
+  - [x] Invalidazione cache Redis (`home_info:{userId}`)
+  - [x] Integrazione gestione errore 409 e salvataggio nel frontend
 
 ---
 
 ### Milestone M4 — Moderazione e Sicurezza Avanzata
-- [ ] **M4-G · Enforcement Ban Utente**
-  - [ ] Controllo stato ban in `authContext.js` (con cache Redis veloce)
-  - [ ] Endpoint admin per applicazione/revoca ban
-  - [ ] Invalidazione immediata sessioni attive al ban
-- [ ] **M4-H · Autenticazione a Due Fattori (2FA TOTP)**
+- [x] **M4-G · Enforcement Ban Utente**
+  - [x] Controllo stato ban in `authContext.js` (con cache Redis veloce)
+  - [x] Endpoint admin per applicazione/revoca ban
+  - [x] Invalidazione immediata sessioni attive al ban
+- [ ] **M4-H · Autenticazione a Due Fattori (2FA TOTP)** *(saltato su richiesta)*
   - [ ] Generazione segreto TOTP e QR code (`/player/profile/2fa/setup`)
   - [ ] Conferma attivazione con verifica OTP (`/player/profile/2fa/confirm`)
   - [ ] Intercettazione login con richiesta 2FA quando attivo
@@ -89,9 +89,14 @@
 ---
 
 ### Milestone M5 — Progressione a Lungo Termine (Post-v1.0)
-- [ ] **M5-I · Sistema Obiettivi / Achievement**
-  - [ ] Popolamento catalogo obiettivi in DB
-  - [ ] Sviluppo `achievementEngine.js` in ascolto sugli eventi di gioco
-  - [ ] Endpoint di riscatto ricompense (`claim`)
-  - [ ] Schermata obiettivi nel client Angular
+- [x] **M5-I · Sistema Obiettivi / Achievement**
+  - [x] Popolamento catalogo obiettivi in DB
+  - [x] Sviluppo `achievementEngine.js` collegato alla chiusura partita
+  - [x] Endpoint di riscatto ricompense (`claim`) con premio ELO
+  - [x] Schermata obiettivi nel client Angular con progresso e riscatto
+
+### Ottimizzazione Asset Statici
+- [x] Conversione di tutti i 143 PNG/JPEG locali in WebP
+- [x] Aggiornamento riferimenti Angular e MIME type del gateway
+- [x] Riduzione peso asset da circa 569 MB a circa 9,9 MB
 

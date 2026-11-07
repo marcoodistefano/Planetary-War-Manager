@@ -16,6 +16,8 @@ export interface AppSettings {
 export class UserStateService {
   private avatarIdSubject = new BehaviorSubject<number>(1);
   avatarId$ = this.avatarIdSubject.asObservable();
+  private usernameSubject = new BehaviorSubject<string>('');
+  username$ = this.usernameSubject.asObservable();
 
   private settingsSubject: BehaviorSubject<AppSettings>;
   settings$: Observable<AppSettings>;
@@ -29,6 +31,10 @@ export class UserStateService {
 
   setAvatarId(id: number) {
     this.avatarIdSubject.next(id);
+  }
+
+  setUsername(username: string) {
+    this.usernameSubject.next(username);
   }
 
   getSettings(): AppSettings {

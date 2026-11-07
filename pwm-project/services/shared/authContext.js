@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const redisClient = require("./redisClient");
+const { getBanStatus } = require("./banStatus.js");
 
 const JWT_SECRET =
   process.env.JWT_SECRET ||
@@ -66,6 +67,17 @@ const getAuthContextFromRequest = async (req) => {
     return { ok: false, status: 401, error: "Sessione mancante nel token" };
   }
 
+  const userIdFromToken =
+    decoded && typeof decoded.sub === "string" ? decoded.sub : null;
+  if (!userIdFromToken) {
+    return { ok: false, status: 401, error: "Identita utente non risolvibile" };
+  }
+
+  const banStatus = await getBanStatus(userIdFromToken);
+  if (banStatus.isBanned || banStatus.isPermaBanned) {
+    return { ok: false, status: 403, error: "account_banned" };
+  }
+
   const sessionDataRaw = await redisClient.get(`session:${sessionId}`);
   if (!sessionDataRaw) {
     return { ok: false, status: 401, error: "Sessione terminata o non valida" };
@@ -82,9 +94,6 @@ const getAuthContextFromRequest = async (req) => {
     sessionData && typeof sessionData.userId === "string"
       ? sessionData.userId
       : null;
-  const userIdFromToken =
-    decoded && typeof decoded.sub === "string" ? decoded.sub : null;
-
   if (userIdFromSession && userIdFromToken && userIdFromSession !== userIdFromToken) {
     return { ok: false, status: 401, error: "Identita sessione non coerente" };
   }

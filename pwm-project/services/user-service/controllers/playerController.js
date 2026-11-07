@@ -1,5 +1,6 @@
 const playerModel = require("../models/playerModel.js");
 const { getAuthContextFromRequest } = require("../../shared/authContext.js");
+const achievementEngine = require("../../shared/achievementEngine.js");
 
 const resolveUserId = async (req, res) => {
   const auth = await getAuthContextFromRequest(req);
@@ -78,9 +79,13 @@ const updateUsername = async (req, res) => {
     const U_ID = await resolveUserId(req, res);
     if (!U_ID) return;
     const { newUsername } = req.body;
-    // Qui andrà la chiamata al model per aggiornare
-    return res.json({ message: "Username aggiornato in costruzione" });
+    const result = await playerModel.updateUsername(U_ID, newUsername);
+    if (result.status !== 200) {
+      return res.status(result.status).json({ error: result.error });
+    }
+    return res.status(200).json(result);
   } catch (error) {
+    console.error("Errore controller updateUsername:", error);
     return res.status(500).json({ error: "Errore interno" });
   }
 };
@@ -133,6 +138,30 @@ const updateAvatar = async (req, res) => {
   } catch (error) {
     console.error("Errore controller updateAvatar:", error);
     return res.status(500).json({ error: "Errore interno del server" });
+  }
+};
+
+const getAchievements = async (req, res) => {
+  try {
+    const U_ID = await resolveUserId(req, res);
+    if (!U_ID) return;
+    const data = await achievementEngine.listForUser(U_ID);
+    return res.status(200).json({ status: 200, data });
+  } catch (error) {
+    console.error("Errore controller getAchievements:", error);
+    return res.status(500).json({ error: "Errore nel recupero degli obiettivi" });
+  }
+};
+
+const claimAchievement = async (req, res) => {
+  try {
+    const U_ID = await resolveUserId(req, res);
+    if (!U_ID) return;
+    const result = await achievementEngine.claimForUser(U_ID, req.params.id);
+    return res.status(result.status).json(result);
+  } catch (error) {
+    console.error("Errore controller claimAchievement:", error);
+    return res.status(500).json({ error: "Errore nel riscatto della ricompensa" });
   }
 };
 
@@ -223,6 +252,8 @@ module.exports = {
   updateUsername,
   updatePassword,
   updateAvatar,
+  getAchievements,
+  claimAchievement,
   getFriends,
   getFriendPendingRequests,
   sendFriendRequest_byCode,

@@ -37,11 +37,12 @@
               <div class="setting-item">
                 <label>NUOVO IDENTIFICATIVO TERMINALE</label>
                 <input type="text" [(ngModel)]="newName" placeholder="Inserisci nome..." class="tactical-input" />
+                <p class="error-message" *ngIf="errorMessage">{{ errorMessage }}</p>
               </div>
 
               <div class="action-footer">
-                <button class="primary-glow full-width" (click)="confirm()" [disabled]="newName.length < 3">
-                  AGGIORNA USERNAME
+                <button class="primary-glow full-width" (click)="confirm()" [disabled]="newName.trim().length < 3 || isSaving">
+                  {{ isSaving ? 'SALVATAGGIO...' : 'AGGIORNA USERNAME' }}
                 </button>
               </div>
             </div>

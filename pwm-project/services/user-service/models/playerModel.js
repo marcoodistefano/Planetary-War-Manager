@@ -3,6 +3,8 @@ const redisClient = require("../../shared/redisClient.js");
 const aslan = require("../middleware/Aslan.js");
 const Eru = require("../middleware/Eru_recostructor.js");
 
+const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,32}$/;
+
 const fetchToRedis = async (U_ID, Information) => {
   const redis_response = await redisClient.setEx(
     `home_info:${U_ID}`,
@@ -310,6 +312,54 @@ const buildHome = async (U_ID) => {
 
 };
 
+const updateUsername = async (U_ID, newUsername) => {
+  const username = typeof newUsername === "string" ? newUsername.trim() : "";
+
+  if (!USERNAME_PATTERN.test(username)) {
+    return {
+      status: 400,
+      error: "Lo username deve contenere da 3 a 32 caratteri: lettere, numeri o underscore",
+    };
+  }
+
+  try {
+    const result = await db.query(
+      `UPDATE utenti
+       SET username = $1
+       WHERE id_user = $2
+         AND NOT EXISTS (
+           SELECT 1 FROM utenti
+           WHERE LOWER(username) = LOWER($1) AND id_user <> $2
+         )
+       RETURNING username`,
+      [username, U_ID],
+    );
+
+    if (result.rowCount === 0) {
+      const userResult = await db.query(
+        "SELECT 1 FROM utenti WHERE id_user = $1",
+        [U_ID],
+      );
+      return userResult.rowCount === 0
+        ? { status: 404, error: "Utente non trovato" }
+        : { status: 409, error: "username_taken" };
+    }
+
+    await redisClient.del(`home_info:${U_ID}`);
+    return {
+      status: 200,
+      message: "Username aggiornato con successo",
+      data: result.rows[0],
+    };
+  } catch (error) {
+    if (error?.code === "23505") {
+      return { status: 409, error: "username_taken" };
+    }
+    console.error("Errore in updateUsername:", error);
+    return { status: 500, error: "Errore durante l'aggiornamento dello username" };
+  }
+};
+
 const getAvatar = async (U_ID) => {
   try {
     const sanitize_avatar = U_ID.split("avatar_").join(""); // Rimuove "avatar_" per la corretta scrittura nel DB
@@ -586,6 +636,7 @@ module.exports = {
   buildHome,
   buildActiveMatchesBrowser,
   getProfileData,
+  updateUsername,
   getAvatar,
   updateAvatar,
   getFriends,

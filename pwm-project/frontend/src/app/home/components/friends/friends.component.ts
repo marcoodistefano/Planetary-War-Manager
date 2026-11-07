@@ -30,7 +30,7 @@ export class FriendsComponent {
 
   private avatarPath(avatarId: number) {
     const AVATAR_ASSET_VERSION = '20260517';
-    return `assets/profile_icons/id_${avatarId}.jpeg?v=${AVATAR_ASSET_VERSION}`;
+    return `assets/profile_icons/id_${avatarId}.webp?v=${AVATAR_ASSET_VERSION}`;
   }
 
   get filteredFriends() {

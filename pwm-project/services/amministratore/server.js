@@ -4,6 +4,8 @@ const path = require('path');
 const axios = require('axios');
 const cors = require('cors');
 const tar = require('tar-fs');
+const { Pool } = require('pg');
+const { createClient } = require('redis');
 
 const app = express();
 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
@@ -44,6 +46,17 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const SECRET = 'PWM{Th1s_1s_Y0UR_F1rs7_Fl4g!}';
+const db = new Pool({
+    connectionString: process.env.DB_URL,
+    host: process.env.DB_HOST || 'db',
+    user: process.env.DB_USER || 'commander_admin',
+    password: process.env.DB_PASSWORD || 'secret',
+    database: process.env.DB_NAME || 'pwm_tactical_database',
+    port: Number(process.env.DB_PORT || 5432),
+});
+const redisClient = createClient({ url: process.env.REDIS_URL || 'redis://redis:6379' });
+redisClient.on('error', (error) => console.error('Redis admin error:', error.message));
+redisClient.connect().catch((error) => console.error('Redis admin connection error:', error.message));
 
 // Autenticazione Form
 app.post('/api/login', (req, res) => {
@@ -61,6 +74,84 @@ app.use('/api', (req, res, next) => {
         return next();
     }
     res.status(401).json({ error: 'Non autorizzato' });
+});
+
+const invalidateUserSessions = async (userId) => {
+    const sessionIds = await redisClient.sMembers(`user_sessions:${userId}`);
+    const sessionKeys = sessionIds.map((sessionId) => `session:${sessionId}`);
+    if (sessionKeys.length > 0) {
+        await redisClient.del(sessionKeys);
+    }
+    await redisClient.del(`user_sessions:${userId}`);
+    await redisClient.del(`ban:${userId}`);
+};
+
+app.post('/api/ban/:userId', async (req, res) => {
+    const { userId } = req.params;
+    const { permanent = false, timeUntil, durationHours = 24, motivo = 'moderazione' } = req.body || {};
+    const isPermanent = permanent === true;
+    const expiresAt = isPermanent
+        ? '9999-12-31T23:59:59.999Z'
+        : (timeUntil || new Date(Date.now() + Number(durationHours) * 60 * 60 * 1000).toISOString());
+
+    if (!motivo || String(motivo).length > 20 || Number.isNaN(new Date(expiresAt).getTime())) {
+        return res.status(400).json({ error: 'invalid_ban_parameters' });
+    }
+
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const userResult = await client.query('SELECT 1 FROM utenti WHERE id_user = $1', [userId]);
+        if (userResult.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'user_not_found' });
+        }
+
+        await client.query(
+            `INSERT INTO ban (id_user, time_until, motivo) VALUES ($1, $2, $3)`,
+            [userId, new Date(expiresAt), String(motivo)],
+        );
+        await client.query(
+            `UPDATE utenti
+             SET is_banned = TRUE, is_perma_banned = $1
+             WHERE id_user = $2`,
+            [isPermanent, userId],
+        );
+        await client.query('COMMIT');
+        await invalidateUserSessions(userId);
+        return res.json({ success: true, userId, permanent: isPermanent, timeUntil: expiresAt });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        return res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
+    }
+});
+
+app.post('/api/unban/:userId', async (req, res) => {
+    const { userId } = req.params;
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const userResult = await client.query('SELECT 1 FROM utenti WHERE id_user = $1', [userId]);
+        if (userResult.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'user_not_found' });
+        }
+        await client.query('DELETE FROM ban WHERE id_user = $1', [userId]);
+        await client.query(
+            'UPDATE utenti SET is_banned = FALSE, is_perma_banned = FALSE WHERE id_user = $1',
+            [userId],
+        );
+        await client.query('COMMIT');
+        await redisClient.del(`ban:${userId}`);
+        return res.json({ success: true, userId });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        return res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
+    }
 });
 
 // Storia delle performance per le ultime 24 ore

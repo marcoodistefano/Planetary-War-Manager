@@ -114,7 +114,7 @@ export class HomePage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private avatarPath(avatarId: number) {
-    return `assets/profile_icons/id_${avatarId}.jpeg?v=${AVATAR_ASSET_VERSION}`;
+    return `assets/profile_icons/id_${avatarId}.webp?v=${AVATAR_ASSET_VERSION}`;
   }
 
   ngOnDestroy() {

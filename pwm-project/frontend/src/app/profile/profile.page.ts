@@ -66,7 +66,7 @@ export class ProfilePage implements OnInit, AfterViewInit {
   }
 
   private avatarPath(avatarId: number) {
-    return `assets/profile_icons/id_${avatarId}.jpeg?v=${AVATAR_ASSET_VERSION}`;
+    return `assets/profile_icons/id_${avatarId}.webp?v=${AVATAR_ASSET_VERSION}`;
   }
 
   // === METODI PER IL PLAYBACK DEL VIDEO ===
@@ -117,6 +117,7 @@ export class ProfilePage implements OnInit, AfterViewInit {
             truppe_perse: stats.deaths,
             win_rate: stats.win_rate
           };
+          this.userState.setUsername(profile.username);
         }
       },
       error: (err) => {
@@ -141,7 +142,7 @@ export class ProfilePage implements OnInit, AfterViewInit {
   if (data) {
     console.log("Nuovo Avatar selezionato (path):", data);
     
-    // Estraiamo l'ID dall'URL. Dall'URL 'assets/profile_icons/id_2.jpeg', vogliamo ottenere il numero '2'
+    // Estraiamo l'ID dall'URL, ad esempio 'assets/profile_icons/id_2.webp'.
     const fileName = data.split('/').pop(); 
     const idWithPrefix = fileName ? fileName.split('.')[0] : null; 
     const avatarId = idWithPrefix ? parseInt(idWithPrefix.replace('id_', ''), 10) : null; // 2
@@ -171,7 +172,12 @@ async changeUsername() {
     cssClass: 'profile-modal',
     canDismiss: true
   });
-  return await modal.present();
+  await modal.present();
+  const { data } = await modal.onDidDismiss();
+  if (data) {
+    this.user.username = data;
+    this.userState.setUsername(data);
+  }
 }
 
 async changePassword() {

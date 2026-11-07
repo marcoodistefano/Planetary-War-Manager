@@ -17,5 +17,7 @@ router.get("/player/avatar", playerController.getAvatar);
 router.post("/player/profile/username", playerController.updateUsername);
 router.post("/player/profile/password", playerController.updatePassword);
 router.post("/player/profile/avatar", playerController.updateAvatar);
+router.get("/player/achievements", playerController.getAchievements);
+router.post("/player/achievements/:id/claim", playerController.claimAchievement);
 
 module.exports = router;

@@ -3,6 +3,7 @@ const redisClient = require("../../shared/redisClient.js");
 const { extractTokenFromRequest } = require("../../shared/authContext.js");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const { getBanStatus } = require("../../shared/banStatus.js");
 
 const JWT_SECRET =
   process.env.JWT_SECRET ||
@@ -86,6 +87,11 @@ const login = async (req, res) => {
     }
 
     const userId = authResult.uuid;
+    const banStatus = await getBanStatus(userId);
+    if (banStatus.isBanned || banStatus.isPermaBanned) {
+      return res.status(403).json({ error: "account_banned" });
+    }
+
     const sessionId = crypto.randomUUID();
     const ipAddress = getClientIp(req);
 

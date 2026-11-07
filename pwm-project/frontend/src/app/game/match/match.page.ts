@@ -242,7 +242,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       direction = 'side';
     }
 
-    const suffix = '_' + direction.replace('-flip', '') + '.png';
+    const suffix = '_' + direction.replace('-flip', '') + '.webp';
     if (modelName === 'Soldier') {
       return `/assets/2Dmodels/Land_troops/Soldier/soldier${suffix}`;
     }
@@ -681,7 +681,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private preloadTroopImages() {
-    const images = ['soldier_front.png', 'soldier_back.png', 'soldier_side.png'];
+    const images = ['soldier_front.webp', 'soldier_back.webp', 'soldier_side.webp'];
     images.forEach(img => {
       const i = new Image();
       i.src = `/assets/2Dmodels/Land_troops/Soldier/${img}`;
@@ -1552,7 +1552,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private avatarPath(avatarId: number) {
-    return `assets/profile_icons/id_${avatarId}.jpeg?v=${AVATAR_ASSET_VERSION}`;
+    return `assets/profile_icons/id_${avatarId}.webp?v=${AVATAR_ASSET_VERSION}`;
   }
 
   ngAfterViewInit() {
@@ -2395,7 +2395,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   getStructureImage(name: string, structureId?: string): string {
-    let png = 'fabbrica.png';
+    let png = 'fabbrica.webp';
     name = (name || '').toLowerCase();
 
     if (structureId && this.gameRules && this.gameRules.sheets) {
@@ -2403,50 +2403,50 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       const extDetails = estrattori.find((s: any) => s.id_extractor === structureId);
       if (extDetails && extDetails.risorsa_estratta) {
         const resType = extDetails.risorsa_estratta.toLowerCase();
-        if (resType === 'legno') return 'segheria.png';
-        if (resType === 'mattoni') return 'mattonificio.png';
-        if (resType === 'acciaio') return 'acciaieria.png';
-        if (resType === 'petrolio') return 'petrolio.png';
-        if (resType === 'piombo') return 'carbone.png'; // Fallback per miniere senza icona dedicata
-        if (resType === 'oro') return 'miniera_oro.png';
-        if (resType === 'uranio') return 'arricchimento_uranio.png';
-        if (resType === 'gas_naturale') return 'gas.png';
+        if (resType === 'legno') return 'segheria.webp';
+        if (resType === 'mattoni') return 'mattonificio.webp';
+        if (resType === 'acciaio') return 'acciaieria.webp';
+        if (resType === 'petrolio') return 'petrolio.webp';
+        if (resType === 'piombo') return 'carbone.webp'; // Fallback per miniere senza icona dedicata
+        if (resType === 'oro') return 'miniera_oro.webp';
+        if (resType === 'uranio') return 'arricchimento_uranio.webp';
+        if (resType === 'gas_naturale') return 'gas.webp';
       }
     }
 
-    if (name.includes('segheria') || name.includes('boschivo')) png = 'segheria.png';
+    if (name.includes('segheria') || name.includes('boschivo')) png = 'segheria.webp';
     else if (name.includes('miniera') || name.includes('scavo') || name.includes('carbone')) {
-      if (name.includes('oro')) png = 'miniera_oro.png';
-      else png = 'carbone.png'; // Fallback per altre miniere (es. piombo)
+      if (name.includes('oro')) png = 'miniera_oro.webp';
+      else png = 'carbone.webp'; // Fallback per altre miniere (es. piombo)
     }
-    else if (name.includes('mattonificio') || name.includes('fornace')) png = 'mattonificio.png';
-    else if (name.includes('acciaieria') || name.includes('fonderia')) png = 'acciaieria.png';
-    else if (name.includes('petrol') || name.includes('idrocarburi')) png = 'petrolio.png';
-    else if (name.includes('gas')) png = 'gas.png';
-    else if (name.includes('fortezza')) png = 'fortezza.png';
-    else if (name.includes('caserma')) png = 'caserma.png';
-    else if (name.includes('fabbrica') || name.includes('armamenti')) png = 'fabbrica.png';
+    else if (name.includes('mattonificio') || name.includes('fornace')) png = 'mattonificio.webp';
+    else if (name.includes('acciaieria') || name.includes('fonderia')) png = 'acciaieria.webp';
+    else if (name.includes('petrol') || name.includes('idrocarburi')) png = 'petrolio.webp';
+    else if (name.includes('gas')) png = 'gas.webp';
+    else if (name.includes('fortezza')) png = 'fortezza.webp';
+    else if (name.includes('caserma')) png = 'caserma.webp';
+    else if (name.includes('fabbrica') || name.includes('armamenti')) png = 'fabbrica.webp';
     else if (name.includes('aeroporto')) {
-      if (name.includes('2') || name.includes('avanzato')) png = 'airport2.png';
-      else png = 'airport1.png';
+      if (name.includes('2') || name.includes('avanzato')) png = 'airport2.webp';
+      else png = 'airport1.webp';
     }
     else if (name.includes('porto')) {
-      if (name.includes('nord')) png = 'port_nord.png';
-      else if (name.includes('sud')) png = 'port_sud.png';
-      else if (name.includes('ovest')) png = 'port_ovest.png';
-      else png = 'port_est.png';
+      if (name.includes('nord')) png = 'port_nord.webp';
+      else if (name.includes('sud')) png = 'port_sud.webp';
+      else if (name.includes('ovest')) png = 'port_ovest.webp';
+      else png = 'port_est.webp';
     }
-    else if (name.includes('uranio')) png = 'arricchimento_uranio.png';
+    else if (name.includes('uranio')) png = 'arricchimento_uranio.webp';
     else if (name.includes('radar')) {
-      if (name.includes('aereo') || name.includes('volo')) png = 'radar_aereo.png';
-      else png = 'radar_terrestre.png';
+      if (name.includes('aereo') || name.includes('volo')) png = 'radar_aereo.webp';
+      else png = 'radar_terrestre.webp';
     }
     else if (name.includes('treno') || name.includes('stazione') || name.includes('ferrov')) {
-      png = 'train_station.png';
+      png = 'train_station.webp';
     }
-    else if (name.includes('hangar')) png = 'hangar.png';
-    else if (name.includes('artiglieria') || name.includes('costiera')) png = 'difesa_costiera.png';
-    else if (name.includes('sampt') || name.includes('missil') || name.includes('difes')) png = 'sampt.png';
+    else if (name.includes('hangar')) png = 'hangar.webp';
+    else if (name.includes('artiglieria') || name.includes('costiera')) png = 'difesa_costiera.webp';
+    else if (name.includes('sampt') || name.includes('missil') || name.includes('difes')) png = 'sampt.webp';
 
     return png;
   }
@@ -2497,7 +2497,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
         let png = this.getStructureImage(structure.name, structure.structureId);
         if (structure.status === 'building') {
-          png = 'workinprogress.png';
+          png = 'workinprogress.webp';
         }
 
         const img = document.createElement('img');
@@ -2547,7 +2547,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         if (img) {
           let png = this.getStructureImage(structure.name, structure.structureId);
           if (structure.status === 'building') {
-            png = 'workinprogress.png';
+            png = 'workinprogress.webp';
           }
           img.src = `assets/2Dmodels/Buildings/${png}`;
           img.style.opacity = structure.status === 'building' ? '0.5' : '1';
