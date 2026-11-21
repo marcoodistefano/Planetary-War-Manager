@@ -11,10 +11,18 @@
   </header>
 
   <nav class="order-filters" aria-label="Filtra ordini">
-    <button [class.active]="statusFilter === 'all'" (click)="statusFilter = 'all'">TUTTI</button>
-    <button [class.active]="statusFilter === 'moving'" (click)="statusFilter = 'moving'">MOVIMENTO</button>
-    <button [class.active]="statusFilter === 'combat'" (click)="statusFilter = 'combat'">COMBATTIMENTO</button>
-    <button [class.active]="statusFilter === 'returning'" (click)="statusFilter = 'returning'">RIENTRO</button>
+    <button [class.active]="statusFilter === 'all'" (click)="statusFilter = 'all'">
+      TUTTI <span class="filter-count">({{ getFilterCount('all') }})</span>
+    </button>
+    <button [class.active]="statusFilter === 'moving'" (click)="statusFilter = 'moving'">
+      MOVIMENTO <span class="filter-count">({{ getFilterCount('moving') }})</span>
+    </button>
+    <button [class.active]="statusFilter === 'combat'" (click)="statusFilter = 'combat'">
+      COMBATTIMENTO <span class="filter-count">({{ getFilterCount('combat') }})</span>
+    </button>
+    <button [class.active]="statusFilter === 'returning'" (click)="statusFilter = 'returning'">
+      RIENTRO <span class="filter-count">({{ getFilterCount('returning') }})</span>
+    </button>
   </nav>
 
   <div class="order-list" *ngIf="displayedOrders.length > 0; else noOrders">
@@ -41,12 +49,34 @@
       </div>
 
       <div class="order-actions">
-        <button (click)="centerOnArmy.emit(army.id)" title="Centra sulla mappa">
+        <button (click)="centerOnArmy.emit(army.id)" title="Centra sulla mappa" aria-label="Centra sulla mappa">
           <ion-icon name="locate-outline"></ion-icon> MAPPA
         </button>
-        <button class="cancel-order" (click)="cancelMission.emit(army.id)" title="Annulla missione">
+        <button class="cancel-order" (click)="cancelMission.emit(army.id)" title="Annulla missione in corso" aria-label="Annulla missione in corso">
           <ion-icon name="close-circle-outline"></ion-icon> ANNULLA
         </button>
+      </div>
+
+      <!-- Coda missioni in attesa -->
+      <div class="mission-queue" *ngIf="getQueueForArmy(army).length > 0">
+        <div class="queue-label">
+          <ion-icon name="list-outline"></ion-icon>
+          <span>CODA ({{ getQueueForArmy(army).length }})</span>
+        </div>
+        <ul class="queue-list">
+          <li *ngFor="let mission of getQueueForArmy(army); let i = index" class="queue-item">
+            <ion-icon name="arrow-forward-outline"></ion-icon>
+            <span class="queue-mission-label">{{ getQueuedMissionLabel(mission) }}</span>
+            <span class="queue-mission-target" *ngIf="mission.targetName">→ {{ mission.targetName }}</span>
+            <button
+              class="queue-remove-btn"
+              (click)="removeFromQueue.emit({ armyId: army.id, index: i })"
+              title="Rimuovi dalla coda"
+              aria-label="Rimuovi missione dalla coda">
+              <ion-icon name="trash-outline"></ion-icon>
+            </button>
+          </li>
+        </ul>
       </div>
     </article>
   </div>

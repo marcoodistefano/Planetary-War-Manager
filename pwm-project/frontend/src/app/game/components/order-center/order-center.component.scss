@@ -84,6 +84,12 @@
     cursor: pointer;
     font-size: 0.62rem;
     font-weight: 700;
+
+    .filter-count {
+      opacity: 0.8;
+      font-size: 0.58rem;
+      margin-left: 2px;
+    }
   }
 
   button.active {
@@ -233,6 +239,91 @@
     border-color: #f87171;
     background: rgba(127, 29, 29, 0.35);
     color: #fecaca;
+  }
+}
+
+// --- Coda missioni ---
+.mission-queue {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.2);
+}
+
+.queue-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+
+  ion-icon {
+    font-size: 0.75rem;
+  }
+}
+
+.queue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.5);
+  color: #94a3b8;
+  font-size: 0.68rem;
+
+  ion-icon {
+    color: #475569;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+  }
+
+  .queue-mission-label {
+    color: #cbd5e1;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .queue-mission-target {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #64748b;
+    font-size: 0.63rem;
+  }
+}
+
+.queue-remove-btn {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  border-radius: 3px;
+  background: rgba(127, 29, 29, 0.25);
+  color: #f87171;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: background 0.15s ease;
+  margin-left: auto;
+
+  &:hover {
+    background: rgba(127, 29, 29, 0.55);
   }
 }
 

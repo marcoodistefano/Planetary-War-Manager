@@ -81,6 +81,12 @@
 <div class="ion-page" id="main-map-content">
   <ion-content [fullscreen]="true" class="transparent-bg" [scrollY]="false">
 
+    <!-- CONNECTION STATUS BANNER (FASE UX-1) -->
+    <div class="connection-status-banner" *ngIf="showConnectionBanner" [ngClass]="connectionState">
+      <span class="status-indicator-dot"></span>
+      <span class="status-indicator-text">{{ connectionStatusMessage }}</span>
+    </div>
+
     <div class="hud-panel top-navbar desktop-only">
 
       <div class="nav-group-left">
@@ -189,18 +195,21 @@
     <app-order-center
       *ngIf="isOrderCenterOpen"
       [armies]="matchArmies"
-      [username]="userProfile?.username || ''"
+      [username]="userProfile.username || ''"
       [orderEvents]="orderEvents"
+      [missionQueues]="missionQueues"
       (close)="isOrderCenterOpen = false"
       (centerOnArmy)="centerMapOnArmy($event)"
-      (cancelMission)="cancelArmyMission($event)">
+      (cancelMission)="cancelArmyMission($event)"
+      (removeFromQueue)="removeQueuedMission($event)">
     </app-order-center>
 
     <app-combat-center
       [armies]="matchArmies"
-      [username]="userProfile?.username || ''"
+      [username]="userProfile.username || ''"
       [tacticalDecisions]="tacticalDecisions"
       [combatEvents]="combatEvents"
+      (centerOnArmy)="centerMapOnArmy($event)"
       (retreat)="retreatFromCombat($event)"
       (tacticalDecision)="onCombatTacticalDecision($event)">
     </app-combat-center>
@@ -388,7 +397,7 @@
           [gameRules]="gameRules" [selectedTargetName]="selectedPointName" [selectedTargetCoords]="selectedPointCoords"
           [selectedArmyId]="selectedArmyId" [initialTab]="initialArmyTab"
           [currentMatchId]="currentMatchId"
-          [currentUsername]="userProfile?.username || ''"
+          [currentUsername]="userProfile.username || ''"
           [capitalName]="myCapitalName"
           (createArmyRequest)="onCreateArmyRequest($event)"
           (disbandArmyRequest)="onDisbandArmyRequest($event)"
@@ -461,9 +470,9 @@
 
     <div class="mission-preview-panel" *ngIf="showPreviewModal" [class.invalid]="!isPreviewValid">
       <div class="mission-preview-heading">
-        <ion-icon [name]="isPreviewValid ? 'analytics-outline' : 'warning-outline'"></ion-icon>
+        <ion-icon [name]="isCalculatingPreview ? 'sync-outline' : (isPreviewValid ? 'analytics-outline' : 'warning-outline')" [class.rotating]="isCalculatingPreview"></ion-icon>
         <div>
-          <strong>{{ isPreviewValid ? 'Conferma ordine tattico' : 'Percorso non consentito' }}</strong>
+          <strong>{{ isCalculatingPreview ? 'Calcolo del percorso tattico...' : (isPreviewValid ? 'Conferma ordine tattico' : 'Percorso non consentito') }}</strong>
           <small>{{ getPreviewActionLabel() }} verso {{ pendingMissions[0]?.targetName || 'bersaglio selezionato' }}</small>
         </div>
       </div>
@@ -496,19 +505,20 @@
       </div>
 
       <div class="mission-preview-actions">
-        <button class="preview-confirm" (click)="confirmPendingMissions()" [disabled]="!isPreviewValid" title="Conferma ordine">
-          <ion-icon name="checkmark-outline"></ion-icon> CONFERMA
+        <button class="preview-confirm" (click)="confirmPendingMissions()" [disabled]="!isPreviewValid || isSubmittingOrder || isCalculatingPreview" title="Conferma ordine">
+          <ion-icon [name]="isSubmittingOrder ? 'hourglass-outline' : 'checkmark-outline'"></ion-icon>
+          {{ isSubmittingOrder ? 'INVIO ORDINE...' : 'CONFERMA' }}
         </button>
-        <button class="preview-queue" (click)="queuePendingMissions()" [disabled]="!isPreviewValid" title="Accoda missioni">
+        <button class="preview-queue" (click)="queuePendingMissions()" [disabled]="!isPreviewValid || isSubmittingOrder || isCalculatingPreview" title="Accoda missioni">
           <ion-icon name="list-outline"></ion-icon> ACCODA
         </button>
-        <button class="preview-sync" (click)="synchronizePendingMissions()" [disabled]="!isPreviewValid || pendingMissions.length < 2" title="Sincronizza arrivo">
+        <button class="preview-sync" (click)="synchronizePendingMissions()" [disabled]="!isPreviewValid || pendingMissions.length < 2 || isSubmittingOrder || isCalculatingPreview" title="Sincronizza arrivo">
           <ion-icon name="git-compare-outline"></ion-icon> SINCRONIZZA
         </button>
-        <button class="preview-waypoint" (click)="addWaypoint()" title="Aggiungi waypoint">
+        <button class="preview-waypoint" (click)="addWaypoint()" [disabled]="isSubmittingOrder" title="Aggiungi waypoint">
           <ion-icon name="add-outline"></ion-icon> TAPPA
         </button>
-        <button class="preview-cancel" (click)="cancelPendingMissions()" title="Annulla ordine">
+        <button class="preview-cancel" (click)="cancelPendingMissions()" [disabled]="isSubmittingOrder" title="Annulla ordine">
           <ion-icon name="close-outline"></ion-icon> ANNULLA
         </button>
       </div>

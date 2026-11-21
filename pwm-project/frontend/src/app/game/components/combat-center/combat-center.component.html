@@ -7,35 +7,82 @@
     <ion-icon name="flash-outline"></ion-icon>
   </header>
 
+  <!-- Armate in combattimento attivo -->
   <article class="combat-card" *ngFor="let army of activeCombats">
     <div class="combat-card-title">
       <div>
         <strong>{{ army.name || army.id }}</strong>
         <span>Ingaggio in corso</span>
       </div>
-      <span class="combat-status">{{ getNextRoundLabel(army) }}</span>
+      <span class="combat-status" title="Prossimo round">⏱ {{ getNextRoundLabel(army) }}</span>
+    </div>
+
+    <!-- HP bar -->
+    <div class="hp-bar-wrapper" *ngIf="army.hp !== undefined">
+      <div class="hp-bar-track">
+        <div class="hp-bar-fill" [style.width.%]="getHpPercent(army)"></div>
+      </div>
+      <span class="hp-label">{{ getHpLabel(army) }}</span>
     </div>
 
     <div class="combat-stats">
-      <div><span>HP</span><strong>{{ getHpLabel(army) }}</strong></div>
       <div><span>UNITA</span><strong>{{ getArmyUnits(army) | number }}</strong></div>
       <div><span>BERSAGLIO</span><strong>{{ army.targetName || 'Nemico rilevato' }}</strong></div>
-        <div><span>DISTANZA</span><strong>{{ getCombatDistance(army) }}</strong></div>
-        <div><span>GITTATA</span><strong>{{ getCombatRange(army) }}</strong></div>
+      <div><span>DISTANZA</span><strong>{{ getCombatDistance(army) }}</strong></div>
+      <div><span>GITTATA</span><strong>{{ getCombatRange(army) }}</strong></div>
     </div>
 
-    <div class="combat-event" *ngIf="getLatestEvent(army) as event">
-      <ion-icon name="pulse-outline"></ion-icon>
-      <span>{{ event.attacker }} / {{ event.defender }}: {{ event.damage }} danni, {{ event.result }}</span>
+    <!-- Cronologia round (ultimi 3) -->
+    <div class="round-history" *ngIf="getRoundHistory(army).length > 0">
+      <div class="round-history-label">
+        <ion-icon name="time-outline"></ion-icon>
+        <span>ULTIMI ROUND</span>
+      </div>
+      <ul class="round-list">
+        <li *ngFor="let event of getRoundHistory(army)" class="round-item">
+          <span class="round-damage">{{ getRoundDamageLabel(event, army) }}</span>
+          <span class="round-vs">vs {{ event.attacker === army.name ? event.defender : event.attacker }}</span>
+          <span class="round-result" [ngClass]="getRoundResultClass(event)">{{ getRoundResultLabel(event) }}</span>
+        </li>
+      </ul>
     </div>
 
     <div class="combat-actions">
-      <button class="retreat-button" (click)="retreat.emit(army.id)" title="Ritirati dal combattimento">
+      <button class="map-button" (click)="centerOnArmy.emit(army.id)" title="Visualizza sulla mappa" aria-label="Centra mappa su armata">
+        <ion-icon name="locate-outline"></ion-icon> MAPPA
+      </button>
+      <button class="retreat-button" (click)="retreat.emit(army.id)" title="Ritirati dal combattimento" aria-label="Ordine di ritirata">
         <ion-icon name="return-up-back-outline"></ion-icon> RITIRATI
       </button>
     </div>
   </article>
 
+  <!-- Armate in ritirata / rientro / cooldown -->
+  <div class="retreat-section" *ngIf="retreatingArmies.length > 0">
+    <div class="retreat-section-label">
+      <ion-icon name="shield-half-outline"></ion-icon>
+      <span>IN RITIRATA / RIENTRO</span>
+    </div>
+    <article class="retreat-card" *ngFor="let army of retreatingArmies">
+      <div class="retreat-card-row">
+        <div class="retreat-info">
+          <strong>{{ army.name || army.id }}</strong>
+          <span class="retreat-state-label">{{ getRetreatStateLabel(army) }}</span>
+        </div>
+        <div class="retreat-meta">
+          <span class="retreat-eta">ETA {{ getRetreatEta(army) }}</span>
+          <span class="retreat-units">{{ getArmyUnits(army) | number }} u.</span>
+        </div>
+      </div>
+      <div class="retreat-actions">
+        <button class="map-button" (click)="centerOnArmy.emit(army.id)" title="Visualizza sulla mappa" aria-label="Centra mappa su armata in ritirata">
+          <ion-icon name="locate-outline"></ion-icon> MAPPA
+        </button>
+      </div>
+    </article>
+  </div>
+
+  <!-- Decisioni tattiche richieste -->
   <article class="decision-card" *ngFor="let decision of tacticalDecisions">
     <span class="combat-eyebrow">DECISIONE RICHIESTA</span>
     <strong>{{ decision.message }}</strong>
@@ -48,4 +95,5 @@
       </button>
     </div>
   </article>
+
 </section>

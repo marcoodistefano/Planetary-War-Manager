@@ -481,6 +481,38 @@ export class ArmyModalComponent implements OnInit, OnDestroy, OnChanges {
     delete this.armyComposition[troopKey];
   }
 
+  /** Validazione inline della composizione armata in creazione */
+  get compositionValidation(): { isValid: boolean; totalUnits: number; errorMsg: string | null; speedInfo: { name: string; kmh: number } | null } {
+    const entries = Object.entries(this.armyComposition).filter(([, v]) => Number(v) > 0);
+    const totalUnits = entries.reduce((sum, [, v]) => sum + Number(v), 0);
+
+    if (entries.length === 0 || totalUnits === 0) {
+      return { isValid: false, totalUnits: 0, errorMsg: 'Aggiungi almeno un\'unità per creare l\'armata.', speedInfo: null };
+    }
+
+    return { isValid: true, totalUnits, errorMsg: null, speedInfo: this.getSlowestUnitKmh() };
+  }
+
+  /** Trova l'unità più lenta nella composizione corrente e ne restituisce nome e velocità in km/h */
+  private getSlowestUnitKmh(): { name: string; kmh: number } | null {
+    const truppeLines = this.gameRules?.sheets?.find((s: any) => s.name === 'Truppe' || s.name === 'truppe')?.lines;
+    if (!truppeLines) return null;
+
+    const BASE_KMH = 10;
+    let slowest: { name: string; kmh: number } | null = null;
+
+    for (const [unitId, qty] of Object.entries(this.armyComposition)) {
+      if (!qty || Number(qty) <= 0) continue;
+      const rule = truppeLines.find((l: any) => l.id_truppa === unitId);
+      if (!rule || rule.dominio !== 1 || !(rule.velocita > 0)) continue; // solo terra
+      const kmh = rule.velocita * BASE_KMH;
+      if (!slowest || kmh < slowest.kmh) {
+        slowest = { name: rule.nome || unitId, kmh };
+      }
+    }
+    return slowest;
+  }
+
   saveFormationTemplate() {
     const name = this.templateName.trim();
     if (!name || this.armyCompositionEntries.length === 0) return;

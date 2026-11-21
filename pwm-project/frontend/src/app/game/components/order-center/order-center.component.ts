@@ -14,9 +14,11 @@ export class OrderCenterComponent implements OnInit, OnDestroy {
   @Input() armies: any[] = [];
   @Input() username = '';
   @Input() orderEvents: Record<string, Array<{ label: string; timestamp: string }>> = {};
+  @Input() missionQueues: Record<string, any[]> = {};
   @Output() close = new EventEmitter<void>();
   @Output() centerOnArmy = new EventEmitter<string>();
   @Output() cancelMission = new EventEmitter<string>();
+  @Output() removeFromQueue = new EventEmitter<{ armyId: string; index: number }>();
 
   statusFilter: 'all' | 'moving' | 'combat' | 'returning' = 'all';
 
@@ -52,6 +54,16 @@ export class OrderCenterComponent implements OnInit, OnDestroy {
       if (this.statusFilter === 'returning') return ['retreating', 'returning', 'cooldown'].includes(state);
       return ['moving', 'moving_to_border', 'Pronto alla conquista', "Pronto all'attacco"].includes(state);
     });
+  }
+
+  getFilterCount(filter: 'all' | 'moving' | 'combat' | 'returning'): number {
+    if (filter === 'all') return this.activeOrders.length;
+    return this.activeOrders.filter(army => {
+      const state = army.state || army.status;
+      if (filter === 'combat') return ['combat', 'combattimento', 'in combattimento', 'engaging'].includes(state);
+      if (filter === 'returning') return ['retreating', 'returning', 'cooldown'].includes(state);
+      return ['moving', 'moving_to_border', 'Pronto alla conquista', "Pronto all'attacco"].includes(state);
+    }).length;
   }
 
   isActive(army: any): boolean {
@@ -99,6 +111,16 @@ export class OrderCenterComponent implements OnInit, OnDestroy {
   getLastEvent(army: any): { label: string; timestamp: string } | null {
     const events = this.orderEvents[army.id] || [];
     return events.length > 0 ? events[events.length - 1] : null;
+  }
+
+  getQueueForArmy(army: any): any[] {
+    return this.missionQueues[army.id] || [];
+  }
+
+  getQueuedMissionLabel(mission: any): string {
+    if (mission.mode === 'conquer' || mission.type === 'conquer') return 'Conquista';
+    if (mission.mode === 'return') return 'Rientro';
+    return 'Spostamento';
   }
 
   getEtaLabel(army: any): string {

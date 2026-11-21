@@ -138,6 +138,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   isRankingsModalOpen = false;
   isChatOpen = false;
   tacticalDecisions: any[] = [];
+
+  // --- STATI DI CONNESSIONE E OPERATIVI (FASE UX-1 / UX-2) ---
+  connectionState: 'online' | 'syncing' | 'reconnecting' | 'offline' = 'syncing';
+  connectionStatusMessage: string = 'Inizializzazione connessione tattica...';
+  showConnectionBanner: boolean = false;
+  private connectionBannerTimer?: any;
+  isCalculatingPreview: boolean = false;
+  isSubmittingOrder: boolean = false;
   combatEvents: any[] = [];
 
   get myCapitalName(): string {
@@ -909,6 +917,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
 
           if (parsed.type === 'ORDER_ACCEPTED') {
+            this.isSubmittingOrder = false;
             this.recordOrderEvent(parsed.data?.armyId, 'Ordine accettato');
             this.toastCtrl.create({
               message: 'Ordine accettato e messo in esecuzione.',
@@ -919,6 +928,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
 
           if (parsed.type === 'ORDER_DUPLICATE') {
+            this.isSubmittingOrder = false;
             this.recordOrderEvent(parsed.data?.armyId, 'Ordine duplicato ignorato');
             this.toastCtrl.create({
               message: 'Questo ordine e gia stato ricevuto.',
@@ -1152,6 +1162,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
 
           if (parsed.type === 'PATH_PREVIEW_RESULT') {
+            this.isCalculatingPreview = false;
             const results = parsed.data;
             if (results && results.length > 0) {
               this.totalPreviewDistance = results.reduce((acc: number, r: any) => acc + (r.distanceKm || 0), 0);
@@ -1328,6 +1339,8 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           }
 
           if (parsed.type === 'ERROR') {
+            this.isSubmittingOrder = false;
+            this.isCalculatingPreview = false;
             console.error("[WS ERROR RICEVUTO]:", parsed);
             if (parsed.data?.armyId || parsed.armyId) {
               this.recordOrderEvent(parsed.data?.armyId || parsed.armyId, parsed.error || 'Ordine rifiutato');
@@ -1370,10 +1383,23 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
           this.connStatusSub = undefined;
         }
         this.connStatusSub = this.matchState.connectionStatus$.subscribe(isConnected => {
-          if (!isConnected && this.shouldReconnect) {
-            // console.log('[WS_MATCH] Riconnessione in corso tra 3 secondi...');
-            this.reconnectTimer = window.setTimeout(() => this.connectMatchSocket(), 3000);
-          }
+          this.ngZone.run(() => {
+            if (isConnected) {
+              this.connectionState = 'online';
+              this.connectionStatusMessage = 'STATO SINCRONIZZATO';
+              this.triggerConnectionBanner(2500);
+            } else if (this.shouldReconnect) {
+              this.connectionState = 'reconnecting';
+              this.connectionStatusMessage = 'RICONNESSIONE AL SERVER IN CORSO...';
+              this.showConnectionBanner = true;
+              this.reconnectTimer = window.setTimeout(() => this.connectMatchSocket(), 3000);
+            } else {
+              this.connectionState = 'offline';
+              this.connectionStatusMessage = 'DISCONNESSO';
+              this.showConnectionBanner = true;
+            }
+            this.cdr.detectChanges();
+          });
         });
       }); // Close ngZone.runOutsideAngular
     } catch (error) {
@@ -1702,6 +1728,15 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   cancelArmyMission(armyId: string) {
     this.missionQueues = { ...this.missionQueues, [armyId]: [] };
     this.onArmyMissionRequested({ armyId, mode: 'cancel' });
+  }
+
+  removeQueuedMission(event: { armyId: string; index: number }) {
+    const { armyId, index } = event;
+    const queue = this.missionQueues[armyId] || [];
+    if (index < 0 || index >= queue.length) return;
+    const updated = [...queue.slice(0, index), ...queue.slice(index + 1)];
+    this.missionQueues = { ...this.missionQueues, [armyId]: updated };
+    this.cdr.markForCheck();
   }
 
   openArmyModalFromRadial() {
@@ -2188,7 +2223,37 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       selectionBox = null;
       startPoint = null;
       this.map.dragPan.enable();
+      // Aggiorna l'highlight visivo dopo il box-select
+      this.updateArmySelectionHighlights();
+      if (selectedIds.length === 0) {
+        this.toastCtrl.create({
+          message: 'Nessuna armata nell\'area selezionata.',
+          duration: 1800,
+          position: 'top',
+          color: 'medium',
+          icon: 'information-circle-outline'
+        }).then(t => t.present());
+      } else {
+        this.toastCtrl.create({
+          message: `${selectedIds.length} armat${selectedIds.length === 1 ? 'a selezionata' : 'e selezionate'}.`,
+          duration: 1800,
+          position: 'top',
+          color: 'secondary'
+        }).then(t => t.present());
+      }
       this.cdr.detectChanges();
+    });
+  }
+
+  /** Aggiorna in modo efficiente l'highlight visivo (classe CSS) su tutti i marker delle armate
+   *  in base all'array corrente selectedArmiesForMovement, senza chiamare renderArmies() completo. */
+  private updateArmySelectionHighlights(): void {
+    const selectedSet = new Set(this.selectedArmiesForMovement);
+    this.armyMarkers.forEach((marker, armyId) => {
+      const container = marker.getElement().querySelector('.army-container') as HTMLElement | null;
+      if (container) {
+        container.classList.toggle('army-selected', selectedSet.has(armyId));
+      }
     });
   }
 
@@ -2892,8 +2957,12 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
         // Salviamo info per il clustering
         marker.troopsData = { total: totalTroops, id: army.id, isAirOrSea: this.isAirOrSeaArmy(army) };
 
-        // Aggiorniamo i listener esistenti? MapLibre riutilizza il DOM, 
-        // quindi gli event listener precedentemente agganciati continuano a funzionare.
+        // Sincronizza la classe di selezione visiva sul container esistente
+        const existingContainer = marker.getElement().querySelector('.army-container') as HTMLElement;
+        if (existingContainer) {
+          const isSelected = this.selectedArmiesForMovement.includes(army.id);
+          existingContainer.classList.toggle('army-selected', isSelected);
+        }
       } else {
         // Il root element fornito a MapLibre deve essere 0x0 pixel senza anchor automatico,
         // altrimenti cambiando la dimensione del figlio, MapLibre si sfasa dal nodo.
@@ -3078,6 +3147,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                 }).then(t => t.present());
                 this.selectedArmiesForMovement = [];
                 this.previousSelectedArmiesForMovement = [];
+                this.updateArmySelectionHighlights();
                 return; // Non selezionare la truppa nemica
               }
 
@@ -3089,6 +3159,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                   this.previousSelectedArmiesForMovement = [...this.selectedArmiesForMovement];
                   this.selectedArmiesForMovement = [army.id];
                   this.selectedArmyId = army.id;
+                  this.updateArmySelectionHighlights();
                 }
 
                 const popupHtml = `
@@ -3138,6 +3209,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
                       const newSelection = new Set([...this.previousSelectedArmiesForMovement, army.id]);
                       this.selectedArmiesForMovement = Array.from(newSelection);
                       this.previousSelectedArmiesForMovement = [...this.selectedArmiesForMovement];
+                      this.updateArmySelectionHighlights();
 
                       popup.remove();
                       if (this.activeArmyPopup === popup) this.activeArmyPopup = null;
@@ -3161,6 +3233,11 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
             }, 250);
           }
         });
+
+        // Applica immediatamente la classe di selezione visiva sul nuovo marker
+        if (this.selectedArmiesForMovement.includes(army.id)) {
+          container.classList.add('army-selected');
+        }
 
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([markerCoords[0], markerCoords[1]])
@@ -4157,7 +4234,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   confirmPendingMissions() {
-    if (!this.pendingMissions || this.pendingMissions.length === 0) return;
+    if (!this.pendingMissions || this.pendingMissions.length === 0 || this.isSubmittingOrder) return;
 
     if (this.previewRequiresWarDeclaration && !this.showWarDeclarationConfirm) {
       this.showWarDeclarationConfirm = true;
@@ -4165,16 +4242,10 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    this.isSubmittingOrder = true;
     this.pendingMissions.forEach(missionData => {
       this.onArmyMissionRequested(missionData);
     });
-
-    this.toastCtrl.create({
-      message: `Ordine inviato per ${this.pendingMissions.length} armate.`,
-      duration: 2000,
-      position: 'top',
-      color: 'success'
-    }).then(t => t.present());
 
     this.cancelPendingMissions();
   }
@@ -4236,6 +4307,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
     this.selectedArmiesForMovement = group.armyIds.filter(id => availableIds.has(id));
     this.previousSelectedArmiesForMovement = [...this.selectedArmiesForMovement];
     this.selectedGroupName = name;
+    this.updateArmySelectionHighlights();
   }
 
   deleteArmyGroup() {
@@ -4307,12 +4379,14 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
     this.selectedArmiesForMovement = [];
     this.previousSelectedArmiesForMovement = [];
+    this.updateArmySelectionHighlights();
   }
 
   clearArmySelection() {
     this.selectedArmiesForMovement = [];
     this.previousSelectedArmiesForMovement = [];
     this.selectedArmyId = '';
+    this.updateArmySelectionHighlights();
     if (this.activeArmyPopup) {
       this.activeArmyPopup.remove();
       this.activeArmyPopup = null;
@@ -4374,6 +4448,7 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
 
   recalculatePreview() {
     if (!this.pendingMissions || this.pendingMissions.length === 0) return;
+    this.isCalculatingPreview = true;
     this.pendingMissions.forEach(m => {
       m.waypoints = [...this.selectedWaypoints];
     });
@@ -5059,6 +5134,17 @@ export class MatchPage implements OnInit, AfterViewInit, OnDestroy {
       console.log('Tactical decision sent:', choice);
     })
     .catch((err: any) => console.error('Error sending tactical decision', err));
+  }
+
+  triggerConnectionBanner(durationMs = 2500) {
+    this.showConnectionBanner = true;
+    if (this.connectionBannerTimer) {
+      clearTimeout(this.connectionBannerTimer);
+    }
+    this.connectionBannerTimer = setTimeout(() => {
+      this.showConnectionBanner = false;
+      this.cdr.detectChanges();
+    }, durationMs);
   }
 
 

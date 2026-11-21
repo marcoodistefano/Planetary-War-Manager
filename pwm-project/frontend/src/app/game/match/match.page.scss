@@ -32,6 +32,106 @@
 }
 
 /* ==========================================================================
+   CONNECTION STATUS BANNER (FASE UX-1)
+   ========================================================================== */
+.connection-status-banner {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  animation: slideDownBanner 0.25s ease-out;
+
+  .status-indicator-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  &.online {
+    background: rgba(16, 40, 24, 0.92);
+    border: 1px solid rgba(63, 185, 80, 0.5);
+    color: #a3e635;
+
+    .status-indicator-dot {
+      background: #3fb950;
+      box-shadow: 0 0 8px #3fb950;
+    }
+  }
+
+  &.syncing {
+    background: rgba(10, 24, 45, 0.92);
+    border: 1px solid rgba(88, 166, 255, 0.5);
+    color: #86d7ff;
+
+    .status-indicator-dot {
+      background: #58a6ff;
+      box-shadow: 0 0 8px #58a6ff;
+      animation: pulse 1.2s infinite;
+    }
+  }
+
+  &.reconnecting {
+    background: rgba(45, 30, 10, 0.92);
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    color: #fde047;
+
+    .status-indicator-dot {
+      background: #f59e0b;
+      box-shadow: 0 0 8px #f59e0b;
+      animation: pulse 0.8s infinite;
+    }
+  }
+
+  &.offline {
+    background: rgba(45, 12, 16, 0.92);
+    border: 1px solid rgba(255, 123, 114, 0.5);
+    color: #ff7b72;
+
+    .status-indicator-dot {
+      background: #ff7b72;
+      box-shadow: 0 0 8px #ff7b72;
+    }
+  }
+}
+
+@keyframes slideDownBanner {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -15px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.rotating {
+  animation: spinIcon 1s linear infinite;
+}
+
+@keyframes spinIcon {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
    2. MAPPA E OVERLAY SFONDO
    ========================================================================== */
 #map-container {
@@ -1696,6 +1796,22 @@ ion-menu {
   border: 1px solid #67e8f9;
   background: rgba(34, 211, 238, 0.14);
   box-shadow: 0 0 12px rgba(34, 211, 238, 0.25);
+}
+
+// Highlight visivo persistente sulle armate selezionate
+:global(.army-container.army-selected) {
+  outline: 2.5px solid #22d3ee;
+  outline-offset: 3px;
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 3px rgba(34, 211, 238, 0.35),
+    0 0 10px rgba(34, 211, 238, 0.5);
+  animation: army-selected-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes army-selected-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.35), 0 0 10px rgba(34, 211, 238, 0.5); }
+  50%       { box-shadow: 0 0 0 5px rgba(34, 211, 238, 0.15), 0 0 18px rgba(34, 211, 238, 0.7); }
 }
 
 .army-group-controls {

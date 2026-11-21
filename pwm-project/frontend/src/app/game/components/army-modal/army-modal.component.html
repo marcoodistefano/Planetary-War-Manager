@@ -110,6 +110,21 @@
                     <ion-icon name="close-outline"></ion-icon>
                   </button>
                 </div>
+
+                <!-- Info velocità convoglio -->
+                <div class="convoy-speed-info" *ngIf="compositionValidation.speedInfo as speed">
+                  <ion-icon name="speedometer-outline"></ion-icon>
+                  <span>
+                    Velocità convoglio: <strong>{{ speed.kmh }} km/h</strong>
+                    <em>(limitata da {{ speed.name }})</em>
+                  </span>
+                </div>
+              </div>
+
+              <!-- Banner validazione composizione vuota -->
+              <div class="composition-empty-banner" *ngIf="armyCompositionEntries.length === 0 && compositionValidation.errorMsg">
+                <ion-icon name="warning-outline"></ion-icon>
+                <span>{{ compositionValidation.errorMsg }}</span>
               </div>
 
               <div class="formation-templates">
@@ -135,7 +150,10 @@
                 </div>
               </div>
 
-              <button class="primary-glow" (click)="createArmy()" [disabled]="armyCompositionEntries.length === 0">
+              <button class="primary-glow" (click)="createArmy()"
+                [disabled]="!compositionValidation.isValid"
+                [title]="compositionValidation.errorMsg || 'Crea nuova armata'"
+                [attr.aria-disabled]="!compositionValidation.isValid">
                 CREA NUOVA ARMATA
               </button>
               <button class="reinforce-action" *ngIf="selectedArmy && (selectedArmy.status === 'standby' || selectedArmy.state === 'standby')"

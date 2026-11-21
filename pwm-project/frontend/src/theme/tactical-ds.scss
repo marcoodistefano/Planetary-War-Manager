@@ -1,0 +1,48 @@
+// ==============================================================================
+// PWM TACTICAL DESIGN SYSTEM - VARIABILI & REGOLE VISIVE (FASE UX-0)
+// ==============================================================================
+
+:root {
+  // --- Superfici e Fondi ---
+  --pwm-surface-base: rgba(8, 14, 26, 0.94);
+  --pwm-surface-elevated: rgba(13, 24, 44, 0.96);
+  --pwm-surface-card: rgba(16, 28, 52, 0.78);
+  --pwm-surface-input: rgba(4, 9, 18, 0.85);
+  --pwm-surface-overlay: rgba(2, 6, 12, 0.82);
+
+  // --- Bordi ---
+  --pwm-border-neutral: rgba(95, 208, 255, 0.18);
+  --pwm-border-subtle: rgba(255, 255, 255, 0.08);
+  --pwm-border-info: rgba(88, 166, 255, 0.45);
+  --pwm-border-positive: rgba(63, 185, 80, 0.45);
+  --pwm-border-warning: rgba(245, 158, 11, 0.50);
+  --pwm-border-danger: rgba(255, 123, 114, 0.50);
+
+  // --- Stati semantici ---
+  --pwm-color-info: #58a6ff;
+  --pwm-color-info-rgb: 88, 166, 255;
+  --pwm-color-positive: #3fb950;
+  --pwm-color-positive-rgb: 63, 185, 80;
+  --pwm-color-warning: #f59e0b;
+  --pwm-color-warning-rgb: 245, 158, 11;
+  --pwm-color-danger: #ff7b72;
+  --pwm-color-danger-rgb: 255, 123, 114;
+
+  // --- Tipografia e Colori Testo ---
+  --pwm-text-primary: #f0f6fc;
+  --pwm-text-secondary: #8b949e;
+  --pwm-text-muted: rgba(255, 255, 255, 0.45);
+  --pwm-text-disabled: rgba(255, 255, 255, 0.25);
+  --pwm-font-tactical: 'Courier New', Courier, monospace;
+
+  // --- Raggi di curvatura standard ---
+  --pwm-radius-xs: 4px;
+  --pwm-radius-sm: 8px;
+  --pwm-radius-md: 12px;
+  --pwm-radius-lg: 16px;
+  --pwm-radius-pill: 9999px;
+
+  // --- Ombre tattiche ---
+  --pwm-shadow-card: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 16px rgba(88, 166, 255, 0.12);
+  --pwm-shadow-glow: 0 0 15px rgba(88, 166, 255, 0.28);
+}
